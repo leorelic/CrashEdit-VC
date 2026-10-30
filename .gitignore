@@ -1,7 +1,7 @@
-!.gitignore
-*.suo
+/build/
+/cmake-build-*/
+.vs/
+.idea/
 *.user
-bin
-obj
-.vs
-.idea/*
+*.suo
+imgui.ini
