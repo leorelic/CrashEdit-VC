@@ -6,7 +6,6 @@ option(CRASHEDIT_BUILD_TESTS "Build CrashEdit format tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
 if(MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
@@ -15,12 +14,16 @@ if(CRASHEDIT_BUILD_APP)
   include(FetchContent)
   find_package(OpenGL REQUIRED)
   FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG d682dc41f58b98c9343ffbaa7d94f07e9024b3ca GIT_SHALLOW FALSE)
+  FetchContent_GetProperties(imgui)
+  if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+  endif()
   FetchContent_Declare(glfw GIT_REPOSITORY https://github.com/glfw/glfw.git GIT_TAG 3.4 GIT_SHALLOW TRUE)
   set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
   set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(imgui glfw)
+  FetchContent_MakeAvailable(glfw)
 
   add_library(crashedit_imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -30,7 +33,7 @@ if(CRASHEDIT_BUILD_APP)
   target_include_directories(crashedit_imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
   target_link_libraries(crashedit_imgui PUBLIC glfw OpenGL::GL)
 
-  add_executable(CrashEdit WIN32
+  add_executable(CrashEdit
     src/main.cpp src/app/application.cpp src/core/workspace.cpp
     src/crash/formats/nsf/nsf_archive.cpp src/ui/editor_ui.cpp)
   target_include_directories(CrashEdit PRIVATE src)
