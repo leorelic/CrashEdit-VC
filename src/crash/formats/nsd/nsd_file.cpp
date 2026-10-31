@@ -220,11 +220,7 @@ bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) co
         writeI32(tail, 16, unknown);
         for (std::size_t i = 0; i < goolMap.size(); ++i) writeI32(tail, 20 + i * 4, goolMap[i]);
         output.insert(output.end(), tail.begin(), tail.end());
-        const std::size_t oldExtraOffset = 0x634U + oldIndexBytes;
-        if (!rangeFits(originalData.size(), oldExtraOffset, originalData.size() - oldExtraOffset)) {
-            error = "Old NSD trailing data is invalid."; return false;
-        }
-        output.insert(output.end(), originalData.begin() + static_cast<std::ptrdiff_t>(oldExtraOffset), originalData.end());
+        output.insert(output.end(), extraData.begin(), extraData.end());
     } else {
         const std::size_t goolCount = variant == NsdVariant::Crash3 ? 128U : 64U;
         if (goolMap.size() != goolCount) { error = "NSD GOOL map has an invalid size for this variant."; return false; }
@@ -239,7 +235,9 @@ bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) co
         writeI32(tail, 4, blank);
         writeI32(tail, 8, id);
         writeI32(tail, 12, entityCount);
+        if (extraData.size() != 0xCCU) { error = "NSD extra-data section must contain 0xCC bytes."; return false; }
         for (std::size_t i = 0; i < goolMap.size(); ++i) writeI32(tail, 16 + i * 4, goolMap[i]);
+        std::copy(extraData.begin(), extraData.end(), tail.begin() + static_cast<std::ptrdiff_t>(16 + goolCount * 4));
         output.insert(output.end(), tail.begin(), tail.end());
 
         for (const auto& spawn : spawns) {
