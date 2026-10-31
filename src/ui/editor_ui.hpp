@@ -16,7 +16,7 @@ private:
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
- int sceneMoveSpeed_=50;
+ int sceneMoveSpeed_=100;
  std::uint32_t sceneCameraZoneEid_=0;
  char path_[1024]{};
  std::filesystem::path nsfPath_,nsdPath_;
