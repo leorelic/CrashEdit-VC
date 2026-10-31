@@ -8,8 +8,11 @@
 #include <imgui_impl_opengl3.h>
 #include <iostream>
 #include <filesystem>
+#include <cstdint>
+#include <string>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
