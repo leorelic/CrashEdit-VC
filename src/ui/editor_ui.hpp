@@ -2,7 +2,8 @@
 #include "core/workspace.hpp"
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/nsd/nsd_file.hpp"
-#include <string>\n#include <map>
+#include <string>
+#include <map>
 namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {
@@ -11,7 +12,10 @@ public:
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
- unsigned int hierarchyIcon(const char* name);\n std::map<std::string,unsigned int> hierarchyIcons_;\n bool hierarchyIconsLoaded_=false;\n Workspace& workspace_;
+ unsigned int hierarchyIcon(const char* name);
+ std::map<std::string,unsigned int> hierarchyIcons_;
+ bool hierarchyIconsLoaded_=false;
+ Workspace& workspace_;
  bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true,textureViewer_=true,clutEditor_=true,entityDataChanged_=false;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;

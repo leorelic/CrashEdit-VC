@@ -20,7 +20,18 @@ if(CRASHEDIT_BUILD_APP)
         GIT_TAG docking
         GIT_SHALLOW TRUE
     )
-    FetchContent_Declare(\n        stb\n        GIT_REPOSITORY https://github.com/nothings/stb.git\n        GIT_TAG master\n        GIT_SHALLOW TRUE\n    )\n    FetchContent_GetProperties(stb)\n    if(NOT stb_POPULATED)\n        FetchContent_Populate(stb)\n    endif()\n\n    FetchContent_GetProperties(imgui)
+    FetchContent_Declare(
+        stb
+        GIT_REPOSITORY https://github.com/nothings/stb.git
+        GIT_TAG master
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(stb)
+    if(NOT stb_POPULATED)
+        FetchContent_Populate(stb)
+    endif()
+
+    FetchContent_GetProperties(imgui)
     if(NOT imgui_POPULATED)
         FetchContent_Populate(imgui)
     endif()
@@ -59,7 +70,12 @@ if(CRASHEDIT_BUILD_APP)
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
     )
-    target_include_directories(CrashEdit PRIVATE src ${stb_SOURCE_DIR})\n    target_compile_definitions(CrashEdit PRIVATE CRASHEDIT_SOURCE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images")\n    add_custom_command(TARGET CrashEdit POST_BUILD\n        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"\n        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images" "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"\n    )
+    target_include_directories(CrashEdit PRIVATE src ${stb_SOURCE_DIR})
+    target_compile_definitions(CrashEdit PRIVATE CRASHEDIT_SOURCE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images")
+    add_custom_command(TARGET CrashEdit POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images" "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"
+    )
     target_link_libraries(CrashEdit PRIVATE crashedit_imgui glfw OpenGL::GL)
     if(WIN32)
         target_link_libraries(CrashEdit PRIVATE comdlg32)
@@ -77,7 +93,8 @@ if(CRASHEDIT_BUILD_APP)
         endif()
     endif()
 
-    install(TARGETS CrashEdit RUNTIME DESTINATION . BUNDLE DESTINATION .)\n    install(DIRECTORY Embeds/Images/ DESTINATION Assets/Images)
+    install(TARGETS CrashEdit RUNTIME DESTINATION . BUNDLE DESTINATION .)
+    install(DIRECTORY Embeds/Images/ DESTINATION Assets/Images)
 endif()
 
 if(CRASHEDIT_BUILD_TESTS)
