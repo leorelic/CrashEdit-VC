@@ -39,6 +39,7 @@ CRASHEDIT_GL_PROC(void, Uniform1i, (int, int));
 
 CRASHEDIT_GL_PROC(void, EnableVertexAttribArray, (unsigned int));
 CRASHEDIT_GL_PROC(void, VertexAttribPointer, (unsigned int, int, unsigned int, unsigned char, int, const void*));
+CRASHEDIT_GL_PROC(void, DrawArrays, (unsigned int, int, int));
 CRASHEDIT_GL_PROC(void, DrawElements, (unsigned int, int, unsigned int, const void*));
 
 CRASHEDIT_GL_PROC(void, GenTextures, (int, unsigned int*));
@@ -48,11 +49,17 @@ CRASHEDIT_GL_PROC(void, ActiveTexture, (unsigned int));
 CRASHEDIT_GL_PROC(void, TexParameteri, (unsigned int, unsigned int, int));
 CRASHEDIT_GL_PROC(void, TexImage2D, (unsigned int, int, int, int, int, int, unsigned int, unsigned int, const void*));
 CRASHEDIT_GL_PROC(void, PixelStorei, (unsigned int, int));
+CRASHEDIT_GL_PROC(void, GenRenderbuffers, (int, unsigned int*));
+CRASHEDIT_GL_PROC(void, BindRenderbuffer, (unsigned int, unsigned int));
+CRASHEDIT_GL_PROC(void, DeleteRenderbuffers, (int, const unsigned int*));
+CRASHEDIT_GL_PROC(void, RenderbufferStorage, (unsigned int, unsigned int, int, int));
+CRASHEDIT_GL_PROC(void, FramebufferRenderbuffer, (unsigned int, unsigned int, unsigned int, unsigned int));
 CRASHEDIT_GL_PROC(void, GenFramebuffers, (int, unsigned int*));
 CRASHEDIT_GL_PROC(void, BindFramebuffer, (unsigned int, unsigned int));
 CRASHEDIT_GL_PROC(void, DeleteFramebuffers, (int, const unsigned int*));
 CRASHEDIT_GL_PROC(void, FramebufferTexture2D, (unsigned int, unsigned int, unsigned int, unsigned int, int));
 CRASHEDIT_GL_PROC(unsigned int, CheckFramebufferStatus, (unsigned int));
+CRASHEDIT_GL_PROC(void, GetIntegerv, (unsigned int, int*));
 CRASHEDIT_GL_PROC(void, Viewport, (int, int, int, int));
 CRASHEDIT_GL_PROC(void, ClearColor, (float, float, float, float));
 CRASHEDIT_GL_PROC(void, Clear, (unsigned int));
@@ -93,6 +100,7 @@ inline bool load(std::string& error) {
     CRASHEDIT_LOAD_GL(Uniform1i)
     CRASHEDIT_LOAD_GL(EnableVertexAttribArray)
     CRASHEDIT_LOAD_GL(VertexAttribPointer)
+    CRASHEDIT_LOAD_GL(DrawArrays)
     CRASHEDIT_LOAD_GL(DrawElements)
     CRASHEDIT_LOAD_GL(GenTextures)
     CRASHEDIT_LOAD_GL(BindTexture)
@@ -101,11 +109,17 @@ inline bool load(std::string& error) {
     CRASHEDIT_LOAD_GL(TexParameteri)
     CRASHEDIT_LOAD_GL(TexImage2D)
     CRASHEDIT_LOAD_GL(PixelStorei)
+    CRASHEDIT_LOAD_GL(GenRenderbuffers)
+    CRASHEDIT_LOAD_GL(BindRenderbuffer)
+    CRASHEDIT_LOAD_GL(DeleteRenderbuffers)
+    CRASHEDIT_LOAD_GL(RenderbufferStorage)
+    CRASHEDIT_LOAD_GL(FramebufferRenderbuffer)
     CRASHEDIT_LOAD_GL(GenFramebuffers)
     CRASHEDIT_LOAD_GL(BindFramebuffer)
     CRASHEDIT_LOAD_GL(DeleteFramebuffers)
     CRASHEDIT_LOAD_GL(FramebufferTexture2D)
     CRASHEDIT_LOAD_GL(CheckFramebufferStatus)
+    CRASHEDIT_LOAD_GL(GetIntegerv)
     CRASHEDIT_LOAD_GL(Viewport)
     CRASHEDIT_LOAD_GL(ClearColor)
     CRASHEDIT_LOAD_GL(Clear)
