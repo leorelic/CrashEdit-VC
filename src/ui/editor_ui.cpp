@@ -212,7 +212,7 @@ void EditorUI::drawViewport(){
  if(!sceneryEntries.empty()){
   for(const auto*entry:sceneryEntries){
      const auto&sc=entry->scenery;
-     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];if(sc.isSky)return {float(v.x)*16.0f/400.0f+sceneTargetX_,float(v.y)*16.0f/400.0f+sceneTargetY_,float(v.z)*16.0f/400.0f+sceneTargetZ_};return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
+     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];if(sc.isSky){const float cp=std::cos(scenePitch_),sp=std::sin(scenePitch_),cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);const float cameraX=sceneDistance_*cp*sy,cameraY=sceneDistance_*sp,cameraZ=sceneDistance_*cp*cy;return {float(v.x)*16.0f/400.0f+sceneTargetX_+cameraX,float(v.y)*16.0f/400.0f+sceneTargetY_+cameraY,float(v.z)*16.0f/400.0f+sceneTargetZ_+cameraZ};}return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
      auto vertexColor=[&](std::uint16_t index)->ImU32{
       const auto&v=sc.vertices[index];
       if(v.colorIndex<sc.colors.size()){const auto&c=sc.colors[v.colorIndex];return IM_COL32(c.r,c.g,c.b,255);}
