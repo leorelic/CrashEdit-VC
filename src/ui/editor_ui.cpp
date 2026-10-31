@@ -117,7 +117,7 @@ void EditorUI::drawViewport(){
  }
  struct V3{float x=0,y=0,z=0;};
  struct Projected{float x=0,y=0,depth=0;};
- struct Face{Projected p[3];ImU32 colors[3]{};float depth=0;};
+ struct Face{Projected p[3];ImU32 colors[3]{};ImVec2 uv[3]{};const std::vector<std::uint8_t>*page=nullptr;int colorMode=0,blendMode=0,clutX=0,clutY=0;float depth=0;};
  std::vector<Face>faces;
  std::size_t sceneryCount=0,vertexCount=0,faceCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
@@ -208,17 +208,19 @@ void EditorUI::drawViewport(){
       if(v.colorIndex<sc.colors.size()){const auto&c=sc.colors[v.colorIndex];return IM_COL32(c.r,c.g,c.b,255);}
       return IM_COL32(180,0,180,255);
      };
-     auto addFace=[&](std::uint16_t ia,std::uint16_t ib,std::uint16_t ic){
+     auto addFace=[&](std::uint16_t ia,std::uint16_t ib,std::uint16_t ic,const Crash::NsfSceneryTexture*tex,int uvA,int uvB,int uvC){
       if(ia>=sc.vertices.size()||ib>=sc.vertices.size()||ic>=sc.vertices.size())return;
       const auto pa=project(vertexPosition(ia)),pb=project(vertexPosition(ib)),pc=project(vertexPosition(ic));
       if(pa.depth<=0.05f||pb.depth<=0.05f||pc.depth<=0.05f)return;
       const float minX=std::min({pa.x,pb.x,pc.x}),maxX=std::max({pa.x,pb.x,pc.x});
       const float minY=std::min({pa.y,pb.y,pc.y}),maxY=std::max({pa.y,pb.y,pc.y});
       if(maxX<canvasMin.x||minX>canvasMax.x||maxY<canvasMin.y||minY>canvasMax.y)return;
-      Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;faces.push_back(f);
+      Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;
+      if(tex){f.colorMode=tex->colorMode;f.blendMode=tex->blendMode;f.clutX=tex->clutX;f.clutY=(tex->clutY2<<2)|((tex->clutY1>>2)&3);const std::uint32_t pageEid=tex->page<sc.texturePageEids.size()?sc.texturePageEids[tex->page]:0U;for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536&&chunk.bytes.size()>=8){const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8)|(std::uint32_t(chunk.bytes[6])<<16)|(std::uint32_t(chunk.bytes[7])<<24);if(pageId==pageEid){f.page=&chunk.bytes;break;}}const int xoff=(1<<(2-std::min<int>(tex->colorMode,2)))*64*tex->segment;const float us[4]={float(tex->u1)+xoff,float(tex->u2)+xoff,float(tex->u3)+xoff,float(tex->u4)+xoff};const float vs[4]={float(tex->v1),float(tex->v2),float(tex->v3),float(tex->v4)};auto uv=[&](int k,bool u){const float*vals=u?us:vs;float value=vals[k];const float lo=std::min({vals[0],vals[1],vals[2]}),hi=std::max({vals[0],vals[1],vals[2]});if(value>lo&&value<hi)value+=1.0f;else if(value==hi&&hi!=lo)value+=1.0f;return value;};f.uv[0]=ImVec2(uv(uvA,true),uv(uvA,false));f.uv[1]=ImVec2(uv(uvB,true),uv(uvB,false));f.uv[2]=ImVec2(uv(uvC,true),uv(uvC,false));}
+      faces.push_back(f);
      };
-     for(const auto&t:sc.triangles)addFace(t.a,t.b,t.c);
-     for(const auto&q:sc.quads){addFace(q.a,q.b,q.c);addFace(q.a,q.c,q.d);}
+     for(const auto&t:sc.triangles){const Crash::NsfSceneryTexture*tex=nullptr;if(!t.animated&&t.textureIndex>0&&static_cast<std::size_t>(t.textureIndex-1)<sc.textures.size())tex=&sc.textures[t.textureIndex-1];addFace(t.a,t.b,t.c,tex,1,0,2);}
+     for(const auto&q:sc.quads){const Crash::NsfSceneryTexture*tex=nullptr;if(!q.animated&&q.textureIndex>0&&static_cast<std::size_t>(q.textureIndex-1)<sc.textures.size())tex=&sc.textures[q.textureIndex-1];addFace(q.a,q.b,q.c,tex,1,0,2);addFace(q.a,q.c,q.d,tex,1,3,2);}
   }
   std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
@@ -230,17 +232,18 @@ void EditorUI::drawViewport(){
    const float sum=qa+qb+qc;
    if(sum>0.0f){wa=qa/sum;wb=qb/sum;wc=qc/sum;}
    const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};
-   return IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);
+   ImU32 base=IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);if(!f.page)return base;const ImU32 tex=sampleTexture(f,f.uv[0].x*wa+f.uv[1].x*wb+f.uv[2].x*wc,f.uv[0].y*wa+f.uv[1].y*wb+f.uv[2].y*wc);if((tex>>24)==0)return IM_COL32(0,0,0,0);const auto mul=[&](int sh){return static_cast<unsigned char>(std::min(255U,(((base>>sh)&255U)*((tex>>sh)&255U)*2U)/255U));};return IM_COL32(mul(IM_COL32_R_SHIFT),mul(IM_COL32_G_SHIFT),mul(IM_COL32_B_SHIFT),(tex>>24)&255U);
   };
+  auto sampleTexture=[&](const Face&f,float u,float v)->ImU32{if(!f.page)return IM_COL32(255,255,255,255);const auto&bytes=*f.page;const int x=std::clamp(static_cast<int>(std::floor(u)),0,1023),y=std::clamp(static_cast<int>(std::floor(v)),0,127);auto read16=[&](std::size_t off){return std::uint16_t(bytes[off])|(std::uint16_t(bytes[off+1])<<8);};auto expand=[](unsigned n){return (n*255U+15U)/31U;};std::uint16_t raw=0;if(f.colorMode==0){const unsigned packed=bytes[static_cast<std::size_t>(y)*512U+static_cast<std::size_t>(x/2)];const unsigned index=(packed>>((x&1)?4:0))&15U;const std::size_t off=static_cast<std::size_t>(f.clutY)*512U+static_cast<std::size_t>(f.clutX*16+index)*2U;if(off+1>=bytes.size())return IM_COL32(255,0,255,255);raw=read16(off);}else if(f.colorMode==1){const unsigned index=bytes[static_cast<std::size_t>(y)*512U+static_cast<std::size_t>(x/2)];const std::size_t off=static_cast<std::size_t>(f.clutY)*512U+static_cast<std::size_t>(index)*2U;if(off+1>=bytes.size())return IM_COL32(255,0,255,255);raw=read16(off);}else{const std::size_t off=static_cast<std::size_t>(y)*512U+static_cast<std::size_t>(x)*2U;if(off+1>=bytes.size())return IM_COL32(255,0,255,255);raw=read16(off);}const unsigned r=expand(raw&31U),g=expand((raw>>5)&31U),b=expand((raw>>10)&31U);if((raw&0x7fffU)==0)return IM_COL32(0,0,0,0);return IM_COL32(r,g,b,(raw&0x8000U)&&f.blendMode==0?128:255);};
   for(const auto&f:faces){
-   const int subdivisions=softwareRendering_?2:8;
+   const int subdivisions=softwareRendering_?12:24;
    auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
    for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
     const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
     const float a1=float(i+1)/n,b1=float(j)/n,c1=1.0f-a1-b1;
     const float a2=float(i)/n,b2=float(j+1)/n,c2=1.0f-a2-b2;
-    dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),lerpColor(f,(c+c1+c2)/3.0f,(a+a1+a2)/3.0f,(b+b1+b2)/3.0f));
-    if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),lerpColor(f,(c1+c3+c2)/3.0f,(a1+a3+a2)/3.0f,(b1+b3+b2)/3.0f));}
+    {const float wa=(c+c1+c2)/3.0f,wb=(a+a1+a2)/3.0f,wc=(b+b1+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),color);}
+    if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;{const float wa=(c1+c3+c2)/3.0f,wb=(a1+a3+a2)/3.0f,wc=(b1+b3+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),color);}}
    }
    ++faceCount;
   }
