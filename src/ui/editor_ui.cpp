@@ -308,10 +308,10 @@ void EditorUI::drawTextureViewer(){
  textureY_=std::clamp(textureY_,0,textureFormat_==0?31:imageHeight-1);
  textureClutX_=std::clamp(textureClutX_,0,15);textureClutY_=std::clamp(textureClutY_,0,127);
  const int scaleX=textureFormat_==0?(8>>textureColorMode_):1;
- const int regionX=textureFormat_==0?textureX_*scaleX:textureX_;
- const int regionY=textureFormat_==0?textureY_*4:textureY_;
- textureW_=std::clamp(textureW_,1,imageWidth-regionX);
- textureH_=std::clamp(textureH_,1,imageHeight-regionY);
+ // Size is independent of position. Moving the rectangle must never
+ // silently reduce its dimensions near a page edge.
+ textureW_=std::clamp(textureW_,1,imageWidth);
+ textureH_=std::clamp(textureH_,1,imageHeight);
  ImGui::BeginChild("TexturePageCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar);
  const ImVec2 origin=ImGui::GetCursorScreenPos();
  const ImVec2 imageSize(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_);
@@ -345,15 +345,19 @@ void EditorUI::drawTextureViewer(){
   const ImVec2 mouse=ImGui::GetIO().MousePos;
   const int px=std::clamp(static_cast<int>((mouse.x-origin.x)/textureZoom_),0,imageWidth-1);
   const int py=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
-  if(textureFormat_==0){textureX_=px/scaleX;textureY_=py/4;}
-  else{textureX_=px;textureY_=py;}
+  // Place the selection center under the cursor, then constrain its
+  // top-left corner so the full rectangle stays within the texture page.
+  const int left=std::clamp(px-textureW_/2,0,imageWidth-textureW_);
+  const int top=std::clamp(py-textureH_/2,0,imageHeight-textureH_);
+  if(textureFormat_==0){textureX_=left/scaleX;textureY_=top/4;}
+  else{textureX_=left;textureY_=top;}
  }
  // Recalculate from the final controls every frame. This keeps the dim mask
  // and border persistent after any unrelated UI interaction.
  const int finalX=textureFormat_==0?textureX_*scaleX:textureX_;
  const int finalY=textureFormat_==0?textureY_*4:textureY_;
- const int finalW=std::clamp(textureW_,1,imageWidth-finalX);
- const int finalH=std::clamp(textureH_,1,imageHeight-finalY);
+ const int finalW=textureW_;
+ const int finalH=textureH_;
  const ImVec2 r0(origin.x+float(finalX)*textureZoom_,origin.y+float(finalY)*textureZoom_);
  const ImVec2 r1(r0.x+float(finalW)*textureZoom_,r0.y+float(finalH)*textureZoom_);
  const ImU32 dim=IM_COL32(0,0,0,127);
