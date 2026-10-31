@@ -23,7 +23,37 @@ bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,Ns
   else{std::size_t n=a;if(!n||!has(in,p,n)||n>NsfChunkSize-w){e="Invalid literal run.";return false;}std::copy_n(in.begin()+static_cast<std::ptrdiff_t>(p),n,o.bytes.begin()+static_cast<std::ptrdiff_t>(w));p+=n;w+=n;}}
   if(!has(in,p,skip)){e="Truncated skip region.";return false;}p+=skip;auto tail=NsfChunkSize-length;if(w>NsfChunkSize||tail>NsfChunkSize-w||!has(in,p,tail)){e="Truncated raw tail.";return false;}std::copy_n(in.begin()+static_cast<std::ptrdiff_t>(p),tail,o.bytes.begin()+static_cast<std::ptrdiff_t>(w));p+=tail;o.wasCompressed=true;
  }else{e="Unknown NSF chunk magic.";return false;}
- o.type=u16(o.bytes,2);o.chunkId=static_cast<std::int32_t>(u32(o.bytes,4));return true;
+ o.type=u16(o.bytes,2);o.chunkId=static_cast<std::int32_t>(u32(o.bytes,4));
+ if(o.type==0){
+  const std::uint32_t count=u32(o.bytes,8);
+  const std::uint64_t tableEnd=16ULL+(static_cast<std::uint64_t>(count)+1ULL)*4ULL;
+  if(tableEnd>NsfChunkSize){o.entryTableError="Entry offset table exceeds the 64 KiB chunk.";return true;}
+  std::vector<std::uint32_t> offsets;offsets.reserve(static_cast<std::size_t>(count)+1U);
+  for(std::uint32_t i=0;i<=count;++i)offsets.push_back(u32(o.bytes,16U+static_cast<std::size_t>(i)*4U));
+  bool valid=true;
+  for(std::size_t i=0;i<offsets.size();++i)if(offsets[i]<tableEnd||offsets[i]>NsfChunkSize||(i&&offsets[i]<offsets[i-1])){valid=false;break;}
+  if(!valid){o.entryTableError="Entry chunk contains invalid entry offsets.";return true;}
+  o.entries.reserve(count);
+  for(std::uint32_t i=0;i<count;++i){
+   NsfEntry entry;entry.offset=offsets[i];entry.size=offsets[i+1]-offsets[i];
+   const std::size_t p=entry.offset;
+   if(entry.size<16){entry.error="Entry header is truncated.";o.entries.push_back(std::move(entry));continue;}
+   if(u32(o.bytes,p)!=0x0100FFFFU){entry.error="Entry magic mismatch.";o.entries.push_back(std::move(entry));continue;}
+   entry.eid=u32(o.bytes,p+4);entry.type=u32(o.bytes,p+8);entry.itemCount=u32(o.bytes,p+12);
+   const std::uint64_t headerEnd=16ULL+static_cast<std::uint64_t>(entry.itemCount)*8ULL;
+   if(headerEnd>entry.size){entry.error="Item offset table exceeds entry boundary.";o.entries.push_back(std::move(entry));continue;}
+   bool itemsValid=true;
+   for(std::uint32_t j=0;j<entry.itemCount;++j){
+    const std::size_t q=p+16U+static_cast<std::size_t>(j)*8U;
+    const std::uint32_t begin=u32(o.bytes,q),end=u32(o.bytes,q+4);
+    if(begin<headerEnd||end<begin||end>entry.size){itemsValid=false;break;}
+   }
+   if(!itemsValid){entry.error="Entry contains an invalid item range.";o.entries.push_back(std::move(entry));continue;}
+   entry.valid=true;o.entries.push_back(std::move(entry));
+  }
+  o.entryTableValid=true;
+ }
+ return true;
 }
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
  std::ofstream s(f,std::ios::binary|std::ios::trunc);if(!s){e="Could not create NSF output.";return false;}
