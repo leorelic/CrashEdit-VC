@@ -48,6 +48,18 @@ CRASHEDIT_GL_PROC(void, ActiveTexture, (unsigned int));
 CRASHEDIT_GL_PROC(void, TexParameteri, (unsigned int, unsigned int, int));
 CRASHEDIT_GL_PROC(void, TexImage2D, (unsigned int, int, int, int, int, int, unsigned int, unsigned int, const void*));
 CRASHEDIT_GL_PROC(void, PixelStorei, (unsigned int, int));
+CRASHEDIT_GL_PROC(void, GenFramebuffers, (int, unsigned int*));
+CRASHEDIT_GL_PROC(void, BindFramebuffer, (unsigned int, unsigned int));
+CRASHEDIT_GL_PROC(void, DeleteFramebuffers, (int, const unsigned int*));
+CRASHEDIT_GL_PROC(void, FramebufferTexture2D, (unsigned int, unsigned int, unsigned int, unsigned int, int));
+CRASHEDIT_GL_PROC(unsigned int, CheckFramebufferStatus, (unsigned int));
+CRASHEDIT_GL_PROC(void, Viewport, (int, int, int, int));
+CRASHEDIT_GL_PROC(void, ClearColor, (float, float, float, float));
+CRASHEDIT_GL_PROC(void, Clear, (unsigned int));
+CRASHEDIT_GL_PROC(void, Enable, (unsigned int));
+CRASHEDIT_GL_PROC(void, Disable, (unsigned int));
+CRASHEDIT_GL_PROC(void, DepthFunc, (unsigned int));
+CRASHEDIT_GL_PROC(void, BlendFunc, (unsigned int, unsigned int));
 
 #undef CRASHEDIT_GL_PROC
 
@@ -89,6 +101,18 @@ inline bool load(std::string& error) {
     CRASHEDIT_LOAD_GL(TexParameteri)
     CRASHEDIT_LOAD_GL(TexImage2D)
     CRASHEDIT_LOAD_GL(PixelStorei)
+    CRASHEDIT_LOAD_GL(GenFramebuffers)
+    CRASHEDIT_LOAD_GL(BindFramebuffer)
+    CRASHEDIT_LOAD_GL(DeleteFramebuffers)
+    CRASHEDIT_LOAD_GL(FramebufferTexture2D)
+    CRASHEDIT_LOAD_GL(CheckFramebufferStatus)
+    CRASHEDIT_LOAD_GL(Viewport)
+    CRASHEDIT_LOAD_GL(ClearColor)
+    CRASHEDIT_LOAD_GL(Clear)
+    CRASHEDIT_LOAD_GL(Enable)
+    CRASHEDIT_LOAD_GL(Disable)
+    CRASHEDIT_LOAD_GL(DepthFunc)
+    CRASHEDIT_LOAD_GL(BlendFunc)
 #undef CRASHEDIT_LOAD_GL
     return error.empty();
 }
