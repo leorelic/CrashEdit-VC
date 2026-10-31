@@ -105,7 +105,6 @@ void EditorUI::drawViewport(){
      if(!e.valid||e.type!=3||e.eid!=eid||!e.scenery.decoded)continue;
      ++sceneryCount;const auto&sc=e.scenery;vertexCount+=sc.vertices.size();
      const V3 zoneOrigin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
-     includePoint(zoneOrigin);includePoint({zoneOrigin.x+float(zone->width)/400.0f,zoneOrigin.y+float(zone->height)/400.0f,zoneOrigin.z+float(zone->depth)/400.0f});
      for(const auto&v:sc.vertices)includePoint({zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
     }
    }
@@ -117,7 +116,7 @@ void EditorUI::drawViewport(){
    sceneTargetX_=(boundsMin.x+boundsMax.x)*0.5f;sceneTargetY_=(boundsMin.y+boundsMax.y)*0.5f;sceneTargetZ_=(boundsMin.z+boundsMax.z)*0.5f;
    const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
    const float radius=std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f;
-   sceneDistance_=std::max(2.0f,radius*2.8f+1.0f);sceneCameraZoneEid_=zoneEntry->eid;sceneCameraInitialized_=true;
+   sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraZoneEid_=zoneEntry->eid;sceneCameraInitialized_=true;
   }
  }
  const ImGuiIO&io=ImGui::GetIO();
@@ -195,7 +194,7 @@ void EditorUI::drawViewport(){
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
   auto lerpColor=[&](const Face&f,float wa,float wb,float wc){const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};return IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);};
   for(const auto&f:faces){
-   constexpr int subdivisions=8;
+   constexpr int subdivisions=3;
    auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
    for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
     const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
