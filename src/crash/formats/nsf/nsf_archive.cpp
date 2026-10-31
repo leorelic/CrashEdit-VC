@@ -49,7 +49,7 @@ static bool parseScenery(const std::vector<std::uint8_t>&bytes,const NsfEntry&en
  const auto&texitem=entry.items[4];
  for(std::uint32_t i=0;i<textureCount;++i){
   const std::size_t p=texitem.offset+static_cast<std::size_t>(i)*12U;const std::uint8_t b2=bytes[p+2],b6=bytes[p+6],b7=bytes[p+7];
-  out.textures.push_back({bytes[p],bytes[p+1],bytes[p+4],bytes[p+5],bytes[p+8],bytes[p+9],bytes[p+10],bytes[p+11],static_cast<std::uint8_t>(b2&0xfU),static_cast<std::uint8_t>((b2>>4U)&0xfU),bytes[p+3],static_cast<std::uint8_t>(((b6>>7U)|((b7>>1U)&2U))&3U),static_cast<std::uint8_t>((b6>>5U)&3U),static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
+  out.textures.push_back({bytes[p],bytes[p+1],bytes[p+4],bytes[p+5],bytes[p+8],bytes[p+9],bytes[p+10],bytes[p+11],static_cast<std::uint8_t>(b2&0xfU),static_cast<std::uint8_t>((b2>>4U)&0xfU),bytes[p+3],static_cast<std::uint8_t>(((b6>>7U)|((b7&1U)<<1U))&3U),static_cast<std::uint8_t>((b6>>5U)&3U),static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
  }
  const auto&coloritem=entry.items[5];
  for(std::uint32_t i=0;i<colorCount;++i){const std::size_t p=coloritem.offset+static_cast<std::size_t>(i)*4U;out.colors.push_back({bytes[p],bytes[p+1],bytes[p+2],bytes[p+3]});}
