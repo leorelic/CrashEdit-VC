@@ -283,7 +283,7 @@ void EditorUI::drawViewport(){
     ++faceCount;
    }
   }else{
-   struct GpuVertex{float x,y,z,r,g,b,a;};
+   struct GpuVertex{float x,y,z,w,r,g,b,a;};
    struct GpuState{unsigned int program=0,vao=0,vbo=0,framebuffer=0,colorTexture=0,depthBuffer=0;int width=0,height=0;bool ready=false;};
    static GpuState gpu;
    auto compileShader=[](unsigned int type,const char*source)->unsigned int{
@@ -294,12 +294,12 @@ void EditorUI::drawViewport(){
    if(!gpu.ready){
     static constexpr const char* vertexSource=
      "#version 150\n"
-     "layout(location=0) in vec3 aPosition;\n"
-     "layout(location=1) in vec4 aColor;\n"
+     "in vec4 aPosition;\n"
+     "in vec4 aColor;\n"
      "out vec4 vColor;\n"
      "void main(){gl_Position=vec4(aPosition,1.0);vColor=aColor;}\n";
     static constexpr const char* fragmentSource=
-     "#version 330 core\n"
+     "#version 150\n"
      "in vec4 vColor;out vec4 fragColor;\n"
      "void main(){fragColor=vColor;}\n";
     const unsigned int vs=compileShader(0x8B31U,vertexSource),fs=compileShader(0x8B30U,fragmentSource);
@@ -311,8 +311,8 @@ void EditorUI::drawViewport(){
     if(gpu.ready){
      GL::GenVertexArrays(1,&gpu.vao);GL::GenBuffers(1,&gpu.vbo);
      GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
-     GL::EnableVertexAttribArray(0);GL::VertexAttribPointer(0,3,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(0));
-     GL::EnableVertexAttribArray(1);GL::VertexAttribPointer(1,4,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(3*sizeof(float)));
+     GL::EnableVertexAttribArray(0);GL::VertexAttribPointer(0,4,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(0));
+     GL::EnableVertexAttribArray(1);GL::VertexAttribPointer(1,4,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(4*sizeof(float)));
      GL::BindVertexArray(0);GL::BindBuffer(0x8892U,0);
     }
    }
@@ -345,9 +345,11 @@ void EditorUI::drawViewport(){
       for(int i=0;i<3;++i){
        const float x=2.0f*(face.p[i].x-canvasMin.x)/canvasSize.x-1.0f;
        const float y=1.0f-2.0f*(face.p[i].y-canvasMin.y)/canvasSize.y;
-       const float z=2.0f*std::clamp((face.p[i].depth-0.05f)/199.95f,0.0f,1.0f)-1.0f;
+       constexpr float nearPlane=0.05f,farPlane=200.0f;
+       const float depth=face.p[i].depth;
+       const float clipZ=((farPlane+nearPlane)/(farPlane-nearPlane))*depth-(2.0f*farPlane*nearPlane)/(farPlane-nearPlane);
        const ImU32 color=face.colors[i];
-       vertices.push_back({x,y,z,colorChannel(color,IM_COL32_R_SHIFT),colorChannel(color,IM_COL32_G_SHIFT),colorChannel(color,IM_COL32_B_SHIFT),1.0f});
+       vertices.push_back({x*depth,y*depth,clipZ,depth,colorChannel(color,IM_COL32_R_SHIFT),colorChannel(color,IM_COL32_G_SHIFT),colorChannel(color,IM_COL32_B_SHIFT),1.0f});
       }
       ++faceCount;
      }
