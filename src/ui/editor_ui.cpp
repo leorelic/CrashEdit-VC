@@ -18,7 +18,7 @@ static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
 static const char* chunkTypeName(std::uint16_t t){switch(t){case 0:return "Entry Chunk";case 1:return "Texture Chunk";case 2:return "Old Sound Chunk";case 3:return "Sound Chunk";case 4:return "Wavebank Chunk";case 5:return "Speech Chunk";default:return "Unknown Chunk";}}
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
- Crash::NsfArchive archive;if(!archive.load(file,error))return false;archive.decodeZones(pendingVersion_==GameVersion::Crash3);
+ Crash::NsfArchive archive;if(!archive.load(file,error))return false;if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);
  auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
  if(!workspace_.open(file.parent_path(),error))return false;
