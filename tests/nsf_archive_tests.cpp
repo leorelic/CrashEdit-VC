@@ -12,5 +12,5 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(normal,24,0x0100FFFF);p32(normal,28,0xAABBCCDD);p32(normal,32,7);p32(normal,36,1);
  p32(normal,40,24);p32(normal,44,28);
  assert(a.loadBytes(normal,e));assert(a.chunks()[0].entryTableValid);assert(a.chunks()[0].entries.size()==1);
- assert(a.chunks()[0].entries[0].valid);assert(a.chunks()[0].entries[0].eid==0xAABBCCDD);assert(a.chunks()[0].entries[0].itemCount==1);
+ assert(a.chunks()[0].entries[0].valid);assert(a.chunks()[0].entries[0].eid==0xAABBCCDD);assert(a.chunks()[0].entries[0].itemCount==1);assert(a.chunks()[0].entries[0].items.size()==1);assert(a.chunks()[0].entries[0].items[0].size==4);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
