@@ -8,6 +8,55 @@ static std::uint32_t u32(const std::vector<std::uint8_t>&d,std::size_t p){return
 static std::int32_t i32(const std::vector<std::uint8_t>&d,std::size_t p){return static_cast<std::int32_t>(u32(d,p));}
 static bool has(const std::vector<std::uint8_t>&d,std::size_t p,std::size_t n){return p<=d.size()&&n<=d.size()-p;}
 static void checksum(std::vector<std::uint8_t>&d){std::uint32_t c=0x12345678;for(std::size_t i=0;i<NsfChunkSize;++i){if(i<12||i>=16)c+=d[i];c=(c<<3)|(c>>29);}for(int i=0;i<4;++i)d[12+i]=std::uint8_t(c>>(8*i));}
+
+static std::size_t align4(std::size_t n){return (n+3U)&~std::size_t(3U);}
+static bool parseScenery(const std::vector<std::uint8_t>&bytes,const NsfEntry&entry,bool crash3,NsfScenery&out){
+ out.isCrash3=crash3;
+ auto fail=[&](const char*message){out.error=message;return false;};
+ if(entry.items.size()!=7)return fail("Scenery entry must contain exactly seven items.");
+ const auto&info=entry.items[0];
+ if(info.size!=76||!has(bytes,info.offset,info.size))return fail("Scenery header must be exactly 76 bytes.");
+ const auto count=[&](std::size_t offset){return u32(bytes,info.offset+offset);};
+ const std::uint32_t vertexCount=count(16),triangleCount=count(20),quadCount=count(24),textureCount=count(28),colorCount=count(32),animatedCount=count(36),pageCount=count(40);
+ constexpr std::uint32_t maxElements=16384;
+ if(vertexCount>maxElements||triangleCount>maxElements||quadCount>maxElements||textureCount>maxElements||colorCount>maxElements||animatedCount>maxElements||pageCount>8U)
+  return fail("Scenery header contains unreasonable element counts.");
+ const std::size_t expected[]={76,align4(static_cast<std::size_t>(vertexCount)*6U),align4(static_cast<std::size_t>(triangleCount)*6U),static_cast<std::size_t>(quadCount)*8U,static_cast<std::size_t>(textureCount)*12U,static_cast<std::size_t>(colorCount)*4U,static_cast<std::size_t>(animatedCount)*4U};
+ for(std::size_t i=0;i<7;++i)if(entry.items[i].size!=expected[i]||!has(bytes,entry.items[i].offset,entry.items[i].size))return fail("Scenery item size does not match its header counts.");
+ out.xOffset=i32(bytes,info.offset);out.yOffset=i32(bytes,info.offset+4);out.zOffset=i32(bytes,info.offset+8);out.isSky=i32(bytes,info.offset+12)!=0;
+ for(std::uint32_t i=0;i<pageCount;++i)out.texturePageEids.push_back(u32(bytes,info.offset+0x2c+static_cast<std::size_t>(i)*4U));
+ const auto&vitem=entry.items[1];out.vertices.reserve(vertexCount);
+ for(std::uint32_t i=0;i<vertexCount;++i){
+  const std::size_t xyOffset=vitem.offset+(static_cast<std::size_t>(vertexCount)-1U-i)*4U;
+  const std::size_t zOffset=vitem.offset+static_cast<std::size_t>(vertexCount)*4U+static_cast<std::size_t>(i)*2U;
+  const std::uint16_t xraw=u16(bytes,xyOffset),yraw=u16(bytes,xyOffset+2),zraw=u16(bytes,zOffset);
+  const std::uint16_t ux=xraw&0xfU,uy=yraw&0xfU,uz=zraw&0xfU;
+  const auto decodeCoord=[&](std::uint16_t raw){return crash3?static_cast<std::int32_t>(raw>>4U):static_cast<std::int32_t>(static_cast<std::int16_t>(raw)>>4);};
+  out.vertices.push_back({decodeCoord(xraw),decodeCoord(yraw),decodeCoord(zraw),static_cast<std::uint16_t>(((uy&3U)<<8U)|(ux<<4U)|uz)});
+ }
+ const auto&titem=entry.items[2];
+ for(std::uint32_t i=0;i<triangleCount;++i){
+  const std::size_t aOffset=titem.offset+(static_cast<std::size_t>(triangleCount)-1U-i)*4U;
+  const std::size_t bOffset=titem.offset+static_cast<std::size_t>(triangleCount)*4U+static_cast<std::size_t>(i)*2U;
+  const std::uint32_t a=u32(bytes,aOffset);const std::uint16_t b=u16(bytes,bOffset);
+  out.triangles.push_back({static_cast<std::uint16_t>((a>>8U)&0xfffU),static_cast<std::uint16_t>((a>>20U)&0xfffU),static_cast<std::uint16_t>((b>>4U)&0xfffU),static_cast<std::uint16_t>((b&0xfU)|((a&0x7fU)<<4U)),(a&0x80U)!=0});
+ }
+ const auto&qitem=entry.items[3];
+ for(std::uint32_t i=0;i<quadCount;++i){
+  const std::size_t p=qitem.offset+static_cast<std::size_t>(i)*8U;const std::uint32_t a=u32(bytes,p),b=u32(bytes,p+4);
+  out.quads.push_back({static_cast<std::uint16_t>((a>>8U)&0xfffU),static_cast<std::uint16_t>((a>>20U)&0xfffU),static_cast<std::uint16_t>((b>>20U)&0xfffU),static_cast<std::uint16_t>((b>>8U)&0xfffU),static_cast<std::uint16_t>((b&0xfU)|((a&0x7fU)<<4U)),static_cast<std::uint8_t>((b>>4U)&0xfU),(a&0x80U)!=0});
+ }
+ const auto&texitem=entry.items[4];
+ for(std::uint32_t i=0;i<textureCount;++i){
+  const std::size_t p=texitem.offset+static_cast<std::size_t>(i)*12U;const std::uint8_t b2=bytes[p+2],b6=bytes[p+6],b7=bytes[p+7];
+  out.textures.push_back({bytes[p],bytes[p+1],bytes[p+4],bytes[p+5],bytes[p+8],bytes[p+9],bytes[p+10],bytes[p+11],static_cast<std::uint8_t>(b2&0xfU),static_cast<std::uint8_t>((b2>>4U)&0xfU),bytes[p+3],static_cast<std::uint8_t>(((b6>>7U)|((b7>>1U)&2U))&3U),static_cast<std::uint8_t>((b6>>5U)&3U),static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
+ }
+ const auto&coloritem=entry.items[5];
+ for(std::uint32_t i=0;i<colorCount;++i){const std::size_t p=coloritem.offset+static_cast<std::size_t>(i)*4U;out.colors.push_back({bytes[p],bytes[p+1],bytes[p+2],bytes[p+3]});}
+ const auto&animitem=entry.items[6];
+ for(std::uint32_t i=0;i<animatedCount;++i)out.animatedTextures.push_back(u32(bytes,animitem.offset+static_cast<std::size_t>(i)*4U));
+ out.decoded=true;return true;
+}
 static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item,std::size_t itemIndex,NsfEntity&out){
  const std::size_t base=item.offset,end=base+item.size;out.itemIndex=itemIndex;
  if(item.size<16){out.error="Entity header is truncated.";return false;}
@@ -98,6 +147,7 @@ bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,Ns
  return true;
 }
 void NsfArchive::decodeZones(bool crash3Retail){
+ for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==3){NsfScenery scenery;if(!parseScenery(chunk.bytes,entry,crash3Retail,scenery)&&scenery.error.empty())scenery.error="Scenery could not be decoded.";entry.scenery=std::move(scenery);}
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==7){
   NsfZone z;z.isCrash3Retail=crash3Retail;
   if(entry.items.size()<2){z.error="Zone entry requires a header and layout item.";entry.zone=std::move(z);continue;}
