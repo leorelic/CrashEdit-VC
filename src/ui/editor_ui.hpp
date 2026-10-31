@@ -17,6 +17,7 @@ private:
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
  int sceneMoveSpeed_=50;
+ std::uint32_t sceneCameraZoneEid_=0;
  char path_[1024]{};
  std::filesystem::path nsfPath_,nsdPath_;
  int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1;
