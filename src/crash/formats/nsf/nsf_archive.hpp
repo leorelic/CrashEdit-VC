@@ -39,12 +39,6 @@ struct NsfZone {
  std::uint16_t collisionDepthX=0,collisionDepthY=0,collisionDepthZ=0;
  std::vector<NsfEntity> entities; std::string error;
 };
-struct NsfEntry {
- std::uint32_t eid=0, type=0, itemCount=0;
- std::size_t offset=0, size=0;
- bool valid=false; std::string error;
- std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery;
-};
 struct NsfSceneryVertex { std::int32_t x=0,y=0,z=0; std::uint16_t colorIndex=0; };
 struct NsfSceneryTriangle { std::uint16_t a=0,b=0,c=0; std::uint16_t textureIndex=0; bool animated=false; };
 struct NsfSceneryQuad { std::uint16_t a=0,b=0,c=0,d=0; std::uint16_t textureIndex=0; std::uint8_t unknown=0; bool animated=false; };
@@ -64,6 +58,12 @@ struct NsfScenery {
  std::vector<NsfSceneryColor> colors;
  std::vector<std::uint32_t> animatedTextures;
  std::string error;
+};
+struct NsfEntry {
+ std::uint32_t eid=0, type=0, itemCount=0;
+ std::size_t offset=0, size=0;
+ bool valid=false; std::string error;
+ std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery;
 };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
