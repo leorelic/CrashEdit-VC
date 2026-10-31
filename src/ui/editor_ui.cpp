@@ -109,9 +109,6 @@ void EditorUI::drawMenu(){
  ImGui::EndMenuBar();
 }
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF"))openDialog_=true;ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Save");ImGui::SameLine();ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
-EditorUI::~EditorUI(){
- for(const auto&entry:hierarchyIcons_){const unsigned int texture=entry.second;if(texture)GL::DeleteTextures(1,&texture);}
-}
 unsigned int EditorUI::hierarchyIcon(const char*name){
  if(!hierarchyIconsLoaded_){
   hierarchyIconsLoaded_=true;

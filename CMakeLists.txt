@@ -71,7 +71,7 @@ if(CRASHEDIT_BUILD_APP)
         src/ui/editor_ui.cpp
     )
     target_include_directories(CrashEdit PRIVATE src ${stb_SOURCE_DIR})
-    target_compile_definitions(CrashEdit PRIVATE CRASHEDIT_SOURCE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images")
+    target_compile_definitions(CrashEdit PRIVATE CRASHEDIT_SOURCE_ASSET_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images\")
     add_custom_command(TARGET CrashEdit POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Embeds/Images" "$<TARGET_FILE_DIR:CrashEdit>/Assets/Images"

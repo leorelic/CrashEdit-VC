@@ -8,7 +8,7 @@ namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {
 public:
- explicit EditorUI(Workspace& w):workspace_(w){} ~EditorUI(); void draw();
+ explicit EditorUI(Workspace& w):workspace_(w){} void draw();
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
