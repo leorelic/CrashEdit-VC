@@ -78,7 +78,7 @@ static void pixelIcon(ImDrawList*d,ImVec2 p,float s,const char*key){
 }
 static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,const char*icon){
  const ImVec2 row=ImGui::GetCursorScreenPos();
- const std::string padded=std::string("   ")+label;
+ const std::string padded=std::string("  ")+label;
  const bool open=ImGui::TreeNodeEx(padded.c_str(),flags);
  const float scale=ImGui::GetIO().FontGlobalScale;
  pixelIcon(ImGui::GetWindowDrawList(),ImVec2(row.x+17.0f*scale,row.y+1.0f*scale),scale,icon);
