@@ -100,8 +100,18 @@ void EditorUI::drawViewport(){
  auto includePoint=[&](V3 p){boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);};
  for(const auto*entry:sceneryEntries){
   const auto&sc=entry->scenery;++sceneryCount;vertexCount+=sc.vertices.size();
-  const V3 zoneOrigin=zone?V3{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f}:V3{};
-  for(const auto&v:sc.vertices)includePoint({zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
+  if(!zone)for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
+ }
+ if(zone){
+  const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+  includePoint(origin);
+  includePoint({origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f});
+  for(std::size_t i=0;i<zone->entities.size();++i){
+   const auto&entity=zone->entities[i];
+   const bool camera=i<static_cast<std::size_t>(zone->cameraCount);
+   const float scale=camera?400.0f:100.0f;
+   for(const auto&p:entity.positions)includePoint({origin.x+float(p.x)/scale,origin.y+float(p.y)/scale,origin.z+float(p.z)/scale});
+  }
  }
  const std::uint32_t cameraResourceEid=zoneEntry?zoneEntry->eid:(sceneryEntry?sceneryEntry->eid:0U);
  if(!sceneryEntries.empty()&&sceneryCount>0){
