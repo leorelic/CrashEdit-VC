@@ -50,7 +50,7 @@ int Application::run(){
  GLFWwindow*w=glfwCreateWindow(1440,900,"CrashEdit — native editor",nullptr,nullptr);if(!w){glfwTerminate();std::cerr<<"OpenGL window creation failed.\n";return 1;}
  glfwMakeContextCurrent(w);
  std::string glError;
- if(!GL::load(glError)){std::cerr<<"Required OpenGL functions are unavailable: "<<glError<<'\\n';glfwDestroyWindow(w);glfwTerminate();return 1;}
+ if(!GL::load(glError)){std::cerr<<"Required OpenGL functions are unavailable: "<<glError<<'\n';glfwDestroyWindow(w);glfwTerminate();return 1;}
  glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"imgui.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();
  ImGui_ImplGlfw_InitForOpenGL(w,true);
 #if defined(__APPLE__)
