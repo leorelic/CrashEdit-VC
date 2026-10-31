@@ -303,32 +303,47 @@ void EditorUI::drawTextureViewer(){
  labeledInt("X","##TextureX",&textureX_);ImGui::SameLine();labeledInt("Y","##TextureY",&textureY_);ImGui::SameLine();labeledInt("Width","##TextureWidth",&textureW_);ImGui::SameLine();labeledInt("Height","##TextureHeight",&textureH_);
  labeledInt("CLUT X","##ClutX",&textureClutX_);ImGui::SameLine();labeledInt("CLUT Y","##ClutY",&textureClutY_);ImGui::SameLine();ImGui::TextUnformatted("Zoom");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderFloat("##TextureZoom",&textureZoom_,0.5f,3.0f,"%.1fx");
  const int imageWidth=textureColorMode_==0?1024:(textureColorMode_==1?512:256);
- const int imageHeight=128;
- textureX_=std::clamp(textureX_,0,textureFormat_==0?127:imageWidth-1);textureY_=std::clamp(textureY_,0,textureFormat_==0?31:imageHeight-1);
- const int regionX=textureFormat_==0?textureX_*(8>>textureColorMode_):textureX_;
- const int regionY=textureFormat_==0?textureY_*4:textureY_;
- textureW_=std::clamp(textureW_,1,imageWidth-regionX);textureH_=std::clamp(textureH_,1,imageHeight-regionY);
+ constexpr int imageHeight=128;
+ textureX_=std::clamp(textureX_,0,textureFormat_==0?127:imageWidth-1);
+ textureY_=std::clamp(textureY_,0,textureFormat_==0?31:imageHeight-1);
  textureClutX_=std::clamp(textureClutX_,0,15);textureClutY_=std::clamp(textureClutY_,0,127);
+ const int scaleX=textureFormat_==0?(8>>textureColorMode_):1;
+ const int regionX=textureFormat_==0?textureX_*scaleX:textureX_;
+ const int regionY=textureFormat_==0?textureY_*4:textureY_;
+ textureW_=std::clamp(textureW_,1,imageWidth-regionX);
+ textureH_=std::clamp(textureH_,1,imageHeight-regionY);
  ImGui::BeginChild("TexturePageCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar);
- const ImVec2 origin=ImGui::GetCursorScreenPos();ImDrawList*draw=ImGui::GetWindowDrawList();
+ const ImVec2 origin=ImGui::GetCursorScreenPos();
+ const ImVec2 imageSize(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_);
+ // The invisible item owns mouse capture and reserves the full image area.
+ // Render the image and selection after it so later widgets cannot cover the overlay.
+ ImGui::InvisibleButton("TextureSelection",imageSize,ImGuiButtonFlags_MouseButtonLeft);
+ const bool imageHovered=ImGui::IsItemHovered();
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
  auto read16=[&](std::size_t offset){return std::uint16_t(page->bytes[offset])|(std::uint16_t(page->bytes[offset+1])<<8);};
  auto convert5551=[&](std::uint16_t raw){const unsigned r=expand5(raw&31U),g=expand5((raw>>5)&31U),b=expand5((raw>>10)&31U);const bool bit=(raw&0x8000U)!=0;unsigned a=255U;if(textureBlendMode_==0&&bit)a=127U;else if(textureBlendMode_==0&&r+g+b==0)a=0U;return IM_COL32(r,g,b,a);};
  std::vector<ImU32> palette;
- if(textureColorMode_==0||textureColorMode_==1){const int count=textureColorMode_==0?16:256;palette.resize(static_cast<std::size_t>(count));for(int i=0;i<count;++i){const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?textureClutX_*16:0)+i)*2U;if(offset+1U<page->bytes.size())palette[static_cast<std::size_t>(i)]=convert5551(read16(offset));}}
- for(int y=0;y<imageHeight;++y){for(int x=0;x<imageWidth;++x){ImU32 color=IM_COL32(255,0,255,255);const std::size_t row=static_cast<std::size_t>(y)*512U;
-  if(textureColorMode_==0){const unsigned packed=page->bytes[row+static_cast<std::size_t>(x/2)];const unsigned index=(packed>>((x&1)?4:0))&15U;color=palette[index];}
-  else if(textureColorMode_==1){const unsigned index=page->bytes[row+static_cast<std::size_t>(x)];color=palette[index];}
-  else{const std::size_t offset=row+static_cast<std::size_t>(x)*2U;if(offset+1U<page->bytes.size())color=convert5551(read16(offset));}
-  const ImVec2 p0(origin.x+float(x)*textureZoom_,origin.y+float(y)*textureZoom_);const ImVec2 p1(p0.x+textureZoom_,p0.y+textureZoom_);draw->AddRectFilled(p0,p1,color);
- }}
- ImGui::SetCursorScreenPos(origin);
- ImGui::InvisibleButton("TextureSelection",ImVec2(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_));
- if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+ if(textureColorMode_==0||textureColorMode_==1){
+  const int count=textureColorMode_==0?16:256;palette.resize(static_cast<std::size_t>(count));
+  for(int i=0;i<count;++i){const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?textureClutX_*16:0)+i)*2U;if(offset+1U<page->bytes.size())palette[static_cast<std::size_t>(i)]=convert5551(read16(offset));}
+ }
+ ImDrawList*draw=ImGui::GetWindowDrawList();
+ draw->PushClipRect(origin,ImVec2(origin.x+imageSize.x,origin.y+imageSize.y),true);
+ for(int y=0;y<imageHeight;++y){
+  for(int x=0;x<imageWidth;++x){
+   ImU32 color=IM_COL32(255,0,255,255);const std::size_t row=static_cast<std::size_t>(y)*512U;
+   if(textureColorMode_==0){const unsigned packed=page->bytes[row+static_cast<std::size_t>(x/2)];const unsigned index=(packed>>((x&1)?4:0))&15U;color=palette[index];}
+   else if(textureColorMode_==1){const unsigned index=page->bytes[row+static_cast<std::size_t>(x)];color=palette[index];}
+   else{const std::size_t offset=row+static_cast<std::size_t>(x)*2U;if(offset+1U<page->bytes.size())color=convert5551(read16(offset));}
+   const ImVec2 p0(origin.x+float(x)*textureZoom_,origin.y+float(y)*textureZoom_);
+   draw->AddRectFilled(p0,ImVec2(p0.x+textureZoom_,p0.y+textureZoom_),color);
+  }
+ }
+ if(imageHovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
   const ImVec2 mouse=ImGui::GetIO().MousePos;
-  const int px=std::clamp(static_cast<int>((mouse.x-origin.x)/textureZoom_),0,imageWidth-1);
-  const int py=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
-  textureDragX_=px;textureDragY_=py;textureSelecting_=true;
+  textureDragX_=std::clamp(static_cast<int>((mouse.x-origin.x)/textureZoom_),0,imageWidth-1);
+  textureDragY_=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
+  textureSelecting_=true;
  }
  if(textureSelecting_&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
   const ImVec2 mouse=ImGui::GetIO().MousePos;
@@ -336,18 +351,26 @@ void EditorUI::drawTextureViewer(){
   const int py=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
   const int left=std::min(textureDragX_,px),top=std::min(textureDragY_,py);
   const int width=std::abs(px-textureDragX_)+1,height=std::abs(py-textureDragY_)+1;
-  if(textureFormat_==0){const int scaleX=8>>textureColorMode_;textureX_=left/scaleX;textureY_=top/4;textureW_=std::max(1,width);textureH_=std::max(1,height);}
-  else{textureX_=left;textureY_=top;textureW_=std::max(1,width);textureH_=std::max(1,height);}
+  if(textureFormat_==0){textureX_=left/scaleX;textureY_=top/4;textureW_=width;textureH_=height;}
+  else{textureX_=left;textureY_=top;textureW_=width;textureH_=height;}
  }
  if(textureSelecting_&&ImGui::IsMouseReleased(ImGuiMouseButton_Left))textureSelecting_=false;
- const ImVec2 r0(origin.x+float(regionX)*textureZoom_,origin.y+float(regionY)*textureZoom_);const ImVec2 r1(r0.x+float(textureW_)*textureZoom_,r0.y+float(textureH_)*textureZoom_);
+ // Recalculate from the final controls every frame. This keeps the dim mask
+ // and border persistent after any unrelated UI interaction.
+ const int finalX=textureFormat_==0?textureX_*scaleX:textureX_;
+ const int finalY=textureFormat_==0?textureY_*4:textureY_;
+ const int finalW=std::clamp(textureW_,1,imageWidth-finalX);
+ const int finalH=std::clamp(textureH_,1,imageHeight-finalY);
+ const ImVec2 r0(origin.x+float(finalX)*textureZoom_,origin.y+float(finalY)*textureZoom_);
+ const ImVec2 r1(r0.x+float(finalW)*textureZoom_,r0.y+float(finalH)*textureZoom_);
  const ImU32 dim=IM_COL32(0,0,0,127);
- draw->AddRectFilled(ImVec2(origin.x,origin.y),ImVec2(origin.x+imageWidth*textureZoom_,r0.y),dim);
+ draw->AddRectFilled(origin,ImVec2(origin.x+imageSize.x,r0.y),dim);
  draw->AddRectFilled(ImVec2(origin.x,r0.y),ImVec2(r0.x,r1.y),dim);
- draw->AddRectFilled(ImVec2(r1.x,r0.y),ImVec2(origin.x+imageWidth*textureZoom_,r1.y),dim);
- draw->AddRectFilled(ImVec2(origin.x,r1.y),ImVec2(origin.x+imageWidth*textureZoom_,origin.y+imageHeight*textureZoom_),dim);
- draw->AddRect(r0,r1,IM_COL32(0,0,0,255),0.0f,0,3.0f);draw->AddRect(ImVec2(r0.x+2,r0.y+2),ImVec2(r1.x-2,r1.y-2),IM_COL32(255,255,255,255),0.0f,0,1.0f);
- ImGui::Dummy(ImVec2(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_));
+ draw->AddRectFilled(ImVec2(r1.x,r0.y),ImVec2(origin.x+imageSize.x,r1.y),dim);
+ draw->AddRectFilled(ImVec2(origin.x,r1.y),ImVec2(origin.x+imageSize.x,origin.y+imageSize.y),dim);
+ draw->AddRect(r0,r1,IM_COL32(0,0,0,255),0.0f,0,3.0f);
+ draw->AddRect(ImVec2(r0.x+2,r0.y+2),ImVec2(r1.x-2,r1.y-2),IM_COL32(255,255,255,255),0.0f,0,1.0f);
+ draw->PopClipRect();
  ImGui::EndChild();ImGui::End();
 }
 void EditorUI::drawClutEditor(){
@@ -360,23 +383,33 @@ void EditorUI::drawClutEditor(){
  }
  if(!page){ImGui::TextDisabled("Select a type-1 Texture Chunk to inspect its CLUT palette.");ImGui::End();return;}
  ImGui::Text("Palette from texture page chunk %d",selectedChunk_);
- ImGui::TextUnformatted("CLUT X");ImGui::SameLine();ImGui::SetNextItemWidth(90.0f);ImGui::SliderInt("##ClutEditorX",&textureClutX_,0,15);
- ImGui::SameLine();ImGui::TextUnformatted("CLUT Y");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderInt("##ClutEditorY",&textureClutY_,0,127);
+ ImGui::TextUnformatted("CLUT Y");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderInt("##ClutEditorY",&textureClutY_,0,127);
  const int count=textureColorMode_==0?16:(textureColorMode_==1?256:0);
  if(count==0){ImGui::TextDisabled("16-bit direct color has no CLUT.");ImGui::End();return;}
+ textureClutY_=std::clamp(textureClutY_,0,127);
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
- const int columns=count;
- for(int i=0;i<count;++i){
-  const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?textureClutX_*16:0)+i)*2U;
-  if(offset+1U>=page->bytes.size())continue;
-  const std::uint16_t raw=std::uint16_t(page->bytes[offset])|(std::uint16_t(page->bytes[offset+1])<<8);
-  const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
-  ImGui::PushID(i);
-  ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(26,26));
-  if((i%columns)!=columns-1)ImGui::SameLine();
-  ImGui::PopID();
+ ImGui::TextDisabled(textureColorMode_==0?"4-bit: each column is a separate CLUT X (16 colors per CLUT).":"8-bit: CLUT X is unused; the 256-entry palette is shown as a 16 x 16 grid.");
+ if(ImGui::BeginTable("ClutPaletteGrid",16,ImGuiTableFlags_Borders|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
+  for(int x=0;x<16;++x){ImGui::TableSetupColumn(("X "+std::to_string(x)).c_str(),ImGuiTableColumnFlags_WidthFixed,22.0f);}
+  ImGui::TableHeadersRow();
+  for(int row=0;row<16;++row){
+   ImGui::TableNextRow();
+   for(int col=0;col<16;++col){
+    ImGui::TableSetColumnIndex(col);
+    const int paletteIndex=textureColorMode_==0?row:(row*16+col);
+    const int clutX=textureColorMode_==0?col:0;
+    const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?clutX*16:paletteIndex)*2);
+    if(offset+1U>=page->bytes.size())continue;
+    const std::uint16_t raw=std::uint16_t(page->bytes[offset])|(std::uint16_t(page->bytes[offset+1])<<8);
+    const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
+    ImGui::PushID(row*16+col);
+    ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(20,20));
+    ImGui::PopID();
+   }
+  }
+  ImGui::EndTable();
  }
- ImGui::TextDisabled("Palette entries are displayed read-only, matching the original CrashEdit palette preview.");
+ ImGui::TextDisabled("Palette entries are displayed read-only.");
  ImGui::End();
 }
 void EditorUI::drawBottom(){if(console_){ImGui::Begin("Console / Diagnostics",&console_);ImGui::TextUnformatted("[info] Native editor ready.");if(nsfValid_)ImGui::Text("NSF: %zu chunks | compressed: %zu",nsf_.chunks().size(),nsf_.compressedChunkCount());if(nsfValid_&&!nsdValid_)ImGui::TextWrapped("[warning] %s",status_.c_str());ImGui::End();}if(properties_){ImGui::Begin("Properties",&properties_);if(nsfValid_&&selectedChunk_==-2&&nsdValid_){ImGui::Text("NSD: %s",nsdPath_.filename().string().c_str());ImGui::Text("Game: %s",versionName(gameVersion_));ImGui::Text("Level ID: %08X",static_cast<unsigned>(nsd_.id));ImGui::Text("Total entities: %d",nsd_.entityCount);ImGui::Text("Chunks: %d | Index entries: %zu",nsd_.chunkCount,nsd_.index.size());ImGui::Text("Spawn points: %zu",nsd_.spawns.size());if(selectedSpawn_>=0&&static_cast<std::size_t>(selectedSpawn_)<nsd_.spawns.size()){const auto&p=nsd_.spawns[static_cast<std::size_t>(selectedSpawn_)];ImGui::Separator();ImGui::Text("Spawn %d",selectedSpawn_);ImGui::Text("Zone EID: %s (%08X)",Crash::eidToEName(static_cast<std::uint32_t>(p.zoneEid)).c_str(),static_cast<unsigned>(p.zoneEid));ImGui::Text("Camera: %d",p.camera);ImGui::Text("Point: %d",p.point);ImGui::Text("X: %08X  Y: %08X  Z: %08X",static_cast<std::uint32_t>(p.x),static_cast<std::uint32_t>(p.y),static_cast<std::uint32_t>(p.z));if(ImGui::Button("Open matching NSF zone")){bool found=false;for(std::size_t ci=0;ci<nsf_.chunks().size()&&!found;++ci){const auto&chunk=nsf_.chunks()[ci];for(std::size_t ei=0;ei<chunk.entries.size();++ei){const auto&entry=chunk.entries[ei];if(entry.valid&&entry.type==7&&entry.eid==static_cast<std::uint32_t>(p.zoneEid)){selectedChunk_=static_cast<int>(ci);selectedEntry_=static_cast<int>(ei);selectedEntity_=-1;selectedSpawn_=-1;found=true;break;}}}if(!found)status_="No matching zone entry was found in this NSF.";}}}else if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){const auto&c=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];ImGui::Text("Chunk %d",selectedChunk_);ImGui::Text("Type: %s (%u)",chunkTypeName(c.type),static_cast<unsigned>(c.type));ImGui::Text("Chunk ID: %04X",static_cast<unsigned>(c.chunkId));ImGui::Text("Size: %zu bytes",c.bytes.size());ImGui::Text("Compressed in NSF: %s",c.wasCompressed?"Yes":"No");if(c.type==0){ImGui::Text("Entry count: %zu",c.entries.size());ImGui::Text("Entry table: %s",c.entryTableValid?"Valid":"Invalid / unavailable");if(!c.entryTableError.empty())ImGui::TextWrapped("%s",c.entryTableError.c_str());if(selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<c.entries.size()){const auto&e=c.entries[static_cast<std::size_t>(selectedEntry_)];ImGui::Separator();ImGui::Text("Entry %d",selectedEntry_);if(e.valid){ImGui::Text("EID: %s (%08X)",Crash::eidToEName(e.eid).c_str(),e.eid);ImGui::Text("Type: %u",e.type);ImGui::Text("Items: %u",e.itemCount);ImGui::Text("Offset: 0x%zX | Size: %zu",e.offset,e.size);if(e.type==7&&e.zone.decoded){const auto&z=e.zone;ImGui::Separator();ImGui::Text("Zone Header: %zu bytes",z.headerSize);ImGui::Text("Worlds: %d | Zones: %d",z.worldCount,z.zoneCount);ImGui::Text("Cameras: %d | Entities: %d | Info: %d",z.cameraCount,z.entityCount,z.infoCount);ImGui::Text("Music: %d | Flags: %08X",z.music,static_cast<unsigned>(z.zoneFlags));ImGui::Separator();ImGui::Text("Layout position: %d, %d, %d",z.x,z.y,z.z);ImGui::Text("Dimensions: %d x %d x %d",z.width,z.height,z.depth);ImGui::Text("Collision depth: %u, %u, %u",z.collisionDepthX,z.collisionDepthY,z.collisionDepthZ);if(selectedEntity_>=0&&static_cast<std::size_t>(selectedEntity_)<z.entities.size()){const auto&ent=z.entities[static_cast<std::size_t>(selectedEntity_)];ImGui::Separator();if(static_cast<std::size_t>(selectedEntity_)<static_cast<std::size_t>(z.cameraCount)){ImGui::Text("Camera [%d]-%d",ent.hasCameraIndex?ent.cameraIndex:selectedEntity_,ent.hasCameraSubIndex?ent.cameraSubIndex:0);ImGui::Separator();ImGui::Text("Camera Index: %s",ent.hasCameraIndex?std::to_string(ent.cameraIndex).c_str():"Not present");ImGui::Text("Camera SubIndex: %s",ent.hasCameraSubIndex?std::to_string(ent.cameraSubIndex).c_str():"Not present");ImGui::TextDisabled("Camera entities are the first CameraCount entities in the zone.");}else{if(!ent.name.empty()&&ent.hasId)ImGui::Text("%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)ImGui::Text("Entity [ID %d]",ent.id);else ImGui::Text("Entity %d",selectedEntity_-z.cameraCount);ImGui::Separator();if(ent.hasGoolType&&ent.hasSubtype){const auto goolEid=static_cast<std::uint32_t>(ent.goolType);if(Crash::isValidEid(goolEid))ImGui::Text("GOOL: %s (%08X) | Subtype: %d",Crash::eidToEName(goolEid).c_str(),goolEid,ent.subtype);else ImGui::Text("GOOL: %08X | Subtype: %d",goolEid,ent.subtype);}else ImGui::TextDisabled("GOOL Type/Subtype not defined");if(ent.hasId){int v=ent.id;if(ImGui::InputInt("Object ID",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x009fU,0,v))entityDataChanged_=true;}}if(ent.hasGoolType){int v=ent.goolType;if(ImGui::InputInt("GOOL Type / EID",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a9U,0,v))entityDataChanged_=true;}}if(ent.hasSubtype){int v=ent.subtype;if(ImGui::InputInt("GOOL Subtype",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00aaU,0,v))entityDataChanged_=true;}}if(ent.hasAlternateId)ImGui::Text("Alternate ID: %d",ent.alternateId);if(!ent.positions.empty()){ImGui::Text("Positions: %zu",ent.positions.size());for(std::size_t pi=0;pi<ent.positions.size();++pi){const auto&pos=ent.positions[pi];ImGui::BulletText("[%zu] X %d  Y %d  Z %d",pi,pos.x,pos.y,pos.z);}}if(!ent.settings.empty()){ImGui::Separator();ImGui::Text("GOOL Arguments / Settings (%zu)",ent.settings.size());if(ImGui::BeginTable("GoolSettings",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp)){ImGui::TableSetupColumn("#");ImGui::TableSetupColumn("A (8-bit)");ImGui::TableSetupColumn("B (signed 24-bit)");ImGui::TableHeadersRow();for(std::size_t si=0;si<ent.settings.size();++si){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",si);ImGui::TableSetColumnIndex(1);int argA=ent.settings[si].valueA;if(ImGui::InputInt(("##argA"+std::to_string(si)).c_str(),&argA)){argA=std::clamp(argA,0,255);const auto raw=(static_cast<std::uint32_t>(ent.settings[si].valueB)<<8)|(static_cast<std::uint32_t>(argA)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a4U,si,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}ImGui::TableSetColumnIndex(2);int argB=ent.settings[si].valueB;if(ImGui::InputInt(("##argB"+std::to_string(si)).c_str(),&argB)){argB=std::clamp(argB,-8388608,8388607);const auto raw=(static_cast<std::uint32_t>(argB)<<8)|(static_cast<std::uint32_t>(ent.settings[si].valueA)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a4U,si,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}ImGui::EndTable();}}if(!ent.victims.empty()){ImGui::Separator();ImGui::Text("Victim List (%zu)",ent.victims.size());for(std::size_t vi=0;vi<ent.victims.size();++vi){int victim=ent.victims[vi];ImGui::PushID(static_cast<int>(vi));if(ImGui::InputInt("Object ID",&victim)){victim=std::clamp(victim,-32768,32767);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0287U,vi,victim))entityDataChanged_=true;}ImGui::PopID();}}if(ent.hasBoxCount){int v=ent.boxCount;if(ImGui::InputInt("Box Count (Willy)",&v)){const auto raw=(static_cast<std::uint32_t>(v)<<8)|(static_cast<std::uint32_t>(ent.properties.empty()?0:0)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x028bU,0,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}if(ent.hasDdaSettings){int v=ent.ddaDeathCount;if(ImGui::InputInt("DDA Death / 1-Up Count",&v)){const auto raw=static_cast<std::uint32_t>(v)<<8;if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0277U,0,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}if(ent.hasDdaSection){int v=ent.ddaSection;if(ImGui::InputInt("DDA Section",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0288U,0,v))entityDataChanged_=true;}}}ImGui::Text("Declared length: %u | Properties: %zu",ent.declaredLength,ent.properties.size());if(!ent.error.empty())ImGui::TextWrapped("%s",ent.error.c_str());if(ImGui::BeginTable("EntityPropertyTable",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)){ImGui::TableSetupColumn("Property");ImGui::TableSetupColumn("ID");ImGui::TableSetupColumn("Type");ImGui::TableSetupColumn("Rows");ImGui::TableSetupColumn("Decoded values");ImGui::TableHeadersRow();for(const auto&prop:ent.properties){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted(entityPropertyName(static_cast<std::uint16_t>(prop.id)));ImGui::TableSetColumnIndex(1);ImGui::Text("0x%03X",static_cast<unsigned>(static_cast<std::uint16_t>(prop.id)));ImGui::TableSetColumnIndex(2);ImGui::Text("%u / %u B",prop.type,prop.elementSize);ImGui::TableSetColumnIndex(3);ImGui::Text("%d",prop.rowCount);ImGui::TableSetColumnIndex(4);if(!prop.error.empty())ImGui::TextDisabled("%s",prop.error.c_str());else if(!prop.positions.empty()){for(const auto&v:prop.positions)ImGui::Text("%d, %d, %d",v.x,v.y,v.z);}else if(!prop.intValues.empty()){std::string vals;for(std::size_t vi=0;vi<std::min<std::size_t>(prop.intValues.size(),8);++vi){if(vi)vals+=", ";vals+=std::to_string(prop.intValues[vi]);}if(prop.intValues.size()>8)vals+=" ...";ImGui::TextWrapped("%s",vals.c_str());}else ImGui::TextDisabled("%zu bytes (raw)",prop.dataSize);}ImGui::EndTable();}}}}else ImGui::TextWrapped("Entry could not be decoded: %s",e.error.c_str());}}else ImGui::TextDisabled("Specialized resource decoding is pending.");}else ImGui::TextDisabled("Select an NSD, spawn point, or NSF chunk.");ImGui::End();}if(entityDataChanged_){nsf_.decodeZones(gameVersion_==GameVersion::Crash3);entityDataChanged_=false;}if(assets_){ImGui::Begin("Asset Browser",&assets_);ImGui::TextDisabled("Texture previews, sound entries, and wavebank instruments will appear here after typed resource decoding.");ImGui::End();}}
