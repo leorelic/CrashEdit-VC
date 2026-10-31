@@ -308,7 +308,7 @@ void EditorUI::drawTextureViewer(){
  const int regionX=textureFormat_==0?textureX_*(8>>textureColorMode_):textureX_;
  const int regionY=textureFormat_==0?textureY_*4:textureY_;
  textureW_=std::clamp(textureW_,1,imageWidth-regionX);textureH_=std::clamp(textureH_,1,imageHeight-regionY);
- textureClutX_=std::clamp(textureClutX_,0,31);textureClutY_=std::clamp(textureClutY_,0,127);
+ textureClutX_=std::clamp(textureClutX_,0,15);textureClutY_=std::clamp(textureClutY_,0,127);
  ImGui::BeginChild("TexturePageCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar);
  const ImVec2 origin=ImGui::GetCursorScreenPos();ImDrawList*draw=ImGui::GetWindowDrawList();
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
@@ -322,13 +322,6 @@ void EditorUI::drawTextureViewer(){
   else{const std::size_t offset=row+static_cast<std::size_t>(x)*2U;if(offset+1U<page->bytes.size())color=convert5551(read16(offset));}
   const ImVec2 p0(origin.x+float(x)*textureZoom_,origin.y+float(y)*textureZoom_);const ImVec2 p1(p0.x+textureZoom_,p0.y+textureZoom_);draw->AddRectFilled(p0,p1,color);
  }}
- const ImVec2 r0(origin.x+float(regionX)*textureZoom_,origin.y+float(regionY)*textureZoom_);const ImVec2 r1(r0.x+float(textureW_)*textureZoom_,r0.y+float(textureH_)*textureZoom_);
- const ImU32 dim=IM_COL32(0,0,0,127);
- draw->AddRectFilled(ImVec2(origin.x,origin.y),ImVec2(origin.x+imageWidth*textureZoom_,r0.y),dim);
- draw->AddRectFilled(ImVec2(origin.x,r0.y),ImVec2(r0.x,r1.y),dim);
- draw->AddRectFilled(ImVec2(r1.x,r0.y),ImVec2(origin.x+imageWidth*textureZoom_,r1.y),dim);
- draw->AddRectFilled(ImVec2(origin.x,r1.y),ImVec2(origin.x+imageWidth*textureZoom_,origin.y+imageHeight*textureZoom_),dim);
- draw->AddRect(r0,r1,IM_COL32(0,0,0,255),0.0f,0,3.0f);draw->AddRect(ImVec2(r0.x+2,r0.y+2),ImVec2(r1.x-2,r1.y-2),IM_COL32(255,255,255,255),0.0f,0,1.0f);
  ImGui::SetCursorScreenPos(origin);
  ImGui::InvisibleButton("TextureSelection",ImVec2(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_));
  if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
@@ -347,6 +340,13 @@ void EditorUI::drawTextureViewer(){
   else{textureX_=left;textureY_=top;textureW_=std::max(1,width);textureH_=std::max(1,height);}
  }
  if(textureSelecting_&&ImGui::IsMouseReleased(ImGuiMouseButton_Left))textureSelecting_=false;
+ const ImVec2 r0(origin.x+float(regionX)*textureZoom_,origin.y+float(regionY)*textureZoom_);const ImVec2 r1(r0.x+float(textureW_)*textureZoom_,r0.y+float(textureH_)*textureZoom_);
+ const ImU32 dim=IM_COL32(0,0,0,127);
+ draw->AddRectFilled(ImVec2(origin.x,origin.y),ImVec2(origin.x+imageWidth*textureZoom_,r0.y),dim);
+ draw->AddRectFilled(ImVec2(origin.x,r0.y),ImVec2(r0.x,r1.y),dim);
+ draw->AddRectFilled(ImVec2(r1.x,r0.y),ImVec2(origin.x+imageWidth*textureZoom_,r1.y),dim);
+ draw->AddRectFilled(ImVec2(origin.x,r1.y),ImVec2(origin.x+imageWidth*textureZoom_,origin.y+imageHeight*textureZoom_),dim);
+ draw->AddRect(r0,r1,IM_COL32(0,0,0,255),0.0f,0,3.0f);draw->AddRect(ImVec2(r0.x+2,r0.y+2),ImVec2(r1.x-2,r1.y-2),IM_COL32(255,255,255,255),0.0f,0,1.0f);
  ImGui::Dummy(ImVec2(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_));
  ImGui::EndChild();ImGui::End();
 }
@@ -360,12 +360,12 @@ void EditorUI::drawClutEditor(){
  }
  if(!page){ImGui::TextDisabled("Select a type-1 Texture Chunk to inspect its CLUT palette.");ImGui::End();return;}
  ImGui::Text("Palette from texture page chunk %d",selectedChunk_);
- ImGui::TextUnformatted("CLUT X");ImGui::SameLine();ImGui::SetNextItemWidth(90.0f);ImGui::SliderInt("##ClutEditorX",&textureClutX_,0,textureColorMode_==0?31:0);
+ ImGui::TextUnformatted("CLUT X");ImGui::SameLine();ImGui::SetNextItemWidth(90.0f);ImGui::SliderInt("##ClutEditorX",&textureClutX_,0,15);
  ImGui::SameLine();ImGui::TextUnformatted("CLUT Y");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderInt("##ClutEditorY",&textureClutY_,0,127);
  const int count=textureColorMode_==0?16:(textureColorMode_==1?256:0);
  if(count==0){ImGui::TextDisabled("16-bit direct color has no CLUT.");ImGui::End();return;}
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
- const int columns=16;
+ const int columns=count;
  for(int i=0;i<count;++i){
   const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?textureClutX_*16:0)+i)*2U;
   if(offset+1U>=page->bytes.size())continue;
