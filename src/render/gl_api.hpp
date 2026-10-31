@@ -69,6 +69,7 @@ CRASHEDIT_GL_PROC(void, Disable, (unsigned int));
 CRASHEDIT_GL_PROC(void, DepthFunc, (unsigned int));
 CRASHEDIT_GL_PROC(void, BlendFunc, (unsigned int, unsigned int));
 CRASHEDIT_GL_PROC(void, BlendFuncSeparate, (unsigned int, unsigned int, unsigned int, unsigned int));
+CRASHEDIT_GL_PROC(void, BlendEquation, (unsigned int));
 CRASHEDIT_GL_PROC(void, DepthMask, (unsigned char));
 
 #undef CRASHEDIT_GL_PROC
@@ -132,6 +133,7 @@ inline bool load(std::string& error) {
     CRASHEDIT_LOAD_GL(DepthFunc)
     CRASHEDIT_LOAD_GL(BlendFunc)
     CRASHEDIT_LOAD_GL(BlendFuncSeparate)
+    CRASHEDIT_LOAD_GL(BlendEquation)
     CRASHEDIT_LOAD_GL(DepthMask)
 #undef CRASHEDIT_LOAD_GL
     return error.empty();
