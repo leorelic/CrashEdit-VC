@@ -3,8 +3,6 @@
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -13,7 +11,6 @@
 #include <cstdint>
 #include <chrono>
 #include <filesystem>
-#include <map>
 #include <tuple>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -29,22 +26,38 @@ static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
 static const char* chunkTypeName(std::uint16_t t){switch(t){case 0:return "Entry Chunk";case 1:return "Texture Chunk";case 2:return "Old Sound Chunk";case 3:return "Sound Chunk";case 4:return "Wavebank Chunk";case 5:return "Speech Chunk";default:return "Unknown Chunk";}}
-static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,unsigned int texture){
+static void pixelIcon(ImDrawList*d,ImVec2 p,float s,const char*key){
+ auto r=[&](int x,int y,int w,int h,ImU32 c){d->AddRectFilled(ImVec2(p.x+x*s,p.y+y*s),ImVec2(p.x+(x+w)*s,p.y+(y+h)*s),c);};
+ const ImU32 ink=IM_COL32(25,30,39,255),white=IM_COL32(245,240,220,255);
+ const std::string k=key?key:"";
+ if(k=="ThingViolet"){r(2,1,12,14,IM_COL32(82,42,151,255));r(4,3,8,10,IM_COL32(229,151,43,255));r(5,5,6,6,IM_COL32(62,157,70,255));r(7,6,3,4,IM_COL32(65,177,224,255));r(3,2,2,2,IM_COL32(255,211,90,255));}
+ else if(k=="ThingBlue"){r(1,2,14,12,IM_COL32(24,80,139,255));r(2,4,12,8,IM_COL32(68,178,230,255));r(2,10,12,4,IM_COL32(39,126,54,255));r(4,7,4,4,white);r(9,8,4,3,IM_COL32(222,241,255,255));}
+ else if(k=="ThingLime"){r(1,1,14,14,IM_COL32(38,76,45,255));r(3,3,10,10,IM_COL32(169,210,128,255));r(4,4,2,2,IM_COL32(225,244,187,255));r(8,4,2,2,IM_COL32(225,244,187,255));r(5,7,6,4,IM_COL32(46,103,57,255));r(3,6,1,6,IM_COL32(211,232,164,255));r(12,6,1,6,IM_COL32(211,232,164,255));}
+ else if(k=="Painting"){r(1,1,14,14,IM_COL32(142,68,10,255));r(3,3,10,10,IM_COL32(246,173,45,255));r(4,4,8,7,IM_COL32(76,178,223,255));r(4,8,3,3,IM_COL32(48,133,56,255));r(8,7,4,4,IM_COL32(44,121,52,255));r(6,12,4,1,IM_COL32(255,224,120,255));}
+ else if(k.find("MusicNote")==0){ImU32 c=k=="MusicNoteBlue"?IM_COL32(49,111,230,255):k=="MusicNoteYellow"?IM_COL32(238,188,48,255):IM_COL32(225,73,58,255);r(10,1,3,11,c);r(6,3,7,2,c);r(4,11,5,3,c);r(2,12,4,3,c);r(10,1,2,2,white);}
+ else if(k.find("Speaker")==0){ImU32 c=k=="SpeakerBlue"?IM_COL32(54,126,211,255):IM_COL32(222,232,242,255);r(1,6,4,6,c);r(5,4,3,10,c);r(8,3,2,12,c);r(11,5,1,8,white);r(13,7,1,4,white);}
+ else if(k.find("Journal")==0||k=="File"){ImU32 c=k=="JournalOrange"?IM_COL32(222,132,39,255):k=="JournalBlue"?IM_COL32(59,133,196,255):k=="JournalGray"?IM_COL32(145,155,166,255):IM_COL32(220,232,243,255);r(3,1,10,14,c);r(2,2,2,12,IM_COL32(75,87,102,255));r(5,4,6,2,white);r(5,8,6,1,IM_COL32(91,107,123,255));r(5,10,6,1,IM_COL32(91,107,123,255));}
+ else if(k=="ThingCode"){r(2,1,12,14,IM_COL32(218,233,247,255));r(4,4,8,1,IM_COL32(69,129,187,255));r(4,7,2,3,IM_COL32(49,121,206,255));r(10,7,2,3,IM_COL32(49,121,206,255));r(7,6,2,5,ink);}
+ else if(k=="ThingCrimson"){r(8,1,6,4,IM_COL32(224,105,118,255));r(2,5,6,7,IM_COL32(194,73,87,255));r(8,5,6,7,IM_COL32(144,55,69,255));r(5,12,6,3,IM_COL32(117,42,56,255));r(8,5,1,10,white);}
+ else if(k=="ThingYellow"){r(2,3,12,11,IM_COL32(214,164,36,255));r(4,5,3,3,IM_COL32(224,75,56,255));r(9,4,3,3,IM_COL32(58,147,214,255));r(8,9,3,3,IM_COL32(62,169,82,255));}
+ else if(k=="ThingStar"){r(7,1,3,5,IM_COL32(255,205,44,255));r(5,5,7,4,IM_COL32(255,205,44,255));r(1,6,14,3,IM_COL32(255,205,44,255));r(4,9,8,3,IM_COL32(255,205,44,255));r(5,11,3,4,IM_COL32(255,205,44,255));r(9,11,3,4,IM_COL32(255,205,44,255));}
+ else if(k=="ThingDoor"){r(3,1,11,14,IM_COL32(171,101,21,255));r(5,3,8,12,IM_COL32(72,45,25,255));r(10,8,1,2,IM_COL32(255,212,88,255));}
+ else if(k=="Folder"||k=="FolderOpen"){r(1,4,7,3,IM_COL32(225,164,44,255));r(1,6,14,9,IM_COL32(177,111,25,255));r(2,8,12,6,IM_COL32(232,180,73,255));if(k=="FolderOpen")r(1,9,14,5,IM_COL32(245,194,87,255));}
+ else {r(2,2,12,12,IM_COL32(211,137,42,255));r(4,4,8,8,IM_COL32(255,211,102,255));}
+}
+static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,const char*icon){
  const ImVec2 row=ImGui::GetCursorScreenPos();
  const std::string padded=std::string("   ")+label;
  const bool open=ImGui::TreeNodeEx(padded.c_str(),flags);
- if(texture){
-  const float scale=ImGui::GetIO().FontGlobalScale;
-  const ImVec2 a(row.x+17.0f*scale,row.y+1.0f*scale),b(a.x+16.0f*scale,a.y+16.0f*scale);
-  ImGui::GetWindowDrawList()->AddImage((ImTextureID)(std::intptr_t)texture,a,b);
- }
+ const float scale=ImGui::GetIO().FontGlobalScale;
+ pixelIcon(ImGui::GetWindowDrawList(),ImVec2(row.x+17.0f*scale,row.y+1.0f*scale),scale,icon);
  return open;
 }
 static const char* chunkIconName(std::uint16_t type){
  switch(type){case 0:return "JournalOrange";case 1:return "Painting";case 2:case 3:return "JournalBlue";case 4:return "MusicNoteRed";case 5:return "JournalWhite";default:return "JournalGray";}
 }
 static const char* entryIconName(std::uint32_t type){
- switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 15:case 17:return "ThingOrange";default:return "ThingGray";}
+ switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 6:case 15:case 17:return "ThingOrange";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
@@ -109,30 +122,7 @@ void EditorUI::drawMenu(){
  ImGui::EndMenuBar();
 }
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF"))openDialog_=true;ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Save");ImGui::SameLine();ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
-unsigned int EditorUI::hierarchyIcon(const char*name){
- if(!hierarchyIconsLoaded_){
-  hierarchyIconsLoaded_=true;
-  const std::filesystem::path relative=std::filesystem::current_path()/"Assets"/"Images";
-  const std::filesystem::path source=CRASHEDIT_SOURCE_ASSET_DIR;
-  const std::filesystem::path directory=std::filesystem::is_directory(relative)?relative:source;
-  const char*names[]={"JournalOrange","Painting","JournalBlue","MusicNoteRed","JournalWhite","JournalGray","ThingLime","ThingBlue","ThingViolet","ThingOrange","ThingGray"};
-  for(const char*iconName:names){
-   const auto path=directory/(std::string(iconName)+".gif");
-   int width=0,height=0,channels=0;
-   unsigned char*pixels=stbi_load(path.string().c_str(),&width,&height,&channels,4);
-   if(!pixels)continue;
-   unsigned int texture=0;GL::GenTextures(1,&texture);GL::BindTexture(0x0DE1U,texture);
-   GL::TexParameteri(0x0DE1U,0x2801U,0x2601);GL::TexParameteri(0x0DE1U,0x2800U,0x2601);
-   GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
-   GL::PixelStorei(0x0CF5U,1);GL::TexImage2D(0x0DE1U,0,0x1908,width,height,0,0x1908U,0x1401U,pixels);
-   GL::BindTexture(0x0DE1U,0);stbi_image_free(pixels);
-   if(texture)hierarchyIcons_.emplace(iconName,texture);
-  }
- }
- const auto it=hierarchyIcons_.find(name?name:"");
- return it==hierarchyIcons_.end()?0U:it->second;
-}
-void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF..."))openDialog_=true;ImGui::Separator();if(nsfValid_){if(nsdValid_){if(ImGui::Selectable(("NSD — "+nsdPath_.filename().string()).c_str(),selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;}if(ImGui::TreeNode("Spawn Points")){for(std::size_t i=0;i<nsd_.spawns.size();++i){char b[96];std::snprintf(b,sizeof(b),"Spawn %03zu | Zone %s",i,Crash::eidToEName(static_cast<std::uint32_t>(nsd_.spawns[i].zoneEid)).c_str());if(ImGui::Selectable(b,selectedSpawn_==static_cast<int>(i))){selectedChunk_=-2;selectedSpawn_=static_cast<int>(i);}}ImGui::TreePop();}}else ImGui::TextDisabled("NSD missing or unreadable");if(ImGui::TreeNode((nsfPath_.filename().string()+"##nsf").c_str())){for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %08X (%s) | %s",i,textureEid,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | ID %08X | %s",i,static_cast<std::uint32_t>(c.chunkId),chunkTypeName(c.type));}bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,hierarchyIcon(chunkIconName(c.type)));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,hierarchyIcon(entryIconName(e.type)));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;}if(entryOpen){if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));if(ImGui::Selectable(entLabel,selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k))){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k)ImGui::BulletText("Item %zu | %zu bytes",k,e.items[k].size);}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);ImGui::End();}
+void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF..."))openDialog_=true;ImGui::Separator();if(nsfValid_){if(nsdValid_){if(ImGui::Selectable(("NSD — "+nsdPath_.filename().string()).c_str(),selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;}if(ImGui::TreeNode("Spawn Points")){for(std::size_t i=0;i<nsd_.spawns.size();++i){char b[96];std::snprintf(b,sizeof(b),"Spawn %03zu | Zone %s",i,Crash::eidToEName(static_cast<std::uint32_t>(nsd_.spawns[i].zoneEid)).c_str());if(ImGui::Selectable(b,selectedSpawn_==static_cast<int>(i))){selectedChunk_=-2;selectedSpawn_=static_cast<int>(i);}}ImGui::TreePop();}}else ImGui::TextDisabled("NSD missing or unreadable");if(ImGui::TreeNode((nsfPath_.filename().string()+"##nsf").c_str())){for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %08X (%s) | %s",i,textureEid,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | ID %08X | %s",i,static_cast<std::uint32_t>(c.chunkId),chunkTypeName(c.type));}bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconName(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconName(e.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;}if(entryOpen){if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));if(ImGui::Selectable(entLabel,selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k))){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k)ImGui::BulletText("Item %zu | %zu bytes",k,e.items[k].size);}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);ImGui::End();}
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
