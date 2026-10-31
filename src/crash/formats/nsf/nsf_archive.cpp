@@ -5,13 +5,45 @@
 namespace CrashEdit::Crash {
 static std::uint16_t u16(const std::vector<std::uint8_t>&d,std::size_t p){return std::uint16_t(d[p])|std::uint16_t(std::uint16_t(d[p+1])<<8);}
 static std::uint32_t u32(const std::vector<std::uint8_t>&d,std::size_t p){return std::uint32_t(d[p])|(std::uint32_t(d[p+1])<<8)|(std::uint32_t(d[p+2])<<16)|(std::uint32_t(d[p+3])<<24);}
+static std::int32_t i32(const std::vector<std::uint8_t>&d,std::size_t p){return static_cast<std::int32_t>(u32(d,p));}
 static bool has(const std::vector<std::uint8_t>&d,std::size_t p,std::size_t n){return p<=d.size()&&n<=d.size()-p;}
 static void checksum(std::vector<std::uint8_t>&d){std::uint32_t c=0x12345678;for(std::size_t i=0;i<NsfChunkSize;++i){if(i<12||i>=16)c+=d[i];c=(c<<3)|(c>>29);}for(int i=0;i<4;++i)d[12+i]=std::uint8_t(c>>(8*i));}
+static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item,std::size_t itemIndex,NsfEntity&out){
+ const std::size_t base=item.offset,end=base+item.size;out.itemIndex=itemIndex;
+ if(item.size<16){out.error="Entity header is truncated.";return false;}
+ out.declaredLength=u32(bytes,base);const std::uint32_t count=u32(bytes,base+12);
+ if(count>8192||16ULL+static_cast<std::uint64_t>(count)*8ULL>item.size){out.error="Entity property descriptor table is invalid.";return false;}
+ if(out.declaredLength!=item.size)out.error="Entity length field does not match item size.";
+ for(std::uint32_t n=0;n<count;++n){
+  const std::size_t q=base+16U+static_cast<std::size_t>(n)*8U;
+  NsfEntityProperty p;p.id=static_cast<std::int16_t>(u16(bytes,q));p.rawType=bytes[q+4];p.type=static_cast<std::uint8_t>(p.rawType&31U);
+  p.last=(p.rawType&0x80U)!=0;p.sparse=(p.rawType&0x40U)!=0;p.hasMetaValues=(p.rawType&0x20U)!=0;
+  if(static_cast<std::uint16_t>(p.id)==0x0103U&&p.type==0x13U)p.type=4;
+  p.elementSize=bytes[q+5];p.rowCount=static_cast<std::int16_t>(u16(bytes,q+6));
+  const std::size_t dataStart=base+static_cast<std::size_t>(u16(bytes,q+2))+12U;
+  const std::size_t dataEnd=(n+1U==count)?end:base+static_cast<std::size_t>(u16(bytes,q+10))+12U;
+  if(dataStart<base+16U+static_cast<std::size_t>(count)*8U||dataEnd<dataStart||dataEnd>end){p.error="Property data range is invalid.";out.properties.push_back(std::move(p));continue;}
+  p.dataOffset=dataStart;p.dataSize=dataEnd-dataStart;p.valid=true;
+  if(p.rowCount<0){p.valid=false;p.error="Property row count is negative.";out.properties.push_back(std::move(p));continue;}
+  if((p.type==19U&&p.elementSize==4U)||(p.type==3U&&p.elementSize==4U)||(p.type==1U&&p.elementSize==1U)||(p.type==6U&&p.elementSize==6U)){
+   std::size_t pos=dataStart;std::vector<std::uint16_t> rowCounts;
+   if(p.sparse){if(!has(bytes,pos,static_cast<std::size_t>(p.rowCount)*2U)||pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Sparse property row counts are truncated.";}}
+   if(p.valid&&p.sparse){for(int r=0;r<p.rowCount;++r){rowCounts.push_back(u16(bytes,pos));pos+=2;}}
+   else if(p.valid){if(!has(bytes,pos,2)||pos+2>dataEnd){p.valid=false;p.error="Property value count is truncated.";}else{auto nvalues=u16(bytes,pos);pos+=2;rowCounts.assign(static_cast<std::size_t>(p.rowCount),nvalues);}}
+   if(p.valid&&p.hasMetaValues){if(pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Property metadata is truncated.";}else pos+=static_cast<std::size_t>(p.rowCount)*2U;}
+   if(p.valid){pos=(pos+3U)&~std::size_t(3U);for(auto nvalues:rowCounts){const std::size_t bytesNeeded=static_cast<std::size_t>(nvalues)*p.elementSize;if(pos+bytesNeeded>dataEnd){p.valid=false;p.error="Property values exceed their data range.";break;}
+    for(std::uint16_t k=0;k<nvalues;++k){if(p.type==6U){NsfEntityProperty::Position v{static_cast<std::int16_t>(u16(bytes,pos)),static_cast<std::int16_t>(u16(bytes,pos+2)),static_cast<std::int16_t>(u16(bytes,pos+4))};p.positions.push_back(v);}else if(p.type==1U)p.intValues.push_back(bytes[pos]);else p.intValues.push_back(i32(bytes,pos));pos+=p.elementSize;}
+   }}
+  }
+  out.properties.push_back(std::move(p));
+ }
+ out.valid=true;return true;
+}
 bool NsfArchive::load(const std::filesystem::path&f,std::string&e){
  std::ifstream s(f,std::ios::binary|std::ios::ate);if(!s){e="Could not open NSF file: "+f.string();return false;}
  auto end=s.tellg();if(end<0){e="Could not determine NSF file size.";return false;}
  auto z=static_cast<std::uintmax_t>(end);if(z>std::numeric_limits<std::size_t>::max()){e="NSF file too large.";return false;}
- std::vector<std::uint8_t>b(static_cast<std::size_t>(z));s.seekg(0);if(!b.empty()&&!s.read(reinterpret_cast<char*>(b.data()),static_cast<std::streamsize>(b.size()))){e="Could not read NSF file.";return false;}return loadBytes(b,e);
+ std::vector<std::uint8_t>b(static_cast<std::size_t>(z));s.seekg(0);if(!b.empty()&&!s.read(reinterpret_cast<char*>(b.data()),static_cast<std::streamsize>(b.size()))){e="Could not read NSF file." ;return false;}return loadBytes(b,e);
 }
 bool NsfArchive::loadBytes(const std::vector<std::uint8_t>&in,std::string&e){std::vector<NsfChunk> parsed;std::size_t p=0;while(p<in.size()){NsfChunk c;if(!decodeChunk(in,p,c,e))return false;parsed.push_back(std::move(c));}chunks_=std::move(parsed);return true;}
 bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,NsfChunk&o,std::string&e){
@@ -25,35 +57,50 @@ bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,Ns
  }else{e="Unknown NSF chunk magic.";return false;}
  o.type=u16(o.bytes,2);o.chunkId=static_cast<std::int32_t>(u32(o.bytes,4));
  if(o.type==0){
-  const std::uint32_t count=u32(o.bytes,8);
-  const std::uint64_t tableEnd=16ULL+(static_cast<std::uint64_t>(count)+1ULL)*4ULL;
+  const std::uint32_t count=u32(o.bytes,8);const std::uint64_t tableEnd=20ULL+static_cast<std::uint64_t>(count)*4ULL;
   if(tableEnd>NsfChunkSize){o.entryTableError="Entry offset table exceeds the 64 KiB chunk.";return true;}
   std::vector<std::uint32_t> offsets;offsets.reserve(static_cast<std::size_t>(count)+1U);
   for(std::uint32_t i=0;i<=count;++i)offsets.push_back(u32(o.bytes,16U+static_cast<std::size_t>(i)*4U));
-  bool valid=true;
-  for(std::size_t i=0;i<offsets.size();++i)if(offsets[i]<tableEnd||offsets[i]>NsfChunkSize||(i&&offsets[i]<offsets[i-1])){valid=false;break;}
+  bool valid=true;for(std::size_t i=0;i<offsets.size();++i)if(offsets[i]<tableEnd||offsets[i]>NsfChunkSize||(i&&offsets[i]<offsets[i-1])){valid=false;break;}
   if(!valid){o.entryTableError="Entry chunk contains invalid entry offsets.";return true;}
   o.entries.reserve(count);
   for(std::uint32_t i=0;i<count;++i){
-   NsfEntry entry;entry.offset=offsets[i];entry.size=offsets[i+1]-offsets[i];
-   const std::size_t p=entry.offset;
+   NsfEntry entry;entry.offset=offsets[i];entry.size=offsets[i+1]-offsets[i];const std::size_t q=entry.offset;
    if(entry.size<16){entry.error="Entry header is truncated.";o.entries.push_back(std::move(entry));continue;}
-   if(u32(o.bytes,p)!=0x0100FFFFU){entry.error="Entry magic mismatch.";o.entries.push_back(std::move(entry));continue;}
-   entry.eid=u32(o.bytes,p+4);entry.type=u32(o.bytes,p+8);entry.itemCount=u32(o.bytes,p+12);
-   const std::uint64_t headerEnd=16ULL+static_cast<std::uint64_t>(entry.itemCount)*8ULL;
+   if(u32(o.bytes,q)!=0x0100FFFFU){entry.error="Entry magic mismatch.";o.entries.push_back(std::move(entry));continue;}
+   entry.eid=u32(o.bytes,q+4);entry.type=u32(o.bytes,q+8);entry.itemCount=u32(o.bytes,q+12);
+   const std::uint64_t headerEnd=16ULL+(static_cast<std::uint64_t>(entry.itemCount)+1ULL)*4ULL;
    if(headerEnd>entry.size){entry.error="Item offset table exceeds entry boundary.";o.entries.push_back(std::move(entry));continue;}
-   bool itemsValid=true;
-   for(std::uint32_t j=0;j<entry.itemCount;++j){
-    const std::size_t q=p+16U+static_cast<std::size_t>(j)*8U;
-    const std::uint32_t begin=u32(o.bytes,q),end=u32(o.bytes,q+4);
-    if(begin<headerEnd||end<begin||end>entry.size){itemsValid=false;break;}
-   }
-   if(!itemsValid){entry.error="Entry contains an invalid item range.";o.entries.push_back(std::move(entry));continue;}
+   std::vector<std::uint32_t> itemOffsets;itemOffsets.reserve(static_cast<std::size_t>(entry.itemCount)+1U);
+   for(std::uint32_t j=0;j<=entry.itemCount;++j)itemOffsets.push_back(u32(o.bytes,q+16U+static_cast<std::size_t>(j)*4U));
+   bool itemsValid=true;for(std::size_t j=0;j<itemOffsets.size();++j)if(itemOffsets[j]<headerEnd||itemOffsets[j]>entry.size||(j&&itemOffsets[j]<itemOffsets[j-1])){itemsValid=false;break;}
+   if(!itemsValid){entry.error="Entry contains an invalid item offset table.";o.entries.push_back(std::move(entry));continue;}
+   for(std::uint32_t j=0;j<entry.itemCount;++j)entry.items.push_back({q+itemOffsets[j],itemOffsets[j+1]-itemOffsets[j]});
    entry.valid=true;o.entries.push_back(std::move(entry));
   }
   o.entryTableValid=true;
  }
  return true;
+}
+void NsfArchive::decodeZones(bool crash3Retail){
+ for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==7){
+  NsfZone z;z.isCrash3Retail=crash3Retail;
+  if(entry.items.size()<2){z.error="Zone entry requires a header and layout item.";entry.zone=std::move(z);continue;}
+  z.headerSize=crash3Retail?0x358U:0x318U;const auto&header=entry.items[0];const auto&layout=entry.items[1];
+  if(header.size!=z.headerSize){z.error="Zone header size does not match selected game version (expected "+std::to_string(z.headerSize)+" bytes).";entry.zone=std::move(z);continue;}
+  if(layout.size<0x24){z.error="Zone layout item is shorter than 0x24 bytes.";entry.zone=std::move(z);continue;}
+  const auto&b=chunk.bytes;const std::size_t h=header.offset,l=layout.offset;
+  z.worldCount=i32(b,h);z.infoCount=i32(b,h+0x184);z.cameraCount=i32(b,h+0x188);z.entityCount=i32(b,h+0x18c);z.zoneCount=i32(b,h+0x190);
+  if(z.worldCount<0||z.worldCount>8||z.cameraCount<0||z.entityCount<0||z.zoneCount<0||z.zoneCount>(crash3Retail?16:8)){z.error="Zone header contains invalid counts.";entry.zone=std::move(z);continue;}
+  for(int i=0;i<8;++i)z.worlds.push_back(i32(b,h+4+static_cast<std::size_t>(i)*0x30));
+  const int links=crash3Retail?16:8;for(int i=0;i<links;++i){z.zones.push_back(i32(b,h+0x194+static_cast<std::size_t>(i)*4));z.zoneLinkTypes.push_back(i32(b,h+(crash3Retail?0x1d4:0x1b4)+static_cast<std::size_t>(i)*4));}
+  z.zoneFlags=i32(b,h+(crash3Retail?0x2dc:0x29c));z.music=i32(b,h+(crash3Retail?0x2e4:0x2a4));
+  z.x=i32(b,l);z.y=i32(b,l+4);z.z=i32(b,l+8);z.width=i32(b,l+12);z.height=i32(b,l+16);z.depth=i32(b,l+20);
+  z.collisionDepthX=u16(b,l+0x1e);z.collisionDepthY=u16(b,l+0x20);z.collisionDepthZ=u16(b,l+0x22);
+  for(std::size_t i=2;i<entry.items.size();++i){NsfEntity entity;if(!parseEntity(b,entry.items[i],i-2,entity)&&entity.error.empty())entity.error="Entity could not be decoded.";z.entities.push_back(std::move(entity));}
+  if(static_cast<std::size_t>(z.cameraCount)>z.entities.size()){z.error="Zone camera count exceeds the number of entity items.";entry.zone=std::move(z);continue;}
+  z.decoded=true;entry.zone=std::move(z);
+ }
 }
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
  std::ofstream s(f,std::ios::binary|std::ios::trunc);if(!s){e="Could not create NSF output.";return false;}
