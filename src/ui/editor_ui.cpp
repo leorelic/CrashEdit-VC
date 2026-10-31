@@ -339,22 +339,15 @@ void EditorUI::drawTextureViewer(){
    draw->AddRectFilled(p0,ImVec2(p0.x+textureZoom_,p0.y+textureZoom_),color);
   }
  }
+ // A single click moves the existing selection rectangle. Width and height
+ // remain controlled by the numeric fields; dragging does not resize it.
  if(imageHovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
-  const ImVec2 mouse=ImGui::GetIO().MousePos;
-  textureDragX_=std::clamp(static_cast<int>((mouse.x-origin.x)/textureZoom_),0,imageWidth-1);
-  textureDragY_=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
-  textureSelecting_=true;
- }
- if(textureSelecting_&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
   const ImVec2 mouse=ImGui::GetIO().MousePos;
   const int px=std::clamp(static_cast<int>((mouse.x-origin.x)/textureZoom_),0,imageWidth-1);
   const int py=std::clamp(static_cast<int>((mouse.y-origin.y)/textureZoom_),0,imageHeight-1);
-  const int left=std::min(textureDragX_,px),top=std::min(textureDragY_,py);
-  const int width=std::abs(px-textureDragX_)+1,height=std::abs(py-textureDragY_)+1;
-  if(textureFormat_==0){textureX_=left/scaleX;textureY_=top/4;textureW_=width;textureH_=height;}
-  else{textureX_=left;textureY_=top;textureW_=width;textureH_=height;}
+  if(textureFormat_==0){textureX_=px/scaleX;textureY_=py/4;}
+  else{textureX_=px;textureY_=py;}
  }
- if(textureSelecting_&&ImGui::IsMouseReleased(ImGuiMouseButton_Left))textureSelecting_=false;
  // Recalculate from the final controls every frame. This keeps the dim mask
  // and border persistent after any unrelated UI interaction.
  const int finalX=textureFormat_==0?textureX_*scaleX:textureX_;
