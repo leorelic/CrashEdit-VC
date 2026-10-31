@@ -139,7 +139,7 @@ void EditorUI::draw(){
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  ImGui::End();
  if(!restoredLastNsfPath_){
-  if(path_[0]=='\\0'&&!editorPreferences.lastNsfPath.empty())
+  if(path_[0]=='\0'&&!editorPreferences.lastNsfPath.empty())
    std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
   restoredLastNsfPath_=true;
  }
@@ -156,7 +156,7 @@ void EditorUI::draw(){
    ImGui::SameLine();
    if(ImGui::Button("Browse NSF...")){
 #ifdef _WIN32
-    OPENFILENAMEA ofn{};char selected[MAX_PATH]{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;ofn.lpstrFilter="Crash Bandicoot level archives (*.nsf)\\0*.nsf;*.NSF\\0All files (*.*)\\0*.*\\0";ofn.nFilterIndex=1;ofn.Flags=OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameA(&ofn))std::snprintf(path_,sizeof(path_),"%s",selected);
+    OPENFILENAMEA ofn{};char selected[MAX_PATH]{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;ofn.lpstrFilter="Crash Bandicoot level archives (*.nsf)\0*.nsf;*.NSF\0All files (*.*)\0*.*\0";ofn.nFilterIndex=1;ofn.Flags=OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameA(&ofn))std::snprintf(path_,sizeof(path_),"%s",selected);
 #else
     status_="Enter the NSF path above; native file browsing is not yet available on this platform.";
 #endif
