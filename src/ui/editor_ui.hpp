@@ -15,7 +15,7 @@ private:
  bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true;
  char path_[1024]{};
  std::filesystem::path nsfPath_,nsdPath_;
- int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1;
+ int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1;
  std::string status_="Ready — open a Crash 2 level archive.";
  GameVersion pendingVersion_=GameVersion::Crash2,gameVersion_=GameVersion::Crash2;
  Crash::NsfArchive nsf_; Crash::NsdFile nsd_; bool nsfValid_=false,nsdValid_=false;
