@@ -303,8 +303,10 @@ void EditorUI::drawTextureViewer(){
  ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("CLUT X",&textureClutX_);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("CLUT Y",&textureClutY_);ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderFloat("Zoom",&textureZoom_,0.5f,3.0f,"%.1fx");
  const int imageWidth=textureColorMode_==0?1024:(textureColorMode_==1?512:256);
  const int imageHeight=128;
- textureX_=std::clamp(textureX_,0,imageWidth-1);textureY_=std::clamp(textureY_,0,imageHeight-1);
- textureW_=std::clamp(textureW_,1,imageWidth-textureX_);textureH_=std::clamp(textureH_,1,imageHeight-textureY_);
+ textureX_=std::clamp(textureX_,0,textureFormat_==0?127:imageWidth-1);textureY_=std::clamp(textureY_,0,textureFormat_==0?31:imageHeight-1);
+ const int regionX=textureFormat_==0?textureX_*(8>>textureColorMode_):textureX_;
+ const int regionY=textureFormat_==0?textureY_*4:textureY_;
+ textureW_=std::clamp(textureW_,1,imageWidth-regionX);textureH_=std::clamp(textureH_,1,imageHeight-regionY);
  textureClutX_=std::clamp(textureClutX_,0,31);textureClutY_=std::clamp(textureClutY_,0,127);
  ImGui::BeginChild("TexturePageCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar);
  const ImVec2 origin=ImGui::GetCursorScreenPos();ImDrawList*draw=ImGui::GetWindowDrawList();
@@ -319,7 +321,7 @@ void EditorUI::drawTextureViewer(){
   else{const std::size_t offset=row+static_cast<std::size_t>(x)*2U;if(offset+1U<page->bytes.size())color=convert5551(read16(offset));}
   const ImVec2 p0(origin.x+float(x)*textureZoom_,origin.y+float(y)*textureZoom_);const ImVec2 p1(p0.x+textureZoom_,p0.y+textureZoom_);draw->AddRectFilled(p0,p1,color);
  }}
- const ImVec2 r0(origin.x+float(textureX_)*textureZoom_,origin.y+float(textureY_)*textureZoom_);const ImVec2 r1(r0.x+float(textureW_)*textureZoom_,r0.y+float(textureH_)*textureZoom_);
+ const ImVec2 r0(origin.x+float(regionX)*textureZoom_,origin.y+float(regionY)*textureZoom_);const ImVec2 r1(r0.x+float(textureW_)*textureZoom_,r0.y+float(textureH_)*textureZoom_);
  draw->AddRect(r0,r1,IM_COL32(0,0,0,255),0.0f,0,3.0f);draw->AddRect(ImVec2(r0.x+2,r0.y+2),ImVec2(r1.x-2,r1.y-2),IM_COL32(255,255,255,255),0.0f,0,1.0f);
  ImGui::Dummy(ImVec2(float(imageWidth)*textureZoom_,float(imageHeight)*textureZoom_));
  ImGui::EndChild();ImGui::End();
