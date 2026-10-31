@@ -403,6 +403,57 @@ void EditorUI::drawViewport(){
    const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};
    ImU32 base=IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);if(!f.page)return base;const ImU32 tex=sampleTexture(f,f.uv[0].x*wa+f.uv[1].x*wb+f.uv[2].x*wc,f.uv[0].y*wa+f.uv[1].y*wb+f.uv[2].y*wc);if((tex>>24)==0)return IM_COL32(0,0,0,0);const auto mul=[&](int sh){return static_cast<unsigned char>(std::min(255U,(((base>>sh)&255U)*((tex>>sh)&255U)*2U)/255U));};return IM_COL32(mul(IM_COL32_R_SHIFT),mul(IM_COL32_G_SHIFT),mul(IM_COL32_B_SHIFT),(tex>>24)&255U);
   };
+  // Zone guides are collected in camera space and submitted to the same
+  // depth buffer as scenery. ImGui draw-list primitives are screen-space
+  // overlays and therefore cannot be occluded by walls.
+  struct OverlaySegment{Projected a,b;ImU32 color;float width;};
+  struct OverlayMarker{Projected p;ImU32 color;float radius;};
+  std::vector<OverlaySegment> overlaySegments;
+  std::vector<OverlayMarker> overlayMarkers;
+  auto addOverlaySegment=[&](Projected a,Projected b,ImU32 color,float width){
+   if(a.depth>0.05f&&b.depth>0.05f)overlaySegments.push_back({a,b,color,width});
+  };
+  auto addOverlayMarker=[&](Projected p,ImU32 color,float radius){
+   if(p.depth>0.05f)overlayMarkers.push_back({p,color,radius});
+  };
+  if(zone){
+   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+   const V3 corners[8]={{origin.x,origin.y,origin.z},{origin.x+float(zone->width)/400.0f,origin.y,origin.z},{origin.x,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x,origin.y+float(zone->height)/400.0f,origin.z},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z},{origin.x,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f}};
+   const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
+   for(const auto&e:edges)addOverlaySegment(project(corners[e[0]]),project(corners[e[1]]),IM_COL32(110,155,190,180),1.2f);
+   for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){
+    const auto&entity=zone->entities[i];if(entity.positions.empty())continue;
+    std::vector<Projected> path;path.reserve(entity.positions.size());
+    for(const auto&p:entity.positions)path.push_back(project({origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f}));
+    for(std::size_t pi=1;pi<path.size();++pi)addOverlaySegment(path[pi-1],path[pi],IM_COL32(245,190,75,220),1.8f);
+    for(const auto&q:path)addOverlayMarker(q,IM_COL32(245,190,75,255),4.0f);
+   }
+   for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){
+    const auto&camera=zone->entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
+    for(const auto&p:camera.positions)path.push_back(project({origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f}));
+    for(std::size_t pi=1;pi<path.size();++pi)addOverlaySegment(path[pi-1],path[pi],IM_COL32(80,210,130,255),2.0f);
+    for(const auto&q:path)addOverlayMarker(q,IM_COL32(235,85,85,255),3.5f);
+   }
+   for(const auto*neighborEntry:neighborZoneEntries){
+    const auto&neighbor=neighborEntry->zone;
+    const V3 neighborOrigin{float(neighbor.x)/400.0f,float(neighbor.y)/400.0f,float(neighbor.z)/400.0f};
+    const V3 neighborCorners[8]={{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f}};
+    for(const auto&e:edges)addOverlaySegment(project(neighborCorners[e[0]]),project(neighborCorners[e[1]]),IM_COL32(110,155,190,128),1.0f);
+    for(std::size_t i=static_cast<std::size_t>(neighbor.cameraCount);i<neighbor.entities.size();++i){
+     const auto&entity=neighbor.entities[i];if(entity.positions.empty())continue;
+     std::vector<Projected> path;path.reserve(entity.positions.size());
+     for(const auto&p:entity.positions)path.push_back(project({neighborOrigin.x+float(p.x)/100.0f,neighborOrigin.y+float(p.y)/100.0f,neighborOrigin.z+float(p.z)/100.0f}));
+     for(std::size_t pi=1;pi<path.size();++pi)addOverlaySegment(path[pi-1],path[pi],IM_COL32(245,190,75,128),1.2f);
+     for(const auto&q:path)addOverlayMarker(q,IM_COL32(245,190,75,128),3.0f);
+    }
+    for(int i=0;i+2<neighbor.cameraCount&&static_cast<std::size_t>(i+2)<neighbor.entities.size();i+=3){
+     const auto&camera=neighbor.entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
+     for(const auto&p:camera.positions)path.push_back(project({neighborOrigin.x+float(p.x)/400.0f,neighborOrigin.y+float(p.y)/400.0f,neighborOrigin.z+float(p.z)/400.0f}));
+     for(std::size_t pi=1;pi<path.size();++pi)addOverlaySegment(path[pi-1],path[pi],IM_COL32(80,210,130,128),1.4f);
+     for(const auto&q:path)addOverlayMarker(q,IM_COL32(235,85,85,128),2.5f);
+    }
+   }
+  }
   if(editorPreferences.softwareRendering){
    for(const auto&f:faces){
     const int subdivisions=2;
@@ -595,6 +646,51 @@ void EditorUI::drawViewport(){
      drawBlendPass(0,0x8006U,0x0302U,0x0303U); // standard alpha
      drawBlendPass(2,0x800BU,1U,1U);           // reverse subtract
      drawBlendPass(1,0x8006U,1U,1U);           // additive
+     // Submit zone guides as camera-space billboards into the existing
+     // scenery framebuffer. Their clip-space depth is tested against scenery.
+     std::vector<GpuVertex> guideVertices;
+     guideVertices.reserve(overlaySegments.size()*6U+overlayMarkers.size()*36U);
+     auto guideVertex=[&](float sx,float sy,float depth,ImU32 color){
+      const float x=2.0f*(sx-canvasMin.x)/canvasSize.x-1.0f;
+      const float y=1.0f-2.0f*(sy-canvasMin.y)/canvasSize.y;
+      constexpr float nearPlane=0.05f,farPlane=200.0f;
+      const float clipZ=((farPlane+nearPlane)/(farPlane-nearPlane))*depth-(2.0f*farPlane*nearPlane)/(farPlane-nearPlane);
+      auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U)/255.0f;};
+      return GpuVertex{x*depth,y*depth,clipZ,depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f};
+     };
+     auto addGuideTriangle=[&](const GpuVertex&a,const GpuVertex&b,const GpuVertex&c){guideVertices.push_back(a);guideVertices.push_back(b);guideVertices.push_back(c);};
+     for(const auto&line:overlaySegments){
+      const float dx=line.b.x-line.a.x,dy=line.b.y-line.a.y,length=std::sqrt(dx*dx+dy*dy);
+      if(length<=0.001f)continue;
+      const float ox=-dy/length*(line.width*0.5f),oy=dx/length*(line.width*0.5f);
+      const auto a=guideVertex(line.a.x+ox,line.a.y+oy,line.a.depth,line.color);
+      const auto b=guideVertex(line.a.x-ox,line.a.y-oy,line.a.depth,line.color);
+      const auto c=guideVertex(line.b.x+ox,line.b.y+oy,line.b.depth,line.color);
+      const auto d=guideVertex(line.b.x-ox,line.b.y-oy,line.b.depth,line.color);
+      addGuideTriangle(a,b,c);addGuideTriangle(c,b,d);
+     }
+     constexpr int markerSteps=12;
+     for(const auto&marker:overlayMarkers){
+      const auto center=guideVertex(marker.p.x,marker.p.y,marker.p.depth,marker.color);
+      for(int step=0;step<markerSteps;++step){
+       const float a=float(step)*6.28318530718f/float(markerSteps);
+       const float b=float(step+1)*6.28318530718f/float(markerSteps);
+       const auto va=guideVertex(marker.p.x+std::cos(a)*marker.radius,marker.p.y+std::sin(a)*marker.radius,marker.p.depth,marker.color);
+       const auto vb=guideVertex(marker.p.x+std::cos(b)*marker.radius,marker.p.y+std::sin(b)*marker.radius,marker.p.depth,marker.color);
+       addGuideTriangle(center,va,vb);
+      }
+     }
+     if(!guideVertices.empty()){
+      GL::DepthFunc(0x0203U);
+      GL::DepthMask(0);
+      GL::BlendEquation(0x8006U);
+      GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+      GL::Uniform1i(blendMaskLocation,3);GL::Uniform1i(hasTextureLocation,0);GL::Uniform1i(blendModeLocation,3);
+      const std::size_t guideBytes=guideVertices.size()*sizeof(GpuVertex);gpuUploadBytes+=guideBytes;
+      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(guideBytes),guideVertices.data(),0x88E8U);
+      GL::DrawArrays(0x0004U,0,static_cast<int>(guideVertices.size()));++gpuDrawCalls;
+      GL::DepthMask(1);GL::DepthFunc(0x0201U);
+     }
      GL::DepthMask(1);
      GL::BindTexture(0x0DE1U,0);
      GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
@@ -619,50 +715,11 @@ void EditorUI::drawViewport(){
    rendererDiagnostics.cachedTextureCount=gpu.textureCache.size();rendererDiagnostics.cachedTextureBytes=0;
    for(const auto&entry:gpu.textureCache){const int mode=std::clamp(std::get<1>(entry.first),0,2);rendererDiagnostics.cachedTextureBytes+=static_cast<std::size_t>(1024>>mode)*128U*4U;}
   }
-  if(zone){
-  const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
-  const V3 corners[8]={{origin.x,origin.y,origin.z},{origin.x+float(zone->width)/400.0f,origin.y,origin.z},{origin.x,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x,origin.y+float(zone->height)/400.0f,origin.z},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z},{origin.x,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f}};
-  const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
-  for(const auto&e:edges){const auto a=project(corners[e[0]]),b=project(corners[e[1]]);if(a.depth>0.05f&&b.depth>0.05f)dl->AddLine(ImVec2(a.x,a.y),ImVec2(b.x,b.y),IM_COL32(110,155,190,180),1.2f);}
-  // Draw each multi-position entity as a connected path, matching the
-  // original viewer's waypoint/path visualization.
-  for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){
-   const auto&entity=zone->entities[i];if(entity.positions.empty())continue;
-   std::vector<Projected> path;path.reserve(entity.positions.size());
-   for(const auto&p:entity.positions)path.push_back(project({origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f}));
-   for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(245,190,75,220),1.8f);
-   for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),4.0f,IM_COL32(245,190,75,255));
-  }
-  // Camera path is stored on the first entity of each three-entity camera
-  // group; the other two entities carry camera angle data.
-  for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){
-   const auto&camera=zone->entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
-   for(const auto&p:camera.positions)path.push_back(project({origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f}));
-   for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(80,210,130,255),2.0f);
-   for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.5f,IM_COL32(235,85,85,255));
-  }
-  // Render linked zones as translucent neighbors, matching OG CrashEdit's
-  // master (255 alpha) / neighbor (128 alpha) distinction.
-  for(const auto*neighborEntry:neighborZoneEntries){
-   const auto&neighbor=neighborEntry->zone;
-   const V3 neighborOrigin{float(neighbor.x)/400.0f,float(neighbor.y)/400.0f,float(neighbor.z)/400.0f};
-   const V3 corners[8]={{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f}};
-   const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
-   for(const auto&e:edges){const auto a=project(corners[e[0]]),b=project(corners[e[1]]);if(a.depth>0.05f&&b.depth>0.05f)dl->AddLine(ImVec2(a.x,a.y),ImVec2(b.x,b.y),IM_COL32(110,155,190,128),1.0f);}
-   for(std::size_t i=static_cast<std::size_t>(neighbor.cameraCount);i<neighbor.entities.size();++i){
-    const auto&entity=neighbor.entities[i];if(entity.positions.empty())continue;
-    std::vector<Projected> path;path.reserve(entity.positions.size());
-    for(const auto&p:entity.positions)path.push_back(project({neighborOrigin.x+float(p.x)/100.0f,neighborOrigin.y+float(p.y)/100.0f,neighborOrigin.z+float(p.z)/100.0f}));
-    for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(245,190,75,128),1.2f);
-    for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.0f,IM_COL32(245,190,75,128));
-   }
-   for(int i=0;i+2<neighbor.cameraCount&&static_cast<std::size_t>(i+2)<neighbor.entities.size();i+=3){
-    const auto&camera=neighbor.entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
-    for(const auto&p:camera.positions)path.push_back(project({neighborOrigin.x+float(p.x)/400.0f,neighborOrigin.y+float(p.y)/400.0f,neighborOrigin.z+float(p.z)/400.0f}));
-    for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(80,210,130,128),1.4f);
-    for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),2.5f,IM_COL32(235,85,85,128));
-   }
-  }
+  // The software renderer has no depth attachment; retain its 2D guide
+  // rendering. The GPU renderer draws these guides with depth testing.
+  if(editorPreferences.softwareRendering){
+   for(const auto&line:overlaySegments)dl->AddLine(ImVec2(line.a.x,line.a.y),ImVec2(line.b.x,line.b.y),line.color,line.width);
+   for(const auto&marker:overlayMarkers)dl->AddCircleFilled(ImVec2(marker.p.x,marker.p.y),marker.radius,marker.color);
   }
   char stats[384];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
   char performanceStats[384];std::snprintf(performanceStats,sizeof(performanceStats),"CPU scene build: %.2f ms | GPU submit (CPU): %.2f ms | Draw calls: %zu | Upload: %.1f KiB | Texture cache: %zu (%.2f MiB)",rendererDiagnostics.sceneBuildMs,rendererDiagnostics.gpuSubmitCpuMs,rendererDiagnostics.gpuDrawCalls,double(rendererDiagnostics.gpuUploadBytes)/1024.0,rendererDiagnostics.cachedTextureCount,double(rendererDiagnostics.cachedTextureBytes)/(1024.0*1024.0));
