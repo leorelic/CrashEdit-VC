@@ -881,7 +881,7 @@ void EditorUI::drawSpawnPointsEditor(){
  ImGui::Text("Level ID");
  ImGui::SameLine();
  ImGui::SetNextItemWidth(90.0f);
- if(ImGui::InputScalar("##SpawnLevelID",ImGuiDataType_S32,&nsd_.id,nullptr,nullptr,"%02X",ImGuiInputTextFlags_CharsHexadecimal))nsd_.id&=0xFF;
+ ImGui::InputScalar("##SpawnLevelID",ImGuiDataType_S32,&nsd_.id,nullptr,nullptr,"%02X",ImGuiInputTextFlags_CharsHexadecimal);
  ImGui::SameLine();ImGui::Text("Entity Count: %d",nsd_.entityCount);
  ImGui::Separator();
  const bool hasSelection=selectedSpawn_>=0&&static_cast<std::size_t>(selectedSpawn_)<nsd_.spawns.size();
