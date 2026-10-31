@@ -32,10 +32,10 @@ static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,ImU32 col
  const std::string padded=std::string("   ")+label;
  const bool open=ImGui::TreeNodeEx(padded.c_str(),flags);
  ImDrawList*draw=ImGui::GetWindowDrawList();
- const ImVec2 a(row.x+17.0f,row.y+2.0f),b(row.x+31.0f,row.y+16.0f);
- draw->AddRectFilled(a,b,color,3.0f);
- draw->AddRect(a,b,IM_COL32(255,255,255,70),3.0f);
- draw->AddText(ImVec2(a.x+3.0f,a.y+1.0f),IM_COL32(255,255,255,255),glyph);
+ const float scale=ImGui::GetIO().FontGlobalScale;\n const ImVec2 a(row.x+17.0f*scale,row.y+2.0f*scale),b(row.x+31.0f*scale,row.y+16.0f*scale);
+ draw->AddRectFilled(a,b,color,3.0f*scale);
+ draw->AddRect(a,b,IM_COL32(255,255,255,70),3.0f*scale);
+ draw->AddText(ImVec2(a.x+3.0f*scale,a.y+1.0f*scale),IM_COL32(255,255,255,255),glyph);
  return open;
 }
 static ImU32 chunkIconColor(std::uint16_t type){
@@ -82,7 +82,36 @@ void EditorUI::draw(){
  if(ImGui::BeginPopupModal("Select Game Version",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};int choice=static_cast<int>(pendingVersion_);if(ImGui::Combo("Game version",&choice,names,7))pendingVersion_=static_cast<GameVersion>(choice);if(ImGui::Button("Open Level")){std::string e;if(loadLevel(std::filesystem::u8path(path_),e)){ImGui::CloseCurrentPopup();}else status_="Could not open level: "+e;}ImGui::SameLine();if(ImGui::Button("Back")){ImGui::CloseCurrentPopup();openDialog_=true;}ImGui::EndPopup();}
  if(about_){ImGui::OpenPopup("About CrashEdit");about_=false;}if(ImGui::BeginPopupModal("About CrashEdit",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::Text("CrashEdit — cross-platform rewrite");ImGui::Text("C++20 / Dear ImGui / GLFW / OpenGL");if(ImGui::Button("Close"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
 }
-void EditorUI::drawMenu(){if(!ImGui::BeginMenuBar())return;if(ImGui::BeginMenu("File")){if(ImGui::MenuItem("Open NSF...","Ctrl+O"))openDialog_=true;if(ImGui::MenuItem("Export Edited NSF...","Ctrl+Shift+S",false,nsfValid_)){auto out=nsfPath_.parent_path()/(nsfPath_.stem().string()+"_edited.nsf");std::string saveError;if(nsf_.saveUncompressed(out,saveError))status_="Exported edited NSF: "+out.string();else status_="NSF export failed: "+saveError;}if(ImGui::MenuItem("Close Workspace",nullptr,false,workspace_.isOpen())){workspace_.close();nsfValid_=nsdValid_=false;status_="Workspace closed.";}ImGui::Separator();if(ImGui::MenuItem("Exit"))std::exit(0);ImGui::EndMenu();}if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&properties_);ImGui::MenuItem("Console / Diagnostics",nullptr,&console_);ImGui::MenuItem("Asset Browser",nullptr,&assets_);ImGui::EndMenu();}if(ImGui::BeginMenu("Experimental")){static bool useModernFont=false;static int uiScaling=100;auto&io=ImGui::GetIO();if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;ImGui::SetNextItemWidth(190.0f);if(ImGui::SliderInt("UI Scaling",&uiScaling,100,200,"%d%%"))io.FontGlobalScale=static_cast<float>(uiScaling)/100.0f;ImGui::EndMenu();}if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}ImGui::EndMenuBar();}
+void EditorUI::drawMenu(){
+ static int uiScaling=100;
+ static int appliedScaling=100;
+ static ImGuiStyle baseStyle=ImGui::GetStyle();
+ auto&io=ImGui::GetIO();
+ if(uiScaling!=appliedScaling){
+  ImGui::GetStyle()=baseStyle;
+  ImGui::GetStyle().ScaleAllSizes(static_cast<float>(uiScaling)/100.0f);
+  appliedScaling=uiScaling;
+ }
+ io.FontGlobalScale=static_cast<float>(uiScaling)/100.0f;
+ if(!ImGui::BeginMenuBar())return;
+ if(ImGui::BeginMenu("File")){
+  if(ImGui::MenuItem("Open NSF...","Ctrl+O"))openDialog_=true;
+  if(ImGui::MenuItem("Export Edited NSF...","Ctrl+Shift+S",false,nsfValid_)){auto out=nsfPath_.parent_path()/(nsfPath_.stem().string()+"_edited.nsf");std::string saveError;if(nsf_.saveUncompressed(out,saveError))status_="Exported edited NSF: "+out.string();else status_="NSF export failed: "+saveError;}
+  if(ImGui::MenuItem("Close Workspace",nullptr,false,workspace_.isOpen())){workspace_.close();nsfValid_=nsdValid_=false;status_="Workspace closed.";}
+  ImGui::Separator();if(ImGui::MenuItem("Exit"))std::exit(0);ImGui::EndMenu();
+ }
+ if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
+ if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&properties_);ImGui::MenuItem("Console / Diagnostics",nullptr,&console_);ImGui::MenuItem("Asset Browser",nullptr,&assets_);ImGui::EndMenu();}
+ if(ImGui::BeginMenu("Experimental")){
+  static bool useModernFont=false;
+  if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
+  ImGui::SetNextItemWidth(190.0f*static_cast<float>(uiScaling)/100.0f);
+  ImGui::SliderInt("UI Scaling",&uiScaling,100,200,"%d%%");
+  ImGui::EndMenu();
+ }
+ if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}
+ ImGui::EndMenuBar();
+}
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF"))openDialog_=true;ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Save");ImGui::SameLine();ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
 void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF..."))openDialog_=true;ImGui::Separator();if(nsfValid_){if(nsdValid_){if(ImGui::Selectable(("NSD — "+nsdPath_.filename().string()).c_str(),selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;}if(ImGui::TreeNode("Spawn Points")){for(std::size_t i=0;i<nsd_.spawns.size();++i){char b[96];std::snprintf(b,sizeof(b),"Spawn %03zu | Zone %s",i,Crash::eidToEName(static_cast<std::uint32_t>(nsd_.spawns[i].zoneEid)).c_str());if(ImGui::Selectable(b,selectedSpawn_==static_cast<int>(i))){selectedChunk_=-2;selectedSpawn_=static_cast<int>(i);}}ImGui::TreePop();}}else ImGui::TextDisabled("NSD missing or unreadable");if(ImGui::TreeNode((nsfPath_.filename().string()+"##nsf").c_str())){for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %08X (%s) | %s",i,textureEid,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | ID %08X | %s",i,static_cast<std::uint32_t>(c.chunkId),chunkTypeName(c.type));}bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconColor(c.type),chunkIconGlyph(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconColor(e.type),entryIconGlyph(e.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;}if(entryOpen){if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));if(ImGui::Selectable(entLabel,selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k))){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k)ImGui::BulletText("Item %zu | %zu bytes",k,e.items[k].size);}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);ImGui::End();}
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
@@ -611,12 +640,12 @@ void EditorUI::drawTextureViewer(){
   ImGui::EndTabBar();
  }
  const char*modeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
- ImGui::TextUnformatted("Color mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);ImGui::Combo("##ColorMode",&textureColorMode_,modeNames,3);
+ ImGui::TextUnformatted("Color mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f*uiScale);ImGui::Combo("##ColorMode",&textureColorMode_,modeNames,3);
  const char*blendNames[]={"Semi-transparent bit","Opaque"};
- ImGui::SameLine();ImGui::TextUnformatted("Blend mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);ImGui::Combo("##BlendMode",&textureBlendMode_,blendNames,2);
- auto labeledInt=[](const char*label,const char*id,int*value){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt(id,value);};
+ ImGui::SameLine();ImGui::TextUnformatted("Blend mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f*uiScale);ImGui::Combo("##BlendMode",&textureBlendMode_,blendNames,2);
+ auto labeledInt=[](const char*label,const char*id,int*value){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f*uiScale);ImGui::InputInt(id,value);};
  labeledInt("X","##TextureX",&textureX_);ImGui::SameLine();labeledInt("Y","##TextureY",&textureY_);ImGui::SameLine();labeledInt("Width","##TextureWidth",&textureW_);ImGui::SameLine();labeledInt("Height","##TextureHeight",&textureH_);
- labeledInt("CLUT X","##ClutX",&textureClutX_);ImGui::SameLine();labeledInt("CLUT Y","##ClutY",&textureClutY_);ImGui::SameLine();ImGui::TextUnformatted("Zoom");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderFloat("##TextureZoom",&textureZoom_,0.5f,3.0f,"%.1fx");
+ labeledInt("CLUT X","##ClutX",&textureClutX_);ImGui::SameLine();labeledInt("CLUT Y","##ClutY",&textureClutY_);ImGui::SameLine();ImGui::TextUnformatted("Zoom");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f*uiScale);ImGui::SliderFloat("##TextureZoom",&textureZoom_,0.5f,3.0f,"%.1fx");
  const int imageWidth=textureColorMode_==0?1024:(textureColorMode_==1?512:256);
  constexpr int imageHeight=128;
  textureX_=std::clamp(textureX_,0,textureFormat_==0?127:imageWidth-1);
@@ -695,14 +724,14 @@ void EditorUI::drawClutEditor(){
  }
  if(!page){ImGui::TextDisabled("Select a type-1 Texture Chunk to inspect its CLUT palette.");ImGui::End();return;}
  ImGui::Text("Palette from texture page chunk %d",selectedChunk_);
- ImGui::TextUnformatted("CLUT Y");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderInt("##ClutEditorY",&textureClutY_,0,127);
+ ImGui::TextUnformatted("CLUT Y");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f*uiScale);ImGui::SliderInt("##ClutEditorY",&textureClutY_,0,127);
  const int count=textureColorMode_==0?16:(textureColorMode_==1?256:0);
  if(count==0){ImGui::TextDisabled("16-bit direct color has no CLUT.");ImGui::End();return;}
  textureClutY_=std::clamp(textureClutY_,0,127);
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
  ImGui::TextDisabled(textureColorMode_==0?"4-bit: each column is a separate CLUT X (16 colors per CLUT).":"8-bit: CLUT X is unused; the 256-entry palette is shown as a 16 x 16 grid.");
  if(ImGui::BeginTable("ClutPaletteGrid",16,ImGuiTableFlags_Borders|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
-  for(int x=0;x<16;++x){ImGui::TableSetupColumn(("X "+std::to_string(x)).c_str(),ImGuiTableColumnFlags_WidthFixed,22.0f);}
+  for(int x=0;x<16;++x){ImGui::TableSetupColumn(("X "+std::to_string(x)).c_str(),ImGuiTableColumnFlags_WidthFixed,22.0f*uiScale);}
   ImGui::TableHeadersRow();
   for(int row=0;row<16;++row){
    ImGui::TableNextRow();
@@ -716,7 +745,7 @@ void EditorUI::drawClutEditor(){
     const std::uint16_t raw=std::uint16_t(page->bytes[offset])|(std::uint16_t(page->bytes[offset+1])<<8);
     const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
     ImGui::PushID(row*16+col);
-    ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(20,20));
+    ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(20.0f*uiScale,20.0f*uiScale));
     ImGui::PopID();
    }
   }
