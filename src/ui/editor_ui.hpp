@@ -12,7 +12,7 @@ private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
  Workspace& workspace_;
- bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true;
+ bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true,entityDataChanged_=false;
  char path_[1024]{};
  std::filesystem::path nsfPath_,nsdPath_;
  int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1;
