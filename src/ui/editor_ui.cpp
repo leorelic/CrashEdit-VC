@@ -55,7 +55,7 @@ void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Butt
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
- ImGui::TextDisabled("CrashEdit-style viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned movement");
+ ImGui::TextDisabled("CrashEdit-style zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: movement speed");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  canvasSize.x=std::max(canvasSize.x,100.0f);canvasSize.y=std::max(canvasSize.y,100.0f);
@@ -112,11 +112,12 @@ void EditorUI::drawViewport(){
   }
  }
  if(zone&&sceneryCount>0){
+  if(sceneCameraZoneEid_!=zoneEntry->eid)sceneCameraInitialized_=false;
   if(!sceneCameraInitialized_){
    sceneTargetX_=(boundsMin.x+boundsMax.x)*0.5f;sceneTargetY_=(boundsMin.y+boundsMax.y)*0.5f;sceneTargetZ_=(boundsMin.z+boundsMax.z)*0.5f;
    const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
    const float radius=std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f;
-   sceneDistance_=std::max(2.0f,radius*2.8f+1.0f);sceneCameraInitialized_=true;
+   sceneDistance_=std::max(2.0f,radius*2.8f+1.0f);sceneCameraZoneEid_=zoneEntry->eid;sceneCameraInitialized_=true;
   }
  }
  const ImGuiIO&io=ImGui::GetIO();
@@ -191,10 +192,27 @@ void EditorUI::drawViewport(){
    }
   }
   std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
+  auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
+  auto lerpColor=[&](const Face&f,float wa,float wb,float wc){const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};return IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);};
   for(const auto&f:faces){
-   dl->AddTriangleFilled(ImVec2(f.p[0].x,f.p[0].y),ImVec2(f.p[1].x,f.p[1].y),ImVec2(f.p[2].x,f.p[2].y),f.color);
+   constexpr int subdivisions=8;
+   auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
+   for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
+    const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
+    const float a1=float(i+1)/n,b1=float(j)/n,c1=1.0f-a1-b1;
+    const float a2=float(i)/n,b2=float(j+1)/n,c2=1.0f-a2-b2;
+    dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),lerpColor(f,c,a,b));
+    if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),lerpColor(f,(c1+c3+c2)/3.0f,(a1+a3+a2)/3.0f,(b1+b3+b2)/3.0f));}
+   }
    ++faceCount;
   }
+  const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+  const V3 corners[8]={{origin.x,origin.y,origin.z},{origin.x+float(zone->width)/400.0f,origin.y,origin.z},{origin.x,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x,origin.y+float(zone->height)/400.0f,origin.z},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z},{origin.x,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f}};
+  const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
+  for(const auto&e:edges){const auto a=project(corners[e[0]]),b=project(corners[e[1]]);if(a.depth>0.05f&&b.depth>0.05f)dl->AddLine(ImVec2(a.x,a.y),ImVec2(b.x,b.y),IM_COL32(110,155,190,180),1.2f);}
+  for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){const auto&entity=zone->entities[i];if(entity.positions.empty())continue;const auto&p=entity.positions.front();const V3 world{origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),4.0f,IM_COL32(245,190,75,255));}
+  for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){const auto&camera=zone->entities[static_cast<std::size_t>(i)];for(const auto&p:camera.positions){const V3 world{origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.0f,IM_COL32(235,85,85,255));}}
+
   char stats[192];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,sceneDistance_);
   dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),Crash::eidToEName(zoneEntry->eid).c_str());
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(180,194,210,255),stats);
