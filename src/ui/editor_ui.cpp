@@ -85,10 +85,28 @@ void EditorUI::drawViewport(){
  std::vector<const Crash::NsfEntry*> sceneryEntries;
  if(standaloneScenery&&sceneryEntry)sceneryEntries.push_back(sceneryEntry);
  if(zone){
-  for(std::int32_t world:zone->worlds){
-   const std::uint32_t eid=static_cast<std::uint32_t>(world);
-   for(const auto&ch:nsf_.chunks())if(ch.type==0)
-    for(const auto&e:ch.entries)if(e.valid&&e.type==3&&e.eid==eid&&e.scenery.decoded)sceneryEntries.push_back(&e);
+  // The original ZoneEntryViewer renders scenery from linked zones, not from
+  // the selected zone's own world list. Each linked zone contributes its worlds.
+  const auto&chunks=nsf_.chunks();
+  for(std::size_t zi=0;zi<static_cast<std::size_t>(zone->zoneCount)&&zi<zone->zones.size();++zi){
+   const std::uint32_t linkedZoneEid=static_cast<std::uint32_t>(zone->zones[zi]);
+   for(const auto&zoneChunk:chunks){
+    if(zoneChunk.type!=0)continue;
+    for(const auto&linkedZoneEntry:zoneChunk.entries){
+     if(!linkedZoneEntry.valid||linkedZoneEntry.type!=7||linkedZoneEntry.eid!=linkedZoneEid||!linkedZoneEntry.zone.decoded)continue;
+     const auto&linkedZone=linkedZoneEntry.zone;
+     for(std::size_t wi=0;wi<static_cast<std::size_t>(linkedZone.worldCount)&&wi<linkedZone.worlds.size();++wi){
+      const std::uint32_t worldEid=static_cast<std::uint32_t>(linkedZone.worlds[wi]);
+      for(const auto&worldChunk:chunks){
+       if(worldChunk.type!=0)continue;
+       for(const auto&worldEntry:worldChunk.entries)
+        if(worldEntry.valid&&worldEntry.type==3&&worldEntry.eid==worldEid&&worldEntry.scenery.decoded&&
+           std::find(sceneryEntries.begin(),sceneryEntries.end(),&worldEntry)==sceneryEntries.end())
+         sceneryEntries.push_back(&worldEntry);
+      }
+     }
+    }
+   }
   }
  }
  struct V3{float x=0,y=0,z=0;};
@@ -100,7 +118,8 @@ void EditorUI::drawViewport(){
  auto includePoint=[&](V3 p){boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);};
  for(const auto*entry:sceneryEntries){
   const auto&sc=entry->scenery;++sceneryCount;vertexCount+=sc.vertices.size();
-  if(!zone)for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
+  // Scenery offsets are already world-space offsets; do not add zone XYZ.
+  for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
  }
  if(zone){
   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
@@ -170,8 +189,7 @@ void EditorUI::drawViewport(){
  if(!sceneryEntries.empty()){
   for(const auto*entry:sceneryEntries){
      const auto&sc=entry->scenery;
-     const V3 zoneOrigin=zone?V3{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f}:V3{};
-     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
+     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
      auto vertexColor=[&](std::uint16_t index)->ImU32{
       const auto&v=sc.vertices[index];
       if(v.colorIndex<sc.colors.size()){const auto&c=sc.colors[v.colorIndex];return IM_COL32(c.r,c.g,c.b,255);}
