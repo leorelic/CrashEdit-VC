@@ -115,29 +115,36 @@ void EditorUI::drawViewport(){
  std::vector<Face>faces;
  std::size_t sceneryCount=0,vertexCount=0,faceCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
+ V3 frameMin{FLT_MAX,FLT_MAX,FLT_MAX},frameMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
  auto includePoint=[&](V3 p){boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);};
+ auto includeFramePoint=[&](V3 p){frameMin.x=std::min(frameMin.x,p.x);frameMin.y=std::min(frameMin.y,p.y);frameMin.z=std::min(frameMin.z,p.z);frameMax.x=std::max(frameMax.x,p.x);frameMax.y=std::max(frameMax.y,p.y);frameMax.z=std::max(frameMax.z,p.z);};
  for(const auto*entry:sceneryEntries){
   const auto&sc=entry->scenery;++sceneryCount;vertexCount+=sc.vertices.size();
   // Scenery offsets are already world-space offsets; do not add zone XYZ.
   for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
  }
  if(zone){
+  // Match ZoneEntryViewer.CorePositions: frame the selected zone, its cameras,
+  // and its entities. Linked scenery can span neighboring worlds and must not
+  // pull the camera target away from the selected zone.
   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
-  includePoint(origin);
-  includePoint({origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f});
+  includeFramePoint(origin);
+  includeFramePoint({origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f});
   for(std::size_t i=0;i<zone->entities.size();++i){
    const auto&entity=zone->entities[i];
-   const bool camera=i<static_cast<std::size_t>(zone->cameraCount);
-   const float scale=camera?400.0f:100.0f;
-   for(const auto&p:entity.positions)includePoint({origin.x+float(p.x)/scale,origin.y+float(p.y)/scale,origin.z+float(p.z)/scale});
+   if(i<static_cast<std::size_t>(zone->cameraCount)&&i%3!=0)continue;
+   const float scale=i<static_cast<std::size_t>(zone->cameraCount)?400.0f:100.0f;
+   for(const auto&p:entity.positions)includeFramePoint({origin.x+float(p.x)/scale,origin.y+float(p.y)/scale,origin.z+float(p.z)/scale});
   }
+ }else{
+  frameMin=boundsMin;frameMax=boundsMax;
  }
  const std::uint32_t cameraResourceEid=zoneEntry?zoneEntry->eid:(sceneryEntry?sceneryEntry->eid:0U);
  if(!sceneryEntries.empty()&&sceneryCount>0){
   if(sceneCameraZoneEid_!=cameraResourceEid)sceneCameraInitialized_=false;
-  if(!sceneCameraInitialized_){
-   sceneTargetX_=(boundsMin.x+boundsMax.x)*0.5f;sceneTargetY_=(boundsMin.y+boundsMax.y)*0.5f;sceneTargetZ_=(boundsMin.z+boundsMax.z)*0.5f;
-   const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
+  if(!sceneCameraInitialized_&&frameMin.x!=FLT_MAX){
+   sceneTargetX_=(frameMin.x+frameMax.x)*0.5f;sceneTargetY_=(frameMin.y+frameMax.y)*0.5f;sceneTargetZ_=(frameMin.z+frameMax.z)*0.5f;
+   const float dx=frameMax.x-frameMin.x,dy=frameMax.y-frameMin.y,dz=frameMax.z-frameMin.z;
    const float radius=std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f;
    sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraZoneEid_=cameraResourceEid;sceneCameraInitialized_=true;
   }
@@ -227,8 +234,23 @@ void EditorUI::drawViewport(){
   const V3 corners[8]={{origin.x,origin.y,origin.z},{origin.x+float(zone->width)/400.0f,origin.y,origin.z},{origin.x,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x,origin.y+float(zone->height)/400.0f,origin.z},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z},{origin.x,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f}};
   const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
   for(const auto&e:edges){const auto a=project(corners[e[0]]),b=project(corners[e[1]]);if(a.depth>0.05f&&b.depth>0.05f)dl->AddLine(ImVec2(a.x,a.y),ImVec2(b.x,b.y),IM_COL32(110,155,190,180),1.2f);}
-  for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){const auto&entity=zone->entities[i];if(entity.positions.empty())continue;const auto&p=entity.positions.front();const V3 world{origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),4.0f,IM_COL32(245,190,75,255));}
-  for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){const auto&camera=zone->entities[static_cast<std::size_t>(i)];for(const auto&p:camera.positions){const V3 world{origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.0f,IM_COL32(235,85,85,255));}}
+  // Draw each multi-position entity as a connected path, matching the
+  // original viewer's waypoint/path visualization.
+  for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){
+   const auto&entity=zone->entities[i];if(entity.positions.empty())continue;
+   std::vector<Projected> path;path.reserve(entity.positions.size());
+   for(const auto&p:entity.positions)path.push_back(project({origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f}));
+   for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(245,190,75,220),1.8f);
+   for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),4.0f,IM_COL32(245,190,75,255));
+  }
+  // Camera path is stored on the first entity of each three-entity camera
+  // group; the other two entities carry camera angle data.
+  for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){
+   const auto&camera=zone->entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
+   for(const auto&p:camera.positions)path.push_back(project({origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f}));
+   for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(80,210,130,255),2.0f);
+   for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.5f,IM_COL32(235,85,85,255));
+  }
 
   }
   char stats[192];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,sceneDistance_);
