@@ -446,48 +446,6 @@ void EditorUI::drawViewport(){
      GL::DepthMask(1);
      for(const auto&batch:batches){
       const auto&page=std::get<0>(batch.first);
-      unsigned int texture=0;
-      if(page){
-       auto found=gpu.textureCache.find(batch.first);
-       if(found==gpu.textureCache.end()){
-        const int mode=std::clamp(std::get<1>(batch.first),0,2);
-        const int clutX=std::clamp(std::get<2>(batch.first),0,15);
-        const int clutY=std::clamp(std::get<3>(batch.first),0,127);
-        const int blendMode=std::get<4>(batch.first);
-        const int width=1024>>mode;
-        std::vector<std::uint8_t> rgba(static_cast<std::size_t>(width)*128U*4U,0);
-        const auto&bytes=*page;
-        auto expand5=[](unsigned value){return (value*255U+15U)/31U;};
-        for(int py=0;py<128;++py)for(int px=0;px<width;++px){
-         const std::size_t row=static_cast<std::size_t>(py)*512U;
-         std::uint16_t raw=0;bool valid=true;
-         if(mode==0||mode==1){
-          const unsigned index=mode==0?((bytes[row+static_cast<std::size_t>(px/2)]>>((px&1)?4:0))&15U):bytes[row+static_cast<std::size_t>(px)];
-          const std::size_t offset=static_cast<std::size_t>(clutY)*512U+static_cast<std::size_t>(clutX*16+static_cast<int>(index))*2U;
-          if(offset+1U>=bytes.size())valid=false;else raw=std::uint16_t(bytes[offset])|(std::uint16_t(bytes[offset+1U])<<8);
-         }else{
-          const std::size_t offset=row+static_cast<std::size_t>(px)*2U;
-          if(offset+1U>=bytes.size())valid=false;else raw=std::uint16_t(bytes[offset])|(std::uint16_t(bytes[offset+1U])<<8);
-         }
-         const std::size_t out=(static_cast<std::size_t>(py)*static_cast<std::size_t>(width)+static_cast<std::size_t>(px))*4U;
-         if(!valid){rgba[out]=255;rgba[out+1U]=0;rgba[out+2U]=255;rgba[out+3U]=255;continue;}
-         const unsigned red=expand5(raw&31U),green=expand5((raw>>5U)&31U),blue=expand5((raw>>10U)&31U);
-         rgba[out]=static_cast<std::uint8_t>(red);rgba[out+1U]=static_cast<std::uint8_t>(green);rgba[out+2U]=static_cast<std::uint8_t>(blue);
-         rgba[out+3U]=static_cast<std::uint8_t>((raw&0x7fffU)==0&&(raw&0x8000U)==0?0U:((raw&0x8000U)&&blendMode==0?128U:255U));
-        }
-        GL::GenTextures(1,&texture);GL::BindTexture(0x0DE1U,texture);
-        GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);
-        GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
-        GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());
-        gpu.textureCache.emplace(batch.first,texture);
-       }else texture=found->second;
-      }
-      GL::BindTexture(0x0DE1U,texture);
-      GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uHasTexture"),page?1:0);
-      const auto&vertices=batch.second;
-      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.empty()?nullptr:vertices.data(),0x88E8U);
-      if(!vertices.empty())GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
-     }
      GL::BindTexture(0x0DE1U,0);
      GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
      gpuRendered=true;
