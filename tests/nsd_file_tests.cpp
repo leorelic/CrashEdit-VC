@@ -44,6 +44,11 @@ int main() {
     writeI32(standard, 0x520, 1); // spawn count
     writeI32(standard, 0x528, 42); // NSD ID
     writeI32(standard, 0x52C, 9); // entity count
+    writeI32(standard, 0x418, 0x111); // uncompressed chunk section
+    writeI32(standard, 0x41C, 0x222); // prelude count
+    writeI32(standard, 0x420, 0x333); // first compressed chunk info
+    writeI32(standard, 0x524, 0x444); // blank/reserved value
+    standard[0x630] = 0xA5; // opaque extra data
     writeI32(standard, 0x6FC, 0x77); // spawn zone EID
     writeI32(standard, 0x700, 2);
     writeI32(standard, 0x704, 3);
