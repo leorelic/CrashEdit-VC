@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <cfloat>
 #include <cstdint>
 #include <chrono>
@@ -27,6 +28,7 @@ struct EditorPreferences {
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true;
  int sceneMoveSpeed=100;
+ std::string lastNsfPath;
 };
 static EditorPreferences editorPreferences;
 static void* readEditorSettingsOpen(ImGuiContext*,ImGuiSettingsHandler* handler,const char*){return handler->UserData;}
@@ -40,11 +42,12 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
+ else if(std::strncmp(line,"LastNSF=",8)==0)editorPreferences.lastNsfPath=line+8;
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0);
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -119,6 +122,9 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd)status_+=" Matching NSD unavailable: "+nsdError;
+ editorPreferences.lastNsfPath=file.string();
+ std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
+ ImGui::MarkIniSettingsDirty();
  return true;
 }
 void EditorUI::draw(){
@@ -132,16 +138,58 @@ void EditorUI::draw(){
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  ImGui::End();
- if(openDialog_){ImGui::OpenPopup("Open NSF");openDialog_=false;}
- if(ImGui::BeginPopupModal("Open NSF",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Select a level NSF. The game version is requested before the matching NSD is interpreted.");ImGui::InputText("NSF file path",path_,sizeof(path_));ImGui::SameLine();if(ImGui::Button("Browse NSF...")){
+ if(!restoredLastNsfPath_){
+  if(path_[0]=='\\0'&&!editorPreferences.lastNsfPath.empty())
+   std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
+  restoredLastNsfPath_=true;
+ }
+ const ImGuiViewport* dialogViewport=ImGui::GetMainViewport();
+ const ImVec2 dialogCenter=dialogViewport->GetCenter();
+ const ImGuiWindowFlags dialogFlags=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings;
+ if(openDialog_){
+  ImGui::SetNextWindowPos(dialogCenter,ImGuiCond_Appearing,ImVec2(0.5f,0.5f));
+  ImGui::SetNextWindowViewport(dialogViewport->ID);
+  ImGui::SetNextWindowFocus();
+  if(ImGui::Begin("Open NSF",&openDialog_,dialogFlags)){
+   ImGui::TextWrapped("Select a level NSF. The game version is requested before the matching NSD is interpreted.");
+   ImGui::SetNextItemWidth(420.0f);ImGui::InputText("NSF file path",path_,sizeof(path_));
+   ImGui::SameLine();
+   if(ImGui::Button("Browse NSF...")){
 #ifdef _WIN32
- OPENFILENAMEA ofn{};char selected[MAX_PATH]{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;ofn.lpstrFilter="Crash Bandicoot level archives (*.nsf)\0*.nsf;*.NSF\0All files (*.*)\0*.*\0";ofn.nFilterIndex=1;ofn.Flags=OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameA(&ofn))std::snprintf(path_,sizeof(path_),"%s",selected);
+    OPENFILENAMEA ofn{};char selected[MAX_PATH]{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;ofn.lpstrFilter="Crash Bandicoot level archives (*.nsf)\\0*.nsf;*.NSF\\0All files (*.*)\\0*.*\\0";ofn.nFilterIndex=1;ofn.Flags=OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameA(&ofn))std::snprintf(path_,sizeof(path_),"%s",selected);
 #else
- status_="Enter the NSF path above; native file browsing is not yet available on this platform.";
+    status_="Enter the NSF path above; native file browsing is not yet available on this platform.";
 #endif
- }if(ImGui::Button("Continue")){std::filesystem::path p=std::filesystem::u8path(path_);if(p.extension()==".nsf"||p.extension()==".NSF"){versionDialog_=true;ImGui::CloseCurrentPopup();}else status_="Please select an .nsf file.";}ImGui::SameLine();if(ImGui::Button("Cancel"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
- if(versionDialog_){ImGui::OpenPopup("Select Game Version");versionDialog_=false;}
- if(ImGui::BeginPopupModal("Select Game Version",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};int choice=static_cast<int>(pendingVersion_);if(ImGui::Combo("Game version",&choice,names,7))pendingVersion_=static_cast<GameVersion>(choice);if(ImGui::Button("Open Level")){std::string e;if(loadLevel(std::filesystem::u8path(path_),e)){ImGui::CloseCurrentPopup();}else status_="Could not open level: "+e;}ImGui::SameLine();if(ImGui::Button("Back")){ImGui::CloseCurrentPopup();openDialog_=true;}ImGui::EndPopup();}
+   }
+   if(ImGui::Button("Continue")){
+    std::filesystem::path p=std::filesystem::u8path(path_);
+    if(p.extension()==".nsf"||p.extension()==".NSF"){versionDialog_=true;openDialog_=false;}
+    else status_="Please select an .nsf file.";
+   }
+   ImGui::SameLine();
+   if(ImGui::Button("Cancel"))openDialog_=false;
+  }
+  ImGui::End();
+ }
+ if(versionDialog_){
+  ImGui::SetNextWindowPos(dialogCenter,ImGuiCond_Appearing,ImVec2(0.5f,0.5f));
+  ImGui::SetNextWindowViewport(dialogViewport->ID);
+  ImGui::SetNextWindowFocus();
+  if(ImGui::Begin("Choose the game version",&versionDialog_,dialogFlags)){
+   ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");
+   const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};
+   int choice=static_cast<int>(pendingVersion_);
+   if(ImGui::Combo("Game version",&choice,names,7))pendingVersion_=static_cast<GameVersion>(choice);
+   if(ImGui::Button("Open Level")){
+    std::string e;
+    if(loadLevel(std::filesystem::u8path(path_),e))versionDialog_=false;
+    else status_="Could not open level: "+e;
+   }
+   ImGui::SameLine();
+   if(ImGui::Button("Back")){versionDialog_=false;openDialog_=true;}
+  }
+  ImGui::End();
+ }
  if(about_){ImGui::OpenPopup("About CrashEdit");about_=false;}if(ImGui::BeginPopupModal("About CrashEdit",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::Text("CrashEdit — cross-platform rewrite");ImGui::Text("C++20 / Dear ImGui / GLFW / OpenGL");if(ImGui::Button("Close"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
  static EditorPreferences previousPreferences=editorPreferences;
  if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
