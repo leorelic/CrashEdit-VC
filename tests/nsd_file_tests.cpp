@@ -38,7 +38,7 @@ int main() {
                 "ProtoNSD index link should be decoded");
 
     // Standard NSD with one spawn record; offsets mirror NSD.Load in the original C# source.
-    std::vector<std::uint8_t> standard(0x6FC + 24, 0);
+    std::vector<std::uint8_t> standard(0x6FC + 24 + 3, 0);
     writeI32(standard, 0x400, 5);
     writeI32(standard, 0x404, 0);
     writeI32(standard, 0x520, 1); // spawn count
@@ -49,6 +49,7 @@ int main() {
     writeI32(standard, 0x420, 0x333); // first compressed chunk info
     writeI32(standard, 0x524, 0x444); // blank/reserved value
     standard[0x630] = 0xA5; // opaque extra data
+    standard[0x6FC + 24] = 0x5A; // trailing image data
     writeI32(standard, 0x6FC, 0x77); // spawn zone EID
     writeI32(standard, 0x700, 2);
     writeI32(standard, 0x704, 3);
