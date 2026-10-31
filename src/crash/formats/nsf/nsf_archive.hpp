@@ -6,6 +6,7 @@
 #include <vector>
 namespace CrashEdit::Crash {
 inline constexpr std::size_t NsfChunkSize=65536;
+static_assert(NsfChunkSize == 64U * 1024U, "NSF chunks are exactly 64 KiB.");
 struct NsfChunk { std::vector<std::uint8_t> bytes; std::int32_t chunkId=0; std::uint16_t type=0; bool wasCompressed=false; };
 class NsfArchive {
 public:
