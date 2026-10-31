@@ -10,9 +10,9 @@ public:
  explicit EditorUI(Workspace& w); void draw();
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
- void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
+ void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
  Workspace& workspace_;
- bool openDialog_=false,versionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false;
+ bool openDialog_=false,versionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
