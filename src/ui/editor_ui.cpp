@@ -410,6 +410,7 @@ void EditorUI::drawViewport(){
   struct OverlayMarker{Projected p;ImU32 color;float radius;};
   std::vector<OverlaySegment> overlaySegments;
   std::vector<OverlayMarker> overlayMarkers;
+  bool gpuOverlayRendered=false;
   auto addOverlaySegment=[&](Projected a,Projected b,ImU32 color,float width){
    if(a.depth>0.05f&&b.depth>0.05f)overlaySegments.push_back({a,b,color,width});
   };
@@ -690,6 +691,7 @@ void EditorUI::drawViewport(){
       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(guideBytes),guideVertices.data(),0x88E8U);
       GL::DrawArrays(0x0004U,0,static_cast<int>(guideVertices.size()));++gpuDrawCalls;
       GL::DepthMask(1);GL::DepthFunc(0x0201U);
+      gpuOverlayRendered=true;
      }
      GL::DepthMask(1);
      GL::BindTexture(0x0DE1U,0);
@@ -715,9 +717,9 @@ void EditorUI::drawViewport(){
    rendererDiagnostics.cachedTextureCount=gpu.textureCache.size();rendererDiagnostics.cachedTextureBytes=0;
    for(const auto&entry:gpu.textureCache){const int mode=std::clamp(std::get<1>(entry.first),0,2);rendererDiagnostics.cachedTextureBytes+=static_cast<std::size_t>(1024>>mode)*128U*4U;}
   }
-  // The software renderer has no depth attachment; retain its 2D guide
-  // rendering. The GPU renderer draws these guides with depth testing.
-  if(editorPreferences.softwareRendering){
+  // The software renderer (or a failed GPU setup) has no usable depth
+  // attachment, so retain a visible 2D guide fallback in those cases.
+  if(editorPreferences.softwareRendering||!gpuOverlayRendered){
    for(const auto&line:overlaySegments)dl->AddLine(ImVec2(line.a.x,line.a.y),ImVec2(line.b.x,line.b.y),line.color,line.width);
    for(const auto&marker:overlayMarkers)dl->AddCircleFilled(ImVec2(marker.p.x,marker.p.y),marker.radius,marker.color);
   }
