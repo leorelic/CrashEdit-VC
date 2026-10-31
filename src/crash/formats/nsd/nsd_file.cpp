@@ -1,6 +1,7 @@
 #include "crash/formats/nsd/nsd_file.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <fstream>
 #include <limits>
 
