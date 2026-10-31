@@ -88,9 +88,17 @@ static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,const cha
 static bool hierarchyIconRow(const char* label,bool selected,const char* icon){
  const ImVec2 row=ImGui::GetCursorScreenPos();
  const float scale=ImGui::GetIO().FontGlobalScale;
- const std::string padded=std::string("   ")+label;
- const bool clicked=ImGui::Selectable(padded.c_str(),selected,ImGuiSelectableFlags_SpanAvailWidth);
- pixelIcon(ImGui::GetWindowDrawList(),ImVec2(row.x+2.0f*scale,row.y+1.0f*scale),scale,icon);
+ const float iconSize=16.0f*scale;
+ const float textOffset=22.0f*scale;
+ const bool clicked=ImGui::Selectable("##HierarchyIconRow",selected,ImGuiSelectableFlags_SpanAvailWidth);
+ const ImVec2 rowMax=ImGui::GetItemRectMax();
+ const float rowHeight=rowMax.y-row.y;
+ const float fontSize=ImGui::GetFontSize();
+ const float iconY=row.y+std::max(0.0f,(rowHeight-iconSize)*0.5f);
+ const float textY=row.y+std::max(0.0f,(rowHeight-fontSize)*0.5f);
+ ImDrawList* draw=ImGui::GetWindowDrawList();
+ pixelIcon(draw,ImVec2(row.x+2.0f*scale,iconY),scale,icon);
+ draw->AddText(ImVec2(row.x+textOffset,textY),ImGui::GetColorU32(ImGuiCol_Text),label);
  return clicked;
 }
 static const char* chunkIconName(std::uint16_t type){
