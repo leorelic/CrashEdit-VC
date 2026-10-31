@@ -296,11 +296,12 @@ void EditorUI::drawTextureViewer(){
   ImGui::EndTabBar();
  }
  const char*modeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
- ImGui::SetNextItemWidth(150.0f);ImGui::Combo("Color mode",&textureColorMode_,modeNames,3);
+ ImGui::TextUnformatted("Color mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);ImGui::Combo("##ColorMode",&textureColorMode_,modeNames,3);
  const char*blendNames[]={"Semi-transparent bit","Opaque"};
- ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);ImGui::Combo("Blend mode",&textureBlendMode_,blendNames,2);
- ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("X",&textureX_);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("Y",&textureY_);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("Width",&textureW_);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("Height",&textureH_);
- ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("CLUT X",&textureClutX_);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt("CLUT Y",&textureClutY_);ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderFloat("Zoom",&textureZoom_,0.5f,3.0f,"%.1fx");
+ ImGui::SameLine();ImGui::TextUnformatted("Blend mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);ImGui::Combo("##BlendMode",&textureBlendMode_,blendNames,2);
+ auto labeledInt=[](const char*label,const char*id,int*value){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f);ImGui::InputInt(id,value);};
+ labeledInt("X","##TextureX",&textureX_);ImGui::SameLine();labeledInt("Y","##TextureY",&textureY_);ImGui::SameLine();labeledInt("Width","##TextureWidth",&textureW_);ImGui::SameLine();labeledInt("Height","##TextureHeight",&textureH_);
+ labeledInt("CLUT X","##ClutX",&textureClutX_);ImGui::SameLine();labeledInt("CLUT Y","##ClutY",&textureClutY_);ImGui::SameLine();ImGui::TextUnformatted("Zoom");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f);ImGui::SliderFloat("##TextureZoom",&textureZoom_,0.5f,3.0f,"%.1fx");
  const int imageWidth=textureColorMode_==0?1024:(textureColorMode_==1?512:256);
  const int imageHeight=128;
  textureX_=std::clamp(textureX_,0,textureFormat_==0?127:imageWidth-1);textureY_=std::clamp(textureY_,0,textureFormat_==0?31:imageHeight-1);
