@@ -147,9 +147,15 @@ void EditorUI::draw(){
  const ImVec2 dialogCenter=dialogViewport->GetCenter();
  const ImGuiWindowFlags dialogFlags=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings;
  if(openDialog_){
-  if(centerOpenDialog_){ImGui::SetNextWindowPos(dialogCenter,ImGuiCond_Always,ImVec2(0.5f,0.5f));centerOpenDialog_=false;}
+  const bool centerThisFrame=centerOpenDialog_;
   ImGui::SetNextWindowFocus();
-  if(ImGui::Begin("Open NSF",&openDialog_,dialogFlags)){
+  const bool openDialogVisible=ImGui::Begin("Open NSF",&openDialog_,dialogFlags);
+  if(centerThisFrame){
+   const ImVec2 windowSize=ImGui::GetWindowSize();
+   ImGui::SetWindowPos(ImVec2(dialogCenter.x-windowSize.x*0.5f,dialogCenter.y-windowSize.y*0.5f),ImGuiCond_Always);
+   centerOpenDialog_=false;
+  }
+  if(openDialogVisible){
    ImGui::TextWrapped("Select a level NSF. The game version is requested before the matching NSD is interpreted.");
    ImGui::SetNextItemWidth(420.0f);ImGui::InputText("NSF file path",path_,sizeof(path_));
    ImGui::SameLine();
@@ -171,9 +177,15 @@ void EditorUI::draw(){
   ImGui::End();
  }
  if(versionDialog_){
-  if(centerVersionDialog_){ImGui::SetNextWindowPos(dialogCenter,ImGuiCond_Always,ImVec2(0.5f,0.5f));centerVersionDialog_=false;}
+  const bool centerThisFrame=centerVersionDialog_;
   ImGui::SetNextWindowFocus();
-  if(ImGui::Begin("Choose the game version",&versionDialog_,dialogFlags)){
+  const bool versionDialogVisible=ImGui::Begin("Choose the game version",&versionDialog_,dialogFlags);
+  if(centerThisFrame){
+   const ImVec2 windowSize=ImGui::GetWindowSize();
+   ImGui::SetWindowPos(ImVec2(dialogCenter.x-windowSize.x*0.5f,dialogCenter.y-windowSize.y*0.5f),ImGuiCond_Always);
+   centerVersionDialog_=false;
+  }
+  if(versionDialogVisible){
    ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");
    const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};
    int choice=static_cast<int>(pendingVersion_);
