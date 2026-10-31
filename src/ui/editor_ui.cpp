@@ -127,7 +127,7 @@ void EditorUI::drawViewport(){
  }
  struct V3{float x=0,y=0,z=0;};
  struct Projected{float x=0,y=0,depth=0;};
- struct Face{Projected p[3];ImU32 colors[3]{};ImVec2 uv[3]{};const std::vector<std::uint8_t>*page=nullptr;int colorMode=0,blendMode=0,clutX=0,clutY=0;float depth=0;};
+ struct Face{Projected p[3];ImU32 colors[3]{};ImVec2 uv[3]{};const std::vector<std::uint8_t>*page=nullptr;int colorMode=0,blendMode=0,clutX=0,clutY=0;float depth=0;bool sky=false;};
  std::vector<Face>faces;
  std::size_t sceneryCount=0,vertexCount=0,faceCount=0,texturedFaceCount=0,resolvedTexturePageCount=0,missingTexturePageCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
@@ -137,7 +137,7 @@ void EditorUI::drawViewport(){
  for(const auto*entry:sceneryEntries){
   const auto&sc=entry->scenery;++sceneryCount;vertexCount+=sc.vertices.size();
   // Scenery offsets are already world-space offsets; do not add zone XYZ.
-  for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
+  if(!sc.isSky)for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
  }
  if(zone){
   // Match ZoneEntryViewer.CorePositions: frame the selected zone, its cameras,
@@ -212,7 +212,7 @@ void EditorUI::drawViewport(){
  if(!sceneryEntries.empty()){
   for(const auto*entry:sceneryEntries){
      const auto&sc=entry->scenery;
-     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
+     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];if(sc.isSky)return {float(v.x)*16.0f/400.0f+sceneTargetX_,float(v.y)*16.0f/400.0f+sceneTargetY_,float(v.z)*16.0f/400.0f+sceneTargetZ_};return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
      auto vertexColor=[&](std::uint16_t index)->ImU32{
       const auto&v=sc.vertices[index];
       if(v.colorIndex<sc.colors.size()){const auto&c=sc.colors[v.colorIndex];return IM_COL32(c.r,c.g,c.b,255);}
@@ -225,7 +225,7 @@ void EditorUI::drawViewport(){
       const float minX=std::min({pa.x,pb.x,pc.x}),maxX=std::max({pa.x,pb.x,pc.x});
       const float minY=std::min({pa.y,pb.y,pc.y}),maxY=std::max({pa.y,pb.y,pc.y});
       if(maxX<canvasMin.x||minX>canvasMax.x||maxY<canvasMin.y||minY>canvasMax.y)return;
-      Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;
+      Face f{};f.sky=sc.isSky;f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;
       if(tex){f.colorMode=tex->colorMode;f.blendMode=tex->blendMode;f.clutX=tex->clutX;f.clutY=(tex->clutY2<<2)|((tex->clutY1>>2)&3);const std::uint32_t pageEid=tex->page<sc.texturePageEids.size()?sc.texturePageEids[tex->page]:0U;for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536&&chunk.bytes.size()>=8){const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8)|(std::uint32_t(chunk.bytes[6])<<16)|(std::uint32_t(chunk.bytes[7])<<24);if(pageId==pageEid){f.page=&chunk.bytes;break;}}const int xoff=(1<<(2-std::min<int>(tex->colorMode,2)))*64*tex->segment;float us[4]={float(tex->u1)+xoff,float(tex->u2)+xoff,float(tex->u3)+xoff,float(tex->u4)+xoff};float vs[4]={float(tex->v1),float(tex->v2),float(tex->v3),float(tex->v4)};auto adjustCoordinates=[](float* values){if(values[0]>values[1]||values[0]>values[2])values[0]+=1.0f;if(values[1]>values[0]||values[1]>values[2])values[1]+=1.0f;if(values[2]>values[1]||values[2]>values[0])values[2]+=1.0f;if(values[3]>values[1]||values[3]>values[2]||values[3]>values[0])values[3]+=1.0f;};adjustCoordinates(us);adjustCoordinates(vs);f.uv[0]=ImVec2(us[uvA],vs[uvA]);f.uv[1]=ImVec2(us[uvB],vs[uvB]);f.uv[2]=ImVec2(us[uvC],vs[uvC]);}
       faces.push_back(f);
      };
@@ -266,7 +266,8 @@ void EditorUI::drawViewport(){
      for(const auto&q:sc.quads){const auto*tex=resolveTexture(q.textureIndex,q.animated);if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
   rendererDiagnostics.sceneBuildMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-sceneBuildStart).count();
-  if(softwareRendering_)std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
+  if(softwareRendering_)std::stable_sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){if(a.sky!=b.sky)return a.sky;return a.depth>b.depth;});
+  else std::stable_partition(faces.begin(),faces.end(),[](const Face&f){return f.sky;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
   // OpenGL's smooth vertex shading is perspective-correct. The CPU fallback
   // approximates it with a finer screen-space mesh and perspective-correct
@@ -297,6 +298,7 @@ void EditorUI::drawViewport(){
    std::size_t gpuDrawCalls=0,gpuUploadBytes=0;
    struct GpuVertex{float x,y,z,w,r,g,b,a,u,v;};
    using TextureKey=std::tuple<const std::vector<std::uint8_t>*,int,int,int,int>;
+   using BatchKey=std::tuple<bool,TextureKey>;
    struct GpuState{unsigned int program=0,vao=0,vbo=0,framebuffer=0,colorTexture=0,depthBuffer=0;int width=0,height=0;bool ready=false;std::map<TextureKey,unsigned int> textureCache;std::string textureCachePath;};
    static GpuState gpu;
    auto compileShader=[](unsigned int type,const char*source)->unsigned int{
@@ -362,7 +364,7 @@ void EditorUI::drawViewport(){
     GL::BindFramebuffer(0x8D40U,gpu.framebuffer);
     const bool framebufferReady=GL::CheckFramebufferStatus(0x8D40U)==0x8CD5U;
     if(framebufferReady){
-     std::map<TextureKey,std::vector<GpuVertex>> batches;
+     std::map<BatchKey,std::vector<GpuVertex>> batches;
      auto makeVertices=[&](const Face&face){
       std::vector<GpuVertex> vertices;vertices.reserve(3);
       auto colorChannel=[](ImU32 color,int shift){return float((color>>shift)&255U)/255.0f;};
@@ -381,8 +383,8 @@ void EditorUI::drawViewport(){
       return vertices;
      };
      for(const auto&face:faces){
-      const TextureKey key{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
-      auto&batch=batches[key];auto vertices=makeVertices(face);
+      const TextureKey textureKey{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
+      auto&batch=batches[BatchKey{face.sky,textureKey}];auto vertices=makeVertices(face);
       batch.insert(batch.end(),vertices.begin(),vertices.end());
       ++faceCount;
      }
@@ -431,28 +433,32 @@ void EditorUI::drawViewport(){
      };
      // Match CrashEdit's four PS1 scenery blend passes: solid, trans,
      // subtractive, then additive. Non-solid passes preserve source polygon order.
-     GL::DepthMask(1);
      GL::BlendEquation(0x8006U);
      GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
      GL::Uniform1i(blendMaskLocation,3);
-     for(const auto&batch:batches){
-      const auto&page=std::get<0>(batch.first);
-      const int mode=std::get<4>(batch.first);
-      GL::BindTexture(0x0DE1U,getTexture(batch.first));
+     for(bool skyPass:{true,false}){
+      GL::DepthMask(skyPass?0:1);
+      for(const auto&batch:batches){
+      if(std::get<0>(batch.first)!=skyPass)continue;
+      const auto&textureKey=std::get<1>(batch.first);
+      const auto&page=std::get<0>(textureKey);
+      const int mode=std::get<4>(textureKey);
+      GL::BindTexture(0x0DE1U,getTexture(textureKey));
       GL::Uniform1i(hasTextureLocation,page?1:0);
       GL::Uniform1i(blendModeLocation,mode);
       const auto&vertices=batch.second;
       const std::size_t uploadSize=vertices.size()*sizeof(GpuVertex);gpuUploadBytes+=uploadSize;
       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(uploadSize),vertices.empty()?nullptr:vertices.data(),0x88E8U);
       if(!vertices.empty()){GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));++gpuDrawCalls;}
+      }
      }
      auto drawBlendPass=[&](int blendMode,unsigned int equation,unsigned int sourceFactor,unsigned int destinationFactor){
       GL::DepthMask(0);
       GL::BlendEquation(equation);
       GL::BlendFuncSeparate(sourceFactor,destinationFactor,sourceFactor,destinationFactor);
       GL::Uniform1i(blendMaskLocation,blendMode);
-      for(const auto&face:faces){
-       if(!face.page||face.blendMode!=blendMode)continue;
+      for(bool skyPass:{true,false})for(const auto&face:faces){
+       if(face.sky!=skyPass||!face.page||face.blendMode!=blendMode)continue;
        const TextureKey key{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
        GL::BindTexture(0x0DE1U,getTexture(key));
        GL::Uniform1i(hasTextureLocation,1);
