@@ -297,7 +297,7 @@ void EditorUI::drawViewport(){
      "in vec4 aPosition;\n"
      "in vec4 aColor;\n"
      "out vec4 vColor;\n"
-     "void main(){gl_Position=vec4(aPosition,1.0);vColor=aColor;}\n";
+     "void main(){gl_Position=aPosition;vColor=aColor;}\n";
     static constexpr const char* fragmentSource=
      "#version 150\n"
      "in vec4 vColor;out vec4 fragColor;\n"
