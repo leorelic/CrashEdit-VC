@@ -65,9 +65,28 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
 void EditorUI::draw(){
  auto*v=ImGui::GetMainViewport();ImGui::SetNextWindowPos(v->WorkPos);ImGui::SetNextWindowSize(v->WorkSize);ImGui::SetNextWindowViewport(v->ID);
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking;
- ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();auto id=ImGui::GetID("CrashEditDockSpace");ImGui::DockSpace(id,ImVec2(0,-24),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());ImGui::End();
- static bool built=false;if(!built){built=true;ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("Asset Browser",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderFinish(id);}
- drawHierarchy();drawViewport();drawBottom();drawTextureViewer();drawClutEditor();
+ ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
+ static int topTab=0;static bool useModernFont=false;
+ if(ImGui::BeginTabBar("CrashEditTopTabs",ImGuiTabBarFlags_None)){
+  if(ImGui::BeginTabItem("Main")){topTab=0;ImGui::EndTabItem();}
+  if(ImGui::BeginTabItem("Experimental")){topTab=1;ImGui::EndTabItem();}
+  if(ImGui::BeginTabItem("About")){topTab=2;ImGui::EndTabItem();}
+  ImGui::EndTabBar();
+ }
+ if(topTab==0){
+  auto id=ImGui::GetID("CrashEditDockSpace");ImGui::DockSpace(id,ImVec2(0,-24),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
+  static bool built=false;if(!built){built=true;ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("Asset Browser",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderFinish(id);}
+  drawHierarchy();drawViewport();drawBottom();drawTextureViewer();drawClutEditor();
+ }else if(topTab==1){
+  ImGui::Separator();ImGui::TextUnformatted("Experimental features");ImGui::Spacing();
+  if(ImGui::Checkbox("Use modern UI font (Experimental)",&useModernFont)){
+   auto&io=ImGui::GetIO();io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
+  }
+  ImGui::TextWrapped("The original Dear ImGui font remains the default. The modern system font is optional and may look different across operating systems.");
+ }else{
+  ImGui::Separator();ImGui::TextUnformatted("CrashEdit — cross-platform rewrite");ImGui::TextUnformatted("C++20 / Dear ImGui / GLFW / OpenGL");ImGui::Spacing();ImGui::TextWrapped("A modern, cross-platform continuation of the original CrashEdit project.");
+ }
+ ImGui::End();
  if(openDialog_){ImGui::OpenPopup("Open NSF");openDialog_=false;}
  if(ImGui::BeginPopupModal("Open NSF",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Select a level NSF. The game version is requested before the matching NSD is interpreted.");ImGui::InputText("NSF file path",path_,sizeof(path_));ImGui::SameLine();if(ImGui::Button("Browse NSF...")){
 #ifdef _WIN32
