@@ -12,7 +12,7 @@ struct NsfEntityProperty {
  std::int16_t id=0; std::uint8_t rawType=0, type=0, elementSize=0; std::int16_t rowCount=0;
  bool last=false, sparse=false, hasMetaValues=false, valid=false;
  std::size_t dataOffset=0, dataSize=0;
- std::vector<std::int32_t> intValues;
+ std::vector<std::int32_t> intValues; std::vector<std::size_t> valueOffsets;
  struct Position { std::int16_t x=0,y=0,z=0; };
  std::vector<Position> positions;
  std::string error;
@@ -57,6 +57,7 @@ public:
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
  std::size_t compressedChunkCount()const noexcept;
  void decodeZones(bool crash3Retail);
+ bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;
