@@ -22,7 +22,36 @@
 namespace CrashEdit {
 struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::size_t gpuDrawCalls=0,gpuUploadBytes=0,cachedTextureCount=0,cachedTextureBytes=0; };
 static RendererDiagnostics rendererDiagnostics;
-static bool showRendererDiagnostics=false;
+struct EditorPreferences {
+ int uiScaling=100;
+ bool useModernFont=false,softwareRendering=false,rendererDiagnosticsVisible=false;
+ bool showProperties=true,showConsole=true;
+ int sceneMoveSpeed=100;
+};
+static EditorPreferences editorPreferences;
+static void* readEditorSettingsOpen(ImGuiContext*,ImGuiSettingsHandler* handler,const char*){return handler->UserData;}
+static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,const char* line){
+ int value=0;
+ if(std::sscanf(line,"UIScaling=%d",&value)==1)editorPreferences.uiScaling=std::clamp(value,100,200);
+ else if(std::sscanf(line,"UseModernFont=%d",&value)==1)editorPreferences.useModernFont=value!=0;
+ else if(std::sscanf(line,"SoftwareRendering=%d",&value)==1)editorPreferences.softwareRendering=value!=0;
+ else if(std::sscanf(line,"ShowRendererDiagnostics=%d",&value)==1)editorPreferences.rendererDiagnosticsVisible=value!=0;
+ else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
+ else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
+ else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
+}
+static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
+ const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0);
+}
+static void registerEditorSettingsHandler(){
+ ImGuiSettingsHandler handler{};
+ handler.TypeName="CrashEdit";handler.TypeHash=ImHashStr("CrashEdit");
+ handler.ReadOpenFn=readEditorSettingsOpen;handler.ReadLineFn=readEditorSettingsLine;
+ handler.WriteAllFn=writeEditorSettings;handler.UserData=&editorPreferences;
+ ImGui::AddSettingsHandler(&handler);
+}
 static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a.y)*.58f);float h=a.y+(b.y-a.y)*.3f;d->AddRectFilled(a,b,IM_COL32(25,30,38,255));d->AddRectFilled(a,ImVec2(b.x,h),IM_COL32(29,36,46,255));for(int i=-12;i<=12;++i)d->AddLine(ImVec2(c.x+i*42,h),ImVec2(c.x+i*115,b.y),IM_COL32(86,105,126,95));for(int i=1;i<=12;++i){float t=float(i)/12;float y=h+(b.y-h)*t*t;d->AddLine(ImVec2(a.x,y),ImVec2(b.x,y),IM_COL32(86,105,126,95));}}
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
@@ -71,6 +100,7 @@ static const char* entryIconName(std::uint32_t type){
  switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 6:case 15:case 17:return "ThingOrange";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
+EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();}
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  Crash::NsfArchive archive;if(!archive.load(file,error))return false;if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);
  auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
@@ -103,9 +133,11 @@ void EditorUI::draw(){
  if(versionDialog_){ImGui::OpenPopup("Select Game Version");versionDialog_=false;}
  if(ImGui::BeginPopupModal("Select Game Version",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};int choice=static_cast<int>(pendingVersion_);if(ImGui::Combo("Game version",&choice,names,7))pendingVersion_=static_cast<GameVersion>(choice);if(ImGui::Button("Open Level")){std::string e;if(loadLevel(std::filesystem::u8path(path_),e)){ImGui::CloseCurrentPopup();}else status_="Could not open level: "+e;}ImGui::SameLine();if(ImGui::Button("Back")){ImGui::CloseCurrentPopup();openDialog_=true;}ImGui::EndPopup();}
  if(about_){ImGui::OpenPopup("About CrashEdit");about_=false;}if(ImGui::BeginPopupModal("About CrashEdit",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::Text("CrashEdit — cross-platform rewrite");ImGui::Text("C++20 / Dear ImGui / GLFW / OpenGL");if(ImGui::Button("Close"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
+ static EditorPreferences previousPreferences=editorPreferences;
+ if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
 }
 void EditorUI::drawMenu(){
- static int uiScaling=100;
+ int& uiScaling=editorPreferences.uiScaling;
  static int appliedScaling=100;
  static ImGuiStyle baseStyle=ImGui::GetStyle();
  auto&io=ImGui::GetIO();
@@ -115,6 +147,7 @@ void EditorUI::drawMenu(){
   appliedScaling=uiScaling;
  }
  io.FontGlobalScale=static_cast<float>(uiScaling)/100.0f;
+ io.FontDefault=(editorPreferences.useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
  if(!ImGui::BeginMenuBar())return;
  if(ImGui::BeginMenu("File")){
   if(ImGui::MenuItem("Open NSF...","Ctrl+O"))openDialog_=true;
@@ -125,7 +158,7 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
-  static bool useModernFont=false;
+  bool& useModernFont=editorPreferences.useModernFont;
   if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
   ImGui::SetNextItemWidth(190.0f*static_cast<float>(uiScaling)/100.0f);
   ImGui::SliderInt("UI Scaling",&uiScaling,100,200,"%d%%");
@@ -149,12 +182,12 @@ void EditorUI::drawViewport(){
  ImGui::OpenPopupOnItemClick("ViewportOptions",ImGuiPopupFlags_MouseButtonRight);
  if(ImGui::BeginPopup("ViewportOptions")){
   ImGui::TextUnformatted("Renderer");
-  ImGui::Checkbox("Software rendering",&softwareRendering_);
-  ImGui::Checkbox("Show performance diagnostics",&showRendererDiagnostics);
+  ImGui::Checkbox("Software rendering",&editorPreferences.softwareRendering);
+  ImGui::Checkbox("Show performance diagnostics",&editorPreferences.rendererDiagnosticsVisible);
   ImGui::Separator();
   ImGui::TextUnformatted("Camera movement speed");
   ImGui::SetNextItemWidth(180.0f);
-  ImGui::SliderInt("##MovementSpeed",&sceneMoveSpeed_,100,300,"%d%%");
+  ImGui::SliderInt("##MovementSpeed",&editorPreferences.sceneMoveSpeed,100,300,"%d%%");
   ImGui::EndPopup();
  }
  const bool canvasActive=ImGui::IsItemActive();
@@ -263,7 +296,7 @@ void EditorUI::drawViewport(){
  }
  if(canvasHovered&&ImGui::IsKeyDown(ImGuiKey_R)){sceneCameraInitialized_=false;}
  if(canvasHovered){
-  const float moveSpeed=(2.0f*float(sceneMoveSpeed_)/100.0f)*(0.2f+0.8f*(sceneDistance_/20.0f))*io.DeltaTime;
+  const float moveSpeed=(2.0f*float(editorPreferences.sceneMoveSpeed)/100.0f)*(0.2f+0.8f*(sceneDistance_/20.0f))*io.DeltaTime;
   const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
   const float cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);
   if(shift){
@@ -347,7 +380,7 @@ void EditorUI::drawViewport(){
      for(const auto&q:sc.quads){const auto*tex=resolveTexture(q.textureIndex,q.animated);if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
   rendererDiagnostics.sceneBuildMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-sceneBuildStart).count();
-  if(softwareRendering_)std::stable_sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){if(a.sky!=b.sky)return a.sky;return a.depth>b.depth;});
+  if(editorPreferences.softwareRendering)std::stable_sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){if(a.sky!=b.sky)return a.sky;return a.depth>b.depth;});
   else std::stable_partition(faces.begin(),faces.end(),[](const Face&f){return f.sky;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
   // OpenGL's smooth vertex shading is perspective-correct. The CPU fallback
@@ -361,7 +394,7 @@ void EditorUI::drawViewport(){
    const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};
    ImU32 base=IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);if(!f.page)return base;const ImU32 tex=sampleTexture(f,f.uv[0].x*wa+f.uv[1].x*wb+f.uv[2].x*wc,f.uv[0].y*wa+f.uv[1].y*wb+f.uv[2].y*wc);if((tex>>24)==0)return IM_COL32(0,0,0,0);const auto mul=[&](int sh){return static_cast<unsigned char>(std::min(255U,(((base>>sh)&255U)*((tex>>sh)&255U)*2U)/255U));};return IM_COL32(mul(IM_COL32_R_SHIFT),mul(IM_COL32_G_SHIFT),mul(IM_COL32_B_SHIFT),(tex>>24)&255U);
   };
-  if(softwareRendering_){
+  if(editorPreferences.softwareRendering){
    for(const auto&f:faces){
     const int subdivisions=2;
     auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};

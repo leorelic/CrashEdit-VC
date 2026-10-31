@@ -87,7 +87,7 @@ int Application::run(){
  glfwMakeContextCurrent(w);
  std::string glError;
  if(!GL::load(glError)){std::cerr<<"Required OpenGL functions are unavailable: "<<glError<<'\n';glfwDestroyWindow(w);glfwTerminate();return 1;}
- glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"imgui.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();io.Fonts->AddFontDefault();loadUiFont();auto&style=ImGui::GetStyle();style.FramePadding=ImVec2(7.0f,5.0f);style.ItemSpacing=ImVec2(8.0f,6.0f);style.WindowPadding=ImVec2(10.0f,10.0f);
+ glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"cevc.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();io.Fonts->AddFontDefault();loadUiFont();auto&style=ImGui::GetStyle();style.FramePadding=ImVec2(7.0f,5.0f);style.ItemSpacing=ImVec2(8.0f,6.0f);style.WindowPadding=ImVec2(10.0f,10.0f);
  ImGui_ImplGlfw_InitForOpenGL(w,true);
 #if defined(__APPLE__)
  ImGui_ImplOpenGL3_Init("#version 150");
@@ -96,6 +96,6 @@ int Application::run(){
 #endif
  Workspace workspace;EditorUI ui(workspace);
  while(!glfwWindowShouldClose(w)){glfwPollEvents();ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();ui.draw();ImGui::Render();int x,y;glfwGetFramebufferSize(w,&x,&y);glViewport(0,0,x,y);glClearColor(.075f,.082f,.095f,1);glClear(GL_COLOR_BUFFER_BIT);ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());if(io.ConfigFlags&ImGuiConfigFlags_ViewportsEnable){auto*ctx=glfwGetCurrentContext();ImGui::UpdatePlatformWindows();ImGui::RenderPlatformWindowsDefault();glfwMakeContextCurrent(ctx);}glfwSwapBuffers(w);}
- ImGui_ImplOpenGL3_Shutdown();ImGui_ImplGlfw_Shutdown();ImGui::DestroyContext();glfwDestroyWindow(w);glfwTerminate();return 0;
+ ImGui::SaveIniSettingsToDisk(io.IniFilename);ImGui_ImplOpenGL3_Shutdown();ImGui_ImplGlfw_Shutdown();ImGui::DestroyContext();glfwDestroyWindow(w);glfwTerminate();return 0;
 }
 }

@@ -7,7 +7,7 @@ namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {
 public:
- explicit EditorUI(Workspace& w):workspace_(w){} void draw();
+ explicit EditorUI(Workspace& w); void draw();
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
@@ -16,8 +16,6 @@ private:
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
- int sceneMoveSpeed_=100;
- bool softwareRendering_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
  float textureZoom_=1.0f;
