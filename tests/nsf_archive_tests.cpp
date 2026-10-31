@@ -70,7 +70,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // A Crash 2 scenery entry with one vertex, triangle, quad, texture, color, and animated texture.
  std::vector<std::uint8_t> sceneryChunk(65536);p16(sceneryChunk,0,0x1234);p16(sceneryChunk,2,0);p32(sceneryChunk,4,6);p32(sceneryChunk,8,1);
- constexpr std::size_t sceneryEntry=24, sceneryHeaderSize=76;
+ constexpr std::size_t sceneryEntry=24;
  constexpr std::size_t sceneryEntrySize=48+76+8+8+8+12+4+4;
  p32(sceneryChunk,16,sceneryEntry);p32(sceneryChunk,20,sceneryEntry+sceneryEntrySize);
  p32(sceneryChunk,sceneryEntry,0x0100ffff);p32(sceneryChunk,sceneryEntry+4,0x0200007b);p32(sceneryChunk,sceneryEntry+8,3);p32(sceneryChunk,sceneryEntry+12,7);
