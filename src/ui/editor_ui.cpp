@@ -3,6 +3,8 @@
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -27,29 +29,22 @@ static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
 static const char* chunkTypeName(std::uint16_t t){switch(t){case 0:return "Entry Chunk";case 1:return "Texture Chunk";case 2:return "Old Sound Chunk";case 3:return "Sound Chunk";case 4:return "Wavebank Chunk";case 5:return "Speech Chunk";default:return "Unknown Chunk";}}
-static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,ImU32 color,const char*glyph){
+static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,unsigned int texture){
  const ImVec2 row=ImGui::GetCursorScreenPos();
  const std::string padded=std::string("   ")+label;
  const bool open=ImGui::TreeNodeEx(padded.c_str(),flags);
- ImDrawList*draw=ImGui::GetWindowDrawList();
- const float scale=ImGui::GetIO().FontGlobalScale;
- const ImVec2 a(row.x+17.0f*scale,row.y+2.0f*scale),b(row.x+31.0f*scale,row.y+16.0f*scale);
- draw->AddRectFilled(a,b,color,3.0f*scale);
- draw->AddRect(a,b,IM_COL32(255,255,255,70),3.0f*scale);
- draw->AddText(ImVec2(a.x+3.0f*scale,a.y+1.0f*scale),IM_COL32(255,255,255,255),glyph);
+ if(texture){
+  const float scale=ImGui::GetIO().FontGlobalScale;
+  const ImVec2 a(row.x+17.0f*scale,row.y+1.0f*scale),b(a.x+16.0f*scale,a.y+16.0f*scale);
+  ImGui::GetWindowDrawList()->AddImage((ImTextureID)(std::intptr_t)texture,a,b);
+ }
  return open;
 }
-static ImU32 chunkIconColor(std::uint16_t type){
- switch(type){case 0:return IM_COL32(105,118,136,255);case 1:return IM_COL32(56,154,180,255);case 2:case 3:case 4:case 5:return IM_COL32(75,112,180,255);default:return IM_COL32(190,125,55,255);}
+static const char* chunkIconName(std::uint16_t type){
+ switch(type){case 0:return "JournalOrange";case 1:return "Painting";case 2:case 3:return "JournalBlue";case 4:return "MusicNoteRed";case 5:return "JournalWhite";default:return "JournalGray";}
 }
-static const char* chunkIconGlyph(std::uint16_t type){
- switch(type){case 0:return "C";case 1:return "T";case 2:case 3:case 4:case 5:return "A";default:return "?";}
-}
-static ImU32 entryIconColor(std::uint32_t type){
- switch(type){case 1:return IM_COL32(105,175,80,255);case 3:return IM_COL32(65,135,195,255);case 7:return IM_COL32(145,95,190,255);case 15:case 21:return IM_COL32(55,155,175,255);default:return IM_COL32(195,135,65,255);}
-}
-static const char* entryIconGlyph(std::uint32_t type){
- switch(type){case 1:return "A";case 3:return "S";case 7:return "Z";case 15:case 21:return "P";default:return "E";}
+static const char* entryIconName(std::uint32_t type){
+ switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 15:case 17:return "ThingOrange";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
@@ -114,7 +109,33 @@ void EditorUI::drawMenu(){
  ImGui::EndMenuBar();
 }
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF"))openDialog_=true;ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Save");ImGui::SameLine();ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
-void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF..."))openDialog_=true;ImGui::Separator();if(nsfValid_){if(nsdValid_){if(ImGui::Selectable(("NSD — "+nsdPath_.filename().string()).c_str(),selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;}if(ImGui::TreeNode("Spawn Points")){for(std::size_t i=0;i<nsd_.spawns.size();++i){char b[96];std::snprintf(b,sizeof(b),"Spawn %03zu | Zone %s",i,Crash::eidToEName(static_cast<std::uint32_t>(nsd_.spawns[i].zoneEid)).c_str());if(ImGui::Selectable(b,selectedSpawn_==static_cast<int>(i))){selectedChunk_=-2;selectedSpawn_=static_cast<int>(i);}}ImGui::TreePop();}}else ImGui::TextDisabled("NSD missing or unreadable");if(ImGui::TreeNode((nsfPath_.filename().string()+"##nsf").c_str())){for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %08X (%s) | %s",i,textureEid,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | ID %08X | %s",i,static_cast<std::uint32_t>(c.chunkId),chunkTypeName(c.type));}bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconColor(c.type),chunkIconGlyph(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconColor(e.type),entryIconGlyph(e.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;}if(entryOpen){if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));if(ImGui::Selectable(entLabel,selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k))){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k)ImGui::BulletText("Item %zu | %zu bytes",k,e.items[k].size);}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);ImGui::End();}
+EditorUI::~EditorUI(){
+ for(const auto&entry:hierarchyIcons_){const unsigned int texture=entry.second;if(texture)GL::DeleteTextures(1,&texture);}
+}
+unsigned int EditorUI::hierarchyIcon(const char*name){
+ if(!hierarchyIconsLoaded_){
+  hierarchyIconsLoaded_=true;
+  const std::filesystem::path relative=std::filesystem::current_path()/"Assets"/"Images";
+  const std::filesystem::path source=CRASHEDIT_SOURCE_ASSET_DIR;
+  const std::filesystem::path directory=std::filesystem::is_directory(relative)?relative:source;
+  const char*names[]={"JournalOrange","Painting","JournalBlue","MusicNoteRed","JournalWhite","JournalGray","ThingLime","ThingBlue","ThingViolet","ThingOrange","ThingGray"};
+  for(const char*iconName:names){
+   const auto path=directory/(std::string(iconName)+".gif");
+   int width=0,height=0,channels=0;
+   unsigned char*pixels=stbi_load(path.string().c_str(),&width,&height,&channels,4);
+   if(!pixels)continue;
+   unsigned int texture=0;GL::GenTextures(1,&texture);GL::BindTexture(0x0DE1U,texture);
+   GL::TexParameteri(0x0DE1U,0x2801U,0x2601);GL::TexParameteri(0x0DE1U,0x2800U,0x2601);
+   GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
+   GL::PixelStorei(0x0CF5U,1);GL::TexImage2D(0x0DE1U,0,0x1908,width,height,0,0x1908U,0x1401U,pixels);
+   GL::BindTexture(0x0DE1U,0);stbi_image_free(pixels);
+   if(texture)hierarchyIcons_.emplace(iconName,texture);
+  }
+ }
+ const auto it=hierarchyIcons_.find(name?name:"");
+ return it==hierarchyIcons_.end()?0U:it->second;
+}
+void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF..."))openDialog_=true;ImGui::Separator();if(nsfValid_){if(nsdValid_){if(ImGui::Selectable(("NSD — "+nsdPath_.filename().string()).c_str(),selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;}if(ImGui::TreeNode("Spawn Points")){for(std::size_t i=0;i<nsd_.spawns.size();++i){char b[96];std::snprintf(b,sizeof(b),"Spawn %03zu | Zone %s",i,Crash::eidToEName(static_cast<std::uint32_t>(nsd_.spawns[i].zoneEid)).c_str());if(ImGui::Selectable(b,selectedSpawn_==static_cast<int>(i))){selectedChunk_=-2;selectedSpawn_=static_cast<int>(i);}}ImGui::TreePop();}}else ImGui::TextDisabled("NSD missing or unreadable");if(ImGui::TreeNode((nsfPath_.filename().string()+"##nsf").c_str())){for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %08X (%s) | %s",i,textureEid,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | ID %08X | %s",i,static_cast<std::uint32_t>(c.chunkId),chunkTypeName(c.type));}bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,hierarchyIcon(chunkIconName(c.type)));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,hierarchyIcon(entryIconName(e.type)));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;}if(entryOpen){if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));if(ImGui::Selectable(entLabel,selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k))){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k)ImGui::BulletText("Item %zu | %zu bytes",k,e.items[k].size);}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);ImGui::End();}
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
