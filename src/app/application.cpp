@@ -49,7 +49,7 @@ static ImFont* loadUiFont() {
  for (const char* candidate : candidates) {
   std::error_code ec;
   if (std::filesystem::is_regular_file(candidate, ec)) {
-   if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 16.0f)) {
+   if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 20.0f)) {
     std::cout << "UI font: " << candidate << '\n';
     return font;
    }
