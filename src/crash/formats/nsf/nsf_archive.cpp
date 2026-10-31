@@ -32,7 +32,7 @@ static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item
    else if(p.valid){if(!has(bytes,pos,2)||pos+2>dataEnd){p.valid=false;p.error="Property value count is truncated.";}else{auto nvalues=u16(bytes,pos);pos+=2;rowCounts.assign(static_cast<std::size_t>(p.rowCount),nvalues);}}
    if(p.valid&&p.hasMetaValues){if(pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Property metadata is truncated.";}else pos+=static_cast<std::size_t>(p.rowCount)*2U;}
    if(p.valid){pos=(pos+3U)&~std::size_t(3U);for(auto nvalues:rowCounts){const std::size_t bytesNeeded=static_cast<std::size_t>(nvalues)*p.elementSize;if(pos+bytesNeeded>dataEnd){p.valid=false;p.error="Property values exceed their data range.";break;}
-    for(std::uint16_t k=0;k<nvalues;++k){if(p.type==6U){NsfEntityProperty::Position v{static_cast<std::int16_t>(u16(bytes,pos)),static_cast<std::int16_t>(u16(bytes,pos+2)),static_cast<std::int16_t>(u16(bytes,pos+4))};p.positions.push_back(v);}else if(p.type==1U)p.intValues.push_back(bytes[pos]);else if(p.type==18U)p.intValues.push_back(static_cast<std::int16_t>(u16(bytes,pos)));else p.intValues.push_back(i32(bytes,pos));pos+=p.elementSize;}
+    for(std::uint16_t k=0;k<nvalues;++k){if(p.type==6U){NsfEntityProperty::Position v{static_cast<std::int16_t>(u16(bytes,pos)),static_cast<std::int16_t>(u16(bytes,pos+2)),static_cast<std::int16_t>(u16(bytes,pos+4))};p.positions.push_back(v);}else if(p.type==1U)p.intValues.push_back(bytes[pos]);else if(p.type==18U)p.intValues.push_back(static_cast<std::int16_t>(u16(bytes,pos)));else p.intValues.push_back(i32(bytes,pos));p.valueOffsets.push_back(pos);pos+=p.elementSize;}
    }}
   }
   out.properties.push_back(std::move(p));
@@ -116,6 +116,16 @@ void NsfArchive::decodeZones(bool crash3Retail){
   if(static_cast<std::size_t>(z.cameraCount)>z.entities.size()){z.error="Zone camera count exceeds the number of entity items.";entry.zone=std::move(z);continue;}
   z.decoded=true;entry.zone=std::move(z);
  }
+}
+bool NsfArchive::setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value){
+ if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(entryIndex>=chunk.entries.size())return false;auto&entry=chunk.entries[entryIndex];if(!entry.zone.decoded||entityIndex>=entry.zone.entities.size())return false;auto&entity=entry.zone.entities[entityIndex];
+ for(auto&property:entity.properties){if(static_cast<std::uint16_t>(property.id)!=propertyId||!property.valid||valueIndex>=property.valueOffsets.size()||valueIndex>=property.intValues.size())continue;
+  const std::size_t offset=property.valueOffsets[valueIndex];if(property.type==18U){if(value<-32768||value>32767||!has(chunk.bytes,offset,2))return false;chunk.bytes[offset]=static_cast<std::uint8_t>(value);chunk.bytes[offset+1]=static_cast<std::uint8_t>(static_cast<std::uint16_t>(value)>>8);}
+  else if((property.type==5U||property.type==19U||property.type==3U||property.type==4U)&&has(chunk.bytes,offset,4)){const auto raw=static_cast<std::uint32_t>(value);for(int n=0;n<4;++n)chunk.bytes[offset+static_cast<std::size_t>(n)]=static_cast<std::uint8_t>(raw>>(8*n));}
+  else return false;
+  property.intValues[valueIndex]=value;return true;
+ }
+ return false;
 }
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
  std::ofstream s(f,std::ios::binary|std::ios::trunc);if(!s){e="Could not create NSF output.";return false;}
