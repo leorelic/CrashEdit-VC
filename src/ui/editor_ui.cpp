@@ -113,6 +113,27 @@ static const char* entryIconName(std::uint32_t type){
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
 EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();}
+void EditorUI::handleDroppedFiles(int count,const char** paths){
+ for(int i=0;i<count;++i){
+  if(!paths||!paths[i])continue;
+  std::filesystem::path droppedPath=std::filesystem::u8path(paths[i]);
+  std::string extension=droppedPath.extension().string();
+  std::transform(extension.begin(),extension.end(),extension.begin(),[](unsigned char ch){return static_cast<char>(std::tolower(ch));});
+  if(extension!=".nsf")continue;
+  const std::string droppedPathText=droppedPath.string();
+  if(droppedPathText.size()>=sizeof(path_)){
+   status_="Dropped NSF path is too long to fit in the file path field.";
+   return;
+  }
+  std::snprintf(path_,sizeof(path_),"%s",droppedPathText.c_str());
+  openDialog_=false;
+  versionDialog_=true;
+  centerVersionDialog_=true;
+  status_="NSF dropped: choose its Crash game version to continue.";
+  return;
+ }
+ status_="No NSF file found in the dropped files.";
+}
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  Crash::NsfArchive archive;if(!archive.load(file,error))return false;if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);
  auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
