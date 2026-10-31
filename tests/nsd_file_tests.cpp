@@ -80,6 +80,34 @@ int main() {
     ok &= check(parsed.id == 99 && parsed.startZone == 11 && parsed.camera == 12,
                 "OldNSD legacy header fields should parse");
 
+    // Serialization should round-trip all NSD variants and relocate variable-length sections safely.
+    std::vector<std::uint8_t> saved;
+    ok &= check(parsed.saveBytes(saved, error), "OldNSD should serialize");
+    NsdFile oldRoundTrip;
+    ok &= check(oldRoundTrip.loadBytes(saved, NsdVariant::Old, error) &&
+                oldRoundTrip.id == parsed.id && oldRoundTrip.startZone == parsed.startZone &&
+                oldRoundTrip.extraData == parsed.extraData,
+                "OldNSD serialization should preserve legacy fields and trailing bytes");
+
+    ok &= check(parsed.loadBytes(proto, NsdVariant::Proto, error), "ProtoNSD should reload for serialization");
+    ok &= check(parsed.saveBytes(saved, error) && saved == proto,
+                "ProtoNSD serialization should preserve its complete byte sequence");
+
+    ok &= check(parsed.loadBytes(standard, NsdVariant::Standard, error), "standard NSD should reload for serialization");
+    ok &= check(parsed.saveBytes(saved, error) && saved == standard,
+                "unchanged standard NSD should round-trip byte-for-byte");
+    parsed.spawns.push_back({0x99, 3, 4, 500, 600, 700});
+    ok &= check(parsed.saveBytes(saved, error), "standard NSD should serialize after adding a spawn");
+    NsdFile standardRoundTrip;
+    ok &= check(standardRoundTrip.loadBytes(saved, NsdVariant::Standard, error) &&
+                standardRoundTrip.spawns.size() == 2 && standardRoundTrip.spawns[1].zoneEid == 0x99 &&
+                standardRoundTrip.imageData == parsed.imageData && standardRoundTrip.extraData == parsed.extraData,
+                "standard NSD serialization should resize spawn records and retain opaque sections");
+
+    ok &= check(parsed.loadBytes(crash3, NsdVariant::Crash3, error), "Crash 3 NSD should reload for serialization");
+    ok &= check(parsed.saveBytes(saved, error) && saved == crash3,
+                "unchanged Crash 3 NSD should round-trip byte-for-byte");
+
     std::vector<std::uint8_t> truncated(0x6FB, 0);
     ok &= check(!parsed.loadBytes(truncated, NsdVariant::Standard, error), "truncated standard NSD should fail");
     std::cout << (ok ? "All NSD tests passed.\\n" : "NSD tests failed.\\n");
