@@ -119,7 +119,7 @@ void EditorUI::drawViewport(){
  struct Projected{float x=0,y=0,depth=0;};
  struct Face{Projected p[3];ImU32 colors[3]{};ImVec2 uv[3]{};const std::vector<std::uint8_t>*page=nullptr;int colorMode=0,blendMode=0,clutX=0,clutY=0;float depth=0;};
  std::vector<Face>faces;
- std::size_t sceneryCount=0,vertexCount=0,faceCount=0;
+ std::size_t sceneryCount=0,vertexCount=0,faceCount=0,texturedFaceCount=0,resolvedTexturePageCount=0,missingTexturePageCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
  V3 frameMin{FLT_MAX,FLT_MAX,FLT_MAX},frameMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
  auto includePoint=[&](V3 p){boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);};
@@ -216,11 +216,11 @@ void EditorUI::drawViewport(){
       const float minY=std::min({pa.y,pb.y,pc.y}),maxY=std::max({pa.y,pb.y,pc.y});
       if(maxX<canvasMin.x||minX>canvasMax.x||maxY<canvasMin.y||minY>canvasMax.y)return;
       Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;
-      if(tex){f.colorMode=tex->colorMode;f.blendMode=tex->blendMode;f.clutX=tex->clutX;f.clutY=(tex->clutY2<<2)|((tex->clutY1>>2)&3);const std::uint32_t pageEid=tex->page<sc.texturePageEids.size()?sc.texturePageEids[tex->page]:0U;for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536&&chunk.bytes.size()>=8){const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8)|(std::uint32_t(chunk.bytes[6])<<16)|(std::uint32_t(chunk.bytes[7])<<24);if(pageId==pageEid){f.page=&chunk.bytes;break;}}const int xoff=(1<<(2-std::min<int>(tex->colorMode,2)))*64*tex->segment;const float us[4]={float(tex->u1)+xoff,float(tex->u2)+xoff,float(tex->u3)+xoff,float(tex->u4)+xoff};const float vs[4]={float(tex->v1),float(tex->v2),float(tex->v3),float(tex->v4)};auto uv=[&](int k,bool u){const float*vals=u?us:vs;float value=vals[k];const float lo=std::min({vals[0],vals[1],vals[2]}),hi=std::max({vals[0],vals[1],vals[2]});if(value>lo&&value<hi)value+=1.0f;else if(value==hi&&hi!=lo)value+=1.0f;return value;};f.uv[0]=ImVec2(uv(uvA,true),uv(uvA,false));f.uv[1]=ImVec2(uv(uvB,true),uv(uvB,false));f.uv[2]=ImVec2(uv(uvC,true),uv(uvC,false));}
+      if(tex){f.colorMode=tex->colorMode;f.blendMode=tex->blendMode;f.clutX=tex->clutX;f.clutY=(tex->clutY2<<2)|((tex->clutY1>>2)&3);const std::uint32_t pageEid=tex->page<sc.texturePageEids.size()?sc.texturePageEids[tex->page]:0U;for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536&&chunk.bytes.size()>=8){const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8)|(std::uint32_t(chunk.bytes[6])<<16)|(std::uint32_t(chunk.bytes[7])<<24);if(pageId==pageEid){f.page=&chunk.bytes;break;}}const int xoff=(1<<(2-std::min<int>(tex->colorMode,2)))*64*tex->segment;float us[4]={float(tex->u1)+xoff,float(tex->u2)+xoff,float(tex->u3)+xoff,float(tex->u4)+xoff};float vs[4]={float(tex->v1),float(tex->v2),float(tex->v3),float(tex->v4)};auto adjustCoordinates=[](float* values){if(values[0]>values[1]||values[0]>values[2])values[0]+=1.0f;if(values[1]>values[0]||values[1]>values[2])values[1]+=1.0f;if(values[2]>values[1]||values[2]>values[0])values[2]+=1.0f;if(values[3]>values[1]||values[3]>values[2]||values[3]>values[0])values[3]+=1.0f;};adjustCoordinates(us);adjustCoordinates(vs);f.uv[0]=ImVec2(us[uvA],vs[uvA]);f.uv[1]=ImVec2(us[uvB],vs[uvB]);f.uv[2]=ImVec2(us[uvC],vs[uvC]);}
       faces.push_back(f);
      };
-     for(const auto&t:sc.triangles){const Crash::NsfSceneryTexture*tex=nullptr;if(!t.animated&&t.textureIndex>0&&static_cast<std::size_t>(t.textureIndex-1)<sc.textures.size())tex=&sc.textures[t.textureIndex-1];addFace(t.a,t.b,t.c,tex,1,0,2);}
-     for(const auto&q:sc.quads){const Crash::NsfSceneryTexture*tex=nullptr;if(!q.animated&&q.textureIndex>0&&static_cast<std::size_t>(q.textureIndex-1)<sc.textures.size())tex=&sc.textures[q.textureIndex-1];addFace(q.a,q.b,q.c,tex,1,0,2);addFace(q.a,q.c,q.d,tex,1,3,2);}
+     for(const auto&t:sc.triangles){const Crash::NsfSceneryTexture*tex=nullptr;if(!t.animated&&t.textureIndex>0&&static_cast<std::size_t>(t.textureIndex-1)<sc.textures.size())tex=&sc.textures[t.textureIndex-1];if(tex)++texturedFaceCount;const auto before=faces.size();addFace(t.a,t.b,t.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
+     for(const auto&q:sc.quads){const Crash::NsfSceneryTexture*tex=nullptr;if(!q.animated&&q.textureIndex>0&&static_cast<std::size_t>(q.textureIndex-1)<sc.textures.size())tex=&sc.textures[q.textureIndex-1];if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.c,q.d,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
   std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
@@ -271,7 +271,7 @@ void EditorUI::drawViewport(){
   }
 
   }
-  char stats[192];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,sceneDistance_);
+  char stats[256];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
   const char* resourceLabel=zoneEntry?Crash::eidToEName(zoneEntry->eid).c_str():(sceneryEntry?Crash::eidToEName(sceneryEntry->eid).c_str():"No scenery selected");
   dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),resourceLabel);
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(180,194,210,255),stats);
