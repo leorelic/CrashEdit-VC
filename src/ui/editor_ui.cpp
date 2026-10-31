@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstdio>
 #include <filesystem>
@@ -73,7 +74,7 @@ void EditorUI::drawViewport(){
  if(zone&&zoneEntry){
   const auto&chunks=nsf_.chunks();
   for(std::int32_t world:zone->worlds){const auto eid=static_cast<std::uint32_t>(world);for(const auto&ch:chunks)if(ch.type==0)for(const auto&e:ch.entries)if(e.valid&&e.type==3&&e.eid==eid&&e.scenery.decoded){++sceneryCount;const auto&sc=e.scenery;vertexCount+=sc.vertices.size();
-   auto addFace=[&](std::uint16_t ia,std::uint16_t ib,std::uint16_t ic,std::uint16_t ti){if(ia>=sc.vertices.size()||ib>=sc.vertices.size()||ic>=sc.vertices.size())return;const auto&va=sc.vertices[ia];const auto&vb=sc.vertices[ib];const auto&vc=sc.vertices[ic];const auto pa=project(float(va.x+sc.xOffset),float(va.y+sc.yOffset),float(va.z+sc.zOffset));const auto pb=project(float(vb.x+sc.xOffset),float(vb.y+sc.yOffset),float(vb.z+sc.zOffset));const auto pc=project(float(vc.x+sc.xOffset),float(vc.y+sc.yOffset),float(vc.z+sc.zOffset));const float depth=(pa.depth+pb.depth+pc.depth)/3.0f;const unsigned hue=static_cast<unsigned>((ti*47U+eid*13U)%110U);const ImU32 color=IM_COL32(95U+hue/3U,125U+hue/4U,150U+hue/2U,255);faces.push_back({{pa,pb,pc},color,depth});};
+   auto addFace=[&](std::uint16_t ia,std::uint16_t ib,std::uint16_t ic,std::uint16_t ti){if(ia>=sc.vertices.size()||ib>=sc.vertices.size()||ic>=sc.vertices.size())return;const auto&va=sc.vertices[ia];const auto&vb=sc.vertices[ib];const auto&vc=sc.vertices[ic];const auto pa=project(float(va.x+sc.xOffset),float(va.y+sc.yOffset),float(va.z+sc.zOffset));const auto pb=project(float(vb.x+sc.xOffset),float(vb.y+sc.yOffset),float(vb.z+sc.zOffset));const auto pc=project(float(vc.x+sc.xOffset),float(vc.y+sc.yOffset),float(vc.z+sc.zOffset));const float depth=(pa.depth+pb.depth+pc.depth)/3.0f;const unsigned hue=static_cast<unsigned>((ti*47U+eid*13U)%110U);const ImU32 color=IM_COL32(95U+hue/3U,125U+hue/4U,150U+hue/2U,255);Face face{};face.p[0]=pa;face.p[1]=pb;face.p[2]=pc;face.color=color;face.depth=depth;faces.push_back(face);};
    for(const auto&t:sc.triangles)addFace(t.a,t.b,t.c,t.textureIndex);
    for(const auto&q:sc.quads){addFace(q.a,q.b,q.c,q.textureIndex);addFace(q.a,q.c,q.d,q.textureIndex);}
   }}
