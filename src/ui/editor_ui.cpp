@@ -99,6 +99,7 @@ void EditorUI::drawViewport(){
  }
  const auto sceneBuildStart=std::chrono::steady_clock::now();
  std::vector<const Crash::NsfEntry*> sceneryEntries;
+ std::vector<const Crash::NsfEntry*> neighborZoneEntries;
  if(standaloneScenery&&sceneryEntry)sceneryEntries.push_back(sceneryEntry);
  if(zone){
   // The original ZoneEntryViewer renders scenery from linked zones, not from
@@ -111,6 +112,8 @@ void EditorUI::drawViewport(){
     for(const auto&linkedZoneEntry:zoneChunk.entries){
      if(!linkedZoneEntry.valid||linkedZoneEntry.type!=7||linkedZoneEntry.eid!=linkedZoneEid||!linkedZoneEntry.zone.decoded)continue;
      const auto&linkedZone=linkedZoneEntry.zone;
+     if(std::find(neighborZoneEntries.begin(),neighborZoneEntries.end(),&linkedZoneEntry)==neighborZoneEntries.end())
+      neighborZoneEntries.push_back(&linkedZoneEntry);
      for(std::size_t wi=0;wi<static_cast<std::size_t>(linkedZone.worldCount)&&wi<linkedZone.worlds.size();++wi){
       const std::uint32_t worldEid=static_cast<std::uint32_t>(linkedZone.worlds[wi]);
       for(const auto&worldChunk:chunks){
@@ -151,6 +154,18 @@ void EditorUI::drawViewport(){
    if(i<static_cast<std::size_t>(zone->cameraCount)&&i%3!=0)continue;
    const float scale=i<static_cast<std::size_t>(zone->cameraCount)?400.0f:100.0f;
    for(const auto&p:entity.positions)includeFramePoint({origin.x+float(p.x)/scale,origin.y+float(p.y)/scale,origin.z+float(p.z)/scale});
+  }
+  // OG CrashEdit frames all linked zones, not just the selected/master zone.
+  for(const auto*neighborEntry:neighborZoneEntries){
+   const auto&neighbor=neighborEntry->zone;
+   const V3 neighborOrigin{float(neighbor.x)/400.0f,float(neighbor.y)/400.0f,float(neighbor.z)/400.0f};
+   includeFramePoint(neighborOrigin);
+   includeFramePoint({neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f});
+   for(std::size_t i=0;i<neighbor.entities.size();++i){
+    if(i<static_cast<std::size_t>(neighbor.cameraCount)&&i%3!=0)continue;
+    const float scale=i<static_cast<std::size_t>(neighbor.cameraCount)?400.0f:100.0f;
+    for(const auto&p:neighbor.entities[i].positions)includeFramePoint({neighborOrigin.x+float(p.x)/scale,neighborOrigin.y+float(p.y)/scale,neighborOrigin.z+float(p.z)/scale});
+   }
   }
  }else{
   frameMin=boundsMin;frameMax=boundsMax;
@@ -518,7 +533,28 @@ void EditorUI::drawViewport(){
    for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(80,210,130,255),2.0f);
    for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.5f,IM_COL32(235,85,85,255));
   }
-
+  // Render linked zones as translucent neighbors, matching OG CrashEdit's
+  // master (255 alpha) / neighbor (128 alpha) distinction.
+  for(const auto*neighborEntry:neighborZoneEntries){
+   const auto&neighbor=neighborEntry->zone;
+   const V3 neighborOrigin{float(neighbor.x)/400.0f,float(neighbor.y)/400.0f,float(neighbor.z)/400.0f};
+   const V3 corners[8]={{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z},{neighborOrigin.x,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f},{neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f}};
+   const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
+   for(const auto&e:edges){const auto a=project(corners[e[0]]),b=project(corners[e[1]]);if(a.depth>0.05f&&b.depth>0.05f)dl->AddLine(ImVec2(a.x,a.y),ImVec2(b.x,b.y),IM_COL32(110,155,190,128),1.0f);}
+   for(std::size_t i=static_cast<std::size_t>(neighbor.cameraCount);i<neighbor.entities.size();++i){
+    const auto&entity=neighbor.entities[i];if(entity.positions.empty())continue;
+    std::vector<Projected> path;path.reserve(entity.positions.size());
+    for(const auto&p:entity.positions)path.push_back(project({neighborOrigin.x+float(p.x)/100.0f,neighborOrigin.y+float(p.y)/100.0f,neighborOrigin.z+float(p.z)/100.0f}));
+    for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(245,190,75,128),1.2f);
+    for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.0f,IM_COL32(245,190,75,128));
+   }
+   for(int i=0;i+2<neighbor.cameraCount&&static_cast<std::size_t>(i+2)<neighbor.entities.size();i+=3){
+    const auto&camera=neighbor.entities[static_cast<std::size_t>(i)];std::vector<Projected> path;path.reserve(camera.positions.size());
+    for(const auto&p:camera.positions)path.push_back(project({neighborOrigin.x+float(p.x)/400.0f,neighborOrigin.y+float(p.y)/400.0f,neighborOrigin.z+float(p.z)/400.0f}));
+    for(std::size_t pi=1;pi<path.size();++pi)if(path[pi-1].depth>0.05f&&path[pi].depth>0.05f)dl->AddLine(ImVec2(path[pi-1].x,path[pi-1].y),ImVec2(path[pi].x,path[pi].y),IM_COL32(80,210,130,128),1.4f);
+    for(const auto&q:path)if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),2.5f,IM_COL32(235,85,85,128));
+   }
+  }
   }
   char stats[384];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
   char performanceStats[384];std::snprintf(performanceStats,sizeof(performanceStats),"CPU scene build: %.2f ms | GPU submit (CPU): %.2f ms | Draw calls: %zu | Upload: %.1f KiB | Texture cache: %zu (%.2f MiB)",rendererDiagnostics.sceneBuildMs,rendererDiagnostics.gpuSubmitCpuMs,rendererDiagnostics.gpuDrawCalls,double(rendererDiagnostics.gpuUploadBytes)/1024.0,rendererDiagnostics.cachedTextureCount,double(rendererDiagnostics.cachedTextureBytes)/(1024.0*1024.0));
