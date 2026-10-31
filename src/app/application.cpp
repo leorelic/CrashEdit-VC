@@ -23,6 +23,8 @@
 #endif
 namespace CrashEdit {
 static void glfwError(int c,const char*d){std::cerr<<"GLFW "<<c<<": "<<(d?d:"unknown")<<'\n';}
+static EditorUI* editorUiForDrop=nullptr;
+static void glfwDropFiles(GLFWwindow*,int count,const char** paths){if(editorUiForDrop)editorUiForDrop->handleDroppedFiles(count,paths);}
 
 static ImFont* loadUiFont() {
  // Prefer each platform's familiar UI sans-serif font. The default ImGui
@@ -94,8 +96,8 @@ int Application::run(){
 #else
  ImGui_ImplOpenGL3_Init("#version 330");
 #endif
- Workspace workspace;EditorUI ui(workspace);
+ Workspace workspace;EditorUI ui(workspace);editorUiForDrop=&ui;glfwSetDropCallback(w,glfwDropFiles);
  while(!glfwWindowShouldClose(w)){glfwPollEvents();ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();ui.draw();ImGui::Render();int x,y;glfwGetFramebufferSize(w,&x,&y);glViewport(0,0,x,y);glClearColor(.075f,.082f,.095f,1);glClear(GL_COLOR_BUFFER_BIT);ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());if(io.ConfigFlags&ImGuiConfigFlags_ViewportsEnable){auto*ctx=glfwGetCurrentContext();ImGui::UpdatePlatformWindows();ImGui::RenderPlatformWindowsDefault();glfwMakeContextCurrent(ctx);}glfwSwapBuffers(w);}
- ImGui::SaveIniSettingsToDisk(io.IniFilename);ImGui_ImplOpenGL3_Shutdown();ImGui_ImplGlfw_Shutdown();ImGui::DestroyContext();glfwDestroyWindow(w);glfwTerminate();return 0;
+ ImGui::SaveIniSettingsToDisk(io.IniFilename);ImGui_ImplOpenGL3_Shutdown();ImGui_ImplGlfw_Shutdown();ImGui::DestroyContext();editorUiForDrop=nullptr;glfwDestroyWindow(w);glfwTerminate();return 0;
 }
 }
