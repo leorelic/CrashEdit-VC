@@ -59,10 +59,9 @@ static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,const cha
 static bool hierarchyIconRow(const char* label,bool selected,const char* icon){
  const ImVec2 row=ImGui::GetCursorScreenPos();
  const float scale=ImGui::GetIO().FontGlobalScale;
- const bool clicked=ImGui::Selectable("##HierarchyIconRow",selected,ImGuiSelectableFlags_SpanAvailWidth);
- const float rowHeight=ImGui::GetFrameHeight();
- pixelIcon(ImGui::GetWindowDrawList(),ImVec2(row.x+2.0f*scale,row.y+(rowHeight-16.0f*scale)*0.5f),scale,icon);
- ImGui::GetWindowDrawList()->AddText(ImVec2(row.x+23.0f*scale,row.y+(rowHeight-ImGui::GetFontSize())*0.5f),ImGui::GetColorU32(ImGuiCol_Text),label);
+ const std::string padded=std::string("   ")+label;
+ const bool clicked=ImGui::Selectable(padded.c_str(),selected,ImGuiSelectableFlags_SpanAvailWidth);
+ pixelIcon(ImGui::GetWindowDrawList(),ImVec2(row.x+2.0f*scale,row.y+1.0f*scale),scale,icon);
  return clicked;
 }
 static const char* chunkIconName(std::uint16_t type){
