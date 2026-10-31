@@ -23,7 +23,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  if(!workspace_.open(file.parent_path(),error))return false;
  nsf_=std::move(archive);nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
  nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());
- status_="Loaded "+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
+ status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd)status_+=" Matching NSD unavailable: "+nsdError;
  return true;
 }
