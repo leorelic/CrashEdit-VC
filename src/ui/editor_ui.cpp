@@ -256,7 +256,7 @@ void EditorUI::drawViewport(){
      for(const auto&t:sc.triangles){const auto*tex=resolveTexture(t.textureIndex,t.animated);if(tex)++texturedFaceCount;const auto before=faces.size();addFace(t.a,t.b,t.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
      for(const auto&q:sc.quads){const auto*tex=resolveTexture(q.textureIndex,q.animated);if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
-  std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
+  if(softwareRendering_)std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
   // OpenGL's smooth vertex shading is perspective-correct. The CPU fallback
   // approximates it with a finer screen-space mesh and perspective-correct
@@ -293,18 +293,18 @@ void EditorUI::drawViewport(){
    };
    if(!gpu.ready){
     static constexpr const char* vertexSource=
-     "#version 330 core\\n"
-     "layout(location=0) in vec3 aPosition;\\n"
-     "layout(location=1) in vec4 aColor;\\n"
-     "out vec4 vColor;\\n"
-     "void main(){gl_Position=vec4(aPosition,1.0);vColor=aColor;}\\n";
+     "#version 150\n"
+     "layout(location=0) in vec3 aPosition;\n"
+     "layout(location=1) in vec4 aColor;\n"
+     "out vec4 vColor;\n"
+     "void main(){gl_Position=vec4(aPosition,1.0);vColor=aColor;}\n";
     static constexpr const char* fragmentSource=
-     "#version 330 core\\n"
-     "in vec4 vColor;out vec4 fragColor;\\n"
-     "void main(){fragColor=vColor;}\\n";
+     "#version 330 core\n"
+     "in vec4 vColor;out vec4 fragColor;\n"
+     "void main(){fragColor=vColor;}\n";
     const unsigned int vs=compileShader(0x8B31U,vertexSource),fs=compileShader(0x8B30U,fragmentSource);
     if(vs&&fs){
-     gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::LinkProgram(gpu.program);
+     gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::BindAttribLocation(gpu.program,0,"aPosition");GL::BindAttribLocation(gpu.program,1,"aColor");GL::LinkProgram(gpu.program);
      int linked=0;GL::GetProgramiv(gpu.program,0x8B82U,&linked);gpu.ready=linked!=0;
     }
     if(vs)GL::DeleteShader(vs);if(fs)GL::DeleteShader(fs);
