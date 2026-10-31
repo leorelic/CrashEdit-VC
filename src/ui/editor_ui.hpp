@@ -8,6 +8,7 @@ enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash
 class EditorUI {
 public:
  explicit EditorUI(Workspace& w); void draw();
+ void handleDroppedFiles(int count,const char** paths);
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
