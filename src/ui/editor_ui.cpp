@@ -201,7 +201,7 @@ void EditorUI::drawViewport(){
     const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
     const float a1=float(i+1)/n,b1=float(j)/n,c1=1.0f-a1-b1;
     const float a2=float(i)/n,b2=float(j+1)/n,c2=1.0f-a2-b2;
-    dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),lerpColor(f,c,a,b));
+    dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),lerpColor(f,(c+c1+c2)/3.0f,(a+a1+a2)/3.0f,(b+b1+b2)/3.0f));
     if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),lerpColor(f,(c1+c3+c2)/3.0f,(a1+a3+a2)/3.0f,(b1+b3+b2)/3.0f));}
    }
    ++faceCount;
