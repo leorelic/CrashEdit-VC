@@ -25,19 +25,33 @@ static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item
   if(dataStart<base+16U+static_cast<std::size_t>(count)*8U||dataEnd<dataStart||dataEnd>end){p.error="Property data range is invalid.";out.properties.push_back(std::move(p));continue;}
   p.dataOffset=dataStart;p.dataSize=dataEnd-dataStart;p.valid=true;
   if(p.rowCount<0){p.valid=false;p.error="Property row count is negative.";out.properties.push_back(std::move(p));continue;}
-  if((p.type==19U&&p.elementSize==4U)||(p.type==4U&&p.elementSize==4U)||(p.type==3U&&p.elementSize==4U)||(p.type==1U&&p.elementSize==1U)||(p.type==6U&&p.elementSize==6U)){
+  if((p.type==19U&&p.elementSize==4U)||(p.type==5U&&p.elementSize==4U)||(p.type==4U&&p.elementSize==4U)||(p.type==3U&&p.elementSize==4U)||(p.type==1U&&p.elementSize==1U)||(p.type==6U&&p.elementSize==6U)||(p.type==18U&&p.elementSize==2U)){
    std::size_t pos=dataStart;std::vector<std::uint16_t> rowCounts;
    if(p.sparse){if(!has(bytes,pos,static_cast<std::size_t>(p.rowCount)*2U)||pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Sparse property row counts are truncated.";}}
    if(p.valid&&p.sparse){for(int r=0;r<p.rowCount;++r){rowCounts.push_back(u16(bytes,pos));pos+=2;}}
    else if(p.valid){if(!has(bytes,pos,2)||pos+2>dataEnd){p.valid=false;p.error="Property value count is truncated.";}else{auto nvalues=u16(bytes,pos);pos+=2;rowCounts.assign(static_cast<std::size_t>(p.rowCount),nvalues);}}
    if(p.valid&&p.hasMetaValues){if(pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Property metadata is truncated.";}else pos+=static_cast<std::size_t>(p.rowCount)*2U;}
    if(p.valid){pos=(pos+3U)&~std::size_t(3U);for(auto nvalues:rowCounts){const std::size_t bytesNeeded=static_cast<std::size_t>(nvalues)*p.elementSize;if(pos+bytesNeeded>dataEnd){p.valid=false;p.error="Property values exceed their data range.";break;}
-    for(std::uint16_t k=0;k<nvalues;++k){if(p.type==6U){NsfEntityProperty::Position v{static_cast<std::int16_t>(u16(bytes,pos)),static_cast<std::int16_t>(u16(bytes,pos+2)),static_cast<std::int16_t>(u16(bytes,pos+4))};p.positions.push_back(v);}else if(p.type==1U)p.intValues.push_back(bytes[pos]);else p.intValues.push_back(i32(bytes,pos));pos+=p.elementSize;}
+    for(std::uint16_t k=0;k<nvalues;++k){if(p.type==6U){NsfEntityProperty::Position v{static_cast<std::int16_t>(u16(bytes,pos)),static_cast<std::int16_t>(u16(bytes,pos+2)),static_cast<std::int16_t>(u16(bytes,pos+4))};p.positions.push_back(v);}else if(p.type==1U)p.intValues.push_back(bytes[pos]);else if(p.type==18U)p.intValues.push_back(static_cast<std::int16_t>(u16(bytes,pos)));else p.intValues.push_back(i32(bytes,pos));pos+=p.elementSize;}
    }}
   }
   out.properties.push_back(std::move(p));
  }
- for(const auto& property:out.properties){if(!property.valid||property.intValues.empty())continue;if(static_cast<std::uint16_t>(property.id)==0x0173U){out.hasCameraIndex=true;out.cameraIndex=property.intValues.front();}else if(static_cast<std::uint16_t>(property.id)==0x0174U){out.hasCameraSubIndex=true;out.cameraSubIndex=property.intValues.front();}}
+ for(const auto& property:out.properties){
+  if(!property.valid)continue;const auto id=static_cast<std::uint16_t>(property.id);
+  if(id==0x002cU&&property.type==1U){for(auto ch:property.intValues){if(ch==0)break;out.name.push_back(static_cast<char>(static_cast<unsigned char>(ch)));}}
+  if(id==0x004bU)out.positions=property.positions;
+  if(id==0x009fU&& !property.intValues.empty()){out.hasId=true;out.id=property.intValues[0];if(property.intValues.size()>1){out.hasAlternateId=true;out.alternateId=property.intValues[1];}}
+  if(id==0x00a9U&&!property.intValues.empty()){out.hasGoolType=true;out.goolType=property.intValues.front();}
+  if(id==0x00aaU&&!property.intValues.empty()){out.hasSubtype=true;out.subtype=property.intValues.front();}
+  if(id==0x00a4U&&property.type==5U){for(std::size_t n=0;n<property.intValues.size();++n){const auto raw=static_cast<std::uint32_t>(property.intValues[n]);out.settings.push_back({static_cast<std::uint8_t>(raw&0xffU),static_cast<std::int32_t>(property.intValues[n]>>8),raw,0});}}
+  if(id==0x0173U&&!property.intValues.empty()){out.hasCameraIndex=true;out.cameraIndex=property.intValues.front();}
+  if(id==0x0174U&&!property.intValues.empty()){out.hasCameraSubIndex=true;out.cameraSubIndex=property.intValues.front();}
+  if(id==0x0277U&&!property.intValues.empty()){out.hasDdaSettings=true;out.ddaDeathCount=property.intValues.front()>>8;}
+  if(id==0x0287U&&property.type==18U)out.victims=property.intValues;
+  if(id==0x0288U&&!property.intValues.empty()){out.hasDdaSection=true;out.ddaSection=property.intValues.front();}
+  if(id==0x028bU&&property.type==5U&&!property.intValues.empty()){out.hasBoxCount=true;out.boxCount=property.intValues.front()>>8;}
+ }
  out.valid=true;return true;
 }
 bool NsfArchive::load(const std::filesystem::path&f,std::string&e){
