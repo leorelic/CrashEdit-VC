@@ -1,5 +1,6 @@
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/eid.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <iostream>
