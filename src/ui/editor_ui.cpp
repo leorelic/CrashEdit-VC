@@ -901,6 +901,17 @@ void EditorUI::drawSpawnPointsEditor(){
   }else status_="Clipboard does not contain a 24-byte spawn-point structure.";
  }
  ImGui::SameLine();
+ static int targetSpawnEntityId=0;
+ ImGui::SetNextItemWidth(100.0f);ImGui::InputInt("Entity ID",&targetSpawnEntityId);
+ ImGui::SameLine();
+ if(ImGui::Button("Get Spawn")&&hasSelection){
+  bool found=false;
+  for(const auto&chunk:nsf_.chunks())for(const auto&entry:chunk.entries)if(entry.valid&&entry.type==7&&entry.zone.decoded)for(const auto&entity:entry.zone.entities)if(entity.hasId&&entity.id==targetSpawnEntityId&&!entity.positions.empty()){
+   auto&p=nsd_.spawns[static_cast<std::size_t>(selectedSpawn_)];p.zoneEid=static_cast<std::int32_t>(entry.eid);p.x=(entry.zone.x+4*entity.positions[0].x)<<8;p.y=(entry.zone.y+4*entity.positions[0].y)<<8;p.z=(entry.zone.z+4*entity.positions[0].z)<<8;found=true;break;
+  }
+  if(!found)status_="Entity ID was not found in a decoded NSF zone.";
+ }
+ ImGui::SameLine();
  if(ImGui::Button("Reload")){
   Crash::NsdFile reloaded;std::string error;
   if(reloaded.load(nsdPath_,nsdVariant(gameVersion_),error)){nsd_=std::move(reloaded);selectedSpawn_=-1;status_="NSD reloaded from disk.";}
@@ -910,7 +921,7 @@ void EditorUI::drawSpawnPointsEditor(){
   ImGui::TableSetupColumn("Zone EID");ImGui::TableSetupColumn("Camera");ImGui::TableSetupColumn("Point");ImGui::TableSetupColumn("X");ImGui::TableSetupColumn("Y");ImGui::TableSetupColumn("Z");ImGui::TableHeadersRow();
   for(std::size_t i=0;i<nsd_.spawns.size();++i){
    auto&p=nsd_.spawns[i];ImGui::PushID(static_cast<int>(i));ImGui::TableNextRow();
-   ImGui::TableSetColumnIndex(0);int zone=p.zoneEid;if(ImGui::InputInt("##ZoneEID",&zone,0,0,ImGuiInputTextFlags_CharsHexadecimal))p.zoneEid=zone;
+   ImGui::TableSetColumnIndex(0);int zone=p.zoneEid;if(ImGui::InputInt("##ZoneEID",&zone,0,0,ImGuiInputTextFlags_CharsHexadecimal))p.zoneEid=zone;if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))selectedSpawn_=static_cast<int>(i);if(ImGui::BeginDragDropSource()){const int from=static_cast<int>(i);ImGui::SetDragDropPayload("NSD_SPAWN_ROW",&from,sizeof(from));ImGui::Text("Move spawn point %zu",i);ImGui::EndDragDropSource();}if(ImGui::BeginDragDropTarget()){if(const ImGuiPayload*payload=ImGui::AcceptDragDropPayload("NSD_SPAWN_ROW")){const int from=*static_cast<const int*>(payload->Data);if(from>=0&&static_cast<std::size_t>(from)<nsd_.spawns.size()&&from!=static_cast<int>(i)){auto first=nsd_.spawns.begin();if(from<static_cast<int>(i))std::rotate(first+from,first+from+1,first+static_cast<std::ptrdiff_t>(i+1));else std::rotate(first+static_cast<std::ptrdiff_t>(i),first+from,first+from+1);selectedSpawn_=static_cast<int>(i);}}ImGui::EndDragDropTarget();}
    ImGui::TableSetColumnIndex(1);ImGui::SetNextItemWidth(-FLT_MIN);ImGui::InputInt("##Camera",&p.camera);
    ImGui::TableSetColumnIndex(2);ImGui::SetNextItemWidth(-FLT_MIN);ImGui::InputInt("##Point",&p.point);
    std::int32_t*coords[]={&p.x,&p.y,&p.z};
