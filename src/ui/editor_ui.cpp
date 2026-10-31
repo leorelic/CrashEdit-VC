@@ -55,7 +55,7 @@ void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Butt
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
- ImGui::TextDisabled("CrashEdit-style zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: movement speed");
+ ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: movement speed");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  canvasSize.x=std::max(canvasSize.x,100.0f);canvasSize.y=std::max(canvasSize.y,100.0f);
@@ -64,7 +64,8 @@ void EditorUI::drawViewport(){
  ImGui::OpenPopupOnItemClick("ViewportMovementSpeed",ImGuiPopupFlags_MouseButtonRight);
  if(ImGui::BeginPopup("ViewportMovementSpeed")){
   ImGui::TextUnformatted("Camera movement speed");
-  for(int speed=50;speed<=100;speed+=10){char label[32];std::snprintf(label,sizeof(label),"%d%%",speed);if(ImGui::MenuItem(label,nullptr,sceneMoveSpeed_==speed))sceneMoveSpeed_=speed;}
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::SliderInt("##MovementSpeed",&sceneMoveSpeed_,100,150,"%d%%");
   ImGui::EndPopup();
  }
  const bool canvasActive=ImGui::IsItemActive();
@@ -72,20 +73,22 @@ void EditorUI::drawViewport(){
  const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(20,25,33,255));
  const Crash::NsfZone*zone=nullptr;const Crash::NsfEntry*zoneEntry=nullptr;
- if(nsfValid_){
-  if(selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
-   const auto&ch=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
-   if(ch.type==0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<ch.entries.size()){
-    const auto&e=ch.entries[static_cast<std::size_t>(selectedEntry_)];
-    if(e.type==7&&e.zone.decoded){zone=&e.zone;zoneEntry=&e;}
-   }
+ const Crash::NsfScenery*standaloneScenery=nullptr;const Crash::NsfEntry*sceneryEntry=nullptr;
+ if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
+  const auto&ch=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
+  if(ch.type==0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<ch.entries.size()){
+   const auto&e=ch.entries[static_cast<std::size_t>(selectedEntry_)];
+   if(e.valid&&e.type==7&&e.zone.decoded){zone=&e.zone;zoneEntry=&e;}
+   else if(e.valid&&e.type==3&&e.scenery.decoded){standaloneScenery=&e.scenery;sceneryEntry=&e;}
   }
-  if(!zone){
-   for(const auto&ch:nsf_.chunks()){
-    if(ch.type!=0)continue;
-    for(const auto&e:ch.entries)if(e.valid&&e.type==7&&e.zone.decoded){zone=&e.zone;zoneEntry=&e;break;}
-    if(zone)break;
-   }
+ }
+ std::vector<const Crash::NsfEntry*> sceneryEntries;
+ if(standaloneScenery&&sceneryEntry)sceneryEntries.push_back(sceneryEntry);
+ if(zone){
+  for(std::int32_t world:zone->worlds){
+   const std::uint32_t eid=static_cast<std::uint32_t>(world);
+   for(const auto&ch:nsf_.chunks())if(ch.type==0)
+    for(const auto&e:ch.entries)if(e.valid&&e.type==3&&e.eid==eid&&e.scenery.decoded)sceneryEntries.push_back(&e);
   }
  }
  struct V3{float x=0,y=0,z=0;};
@@ -95,28 +98,19 @@ void EditorUI::drawViewport(){
  std::size_t sceneryCount=0,vertexCount=0,faceCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
  auto includePoint=[&](V3 p){boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);};
- if(zone){
-  const auto&chunks=nsf_.chunks();
-  for(std::int32_t world:zone->worlds){
-   const std::uint32_t eid=static_cast<std::uint32_t>(world);
-   for(const auto&ch:chunks){
-    if(ch.type!=0)continue;
-    for(const auto&e:ch.entries){
-     if(!e.valid||e.type!=3||e.eid!=eid||!e.scenery.decoded)continue;
-     ++sceneryCount;const auto&sc=e.scenery;vertexCount+=sc.vertices.size();
-     const V3 zoneOrigin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
-     for(const auto&v:sc.vertices)includePoint({zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
-    }
-   }
-  }
+ for(const auto*entry:sceneryEntries){
+  const auto&sc=entry->scenery;++sceneryCount;vertexCount+=sc.vertices.size();
+  const V3 zoneOrigin=zone?V3{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f}:V3{};
+  for(const auto&v:sc.vertices)includePoint({zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
  }
- if(zone&&sceneryCount>0){
-  if(sceneCameraZoneEid_!=zoneEntry->eid)sceneCameraInitialized_=false;
+ const std::uint32_t cameraResourceEid=zoneEntry?zoneEntry->eid:(sceneryEntry?sceneryEntry->eid:0U);
+ if(!sceneryEntries.empty()&&sceneryCount>0){
+  if(sceneCameraZoneEid_!=cameraResourceEid)sceneCameraInitialized_=false;
   if(!sceneCameraInitialized_){
    sceneTargetX_=(boundsMin.x+boundsMax.x)*0.5f;sceneTargetY_=(boundsMin.y+boundsMax.y)*0.5f;sceneTargetZ_=(boundsMin.z+boundsMax.z)*0.5f;
    const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
    const float radius=std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f;
-   sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraZoneEid_=zoneEntry->eid;sceneCameraInitialized_=true;
+   sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraZoneEid_=cameraResourceEid;sceneCameraInitialized_=true;
   }
  }
  const ImGuiIO&io=ImGui::GetIO();
@@ -163,16 +157,10 @@ void EditorUI::drawViewport(){
   if(depth<=0.05f)return Projected{-100000.0f,-100000.0f,depth};
   return Projected{canvasMin.x+canvasSize.x*0.5f+rx*focal/depth,canvasMin.y+canvasSize.y*0.5f-py*focal/depth,depth};
  };
- if(zone){
-  const auto&chunks=nsf_.chunks();
-  for(std::int32_t world:zone->worlds){
-   const std::uint32_t eid=static_cast<std::uint32_t>(world);
-   for(const auto&ch:chunks){
-    if(ch.type!=0)continue;
-    for(const auto&e:ch.entries){
-     if(!e.valid||e.type!=3||e.eid!=eid||!e.scenery.decoded)continue;
-     const auto&sc=e.scenery;
-     const V3 zoneOrigin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+ if(!sceneryEntries.empty()){
+  for(const auto*entry:sceneryEntries){
+     const auto&sc=entry->scenery;
+     const V3 zoneOrigin=zone?V3{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f}:V3{};
      auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
      auto vertexColor=[&](std::uint16_t index)->ImU32{
       const auto&v=sc.vertices[index];
@@ -190,8 +178,6 @@ void EditorUI::drawViewport(){
      };
      for(const auto&t:sc.triangles)addFace(t.a,t.b,t.c);
      for(const auto&q:sc.quads){addFace(q.a,q.b,q.c);addFace(q.a,q.c,q.d);}
-    }
-   }
   }
   std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
@@ -208,6 +194,7 @@ void EditorUI::drawViewport(){
    }
    ++faceCount;
   }
+  if(zone){
   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
   const V3 corners[8]={{origin.x,origin.y,origin.z},{origin.x+float(zone->width)/400.0f,origin.y,origin.z},{origin.x,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y,origin.z+float(zone->depth)/400.0f},{origin.x,origin.y+float(zone->height)/400.0f,origin.z},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z},{origin.x,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f},{origin.x+float(zone->width)/400.0f,origin.y+float(zone->height)/400.0f,origin.z+float(zone->depth)/400.0f}};
   const int edges[12][2]={{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}};
@@ -215,8 +202,10 @@ void EditorUI::drawViewport(){
   for(std::size_t i=static_cast<std::size_t>(zone->cameraCount);i<zone->entities.size();++i){const auto&entity=zone->entities[i];if(entity.positions.empty())continue;const auto&p=entity.positions.front();const V3 world{origin.x+float(p.x)/100.0f,origin.y+float(p.y)/100.0f,origin.z+float(p.z)/100.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),4.0f,IM_COL32(245,190,75,255));}
   for(int i=0;i+2<zone->cameraCount&&static_cast<std::size_t>(i+2)<zone->entities.size();i+=3){const auto&camera=zone->entities[static_cast<std::size_t>(i)];for(const auto&p:camera.positions){const V3 world{origin.x+float(p.x)/400.0f,origin.y+float(p.y)/400.0f,origin.z+float(p.z)/400.0f};const auto q=project(world);if(q.depth>0.05f)dl->AddCircleFilled(ImVec2(q.x,q.y),3.0f,IM_COL32(235,85,85,255));}}
 
+  }
   char stats[192];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,sceneDistance_);
-  dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),Crash::eidToEName(zoneEntry->eid).c_str());
+  const char* resourceLabel=zoneEntry?Crash::eidToEName(zoneEntry->eid).c_str():(sceneryEntry?Crash::eidToEName(sceneryEntry->eid).c_str():"No scenery selected");
+  dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),resourceLabel);
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(180,194,210,255),stats);
   if(faceCount==0)dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+34),IM_COL32(245,190,105,255),"No visible scenery faces at this camera position");
  }else{
