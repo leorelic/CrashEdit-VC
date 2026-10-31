@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <cstdint>
 #include <string>
+#include <array>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -22,6 +23,41 @@
 #endif
 namespace CrashEdit {
 static void glfwError(int c,const char*d){std::cerr<<"GLFW "<<c<<": "<<(d?d:"unknown")<<'\n';}
+
+static ImFont* loadUiFont() {
+ // Prefer each platform's familiar UI sans-serif font. The default ImGui
+ // bitmap font remains a safe fallback on machines without these files.
+#ifdef _WIN32
+ const std::array<const char*, 3> candidates = {
+  "C:/Windows/Fonts/segoeui.ttf",
+  "C:/Windows/Fonts/arial.ttf",
+  "C:/Windows/Fonts/tahoma.ttf"
+ };
+#elif defined(__APPLE__)
+ const std::array<const char*, 3> candidates = {
+  "/System/Library/Fonts/Supplemental/Arial.ttf",
+  "/Library/Fonts/Arial.ttf",
+  "/System/Library/Fonts/Supplemental/Verdana.ttf"
+ };
+#else
+ const std::array<const char*, 3> candidates = {
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+  "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
+ };
+#endif
+ for (const char* candidate : candidates) {
+  std::error_code ec;
+  if (std::filesystem::is_regular_file(candidate, ec)) {
+   if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 16.0f)) {
+    std::cout << "UI font: " << candidate << '\\n';
+    return font;
+   }
+  }
+ }
+ std::cerr << "No platform UI font found; using Dear ImGui's default font.\\n";
+ return ImGui::GetIO().Fonts->AddFontDefault();
+}
 
 static std::filesystem::path executableDirectory() {
 #ifdef _WIN32
@@ -51,7 +87,7 @@ int Application::run(){
  glfwMakeContextCurrent(w);
  std::string glError;
  if(!GL::load(glError)){std::cerr<<"Required OpenGL functions are unavailable: "<<glError<<'\n';glfwDestroyWindow(w);glfwTerminate();return 1;}
- glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"imgui.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();
+ glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"imgui.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();loadUiFont();auto&style=ImGui::GetStyle();style.FramePadding=ImVec2(7.0f,5.0f);style.ItemSpacing=ImVec2(8.0f,6.0f);style.WindowPadding=ImVec2(10.0f,10.0f);
  ImGui_ImplGlfw_InitForOpenGL(w,true);
 #if defined(__APPLE__)
  ImGui_ImplOpenGL3_Init("#version 150");
