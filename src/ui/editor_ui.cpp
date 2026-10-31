@@ -24,7 +24,7 @@ struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::si
 static RendererDiagnostics rendererDiagnostics;
 struct EditorPreferences {
  int uiScaling=100;
- bool useModernFont=false,softwareRendering=false,rendererDiagnosticsVisible=false;
+ bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true;
  int sceneMoveSpeed=100;
 };
@@ -35,6 +35,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  if(std::sscanf(line,"UIScaling=%d",&value)==1)editorPreferences.uiScaling=std::clamp(value,100,200);
  else if(std::sscanf(line,"UseModernFont=%d",&value)==1)editorPreferences.useModernFont=value!=0;
  else if(std::sscanf(line,"SoftwareRendering=%d",&value)==1)editorPreferences.softwareRendering=value!=0;
+ else if(std::sscanf(line,"DepthBufferEnabled=%d",&value)==1)editorPreferences.depthBufferEnabled=value!=0;
  else if(std::sscanf(line,"ShowRendererDiagnostics=%d",&value)==1)editorPreferences.rendererDiagnosticsVisible=value!=0;
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
@@ -42,8 +43,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0);
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0);
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -143,7 +144,7 @@ void EditorUI::draw(){
  if(ImGui::BeginPopupModal("Select Game Version",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::TextWrapped("Which Crash game/version does this NSF belong to? This controls the format loaders used for its resources and NSD.");const char* names[]={"Crash 1 — 1995 Beta","Crash 1 — March 8 Beta","Crash 1 — May 11 Beta","Crash 1","Crash 2","Crash 3 — May 14 Beta","Crash 3"};int choice=static_cast<int>(pendingVersion_);if(ImGui::Combo("Game version",&choice,names,7))pendingVersion_=static_cast<GameVersion>(choice);if(ImGui::Button("Open Level")){std::string e;if(loadLevel(std::filesystem::u8path(path_),e)){ImGui::CloseCurrentPopup();}else status_="Could not open level: "+e;}ImGui::SameLine();if(ImGui::Button("Back")){ImGui::CloseCurrentPopup();openDialog_=true;}ImGui::EndPopup();}
  if(about_){ImGui::OpenPopup("About CrashEdit");about_=false;}if(ImGui::BeginPopupModal("About CrashEdit",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::Text("CrashEdit — cross-platform rewrite");ImGui::Text("C++20 / Dear ImGui / GLFW / OpenGL");if(ImGui::Button("Close"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
  static EditorPreferences previousPreferences=editorPreferences;
- if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
+ if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
 }
 void EditorUI::drawMenu(){
  int& uiScaling=editorPreferences.uiScaling;
@@ -192,6 +193,9 @@ void EditorUI::drawViewport(){
  if(ImGui::BeginPopup("ViewportOptions")){
   ImGui::TextUnformatted("Renderer");
   ImGui::Checkbox("Software rendering",&editorPreferences.softwareRendering);
+  ImGui::BeginDisabled(editorPreferences.softwareRendering);
+  ImGui::Checkbox("Enable depth buffer",&editorPreferences.depthBufferEnabled);
+  ImGui::EndDisabled();
   ImGui::Checkbox("Show performance diagnostics",&editorPreferences.rendererDiagnosticsVisible);
   ImGui::Separator();
   ImGui::TextUnformatted("Camera movement speed");
@@ -563,7 +567,7 @@ void EditorUI::drawViewport(){
       batch.insert(batch.end(),vertices.begin(),vertices.end());
       ++faceCount;
      }
-     GL::Viewport(0,0,targetWidth,targetHeight);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);
+     GL::Viewport(0,0,targetWidth,targetHeight);if(editorPreferences.depthBufferEnabled)GL::Enable(0x0B71U);else GL::Disable(0x0B71U);GL::DepthFunc(0x0201U);
      GL::Enable(0x0BE2U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
      GL::ClearColor(0.078f,0.098f,0.13f,1.0f);GL::Clear(0x00004000U|0x00000100U);
      GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
