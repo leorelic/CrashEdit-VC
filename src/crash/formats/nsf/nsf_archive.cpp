@@ -25,7 +25,7 @@ static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item
   if(dataStart<base+16U+static_cast<std::size_t>(count)*8U||dataEnd<dataStart||dataEnd>end){p.error="Property data range is invalid.";out.properties.push_back(std::move(p));continue;}
   p.dataOffset=dataStart;p.dataSize=dataEnd-dataStart;p.valid=true;
   if(p.rowCount<0){p.valid=false;p.error="Property row count is negative.";out.properties.push_back(std::move(p));continue;}
-  if((p.type==19U&&p.elementSize==4U)||(p.type==3U&&p.elementSize==4U)||(p.type==1U&&p.elementSize==1U)||(p.type==6U&&p.elementSize==6U)){
+  if((p.type==19U&&p.elementSize==4U)||(p.type==4U&&p.elementSize==4U)||(p.type==3U&&p.elementSize==4U)||(p.type==1U&&p.elementSize==1U)||(p.type==6U&&p.elementSize==6U)){
    std::size_t pos=dataStart;std::vector<std::uint16_t> rowCounts;
    if(p.sparse){if(!has(bytes,pos,static_cast<std::size_t>(p.rowCount)*2U)||pos+static_cast<std::size_t>(p.rowCount)*2U>dataEnd){p.valid=false;p.error="Sparse property row counts are truncated.";}}
    if(p.valid&&p.sparse){for(int r=0;r<p.rowCount;++r){rowCounts.push_back(u16(bytes,pos));pos+=2;}}
@@ -37,6 +37,7 @@ static bool parseEntity(const std::vector<std::uint8_t>&bytes,const NsfItem&item
   }
   out.properties.push_back(std::move(p));
  }
+ for(const auto& property:out.properties){if(!property.valid||property.intValues.empty())continue;if(static_cast<std::uint16_t>(property.id)==0x0173U){out.hasCameraIndex=true;out.cameraIndex=property.intValues.front();}else if(static_cast<std::uint16_t>(property.id)==0x0174U){out.hasCameraSubIndex=true;out.cameraSubIndex=property.intValues.front();}}
  out.valid=true;return true;
 }
 bool NsfArchive::load(const std::filesystem::path&f,std::string&e){
