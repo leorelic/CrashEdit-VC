@@ -61,6 +61,12 @@ void EditorUI::drawViewport(){
  canvasSize.x=std::max(canvasSize.x,100.0f);canvasSize.y=std::max(canvasSize.y,100.0f);
  ImGui::InvisibleButton("ZoneViewportCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool canvasHovered=ImGui::IsItemHovered();
+ ImGui::OpenPopupOnItemClick("ViewportMovementSpeed",ImGuiPopupFlags_MouseButtonRight);
+ if(ImGui::BeginPopup("ViewportMovementSpeed")){
+  ImGui::TextUnformatted("Camera movement speed");
+  for(int speed=50;speed<=100;speed+=10){char label[32];std::snprintf(label,sizeof(label),"%d%%",speed);if(ImGui::MenuItem(label,nullptr,sceneMoveSpeed_==speed))sceneMoveSpeed_=speed;}
+  ImGui::EndPopup();
+ }
  const bool canvasActive=ImGui::IsItemActive();
  ImDrawList*dl=ImGui::GetWindowDrawList();
  const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
@@ -84,7 +90,7 @@ void EditorUI::drawViewport(){
  }
  struct V3{float x=0,y=0,z=0;};
  struct Projected{float x=0,y=0,depth=0;};
- struct Face{Projected p[3];ImU32 color=0;float depth=0;};
+ struct Face{Projected p[3];ImU32 colors[3]{};float depth=0;};
  std::vector<Face>faces;
  std::size_t sceneryCount=0,vertexCount=0,faceCount=0;
  V3 boundsMin{FLT_MAX,FLT_MAX,FLT_MAX},boundsMax{-FLT_MAX,-FLT_MAX,-FLT_MAX};
@@ -98,7 +104,9 @@ void EditorUI::drawViewport(){
     for(const auto&e:ch.entries){
      if(!e.valid||e.type!=3||e.eid!=eid||!e.scenery.decoded)continue;
      ++sceneryCount;const auto&sc=e.scenery;vertexCount+=sc.vertices.size();
-     for(const auto&v:sc.vertices)includePoint({(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
+     const V3 zoneOrigin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+     includePoint(zoneOrigin);includePoint({zoneOrigin.x+float(zone->width)/400.0f,zoneOrigin.y+float(zone->height)/400.0f,zoneOrigin.z+float(zone->depth)/400.0f});
+     for(const auto&v:sc.vertices)includePoint({zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f});
     }
    }
   }
@@ -128,7 +136,7 @@ void EditorUI::drawViewport(){
  }
  if(canvasHovered&&ImGui::IsKeyDown(ImGuiKey_R)){sceneCameraInitialized_=false;}
  if(canvasHovered){
-  const float moveSpeed=10.0f*(0.2f+0.8f*(sceneDistance_/20.0f))*io.DeltaTime;
+  const float moveSpeed=(2.0f*float(sceneMoveSpeed_)/100.0f)*(0.2f+0.8f*(sceneDistance_/20.0f))*io.DeltaTime;
   const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
   const float cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);
   if(shift){
@@ -164,7 +172,8 @@ void EditorUI::drawViewport(){
     for(const auto&e:ch.entries){
      if(!e.valid||e.type!=3||e.eid!=eid||!e.scenery.decoded)continue;
      const auto&sc=e.scenery;
-     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {(float(v.x)*16.0f+float(sc.xOffset))/400.0f,(float(v.y)*16.0f+float(sc.yOffset))/400.0f,(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
+     const V3 zoneOrigin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
+     auto vertexPosition=[&](std::uint16_t index)->V3{const auto&v=sc.vertices[index];return {zoneOrigin.x+(float(v.x)*16.0f+float(sc.xOffset))/400.0f,zoneOrigin.y+(float(v.y)*16.0f+float(sc.yOffset))/400.0f,zoneOrigin.z+(float(v.z)*16.0f+float(sc.zOffset))/400.0f};};
      auto vertexColor=[&](std::uint16_t index)->ImU32{
       const auto&v=sc.vertices[index];
       if(v.colorIndex<sc.colors.size()){const auto&c=sc.colors[v.colorIndex];return IM_COL32(c.r,c.g,c.b,255);}
@@ -174,11 +183,7 @@ void EditorUI::drawViewport(){
       if(ia>=sc.vertices.size()||ib>=sc.vertices.size()||ic>=sc.vertices.size())return;
       const auto pa=project(vertexPosition(ia)),pb=project(vertexPosition(ib)),pc=project(vertexPosition(ic));
       if(pa.depth<=0.05f||pb.depth<=0.05f||pc.depth<=0.05f)return;
-      const ImU32 ca=vertexColor(ia),cb=vertexColor(ib),cc=vertexColor(ic);
-      const unsigned r=((ca>>IM_COL32_R_SHIFT&255U)+(cb>>IM_COL32_R_SHIFT&255U)+(cc>>IM_COL32_R_SHIFT&255U))/3U;
-      const unsigned g=((ca>>IM_COL32_G_SHIFT&255U)+(cb>>IM_COL32_G_SHIFT&255U)+(cc>>IM_COL32_G_SHIFT&255U))/3U;
-      const unsigned b=((ca>>IM_COL32_B_SHIFT&255U)+(cb>>IM_COL32_B_SHIFT&255U)+(cc>>IM_COL32_B_SHIFT&255U))/3U;
-      Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.color=IM_COL32(r,g,b,255);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;faces.push_back(f);
+      Face f{};f.p[0]=pa;f.p[1]=pb;f.p[2]=pc;f.colors[0]=vertexColor(ia);f.colors[1]=vertexColor(ib);f.colors[2]=vertexColor(ic);f.depth=(pa.depth+pb.depth+pc.depth)/3.0f;faces.push_back(f);
      };
      for(const auto&t:sc.triangles)addFace(t.a,t.b,t.c);
      for(const auto&q:sc.quads){addFace(q.a,q.b,q.c);addFace(q.a,q.c,q.d);}
