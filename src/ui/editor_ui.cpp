@@ -307,8 +307,8 @@ void EditorUI::drawViewport(){
     static constexpr const char* fragmentSource=
      "#version 150\n"
      "in vec4 vColor;in vec2 vUV;out vec4 fragColor;\n"
-     "uniform sampler2D uTexture;uniform int uHasTexture;\n"
-     "void main(){if(uHasTexture==0){fragColor=vColor;return;}vec4 texel=texture(uTexture,vUV);if(texel.a<=0.0)discard;fragColor=vec4(min(vColor.rgb*texel.rgb*2.0,vec3(1.0)),texel.a);}\n";
+     "uniform sampler2D uTexture;uniform int uHasTexture;uniform int uTransparencyPass;\n"
+     "void main(){if(uHasTexture==0){if(uTransparencyPass!=0)discard;fragColor=vColor;return;}vec4 texel=texture(uTexture,vUV);if(texel.a<=0.0)discard;if(uTransparencyPass==0){if(texel.a<0.999)discard;}else if(texel.a>=0.999)discard;fragColor=vec4(min(vColor.rgb*texel.rgb*2.0,vec3(1.0)),texel.a);}\n";
     const unsigned int vs=compileShader(0x8B31U,vertexSource),fs=compileShader(0x8B30U,fragmentSource);
     if(vs&&fs){
      gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::BindAttribLocation(gpu.program,0,"aPosition");GL::BindAttribLocation(gpu.program,1,"aColor");GL::BindAttribLocation(gpu.program,2,"aUV");GL::LinkProgram(gpu.program);
@@ -329,8 +329,8 @@ void EditorUI::drawViewport(){
     const ImGuiIO&renderIo=ImGui::GetIO();
     const int targetWidth=std::max(1,static_cast<int>(std::round(canvasSize.x*renderIo.DisplayFramebufferScale.x)));
     const int targetHeight=std::max(1,static_cast<int>(std::round(canvasSize.y*renderIo.DisplayFramebufferScale.y)));
-    int previousFramebuffer=0,previousViewport[4]{},previousTexture=0,previousRenderbuffer=0,previousActiveTexture=0;
-    GL::GetIntegerv(0x8CA6U,&previousFramebuffer);GL::GetIntegerv(0x0BA2U,previousViewport);
+    int previousFramebuffer=0,previousViewport[4]{},previousTexture=0,previousRenderbuffer=0,previousActiveTexture=0,previousDepthMask=1;
+    GL::GetIntegerv(0x8CA6U,&previousFramebuffer);GL::GetIntegerv(0x0BA2U,previousViewport);GL::GetIntegerv(0x0B72U,&previousDepthMask);
     GL::GetIntegerv(0x84E0U,&previousActiveTexture);GL::ActiveTexture(0x84C0U);GL::GetIntegerv(0x8069U,&previousTexture);
     GL::GetIntegerv(0x8CA7U,&previousRenderbuffer);
     const std::string currentTextureSource=nsfPath_.string();
@@ -354,10 +354,9 @@ void EditorUI::drawViewport(){
     const bool framebufferReady=GL::CheckFramebufferStatus(0x8D40U)==0x8CD5U;
     if(framebufferReady){
      std::map<TextureKey,std::vector<GpuVertex>> batches;
-     auto colorChannel=[](ImU32 color,int shift){return float((color>>shift)&255U)/255.0f;};
-     for(const auto&face:faces){
-      const TextureKey key{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
-      auto&vertices=batches[key];
+     auto makeVertices=[&](const Face&face){
+      std::vector<GpuVertex> vertices;vertices.reserve(3);
+      auto colorChannel=[](ImU32 color,int shift){return float((color>>shift)&255U)/255.0f;};
       for(int i=0;i<3;++i){
        const float x=2.0f*(face.p[i].x-canvasMin.x)/canvasSize.x-1.0f;
        const float y=1.0f-2.0f*(face.p[i].y-canvasMin.y)/canvasSize.y;
@@ -370,6 +369,12 @@ void EditorUI::drawViewport(){
        const float v=face.page?face.uv[i].y/128.0f:0.0f;
        vertices.push_back({x*depth,y*depth,clipZ,depth,colorChannel(color,IM_COL32_R_SHIFT),colorChannel(color,IM_COL32_G_SHIFT),colorChannel(color,IM_COL32_B_SHIFT),1.0f,u,v});
       }
+      return vertices;
+     };
+     for(const auto&face:faces){
+      const TextureKey key{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
+      auto&batch=batches[key];auto vertices=makeVertices(face);
+      batch.insert(batch.end(),vertices.begin(),vertices.end());
       ++faceCount;
      }
      GL::Viewport(0,0,targetWidth,targetHeight);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);
@@ -377,6 +382,68 @@ void EditorUI::drawViewport(){
      GL::ClearColor(0.078f,0.098f,0.13f,1.0f);GL::Clear(0x00004000U|0x00000100U);
      GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
      GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);
+     const int hasTextureLocation=GL::GetUniformLocation(gpu.program,"uHasTexture");
+     const int transparencyPassLocation=GL::GetUniformLocation(gpu.program,"uTransparencyPass");
+     auto getTexture=[&](const TextureKey&key)->unsigned int{
+      const auto*page=std::get<0>(key);if(!page)return 0;
+      auto found=gpu.textureCache.find(key);
+      if(found!=gpu.textureCache.end())return found->second;
+      const int mode=std::clamp(std::get<1>(key),0,2);
+      const int clutX=std::clamp(std::get<2>(key),0,15);
+      const int clutY=std::clamp(std::get<3>(key),0,127);
+      const int blendMode=std::get<4>(key);
+      const int width=1024>>mode;
+      std::vector<std::uint8_t> rgba(static_cast<std::size_t>(width)*128U*4U,0);
+      const auto&bytes=*page;
+      auto expand5=[](unsigned value){return (value*255U+15U)/31U;};
+      for(int py=0;py<128;++py)for(int px=0;px<width;++px){
+       const std::size_t row=static_cast<std::size_t>(py)*512U;
+       std::uint16_t raw=0;bool valid=true;
+       if(mode==0||mode==1){
+        const unsigned index=mode==0?((bytes[row+static_cast<std::size_t>(px/2)]>>((px&1)?4:0))&15U):bytes[row+static_cast<std::size_t>(px)];
+        const std::size_t offset=static_cast<std::size_t>(clutY)*512U+static_cast<std::size_t>(clutX*16+static_cast<int>(index))*2U;
+        if(offset+1U>=bytes.size())valid=false;else raw=std::uint16_t(bytes[offset])|(std::uint16_t(bytes[offset+1U])<<8);
+       }else{
+        const std::size_t offset=row+static_cast<std::size_t>(px)*2U;
+        if(offset+1U>=bytes.size())valid=false;else raw=std::uint16_t(bytes[offset])|(std::uint16_t(bytes[offset+1U])<<8);
+       }
+       const std::size_t out=(static_cast<std::size_t>(py)*static_cast<std::size_t>(width)+static_cast<std::size_t>(px))*4U;
+       if(!valid){rgba[out]=255;rgba[out+1U]=0;rgba[out+2U]=255;rgba[out+3U]=255;continue;}
+       const unsigned red=expand5(raw&31U),green=expand5((raw>>5U)&31U),blue=expand5((raw>>10U)&31U);
+       rgba[out]=static_cast<std::uint8_t>(red);rgba[out+1U]=static_cast<std::uint8_t>(green);rgba[out+2U]=static_cast<std::uint8_t>(blue);
+       rgba[out+3U]=static_cast<std::uint8_t>((raw&0x7fffU)==0&&(raw&0x8000U)==0?0U:((raw&0x8000U)&&blendMode==0?128U:255U));
+      }
+      unsigned int texture=0;GL::GenTextures(1,&texture);GL::BindTexture(0x0DE1U,texture);
+      GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);
+      GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
+      GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());
+      gpu.textureCache.emplace(key,texture);return texture;
+     };
+     GL::DepthMask(1);
+     GL::Uniform1i(transparencyPassLocation,0);
+     for(const auto&batch:batches){
+      const auto&page=std::get<0>(batch.first);
+      GL::BindTexture(0x0DE1U,getTexture(batch.first));
+      GL::Uniform1i(hasTextureLocation,page?1:0);
+      const auto&vertices=batch.second;
+      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.empty()?nullptr:vertices.data(),0x88E8U);
+      if(!vertices.empty())GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+     }
+     std::vector<const Face*> transparentFaces;
+     transparentFaces.reserve(faces.size());
+     for(const auto&face:faces)if(face.page&&face.blendMode==0)transparentFaces.push_back(&face);
+     std::sort(transparentFaces.begin(),transparentFaces.end(),[](const Face*a,const Face*b){return a->depth>b->depth;});
+     GL::DepthMask(0);
+     GL::Uniform1i(transparencyPassLocation,1);
+     for(const Face*face:transparentFaces){
+      const TextureKey key{face->page,face->colorMode,face->clutX,face->clutY,face->blendMode};
+      GL::BindTexture(0x0DE1U,getTexture(key));
+      GL::Uniform1i(hasTextureLocation,1);
+      const auto vertices=makeVertices(*face);
+      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.data(),0x88E8U);
+      GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+     }
+     GL::DepthMask(1);
      for(const auto&batch:batches){
       const auto&page=std::get<0>(batch.first);
       unsigned int texture=0;
@@ -425,6 +492,7 @@ void EditorUI::drawViewport(){
      GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
      gpuRendered=true;
     }
+    GL::DepthMask(static_cast<unsigned char>(previousDepthMask!=0));
     GL::BindFramebuffer(0x8D40U,static_cast<unsigned int>(previousFramebuffer));
     GL::Viewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3]);
     GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,static_cast<unsigned int>(previousTexture));GL::ActiveTexture(static_cast<unsigned int>(previousActiveTexture));
