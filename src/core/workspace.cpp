@@ -4,8 +4,8 @@
 namespace CrashEdit {
 static std::string kindOf(const std::filesystem::path& p,bool dir) {
  if(dir) return "Folder"; auto e=p.extension().string();
- if(e==".nsf"||e==".NSF") return "NSF archive";
- if(e==".nsd"||e==".NSD") return "NSD level data";
+ if(e==".nsf"||e==".NSF") return "NSF — Resource";
+ if(e==".nsd"||e==".NSD") return "NSD — Level Details";
  if(e==".iso"||e==".ISO") return "Disc image";
  return e.empty()?"File":e.substr(1)+" file";
 }
