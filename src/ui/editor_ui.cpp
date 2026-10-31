@@ -117,11 +117,11 @@ EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();}
 void EditorUI::handleDroppedFiles(int count,const char** paths){
  for(int i=0;i<count;++i){
   if(!paths||!paths[i])continue;
-  std::filesystem::path droppedPath=std::filesystem::u8path(paths[i]);
+  const std::string droppedPathText(paths[i]);
+  std::filesystem::path droppedPath=std::filesystem::u8path(droppedPathText);
   std::string extension=droppedPath.extension().string();
   std::transform(extension.begin(),extension.end(),extension.begin(),[](unsigned char ch){return static_cast<char>(std::tolower(ch));});
   if(extension!=".nsf")continue;
-  const std::string droppedPathText=droppedPath.string();
   if(droppedPathText.size()>=sizeof(path_)){
    status_="Dropped NSF path is too long to fit in the file path field.";
    return;
