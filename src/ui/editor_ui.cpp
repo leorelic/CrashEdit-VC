@@ -22,6 +22,7 @@
 namespace CrashEdit {
 struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::size_t gpuDrawCalls=0,gpuUploadBytes=0,cachedTextureCount=0,cachedTextureBytes=0; };
 static RendererDiagnostics rendererDiagnostics;
+static bool showRendererDiagnostics=false;
 static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a.y)*.58f);float h=a.y+(b.y-a.y)*.3f;d->AddRectFilled(a,b,IM_COL32(25,30,38,255));d->AddRectFilled(a,ImVec2(b.x,h),IM_COL32(29,36,46,255));for(int i=-12;i<=12;++i)d->AddLine(ImVec2(c.x+i*42,h),ImVec2(c.x+i*115,b.y),IM_COL32(86,105,126,95));for(int i=1;i<=12;++i){float t=float(i)/12;float y=h+(b.y-h)*t*t;d->AddLine(ImVec2(a.x,y),ImVec2(b.x,y),IM_COL32(86,105,126,95));}}
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
@@ -73,6 +74,7 @@ void EditorUI::drawViewport(){
  if(ImGui::BeginPopup("ViewportOptions")){
   ImGui::TextUnformatted("Renderer");
   ImGui::Checkbox("Software rendering",&softwareRendering_);
+  ImGui::Checkbox("Show performance diagnostics",&showRendererDiagnostics);
   ImGui::Separator();
   ImGui::TextUnformatted("Camera movement speed");
   ImGui::SetNextItemWidth(180.0f);
@@ -517,7 +519,7 @@ void EditorUI::drawViewport(){
   const char* resourceLabel=zoneEntry?Crash::eidToEName(zoneEntry->eid).c_str():(sceneryEntry?Crash::eidToEName(sceneryEntry->eid).c_str():"No scenery selected");
   dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),resourceLabel);
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-40),IM_COL32(180,194,210,255),stats);
-  dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(145,190,210,255),performanceStats);
+  if(showRendererDiagnostics)dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(145,190,210,255),performanceStats);
   if(faceCount==0)dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+34),IM_COL32(245,190,105,255),"No visible scenery faces at this camera position");
  }else{
   dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+16),IM_COL32(205,211,220,255),nsfValid_?"Select a decoded zone entry to view its scenery":"No zone loaded — open an NSF");
