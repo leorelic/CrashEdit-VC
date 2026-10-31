@@ -444,8 +444,6 @@ void EditorUI::drawViewport(){
       GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
      }
      GL::DepthMask(1);
-     for(const auto&batch:batches){
-      const auto&page=std::get<0>(batch.first);
      GL::BindTexture(0x0DE1U,0);
      GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
      gpuRendered=true;
