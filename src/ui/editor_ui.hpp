@@ -12,14 +12,14 @@ private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom();
  void drawNode(const ResourceNode&); void drawTextureViewer(); void drawClutEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&);
  Workspace& workspace_;
- bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true,textureViewer_=true,clutEditor_=true,entityDataChanged_=false,textureSelecting_=false;
+ bool openDialog_=false,versionDialog_=false,about_=false,properties_=true,console_=true,assets_=true,textureViewer_=true,clutEditor_=true,entityDataChanged_=false;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
  int sceneMoveSpeed_=100;
  bool softwareRendering_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
- int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0,textureDragX_=0,textureDragY_=0;
+ int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
  float textureZoom_=1.0f;
  std::uint32_t sceneCameraZoneEid_=0;
  char path_[1024]{};
