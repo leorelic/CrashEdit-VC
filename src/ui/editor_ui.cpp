@@ -378,7 +378,7 @@ void EditorUI::drawViewport(){
       ++faceCount;
      }
      GL::Viewport(0,0,targetWidth,targetHeight);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);
-     GL::Enable(0x0BE2U);GL::BlendFunc(0x0302U,0x0303U);
+     GL::Enable(0x0BE2U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
      GL::ClearColor(0.078f,0.098f,0.13f,1.0f);GL::Clear(0x00004000U|0x00000100U);
      GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
      GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);
