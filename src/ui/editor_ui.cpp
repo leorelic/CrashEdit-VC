@@ -219,18 +219,6 @@ void EditorUI::drawViewport(){
    const float scale=i<static_cast<std::size_t>(zone->cameraCount)?400.0f:100.0f;
    for(const auto&p:entity.positions)includeFramePoint({origin.x+float(p.x)/scale,origin.y+float(p.y)/scale,origin.z+float(p.z)/scale});
   }
-  // OG CrashEdit frames all linked zones, not just the selected/master zone.
-  for(const auto*neighborEntry:neighborZoneEntries){
-   const auto&neighbor=neighborEntry->zone;
-   const V3 neighborOrigin{float(neighbor.x)/400.0f,float(neighbor.y)/400.0f,float(neighbor.z)/400.0f};
-   includeFramePoint(neighborOrigin);
-   includeFramePoint({neighborOrigin.x+float(neighbor.width)/400.0f,neighborOrigin.y+float(neighbor.height)/400.0f,neighborOrigin.z+float(neighbor.depth)/400.0f});
-   for(std::size_t i=0;i<neighbor.entities.size();++i){
-    if(i<static_cast<std::size_t>(neighbor.cameraCount)&&i%3!=0)continue;
-    const float scale=i<static_cast<std::size_t>(neighbor.cameraCount)?400.0f:100.0f;
-    for(const auto&p:neighbor.entities[i].positions)includeFramePoint({neighborOrigin.x+float(p.x)/scale,neighborOrigin.y+float(p.y)/scale,neighborOrigin.z+float(p.z)/scale});
-   }
-  }
  }else{
   frameMin=boundsMin;frameMax=boundsMax;
  }
