@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cfloat>
+#include <cstdint>
 #include <filesystem>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -365,7 +366,7 @@ void EditorUI::drawViewport(){
     GL::Viewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3]);
     GL::BindTexture(0x0DE1U,static_cast<unsigned int>(previousTexture));
     GL::BindRenderbuffer(0x8D41U,static_cast<unsigned int>(previousRenderbuffer));
-    if(gpuRendered)dl->AddImage((ImTextureID)(intptr_t)gpu.colorTexture,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));
+    if(gpuRendered)dl->AddImage((ImTextureID)(std::intptr_t)gpu.colorTexture,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));
    }
    if(!gpuRendered){
     for(const auto&f:faces){
