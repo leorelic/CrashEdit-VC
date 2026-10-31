@@ -182,6 +182,10 @@ bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) co
     for (std::size_t i = 0; i < hashKeyMap.size(); ++i) writeI32(output, i * 4, hashKeyMap[i]);
     writeI32(output, 0x400, chunkCount);
     writeI32(output, 0x404, static_cast<std::int32_t>(index.size()));
+    if (variant != NsdVariant::Proto) {
+        if (levelData.size() != 4) { error = "NSD level data must contain four entries."; return false; }
+        for (std::size_t i = 0; i < levelData.size(); ++i) writeI32(output, 0x408 + i * 4, levelData[i]);
+    }
     for (std::size_t i = 0; i < index.size(); ++i) {
         writeI32(output, indexOffset + i * 8, index[i].chunkId);
         writeI32(output, indexOffset + i * 8 + 4, index[i].entryId);
