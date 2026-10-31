@@ -219,8 +219,41 @@ void EditorUI::drawViewport(){
       if(tex){f.colorMode=tex->colorMode;f.blendMode=tex->blendMode;f.clutX=tex->clutX;f.clutY=(tex->clutY2<<2)|((tex->clutY1>>2)&3);const std::uint32_t pageEid=tex->page<sc.texturePageEids.size()?sc.texturePageEids[tex->page]:0U;for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536&&chunk.bytes.size()>=8){const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8)|(std::uint32_t(chunk.bytes[6])<<16)|(std::uint32_t(chunk.bytes[7])<<24);if(pageId==pageEid){f.page=&chunk.bytes;break;}}const int xoff=(1<<(2-std::min<int>(tex->colorMode,2)))*64*tex->segment;float us[4]={float(tex->u1)+xoff,float(tex->u2)+xoff,float(tex->u3)+xoff,float(tex->u4)+xoff};float vs[4]={float(tex->v1),float(tex->v2),float(tex->v3),float(tex->v4)};auto adjustCoordinates=[](float* values){if(values[0]>values[1]||values[0]>values[2])values[0]+=1.0f;if(values[1]>values[0]||values[1]>values[2])values[1]+=1.0f;if(values[2]>values[1]||values[2]>values[0])values[2]+=1.0f;if(values[3]>values[1]||values[3]>values[2]||values[3]>values[0])values[3]+=1.0f;};adjustCoordinates(us);adjustCoordinates(vs);f.uv[0]=ImVec2(us[uvA],vs[uvA]);f.uv[1]=ImVec2(us[uvB],vs[uvB]);f.uv[2]=ImVec2(us[uvC],vs[uvC]);}
       faces.push_back(f);
      };
-     for(const auto&t:sc.triangles){const Crash::NsfSceneryTexture*tex=nullptr;if(!t.animated&&t.textureIndex>0&&static_cast<std::size_t>(t.textureIndex-1)<sc.textures.size())tex=&sc.textures[t.textureIndex-1];if(tex)++texturedFaceCount;const auto before=faces.size();addFace(t.a,t.b,t.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
-     for(const auto&q:sc.quads){const Crash::NsfSceneryTexture*tex=nullptr;if(!q.animated&&q.textureIndex>0&&static_cast<std::size_t>(q.textureIndex-1)<sc.textures.size())tex=&sc.textures[q.textureIndex-1];if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
+     // Resolve the polygon's texture index exactly as ProcessTextureInfoC2 does
+     // in the original CrashEdit. Animated indices address the extended-texture
+     // table first; that record then selects the actual texture-info entry.
+     const int textureFrame=static_cast<int>(ImGui::GetTime()*30.0);
+     auto resolveTexture=[&](std::uint16_t textureIndex,bool animated)->const Crash::NsfSceneryTexture*{
+      int textureId=static_cast<int>(textureIndex)-1;
+      if(animated){
+       if(++textureId<0||static_cast<std::size_t>(textureId)>=sc.animatedTextures.size())return nullptr;
+       std::uint32_t anim=sc.animatedTextures[static_cast<std::size_t>(textureId)];
+       const bool isLod=(anim&0x80000000U)!=0;
+       const int offset=static_cast<int>(anim&0x7ffU);
+       if(offset==0)return nullptr;
+       textureId=offset-1;
+       if(isLod){
+        textureId+=static_cast<int>((anim>>29U)&3U);
+       }else{
+        const int latency=static_cast<int>((anim>>26U)&0x1fU);
+        const int delay=static_cast<int>((anim>>19U)&0x7fU);
+        const int mask=static_cast<int>((anim>>12U)&0x7fU);
+        textureId+=(textureFrame/(1+latency)+delay)&mask;
+        if((anim&(1U<<11U))!=0){
+         ++textureId;
+         if(textureId<0||static_cast<std::size_t>(textureId)>=sc.animatedTextures.size())return nullptr;
+         anim=sc.animatedTextures[static_cast<std::size_t>(textureId)];
+         textureId=static_cast<int>(anim&0x7ffU)-1+static_cast<int>((anim>>29U)&3U);
+        }
+       }
+      }else if(textureIndex==0){
+       return nullptr;
+      }
+      if(textureId<0||static_cast<std::size_t>(textureId)>=sc.textures.size())return nullptr;
+      return &sc.textures[static_cast<std::size_t>(textureId)];
+     };
+     for(const auto&t:sc.triangles){const auto*tex=resolveTexture(t.textureIndex,t.animated);if(tex)++texturedFaceCount;const auto before=faces.size();addFace(t.a,t.b,t.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
+     for(const auto&q:sc.quads){const auto*tex=resolveTexture(q.textureIndex,q.animated);if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
   std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
