@@ -67,4 +67,32 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(object.settings.size()==1&&object.settings[0].valueA==0x34&&object.settings[0].valueB==0x12);
  assert(object.victims.size()==2&&object.victims[0]==7&&object.victims[1]==8);
  assert(object.hasDdaSettings&&object.ddaDeathCount==5&&object.hasDdaSection&&object.ddaSection==2&&object.hasBoxCount&&object.boxCount==9);
+
+ // A Crash 2 scenery entry with one vertex, triangle, quad, texture, color, and animated texture.
+ std::vector<std::uint8_t> sceneryChunk(65536);p16(sceneryChunk,0,0x1234);p16(sceneryChunk,2,0);p32(sceneryChunk,4,6);p32(sceneryChunk,8,1);
+ constexpr std::size_t sceneryEntry=24, sceneryHeaderSize=76;
+ constexpr std::size_t sceneryEntrySize=48+76+8+8+8+12+4+4;
+ p32(sceneryChunk,16,sceneryEntry);p32(sceneryChunk,20,sceneryEntry+sceneryEntrySize);
+ p32(sceneryChunk,sceneryEntry,0x0100ffff);p32(sceneryChunk,sceneryEntry+4,0x0200007b);p32(sceneryChunk,sceneryEntry+8,3);p32(sceneryChunk,sceneryEntry+12,7);
+ std::size_t itemAt=48;
+ const std::size_t itemSizes[]={76,8,8,8,12,4,4};
+ for(std::size_t i=0;i<7;++i){p32(sceneryChunk,sceneryEntry+16+i*4,itemAt);itemAt+=itemSizes[i];}
+ p32(sceneryChunk,sceneryEntry+16+7*4,sceneryEntrySize);
+ const std::size_t sceneryInfo=sceneryEntry+48,vertexData=sceneryInfo+76,triangleData=vertexData+8,quadData=triangleData+8,textureData=quadData+8,colorData=textureData+12,animatedData=colorData+4;
+ p32(sceneryChunk,sceneryInfo,10);p32(sceneryChunk,sceneryInfo+4,20);p32(sceneryChunk,sceneryInfo+8,30);p32(sceneryChunk,sceneryInfo+12,0);
+ p32(sceneryChunk,sceneryInfo+16,1);p32(sceneryChunk,sceneryInfo+20,1);p32(sceneryChunk,sceneryInfo+24,1);p32(sceneryChunk,sceneryInfo+28,1);p32(sceneryChunk,sceneryInfo+32,1);p32(sceneryChunk,sceneryInfo+36,1);p32(sceneryChunk,sceneryInfo+40,1);p32(sceneryChunk,sceneryInfo+44,0x12345678);
+ p32(sceneryChunk,vertexData,0x0032ffe1);p16(sceneryChunk,vertexData+4,0x0043);
+ const std::uint32_t triangleA=0x80U|((0x123U>>4U)&0x7fU);p32(sceneryChunk,triangleData,triangleA);p16(sceneryChunk,triangleData+4,0x3U);
+ const std::uint32_t quadA=0x80U|((0x234U>>4U)&0x7fU);const std::uint32_t quadB=(5U<<4U)|(0x234U&0xfU);p32(sceneryChunk,quadData,quadA);p32(sceneryChunk,quadData+4,quadB);
+ sceneryChunk[textureData]=1;sceneryChunk[textureData+1]=2;sceneryChunk[textureData+2]=0x43;sceneryChunk[textureData+3]=4;sceneryChunk[textureData+4]=5;sceneryChunk[textureData+5]=6;sceneryChunk[textureData+6]=0xa7;sceneryChunk[textureData+7]=0x05;sceneryChunk[textureData+8]=7;sceneryChunk[textureData+9]=8;sceneryChunk[textureData+10]=9;sceneryChunk[textureData+11]=10;
+ sceneryChunk[colorData]=11;sceneryChunk[colorData+1]=22;sceneryChunk[colorData+2]=33;sceneryChunk[colorData+3]=44;p32(sceneryChunk,animatedData,0xabcdef01);
+ assert(a.loadBytes(sceneryChunk,e));a.decodeZones(false);const auto&scenery=a.chunks()[0].entries[0].scenery;
+ assert(scenery.decoded&&scenery.xOffset==10&&scenery.yOffset==20&&scenery.zOffset==30&&!scenery.isSky);
+ assert(scenery.texturePageEids.size()==1&&scenery.texturePageEids[0]==0x12345678);
+ assert(scenery.vertices.size()==1&&scenery.vertices[0].x==-2&&scenery.vertices[0].y==3&&scenery.vertices[0].z==4&&scenery.vertices[0].colorIndex==0x213);
+ assert(scenery.triangles.size()==1&&scenery.triangles[0].textureIndex==0x123&&scenery.triangles[0].animated);
+ assert(scenery.quads.size()==1&&scenery.quads[0].textureIndex==0x234&&scenery.quads[0].unknown==5&&scenery.quads[0].animated);
+ assert(scenery.textures.size()==1&&scenery.textures[0].u1==1&&scenery.textures[0].v4==10&&scenery.textures[0].clutX==3&&scenery.textures[0].clutY1==4&&scenery.textures[0].clutY2==4);
+ assert(scenery.colors.size()==1&&scenery.colors[0].r==11&&scenery.colors[0].g==22&&scenery.colors[0].b==33&&scenery.colors[0].extra==44);
+ assert(scenery.animatedTextures.size()==1&&scenery.animatedTextures[0]==0xabcdef01);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
