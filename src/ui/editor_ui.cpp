@@ -307,8 +307,8 @@ void EditorUI::drawViewport(){
     static constexpr const char* fragmentSource=
      "#version 150\n"
      "in vec4 vColor;in vec2 vUV;out vec4 fragColor;\n"
-     "uniform sampler2D uTexture;uniform int uHasTexture;uniform int uTransparencyPass;\n"
-     "void main(){if(uHasTexture==0){if(uTransparencyPass!=0)discard;fragColor=vColor;return;}vec4 texel=texture(uTexture,vUV);if(texel.a<=0.0)discard;if(uTransparencyPass==0){if(texel.a<0.999)discard;}else if(texel.a>=0.999)discard;fragColor=vec4(min(vColor.rgb*texel.rgb*2.0,vec3(1.0)),texel.a);}\n";
+     "uniform sampler2D uTexture;uniform int uHasTexture;uniform int uBlendMask;uniform int uBlendMode;\n"
+     "void main(){if(uHasTexture==0){if(uBlendMask!=3)discard;fragColor=vColor;return;}vec4 texel=texture(uTexture,vUV);if(texel.a<=0.0)discard;bool stp=texel.a<0.999;if(uBlendMask==3){if(stp&&uBlendMode!=3)discard;}else if(uBlendMode!=uBlendMask)discard;float alpha=(uBlendMask==0&&uBlendMode==0&&stp)?0.5:1.0;fragColor=vec4(min(vColor.rgb*texel.rgb*2.0,vec3(1.0)),alpha);}\n";
     const unsigned int vs=compileShader(0x8B31U,vertexSource),fs=compileShader(0x8B30U,fragmentSource);
     if(vs&&fs){
      gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::BindAttribLocation(gpu.program,0,"aPosition");GL::BindAttribLocation(gpu.program,1,"aColor");GL::BindAttribLocation(gpu.program,2,"aUV");GL::LinkProgram(gpu.program);
@@ -383,7 +383,8 @@ void EditorUI::drawViewport(){
      GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
      GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);
      const int hasTextureLocation=GL::GetUniformLocation(gpu.program,"uHasTexture");
-     const int transparencyPassLocation=GL::GetUniformLocation(gpu.program,"uTransparencyPass");
+     const int blendMaskLocation=GL::GetUniformLocation(gpu.program,"uBlendMask");
+     const int blendModeLocation=GL::GetUniformLocation(gpu.program,"uBlendMode");
      auto getTexture=[&](const TextureKey&key)->unsigned int{
       const auto*page=std::get<0>(key);if(!page)return 0;
       auto found=gpu.textureCache.find(key);
@@ -411,7 +412,7 @@ void EditorUI::drawViewport(){
        if(!valid){rgba[out]=255;rgba[out+1U]=0;rgba[out+2U]=255;rgba[out+3U]=255;continue;}
        const unsigned red=expand5(raw&31U),green=expand5((raw>>5U)&31U),blue=expand5((raw>>10U)&31U);
        rgba[out]=static_cast<std::uint8_t>(red);rgba[out+1U]=static_cast<std::uint8_t>(green);rgba[out+2U]=static_cast<std::uint8_t>(blue);
-       rgba[out+3U]=static_cast<std::uint8_t>((raw&0x7fffU)==0&&(raw&0x8000U)==0?0U:((raw&0x8000U)&&blendMode==0?128U:255U));
+       rgba[out+3U]=static_cast<std::uint8_t>((raw&0x7fffU)==0&&(raw&0x8000U)==0?0U:((raw&0x8000U)?128U:255U));
       }
       unsigned int texture=0;GL::GenTextures(1,&texture);GL::BindTexture(0x0DE1U,texture);
       GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);
@@ -419,30 +420,41 @@ void EditorUI::drawViewport(){
       GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());
       gpu.textureCache.emplace(key,texture);return texture;
      };
+     // Match CrashEdit's four PS1 scenery blend passes: solid, trans,
+     // subtractive, then additive. Non-solid passes preserve source polygon order.
      GL::DepthMask(1);
-     GL::Uniform1i(transparencyPassLocation,0);
+     GL::BlendEquation(0x8006U);
+     GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+     GL::Uniform1i(blendMaskLocation,3);
      for(const auto&batch:batches){
       const auto&page=std::get<0>(batch.first);
+      const int mode=std::get<4>(batch.first);
       GL::BindTexture(0x0DE1U,getTexture(batch.first));
       GL::Uniform1i(hasTextureLocation,page?1:0);
+      GL::Uniform1i(blendModeLocation,mode);
       const auto&vertices=batch.second;
       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.empty()?nullptr:vertices.data(),0x88E8U);
       if(!vertices.empty())GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
      }
-     std::vector<const Face*> transparentFaces;
-     transparentFaces.reserve(faces.size());
-     for(const auto&face:faces)if(face.page&&face.blendMode==0)transparentFaces.push_back(&face);
-     std::sort(transparentFaces.begin(),transparentFaces.end(),[](const Face*a,const Face*b){return a->depth>b->depth;});
-     GL::DepthMask(0);
-     GL::Uniform1i(transparencyPassLocation,1);
-     for(const Face*face:transparentFaces){
-      const TextureKey key{face->page,face->colorMode,face->clutX,face->clutY,face->blendMode};
-      GL::BindTexture(0x0DE1U,getTexture(key));
-      GL::Uniform1i(hasTextureLocation,1);
-      const auto vertices=makeVertices(*face);
-      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.data(),0x88E8U);
-      GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
-     }
+     auto drawBlendPass=[&](int blendMode,unsigned int equation,unsigned int sourceFactor,unsigned int destinationFactor){
+      GL::DepthMask(0);
+      GL::BlendEquation(equation);
+      GL::BlendFuncSeparate(sourceFactor,destinationFactor,sourceFactor,destinationFactor);
+      GL::Uniform1i(blendMaskLocation,blendMode);
+      for(const auto&face:faces){
+       if(!face.page||face.blendMode!=blendMode)continue;
+       const TextureKey key{face.page,face.colorMode,face.clutX,face.clutY,face.blendMode};
+       GL::BindTexture(0x0DE1U,getTexture(key));
+       GL::Uniform1i(hasTextureLocation,1);
+       GL::Uniform1i(blendModeLocation,face.blendMode);
+       const auto vertices=makeVertices(face);
+       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.data(),0x88E8U);
+       GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+      }
+     };
+     drawBlendPass(0,0x8006U,0x0302U,0x0303U); // standard alpha
+     drawBlendPass(2,0x800BU,1U,1U);           // reverse subtract
+     drawBlendPass(1,0x8006U,1U,1U);           // additive
      GL::DepthMask(1);
      GL::BindTexture(0x0DE1U,0);
      GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
