@@ -935,10 +935,8 @@ void EditorUI::drawSpawnPointsEditor(){
    auto&p=nsd_.spawns[i];ImGui::PushID(static_cast<int>(i));ImGui::TableNextRow();
    ImGui::TableSetColumnIndex(0);
    const bool rowSelected=selectedSpawn_==static_cast<int>(i);
-   if(ImGui::Selectable("##SelectSpawnRow",rowSelected,ImGuiSelectableFlags_SpanAvailWidth|ImGuiSelectableFlags_AllowOverlap,ImVec2(0,ImGui::GetTextLineHeightWithSpacing())))selectedSpawn_=static_cast<int>(i);
-   ImGui::SameLine();
    const auto eidName=Crash::eidToEName(static_cast<std::uint32_t>(p.zoneEid));
-   ImGui::TextUnformatted(eidName.c_str());
+   if(ImGui::Selectable(eidName.c_str(),rowSelected,ImGuiSelectableFlags_SpanAvailWidth))selectedSpawn_=static_cast<int>(i);
    if(ImGui::BeginDragDropSource()){
     const int from=static_cast<int>(i);ImGui::SetDragDropPayload("NSD_SPAWN_ROW",&from,sizeof(from));ImGui::Text("Move spawn point %zu",i);ImGui::EndDragDropSource();
    }
