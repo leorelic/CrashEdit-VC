@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cfloat>
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
 #include <map>
 #include <tuple>
@@ -19,6 +20,8 @@
 #include <commdlg.h>
 #endif
 namespace CrashEdit {
+struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::size_t gpuDrawCalls=0,gpuUploadBytes=0,cachedTextureCount=0,cachedTextureBytes=0; };
+static RendererDiagnostics rendererDiagnostics;
 static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a.y)*.58f);float h=a.y+(b.y-a.y)*.3f;d->AddRectFilled(a,b,IM_COL32(25,30,38,255));d->AddRectFilled(a,ImVec2(b.x,h),IM_COL32(29,36,46,255));for(int i=-12;i<=12;++i)d->AddLine(ImVec2(c.x+i*42,h),ImVec2(c.x+i*115,b.y),IM_COL32(86,105,126,95));for(int i=1;i<=12;++i){float t=float(i)/12;float y=h+(b.y-h)*t*t;d->AddLine(ImVec2(a.x,y),ImVec2(b.x,y),IM_COL32(86,105,126,95));}}
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
@@ -92,6 +95,7 @@ void EditorUI::drawViewport(){
    else if(e.valid&&e.type==3&&e.scenery.decoded){standaloneScenery=&e.scenery;sceneryEntry=&e;}
   }
  }
+ const auto sceneBuildStart=std::chrono::steady_clock::now();
  std::vector<const Crash::NsfEntry*> sceneryEntries;
  if(standaloneScenery&&sceneryEntry)sceneryEntries.push_back(sceneryEntry);
  if(zone){
@@ -259,6 +263,7 @@ void EditorUI::drawViewport(){
      for(const auto&t:sc.triangles){const auto*tex=resolveTexture(t.textureIndex,t.animated);if(tex)++texturedFaceCount;const auto before=faces.size();addFace(t.a,t.b,t.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
      for(const auto&q:sc.quads){const auto*tex=resolveTexture(q.textureIndex,q.animated);if(tex)texturedFaceCount+=2;auto before=faces.size();addFace(q.a,q.b,q.c,tex,1,0,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}before=faces.size();addFace(q.a,q.d,q.c,tex,1,3,2);if(tex&&faces.size()>before){if(faces.back().page)++resolvedTexturePageCount;else ++missingTexturePageCount;}}
   }
+  rendererDiagnostics.sceneBuildMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-sceneBuildStart).count();
   if(softwareRendering_)std::sort(faces.begin(),faces.end(),[](const Face&a,const Face&b){return a.depth>b.depth;});
   auto channel=[](ImU32 c,int shift){return float((c>>shift)&255U);};
   // OpenGL's smooth vertex shading is perspective-correct. The CPU fallback
@@ -286,6 +291,8 @@ void EditorUI::drawViewport(){
     ++faceCount;
    }
   }else{
+   const auto gpuCpuStart=std::chrono::steady_clock::now();
+   std::size_t gpuDrawCalls=0,gpuUploadBytes=0;
    struct GpuVertex{float x,y,z,w,r,g,b,a,u,v;};
    using TextureKey=std::tuple<const std::vector<std::uint8_t>*,int,int,int,int>;
    struct GpuState{unsigned int program=0,vao=0,vbo=0,framebuffer=0,colorTexture=0,depthBuffer=0;int width=0,height=0;bool ready=false;std::map<TextureKey,unsigned int> textureCache;std::string textureCachePath;};
@@ -433,8 +440,9 @@ void EditorUI::drawViewport(){
       GL::Uniform1i(hasTextureLocation,page?1:0);
       GL::Uniform1i(blendModeLocation,mode);
       const auto&vertices=batch.second;
-      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.empty()?nullptr:vertices.data(),0x88E8U);
-      if(!vertices.empty())GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+      const std::size_t uploadSize=vertices.size()*sizeof(GpuVertex);gpuUploadBytes+=uploadSize;
+      GL::BufferData(0x8892U,static_cast<GL::SizePtr>(uploadSize),vertices.empty()?nullptr:vertices.data(),0x88E8U);
+      if(!vertices.empty()){GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));++gpuDrawCalls;}
      }
      auto drawBlendPass=[&](int blendMode,unsigned int equation,unsigned int sourceFactor,unsigned int destinationFactor){
       GL::DepthMask(0);
@@ -448,8 +456,9 @@ void EditorUI::drawViewport(){
        GL::Uniform1i(hasTextureLocation,1);
        GL::Uniform1i(blendModeLocation,face.blendMode);
        const auto vertices=makeVertices(face);
-       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.data(),0x88E8U);
-       GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+       const std::size_t uploadSize=vertices.size()*sizeof(GpuVertex);gpuUploadBytes+=uploadSize;
+       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(uploadSize),vertices.data(),0x88E8U);
+       GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));++gpuDrawCalls;
       }
      };
      drawBlendPass(0,0x8006U,0x0302U,0x0303U); // standard alpha
@@ -474,6 +483,10 @@ void EditorUI::drawViewport(){
      ++faceCount;
     }
    }
+   rendererDiagnostics.gpuSubmitCpuMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-gpuCpuStart).count();
+   rendererDiagnostics.gpuDrawCalls=gpuDrawCalls;rendererDiagnostics.gpuUploadBytes=gpuUploadBytes;
+   rendererDiagnostics.cachedTextureCount=gpu.textureCache.size();rendererDiagnostics.cachedTextureBytes=0;
+   for(const auto&entry:gpu.textureCache){const int mode=std::clamp(std::get<1>(entry.first),0,2);rendererDiagnostics.cachedTextureBytes+=static_cast<std::size_t>(1024>>mode)*128U*4U;}
   }
   if(zone){
   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
@@ -499,10 +512,12 @@ void EditorUI::drawViewport(){
   }
 
   }
-  char stats[256];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
+  char stats[384];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
+  char performanceStats[384];std::snprintf(performanceStats,sizeof(performanceStats),"CPU scene build: %.2f ms | GPU submit (CPU): %.2f ms | Draw calls: %zu | Upload: %.1f KiB | Texture cache: %zu (%.2f MiB)",rendererDiagnostics.sceneBuildMs,rendererDiagnostics.gpuSubmitCpuMs,rendererDiagnostics.gpuDrawCalls,double(rendererDiagnostics.gpuUploadBytes)/1024.0,rendererDiagnostics.cachedTextureCount,double(rendererDiagnostics.cachedTextureBytes)/(1024.0*1024.0));
   const char* resourceLabel=zoneEntry?Crash::eidToEName(zoneEntry->eid).c_str():(sceneryEntry?Crash::eidToEName(sceneryEntry->eid).c_str():"No scenery selected");
   dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),resourceLabel);
-  dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(180,194,210,255),stats);
+  dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-40),IM_COL32(180,194,210,255),stats);
+  dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(145,190,210,255),performanceStats);
   if(faceCount==0)dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+34),IM_COL32(245,190,105,255),"No visible scenery faces at this camera position");
  }else{
   dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+16),IM_COL32(205,211,220,255),nsfValid_?"Select a decoded zone entry to view its scenery":"No zone loaded — open an NSF");
