@@ -22,8 +22,8 @@ static void glfwError(int c,const char*d){std::cerr<<"GLFW "<<c<<": "<<(d?d:"unk
 static std::filesystem::path executableDirectory() {
 #ifdef _WIN32
  wchar_t buffer[32768]{};
- DWORD n=GetModuleFileNameW(nullptr,buffer,static_cast<DWORD>(std::size(buffer)));
- if(n>0 && n<std::size(buffer)) return std::filesystem::path(buffer).parent_path();
+ DWORD n=GetModuleFileNameW(nullptr,buffer,static_cast<DWORD>(sizeof(buffer)/sizeof(buffer[0])));
+ if(n>0 && n<(sizeof(buffer)/sizeof(buffer[0]))) return std::filesystem::path(buffer).parent_path();
 #elif defined(__APPLE__)
  std::uint32_t size=0; _NSGetExecutablePath(nullptr,&size);
  std::string buffer(size,' ');
