@@ -19,6 +19,7 @@ struct NsfEntityProperty {
 };
 struct NsfEntity {
  std::size_t itemIndex=0; bool valid=false; std::uint32_t declaredLength=0;
+ bool hasCameraIndex=false,hasCameraSubIndex=false; std::int32_t cameraIndex=0,cameraSubIndex=0;
  std::vector<NsfEntityProperty> properties; std::string error;
 };
 struct NsfZone {
