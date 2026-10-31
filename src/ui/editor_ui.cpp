@@ -1,5 +1,6 @@
 #include "ui/editor_ui.hpp"
 #include "crash/formats/eid.hpp"
+#include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <algorithm>
@@ -268,17 +269,109 @@ void EditorUI::drawViewport(){
    const auto mix=[&](int shift){return static_cast<unsigned char>(std::clamp(channel(f.colors[0],shift)*wa+channel(f.colors[1],shift)*wb+channel(f.colors[2],shift)*wc,0.0f,255.0f));};
    ImU32 base=IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);if(!f.page)return base;const ImU32 tex=sampleTexture(f,f.uv[0].x*wa+f.uv[1].x*wb+f.uv[2].x*wc,f.uv[0].y*wa+f.uv[1].y*wb+f.uv[2].y*wc);if((tex>>24)==0)return IM_COL32(0,0,0,0);const auto mul=[&](int sh){return static_cast<unsigned char>(std::min(255U,(((base>>sh)&255U)*((tex>>sh)&255U)*2U)/255U));};return IM_COL32(mul(IM_COL32_R_SHIFT),mul(IM_COL32_G_SHIFT),mul(IM_COL32_B_SHIFT),(tex>>24)&255U);
   };
-  for(const auto&f:faces){
-   const int subdivisions=softwareRendering_?2:8;
-   auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
-   for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
-    const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
-    const float a1=float(i+1)/n,b1=float(j)/n,c1=1.0f-a1-b1;
-    const float a2=float(i)/n,b2=float(j+1)/n,c2=1.0f-a2-b2;
-    {const float wa=(c+c1+c2)/3.0f,wb=(a+a1+a2)/3.0f,wc=(b+b1+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),color);}
-    if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;{const float wa=(c1+c3+c2)/3.0f,wb=(a1+a3+a2)/3.0f,wc=(b1+b3+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),color);}}
+  if(softwareRendering_){
+   for(const auto&f:faces){
+    const int subdivisions=2;
+    auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
+    for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
+     const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
+     const float a1=float(i+1)/n,b1=float(j)/n,c1=1.0f-a1-b1;
+     const float a2=float(i)/n,b2=float(j+1)/n,c2=1.0f-a2-b2;
+     {const float wa=(c+c1+c2)/3.0f,wb=(a+a1+a2)/3.0f,wc=(b+b1+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c,a,b),point(c1,a1,b1),point(c2,a2,b2),color);}
+     if(i+j<subdivisions-1){const float a3=float(i+1)/n,b3=float(j+1)/n,c3=1.0f-a3-b3;{const float wa=(c1+c3+c2)/3.0f,wb=(a1+a3+a2)/3.0f,wc=(b1+b3+b2)/3.0f;const ImU32 color=lerpColor(f,wa,wb,wc);if((color>>24)!=0)dl->AddTriangleFilled(point(c1,a1,b1),point(c3,a3,b3),point(c2,a2,b2),color);}}
+    }
+    ++faceCount;
    }
-   ++faceCount;
+  }else{
+   struct GpuVertex{float x,y,z,r,g,b,a;};
+   struct GpuState{unsigned int program=0,vao=0,vbo=0,framebuffer=0,colorTexture=0,depthBuffer=0;int width=0,height=0;bool ready=false;};
+   static GpuState gpu;
+   auto compileShader=[](unsigned int type,const char*source)->unsigned int{
+    const unsigned int shader=GL::CreateShader(type);if(!shader)return 0;
+    GL::ShaderSource(shader,1,&source,nullptr);GL::CompileShader(shader);int ok=0;GL::GetShaderiv(shader,0x8B81U,&ok);
+    if(!ok){GL::DeleteShader(shader);return 0;}return shader;
+   };
+   if(!gpu.ready){
+    static constexpr const char* vertexSource=
+     "#version 330 core\\n"
+     "layout(location=0) in vec3 aPosition;\\n"
+     "layout(location=1) in vec4 aColor;\\n"
+     "out vec4 vColor;\\n"
+     "void main(){gl_Position=vec4(aPosition,1.0);vColor=aColor;}\\n";
+    static constexpr const char* fragmentSource=
+     "#version 330 core\\n"
+     "in vec4 vColor;out vec4 fragColor;\\n"
+     "void main(){fragColor=vColor;}\\n";
+    const unsigned int vs=compileShader(0x8B31U,vertexSource),fs=compileShader(0x8B30U,fragmentSource);
+    if(vs&&fs){
+     gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::LinkProgram(gpu.program);
+     int linked=0;GL::GetProgramiv(gpu.program,0x8B82U,&linked);gpu.ready=linked!=0;
+    }
+    if(vs)GL::DeleteShader(vs);if(fs)GL::DeleteShader(fs);
+    if(gpu.ready){
+     GL::GenVertexArrays(1,&gpu.vao);GL::GenBuffers(1,&gpu.vbo);
+     GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
+     GL::EnableVertexAttribArray(0);GL::VertexAttribPointer(0,3,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(0));
+     GL::EnableVertexAttribArray(1);GL::VertexAttribPointer(1,4,0x1406U,0,sizeof(GpuVertex),reinterpret_cast<const void*>(3*sizeof(float)));
+     GL::BindVertexArray(0);GL::BindBuffer(0x8892U,0);
+    }
+   }
+   bool gpuRendered=false;
+   if(gpu.ready){
+    const ImGuiIO&renderIo=ImGui::GetIO();
+    const int targetWidth=std::max(1,static_cast<int>(std::round(canvasSize.x*renderIo.DisplayFramebufferScale.x)));
+    const int targetHeight=std::max(1,static_cast<int>(std::round(canvasSize.y*renderIo.DisplayFramebufferScale.y)));
+    int previousFramebuffer=0,previousViewport[4]{},previousTexture=0,previousRenderbuffer=0;
+    GL::GetIntegerv(0x8CA6U,&previousFramebuffer);GL::GetIntegerv(0x0BA2U,previousViewport);
+    GL::GetIntegerv(0x8069U,&previousTexture);GL::GetIntegerv(0x8CA7U,&previousRenderbuffer);
+    if(!gpu.framebuffer){GL::GenFramebuffers(1,&gpu.framebuffer);GL::GenTextures(1,&gpu.colorTexture);GL::GenRenderbuffers(1,&gpu.depthBuffer);}
+    if(gpu.width!=targetWidth||gpu.height!=targetHeight){
+     gpu.width=targetWidth;gpu.height=targetHeight;
+     GL::BindTexture(0x0DE1U,gpu.colorTexture);
+     GL::TexParameteri(0x0DE1U,0x2801U,0x2601);GL::TexParameteri(0x0DE1U,0x2800U,0x2601);
+     GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
+     GL::TexImage2D(0x0DE1U,0,0x8058,targetWidth,targetHeight,0,0x1908U,0x1401U,nullptr);
+     GL::BindRenderbuffer(0x8D41U,gpu.depthBuffer);GL::RenderbufferStorage(0x8D41U,0x81A6U,targetWidth,targetHeight);
+     GL::BindFramebuffer(0x8D40U,gpu.framebuffer);
+     GL::FramebufferTexture2D(0x8D40U,0x8CE0U,0x0DE1U,gpu.colorTexture,0);
+     GL::FramebufferRenderbuffer(0x8D40U,0x8D00U,0x8D41U,gpu.depthBuffer);
+    }
+    GL::BindFramebuffer(0x8D40U,gpu.framebuffer);
+    const bool framebufferReady=GL::CheckFramebufferStatus(0x8D40U)==0x8CD5U;
+    if(framebufferReady){
+     std::vector<GpuVertex> vertices;vertices.reserve(faces.size()*3);
+     auto colorChannel=[](ImU32 color,int shift){return float((color>>shift)&255U)/255.0f;};
+     for(const auto&face:faces){
+      for(int i=0;i<3;++i){
+       const float x=2.0f*(face.p[i].x-canvasMin.x)/canvasSize.x-1.0f;
+       const float y=1.0f-2.0f*(face.p[i].y-canvasMin.y)/canvasSize.y;
+       const float z=2.0f*std::clamp((face.p[i].depth-0.05f)/199.95f,0.0f,1.0f)-1.0f;
+       const ImU32 color=face.colors[i];
+       vertices.push_back({x,y,z,colorChannel(color,IM_COL32_R_SHIFT),colorChannel(color,IM_COL32_G_SHIFT),colorChannel(color,IM_COL32_B_SHIFT),1.0f});
+      }
+      ++faceCount;
+     }
+     GL::Viewport(0,0,targetWidth,targetHeight);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::Disable(0x0BE2U);
+     GL::ClearColor(0.078f,0.098f,0.13f,1.0f);GL::Clear(0x00004000U|0x00000100U);
+     GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
+     GL::BufferData(0x8892U,static_cast<GL::SizePtr>(vertices.size()*sizeof(GpuVertex)),vertices.empty()?nullptr:vertices.data(),0x88E8U);
+     if(!vertices.empty())GL::DrawArrays(0x0004U,0,static_cast<int>(vertices.size()));
+     GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);GL::Enable(0x0BE2U);
+     gpuRendered=true;
+    }
+    GL::BindFramebuffer(0x8D40U,static_cast<unsigned int>(previousFramebuffer));
+    GL::Viewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3]);
+    GL::BindTexture(0x0DE1U,static_cast<unsigned int>(previousTexture));
+    GL::BindRenderbuffer(0x8D41U,static_cast<unsigned int>(previousRenderbuffer));
+    if(gpuRendered)dl->AddImage((ImTextureID)(intptr_t)gpu.colorTexture,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));
+   }
+   if(!gpuRendered){
+    for(const auto&f:faces){
+     const ImU32 color=lerpColor(f,1.0f/3.0f,1.0f/3.0f,1.0f/3.0f);
+     if((color>>24)!=0)dl->AddTriangleFilled(ImVec2(f.p[0].x,f.p[0].y),ImVec2(f.p[1].x,f.p[1].y),ImVec2(f.p[2].x,f.p[2].y),color);
+     ++faceCount;
+    }
+   }
   }
   if(zone){
   const V3 origin{float(zone->x)/400.0f,float(zone->y)/400.0f,float(zone->z)/400.0f};
