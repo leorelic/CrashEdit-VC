@@ -29,6 +29,7 @@ CRASHEDIT_GL_PROC(void, DeleteShader, (unsigned int));
 CRASHEDIT_GL_PROC(unsigned int, CreateProgram, ());
 CRASHEDIT_GL_PROC(void, AttachShader, (unsigned int, unsigned int));
 CRASHEDIT_GL_PROC(void, LinkProgram, (unsigned int));
+CRASHEDIT_GL_PROC(void, BindAttribLocation, (unsigned int, unsigned int, const char*));
 CRASHEDIT_GL_PROC(void, GetProgramiv, (unsigned int, unsigned int, int*));
 CRASHEDIT_GL_PROC(void, GetProgramInfoLog, (unsigned int, int, int*, char*));
 CRASHEDIT_GL_PROC(void, DeleteProgram, (unsigned int));
@@ -91,6 +92,7 @@ inline bool load(std::string& error) {
     CRASHEDIT_LOAD_GL(CreateProgram)
     CRASHEDIT_LOAD_GL(AttachShader)
     CRASHEDIT_LOAD_GL(LinkProgram)
+    CRASHEDIT_LOAD_GL(BindAttribLocation)
     CRASHEDIT_LOAD_GL(GetProgramiv)
     CRASHEDIT_LOAD_GL(GetProgramInfoLog)
     CRASHEDIT_LOAD_GL(DeleteProgram)
