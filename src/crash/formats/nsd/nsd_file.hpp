@@ -50,6 +50,8 @@ struct NsdFile {
 
     bool load(const std::filesystem::path& file, NsdVariant format, std::string& error);
     bool loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant format, std::string& error);
+    bool save(const std::filesystem::path& file, std::string& error) const;
+    bool saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) const;
 };
 
 } // namespace CrashEdit::Crash
