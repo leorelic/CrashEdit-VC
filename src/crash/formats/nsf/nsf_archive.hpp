@@ -17,9 +17,18 @@ struct NsfEntityProperty {
  std::vector<Position> positions;
  std::string error;
 };
+struct NsfEntitySetting { std::uint8_t valueA=0; std::int32_t valueB=0; std::uint32_t raw=0; std::size_t dataOffset=0; };
 struct NsfEntity {
  std::size_t itemIndex=0; bool valid=false; std::uint32_t declaredLength=0;
  bool hasCameraIndex=false,hasCameraSubIndex=false; std::int32_t cameraIndex=0,cameraSubIndex=0;
+ bool hasId=false,hasAlternateId=false,hasGoolType=false,hasSubtype=false;
+ std::int32_t id=0,alternateId=0,goolType=0,subtype=0;
+ std::string name;
+ std::vector<NsfEntityProperty::Position> positions;
+ std::vector<NsfEntitySetting> settings;
+ std::vector<std::int32_t> victims;
+ bool hasDdaSettings=false,hasDdaSection=false,hasBoxCount=false;
+ std::int32_t ddaDeathCount=0,ddaSection=0,boxCount=0;
  std::vector<NsfEntityProperty> properties; std::string error;
 };
 struct NsfZone {
