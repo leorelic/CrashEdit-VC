@@ -55,18 +55,21 @@ void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Butt
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
- ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: movement speed");
+ ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: renderer and movement speed");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  // Never make the interaction canvas larger than the space actually available.
  canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  ImGui::InvisibleButton("ZoneViewportCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool canvasHovered=ImGui::IsItemHovered();
- ImGui::OpenPopupOnItemClick("ViewportMovementSpeed",ImGuiPopupFlags_MouseButtonRight);
- if(ImGui::BeginPopup("ViewportMovementSpeed")){
+ ImGui::OpenPopupOnItemClick("ViewportOptions",ImGuiPopupFlags_MouseButtonRight);
+ if(ImGui::BeginPopup("ViewportOptions")){
+  ImGui::TextUnformatted("Renderer");
+  ImGui::Checkbox("Software rendering",&softwareRendering_);
+  ImGui::Separator();
   ImGui::TextUnformatted("Camera movement speed");
   ImGui::SetNextItemWidth(180.0f);
-  ImGui::SliderInt("##MovementSpeed",&sceneMoveSpeed_,100,150,"%d%%");
+  ImGui::SliderInt("##MovementSpeed",&sceneMoveSpeed_,100,300,"%d%%");
   ImGui::EndPopup();
  }
  const bool canvasActive=ImGui::IsItemActive();
@@ -230,7 +233,7 @@ void EditorUI::drawViewport(){
    return IM_COL32(mix(IM_COL32_R_SHIFT),mix(IM_COL32_G_SHIFT),mix(IM_COL32_B_SHIFT),255);
   };
   for(const auto&f:faces){
-   constexpr int subdivisions=8;
+   const int subdivisions=softwareRendering_?2:8;
    auto point=[&](float a,float b,float c){return ImVec2(f.p[0].x*a+f.p[1].x*b+f.p[2].x*c,f.p[0].y*a+f.p[1].y*b+f.p[2].y*c);};
    for(int i=0;i<subdivisions;++i)for(int j=0;j<subdivisions-i;++j){
     const float n=float(subdivisions),a=float(i)/n,b=float(j)/n,c=1.0f-a-b;
