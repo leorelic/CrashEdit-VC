@@ -992,7 +992,7 @@ void EditorUI::drawSpawnPointsEditor(){
  ImGui::EndDisabled();
  ImGui::SameLine();
  static int targetSpawnEntityId=0;
- ImGui::TextUnformatted("Entity ID");ImGui::SameLine();ImGui::SetNextItemWidth(100.0f);ImGui::InputInt("##SpawnEntityID",&targetSpawnEntityId);
+ ImGui::TextUnformatted("Object ID");ImGui::SameLine();ImGui::SetNextItemWidth(100.0f);ImGui::InputInt("##SpawnEntityID",&targetSpawnEntityId);
  ImGui::SameLine();
  ImGui::BeginDisabled(!hasSelection);
  if(ImGui::Button("Get Spawn")){
