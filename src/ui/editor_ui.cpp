@@ -32,7 +32,8 @@ static bool treeNodeWithIcon(const char*label,ImGuiTreeNodeFlags flags,ImU32 col
  const std::string padded=std::string("   ")+label;
  const bool open=ImGui::TreeNodeEx(padded.c_str(),flags);
  ImDrawList*draw=ImGui::GetWindowDrawList();
- const float scale=ImGui::GetIO().FontGlobalScale;\n const ImVec2 a(row.x+17.0f*scale,row.y+2.0f*scale),b(row.x+31.0f*scale,row.y+16.0f*scale);
+ const float scale=ImGui::GetIO().FontGlobalScale;
+ const ImVec2 a(row.x+17.0f*scale,row.y+2.0f*scale),b(row.x+31.0f*scale,row.y+16.0f*scale);
  draw->AddRectFilled(a,b,color,3.0f*scale);
  draw->AddRect(a,b,IM_COL32(255,255,255,70),3.0f*scale);
  draw->AddText(ImVec2(a.x+3.0f*scale,a.y+1.0f*scale),IM_COL32(255,255,255,255),glyph);
@@ -625,6 +626,7 @@ void EditorUI::drawViewport(){
 }
 void EditorUI::drawTextureViewer(){
  if(!textureViewer_)return;
+ const float uiScale=ImGui::GetIO().FontGlobalScale;
  ImGui::Begin("Texture Viewer",&textureViewer_);
  const Crash::NsfChunk* page=nullptr;
  if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
@@ -643,7 +645,7 @@ void EditorUI::drawTextureViewer(){
  ImGui::TextUnformatted("Color mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f*uiScale);ImGui::Combo("##ColorMode",&textureColorMode_,modeNames,3);
  const char*blendNames[]={"Semi-transparent bit","Opaque"};
  ImGui::SameLine();ImGui::TextUnformatted("Blend mode");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f*uiScale);ImGui::Combo("##BlendMode",&textureBlendMode_,blendNames,2);
- auto labeledInt=[](const char*label,const char*id,int*value){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f*uiScale);ImGui::InputInt(id,value);};
+ auto labeledInt=[uiScale](const char*label,const char*id,int*value){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(80.0f*uiScale);ImGui::InputInt(id,value);};
  labeledInt("X","##TextureX",&textureX_);ImGui::SameLine();labeledInt("Y","##TextureY",&textureY_);ImGui::SameLine();labeledInt("Width","##TextureWidth",&textureW_);ImGui::SameLine();labeledInt("Height","##TextureHeight",&textureH_);
  labeledInt("CLUT X","##ClutX",&textureClutX_);ImGui::SameLine();labeledInt("CLUT Y","##ClutY",&textureClutY_);ImGui::SameLine();ImGui::TextUnformatted("Zoom");ImGui::SameLine();ImGui::SetNextItemWidth(120.0f*uiScale);ImGui::SliderFloat("##TextureZoom",&textureZoom_,0.5f,3.0f,"%.1fx");
  const int imageWidth=textureColorMode_==0?1024:(textureColorMode_==1?512:256);
@@ -716,6 +718,7 @@ void EditorUI::drawTextureViewer(){
 }
 void EditorUI::drawClutEditor(){
  if(!clutEditor_)return;
+ const float uiScale=ImGui::GetIO().FontGlobalScale;
  ImGui::Begin("CLUT",&clutEditor_);
  const Crash::NsfChunk* page=nullptr;
  if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
