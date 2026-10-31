@@ -43,7 +43,27 @@ struct NsfEntry {
  std::uint32_t eid=0, type=0, itemCount=0;
  std::size_t offset=0, size=0;
  bool valid=false; std::string error;
- std::vector<NsfItem> items; NsfZone zone;
+ std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery;
+};
+struct NsfSceneryVertex { std::int32_t x=0,y=0,z=0; std::uint16_t colorIndex=0; };
+struct NsfSceneryTriangle { std::uint16_t a=0,b=0,c=0; std::uint16_t textureIndex=0; bool animated=false; };
+struct NsfSceneryQuad { std::uint16_t a=0,b=0,c=0,d=0; std::uint16_t textureIndex=0; std::uint8_t unknown=0; bool animated=false; };
+struct NsfSceneryTexture {
+ std::uint8_t u1=0,v1=0,u2=0,v2=0,u3=0,v3=0,u4=0,v4=0;
+ std::uint8_t clutX=0,clutY1=0,clutY2=0,colorMode=0,blendMode=0,segment=0,page=0;
+};
+struct NsfSceneryColor { std::uint8_t r=0,g=0,b=0,extra=0; };
+struct NsfScenery {
+ bool decoded=false,isCrash3=false,isSky=false;
+ std::int32_t xOffset=0,yOffset=0,zOffset=0;
+ std::vector<std::uint32_t> texturePageEids;
+ std::vector<NsfSceneryVertex> vertices;
+ std::vector<NsfSceneryTriangle> triangles;
+ std::vector<NsfSceneryQuad> quads;
+ std::vector<NsfSceneryTexture> textures;
+ std::vector<NsfSceneryColor> colors;
+ std::vector<std::uint32_t> animatedTextures;
+ std::string error;
 };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
