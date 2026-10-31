@@ -17,7 +17,7 @@ private:
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
  int sceneMoveSpeed_=100;
- bool softwareRendering_=false;
+ bool softwareRendering_=true;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
  float textureZoom_=1.0f;
