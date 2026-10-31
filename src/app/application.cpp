@@ -50,7 +50,7 @@ static ImFont* loadUiFont() {
   std::error_code ec;
   if (std::filesystem::is_regular_file(candidate, ec)) {
    if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 16.0f)) {
-    std::cout << "UI font: " << candidate << '\\n';
+    std::cout << "UI font: " << candidate << '\n';
     return font;
    }
   }
