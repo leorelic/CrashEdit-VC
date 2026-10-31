@@ -398,7 +398,8 @@ void EditorUI::drawClutEditor(){
     ImGui::TableSetColumnIndex(col);
     const int paletteIndex=textureColorMode_==0?row:(row*16+col);
     const int clutX=textureColorMode_==0?col:0;
-    const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>((textureColorMode_==0?clutX*16:paletteIndex)*2);
+    const int entry=textureColorMode_==0?(clutX*16+row):paletteIndex;
+    const std::size_t offset=static_cast<std::size_t>(textureClutY_)*512U+static_cast<std::size_t>(entry*2);
     if(offset+1U>=page->bytes.size())continue;
     const std::uint16_t raw=std::uint16_t(page->bytes[offset])|(std::uint16_t(page->bytes[offset+1])<<8);
     const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
