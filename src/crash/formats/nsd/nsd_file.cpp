@@ -4,12 +4,21 @@
 #include <cstddef>
 #include <fstream>
 #include <limits>
+#include <system_error>
 
 namespace CrashEdit::Crash {
 namespace {
 
 bool rangeFits(std::size_t size, std::size_t offset, std::size_t count) {
     return offset <= size && count <= size - offset;
+}
+
+void writeI32(std::vector<std::uint8_t>& bytes, std::size_t offset, std::int32_t value) {
+    const auto v = static_cast<std::uint32_t>(value);
+    bytes[offset] = static_cast<std::uint8_t>(v & 0xFFU);
+    bytes[offset + 1] = static_cast<std::uint8_t>((v >> 8U) & 0xFFU);
+    bytes[offset + 2] = static_cast<std::uint8_t>((v >> 16U) & 0xFFU);
+    bytes[offset + 3] = static_cast<std::uint8_t>((v >> 24U) & 0xFFU);
 }
 
 std::int32_t readI32(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
@@ -148,6 +157,112 @@ bool NsdFile::loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant forma
     }
 
     *this = std::move(parsed);
+    error.clear();
+    return true;
+}
+
+bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) const {
+    if (originalData.empty()) { error = "Cannot save an NSD that has not been loaded."; return false; }
+    if (hashKeyMap.size() != 256) { error = "NSD hash-key map must contain 256 entries."; return false; }
+
+    const std::size_t indexOffset = variant == NsdVariant::Proto ? 0x408U : 0x520U;
+    if (index.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+        error = "NSD index contains too many entries."; return false;
+    }
+    const std::size_t newIndexBytes = index.size() * 8U;
+    const std::size_t oldEntryCount = static_cast<std::size_t>(readI32(originalData, 0x404));
+    const std::size_t oldIndexBytes = oldEntryCount * 8U;
+    if (!rangeFits(originalData.size(), indexOffset, oldIndexBytes)) {
+        error = "Original NSD index is invalid; refusing to save."; return false;
+    }
+
+    std::vector<std::uint8_t> output;
+    output.insert(output.end(), originalData.begin(), originalData.begin() + static_cast<std::ptrdiff_t>(indexOffset));
+    output.resize(indexOffset + newIndexBytes);
+    for (std::size_t i = 0; i < hashKeyMap.size(); ++i) writeI32(output, i * 4, hashKeyMap[i]);
+    writeI32(output, 0x400, chunkCount);
+    writeI32(output, 0x404, static_cast<std::int32_t>(index.size()));
+    for (std::size_t i = 0; i < index.size(); ++i) {
+        writeI32(output, indexOffset + i * 8, index[i].chunkId);
+        writeI32(output, indexOffset + i * 8 + 4, index[i].entryId);
+    }
+
+    const std::size_t oldTailOffset = indexOffset + oldIndexBytes;
+    const std::size_t newTailOffset = indexOffset + newIndexBytes;
+    if (variant == NsdVariant::Proto) {
+        output.insert(output.end(), originalData.begin() + static_cast<std::ptrdiff_t>(oldTailOffset), originalData.end());
+        bytes = std::move(output);
+        error.clear();
+        return true;
+    }
+
+    if (levelData.size() != 4 || compressedChunkInfo.size() != 64) {
+        error = "NSD level/compression metadata has an invalid size."; return false;
+    }
+    const std::size_t fixedTailSize = variant == NsdVariant::Old ? 0x114U :
+        (variant == NsdVariant::Crash3 ? 0x2DCU : 0x1DCU);
+    if (!rangeFits(originalData.size(), oldTailOffset, fixedTailSize)) {
+        error = "Original NSD metadata is truncated; refusing to save."; return false;
+    }
+    std::vector<std::uint8_t> tail(originalData.begin() + static_cast<std::ptrdiff_t>(oldTailOffset),
+        originalData.begin() + static_cast<std::ptrdiff_t>(oldTailOffset + fixedTailSize));
+
+    if (variant == NsdVariant::Old) {
+        if (goolMap.size() != 64) { error = "Old NSD GOOL map must contain 64 entries."; return false; }
+        writeI32(tail, 0, magic);
+        writeI32(tail, 4, id);
+        writeI32(tail, 8, startZone);
+        writeI32(tail, 12, camera);
+        writeI32(tail, 16, unknown);
+        for (std::size_t i = 0; i < goolMap.size(); ++i) writeI32(tail, 20 + i * 4, goolMap[i]);
+        output.insert(output.end(), tail.begin(), tail.end());
+        const std::size_t oldExtraOffset = 0x634U + oldIndexBytes;
+        if (!rangeFits(originalData.size(), oldExtraOffset, originalData.size() - oldExtraOffset)) {
+            error = "Old NSD trailing data is invalid."; return false;
+        }
+        output.insert(output.end(), originalData.begin() + static_cast<std::ptrdiff_t>(oldExtraOffset), originalData.end());
+    } else {
+        const std::size_t goolCount = variant == NsdVariant::Crash3 ? 128U : 64U;
+        if (goolMap.size() != goolCount) { error = "NSD GOOL map has an invalid size for this variant."; return false; }
+        if (spawns.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+            error = "NSD contains too many spawn points."; return false;
+        }
+        const std::size_t oldSpawnOffset = variant == NsdVariant::Crash3 ? 0x7FCU + oldIndexBytes : 0x6FCU + oldIndexBytes;
+        if (!rangeFits(originalData.size(), oldSpawnOffset, 0)) {
+            error = "Original NSD spawn offset is invalid."; return false;
+        }
+        writeI32(tail, 0, static_cast<std::int32_t>(spawns.size()));
+        writeI32(tail, 4, blank);
+        writeI32(tail, 8, id);
+        writeI32(tail, 12, entityCount);
+        for (std::size_t i = 0; i < goolMap.size(); ++i) writeI32(tail, 16 + i * 4, goolMap[i]);
+        output.insert(output.end(), tail.begin(), tail.end());
+
+        for (const auto& spawn : spawns) {
+            const std::size_t offset = output.size();
+            output.resize(offset + 24);
+            writeI32(output, offset, spawn.zoneEid);
+            writeI32(output, offset + 4, spawn.camera);
+            writeI32(output, offset + 8, spawn.point);
+            writeI32(output, offset + 12, spawn.x);
+            writeI32(output, offset + 16, spawn.y);
+            writeI32(output, offset + 20, spawn.z);
+        }
+        output.insert(output.end(), imageData.begin(), imageData.end());
+    }
+
+    bytes = std::move(output);
+    error.clear();
+    return true;
+}
+
+bool NsdFile::save(const std::filesystem::path& file, std::string& error) const {
+    std::vector<std::uint8_t> bytes;
+    if (!saveBytes(bytes, error)) return false;
+    std::ofstream stream(file, std::ios::binary | std::ios::trunc);
+    if (!stream) { error = "Could not open NSD for writing: " + file.string(); return false; }
+    if (!bytes.empty()) stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!stream) { error = "Could not write the complete NSD file: " + file.string(); return false; }
     error.clear();
     return true;
 }
