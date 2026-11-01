@@ -985,7 +985,7 @@ void EditorUI::drawClutEditor(){
  textureClutY_=std::clamp(textureClutY_,0,127);
  auto expand5=[](unsigned v){return static_cast<unsigned char>((v*255U+15U)/31U);};
  ImGui::TextDisabled(textureColorMode_==0?"4-bit: each column is a separate CLUT X (16 colors per CLUT).":"8-bit: CLUT X is unused; the 256-entry palette is shown as a 16 x 16 grid.");
- if(ImGui::BeginTable("ClutPaletteGrid",16,ImGuiTableFlags_Borders|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
+ if(ImGui::BeginTable("ClutPaletteGrid",16,ImGuiTableFlags_Borders|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0),1200.0f)){
   for(int x=0;x<16;++x){ImGui::TableSetupColumn(("X "+std::to_string(x)).c_str(),ImGuiTableColumnFlags_WidthFixed,22.0f*uiScale);}
   ImGui::TableHeadersRow();
   for(int row=0;row<16;++row){
@@ -1068,7 +1068,7 @@ void EditorUI::drawSpawnPointsEditor(){
   if(reloaded.load(nsdPath_,nsdVariant(gameVersion_),error)){nsd_=std::move(reloaded);selectedSpawn_=-1;status_="NSD reloaded from disk.";}
   else status_="NSD reload failed: "+error;
  }
- if(ImGui::BeginTable("SpawnPointTable",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0))){
+ if(ImGui::BeginTable("SpawnPointTable",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0),1000.0f)){
   ImGui::TableSetupColumn("Zone EID");ImGui::TableSetupColumn("Camera");ImGui::TableSetupColumn("Point");ImGui::TableSetupColumn("X");ImGui::TableSetupColumn("Y");ImGui::TableSetupColumn("Z");ImGui::TableHeadersRow();
   for(std::size_t i=0;i<nsd_.spawns.size();++i){
    auto&p=nsd_.spawns[i];ImGui::PushID(static_cast<int>(i));ImGui::TableNextRow();
@@ -1176,7 +1176,7 @@ void EditorUI::drawSearchWindow(){
   if(needle.empty())return true;
   return std::search(value.begin(),value.end(),needle.begin(),needle.end(),[](unsigned char a,unsigned char b){return std::tolower(a)==std::tolower(b);})!=value.end();
  };
- if(ImGui::BeginTable("EntrySearchResults",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,-ImGui::GetFrameHeightWithSpacing()*1.8f))){
+ if(ImGui::BeginTable("EntrySearchResults",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,-ImGui::GetFrameHeightWithSpacing()*1.8f),1000.0f)){
   ImGui::TableSetupColumn("Chunk",ImGuiTableColumnFlags_WidthFixed,62.0f);
   ImGui::TableSetupColumn("Entry",ImGuiTableColumnFlags_WidthFixed,62.0f);
   ImGui::TableSetupColumn("Name / EID");
@@ -1243,7 +1243,7 @@ void EditorUI::drawGoolInspector(){
  ImGui::Text("Instructions: %zu | Data words: %zu | State map: %zu | State descriptors: %zu | Frame-group bytes: %zu",g.instructions.size(),g.dataPool.size(),g.stateMap.size(),g.stateDescriptors.size(),g.frameGroupBytes);
  ImGui::Separator();
  ImGui::TextDisabled("Crash 2 operands are split using the original CrashEdit bit layouts. Reference values are typed but not yet resolved to their targets.");
- if(ImGui::BeginTable("GOOLInstructionListing",7,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,280))){
+ if(ImGui::BeginTable("GOOLInstructionListing",7,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,280),1800.0f)){
   ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48);
   ImGui::TableSetupColumn("Offset",ImGuiTableColumnFlags_WidthFixed,72);
   ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,82);
