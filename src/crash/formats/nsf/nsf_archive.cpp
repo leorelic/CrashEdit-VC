@@ -167,6 +167,50 @@ void NsfArchive::decodeZones(bool crash3Retail){
   z.decoded=true;entry.zone=std::move(z);
  }
 }
+
+void NsfArchive::decodeGools(NsfGoolVersion version){
+ for(auto&chunk:chunks_){
+  if(chunk.type!=0||!chunk.entryTableValid)continue;
+  for(auto&entry:chunk.entries){
+   if(!entry.valid||entry.type!=11)continue;
+   NsfGool gool;gool.version=version;
+   auto fail=[&](const std::string&message){gool.error=message;entry.gool=std::move(gool);};
+   if(entry.items.size()!=3&&entry.items.size()!=5&&entry.items.size()!=6){fail("GOOL entry must contain 3, 5, or 6 items.");continue;}
+   const auto&header=entry.items[0];
+   if(header.size!=24||!has(chunk.bytes,header.offset,header.size)){fail("GOOL header must be exactly 24 bytes.");continue;}
+   const auto&code=entry.items[1];const auto&data=entry.items[2];
+   if(code.size%4U!=0||!has(chunk.bytes,code.offset,code.size)){fail("GOOL instruction item is not a valid sequence of 32-bit words.");continue;}
+   if(data.size%4U!=0||!has(chunk.bytes,data.offset,data.size)){fail("GOOL data pool is not a valid sequence of 32-bit words.");continue;}
+   gool.id=i32(chunk.bytes,header.offset);
+   gool.classId=i32(chunk.bytes,header.offset+4);
+   gool.format=i32(chunk.bytes,header.offset+8);
+   gool.heapBase=i32(chunk.bytes,header.offset+12);
+   gool.eventCount=i32(chunk.bytes,header.offset+16);
+   gool.entryCount=i32(chunk.bytes,header.offset+20);
+   if(gool.format==1){
+    if(entry.items.size()!=5&&entry.items.size()!=6){fail("GOOL format 1 requires state map and state descriptor items.");continue;}
+    const auto&stateMap=entry.items[3];const auto&descriptors=entry.items[4];
+    if(stateMap.size%2U!=0||!has(chunk.bytes,stateMap.offset,stateMap.size)){fail("GOOL state map has an invalid byte length.");continue;}
+    if(descriptors.size%16U!=0||!has(chunk.bytes,descriptors.offset,descriptors.size)){fail("GOOL state descriptor item has an invalid byte length.");continue;}
+    if(entry.items.size()==6&&!has(chunk.bytes,entry.items[5].offset,entry.items[5].size)){fail("GOOL frame-group item exceeds its chunk.");continue;}
+    for(std::size_t p=0;p<stateMap.size;p+=2)gool.stateMap.push_back(static_cast<std::int16_t>(u16(chunk.bytes,stateMap.offset+p)));
+    for(std::size_t p=0;p<descriptors.size;p+=16){
+     const std::size_t q=descriptors.offset+p;
+     gool.stateDescriptors.push_back({i32(chunk.bytes,q),i32(chunk.bytes,q+4),static_cast<std::int16_t>(u16(chunk.bytes,q+8)),static_cast<std::int16_t>(u16(chunk.bytes,q+10)),static_cast<std::int16_t>(u16(chunk.bytes,q+12)),static_cast<std::int16_t>(u16(chunk.bytes,q+14))});
+    }
+    if(entry.items.size()==6)gool.frameGroupBytes=entry.items[5].size;
+   }else if(gool.format==0){
+    if(entry.items.size()!=3){fail("GOOL format 0 must contain exactly 3 items.");continue;}
+   }else{fail("Unsupported GOOL format value "+std::to_string(gool.format)+".");continue;}
+   for(std::size_t p=0;p<code.size;p+=4){
+    const std::uint32_t word=u32(chunk.bytes,code.offset+p);
+    gool.instructions.push_back({p,word,static_cast<std::uint8_t>(word>>24U),word&0x00ffffffU});
+   }
+   for(std::size_t p=0;p<data.size;p+=4)gool.dataPool.push_back(i32(chunk.bytes,data.offset+p));
+   gool.decoded=true;entry.gool=std::move(gool);
+  }
+ }
+}
 bool NsfArchive::setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(entryIndex>=chunk.entries.size())return false;auto&entry=chunk.entries[entryIndex];if(!entry.zone.decoded||entityIndex>=entry.zone.entities.size())return false;auto&entity=entry.zone.entities[entityIndex];
  for(auto&property:entity.properties){if(static_cast<std::uint16_t>(property.id)!=propertyId||!property.valid||valueIndex>=property.valueOffsets.size()||valueIndex>=property.intValues.size())continue;
