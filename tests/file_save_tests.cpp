@@ -25,6 +25,32 @@ bool check(bool value, const char* message) {
 int main() {
     const auto root = std::filesystem::temp_directory_path() / "CrashEditSavePairTests";
     std::error_code ec;
+    // .bak-only mode must not create dated archives.
+    const auto bakOnlyRoot = root / "BakOnly";
+    std::filesystem::create_directories(bakOnlyRoot, ec);
+    const auto bakOnlyNsf = bakOnlyRoot / "LEVEL.NSF";
+    const auto bakOnlyNsd = bakOnlyRoot / "LEVEL.NSD";
+    ok &= check(write(bakOnlyNsf, oldNsf) && write(bakOnlyNsd, oldNsd), "write .bak-only originals");
+    ok &= check(CrashEdit::saveFilePair(bakOnlyNsf,newNsf,bakOnlyNsd,newNsd,true,false,"",error), ".bak-only save succeeds");
+    ok &= check(read(bakOnlyRoot/"LEVEL.NSF.bak")==oldNsf && read(bakOnlyRoot/"LEVEL.NSD.bak")==oldNsd,
+                ".bak-only mode creates original backups");
+    ok &= check(!std::filesystem::exists(bakOnlyRoot/"LEVEL(2026-11-01).NSF"),
+                ".bak-only mode does not create dated archives");
+
+    // Dated-only mode must not create .bak files.
+    const auto datedOnlyRoot = root / "DatedOnly";
+    std::filesystem::create_directories(datedOnlyRoot, ec);
+    const auto datedOnlyNsf = datedOnlyRoot / "LEVEL.NSF";
+    const auto datedOnlyNsd = datedOnlyRoot / "LEVEL.NSD";
+    ok &= check(write(datedOnlyNsf, oldNsf) && write(datedOnlyNsd, oldNsd), "write dated-only originals");
+    ok &= check(CrashEdit::saveFilePair(datedOnlyNsf,newNsf,datedOnlyNsd,newNsd,false,true,"2026-11-01",error), "dated-only save succeeds");
+    ok &= check(read(datedOnlyRoot/"LEVEL(2026-11-01).NSF")==newNsf &&
+                read(datedOnlyRoot/"LEVEL(2026-11-01).NSD")==newNsd,
+                "dated-only mode creates dated archives");
+    ok &= check(!std::filesystem::exists(datedOnlyRoot/"LEVEL.NSF.bak") &&
+                !std::filesystem::exists(datedOnlyRoot/"LEVEL.NSD.bak"),
+                "dated-only mode does not create .bak files");
+
     std::filesystem::remove_all(root, ec);
     std::filesystem::create_directories(root, ec);
     const auto nsf = root / "S000000E.NSF";
@@ -33,13 +59,13 @@ int main() {
     const std::vector<std::uint8_t> newNsf{7,8,9,10}, newNsd{11,12,13};
     bool ok = check(write(nsf, oldNsf) && write(nsd, oldNsd), "write original pair");
     std::string error;
-    ok &= check(CrashEdit::saveFilePair(nsf,newNsf,nsd,newNsd,true,"2026-11-01",error), "save pair with backups");
+    ok &= check(CrashEdit::saveFilePair(nsf,newNsf,nsd,newNsd,true,true,"2026-11-01",error), "save pair with backups");
     ok &= check(read(nsf)==newNsf && read(nsd)==newNsd, "replace both original files");
     ok &= check(read(root/"S000000E.NSF.bak")==oldNsf && read(root/"S000000E.NSD.bak")==oldNsd, "preserve pre-save originals");
     ok &= check(read(root/"S000000E(2026-11-01).NSF")==newNsf &&
                 read(root/"S000000E(2026-11-01).NSD")==newNsd, "write dated copies of new pair");
     const std::vector<std::uint8_t> newerNsf{21,22}, newerNsd{23,24};
-    ok &= check(CrashEdit::saveFilePair(nsf,newerNsf,nsd,newerNsd,true,"2026-11-01",error), "save same-day pair again");
+    ok &= check(CrashEdit::saveFilePair(nsf,newerNsf,nsd,newerNsd,true,true,"2026-11-01",error), "save same-day pair again");
     ok &= check(read(root/"S000000E.NSF.bak")==newNsf && read(root/"S000000E.NSD.bak")==newNsd,
                 "refresh .bak files with immediately previous originals");
     ok &= check(read(root/"S000000E(2026-11-01)(2).NSF")==newerNsf &&
