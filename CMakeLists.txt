@@ -61,6 +61,7 @@ if(CRASHEDIT_BUILD_APP)
         src/core/diagnostics.cpp
         src/core/file_save.cpp
         src/crash/formats/nsf/nsf_archive.cpp
+        src/crash/formats/gool/gool_opcodes.cpp
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
     )
@@ -124,6 +125,7 @@ if(CRASHEDIT_BUILD_TESTS)
     add_executable(crashedit_gool_tests
         tests/gool_tests.cpp
         src/crash/formats/nsf/nsf_archive.cpp
+        src/crash/formats/gool/gool_opcodes.cpp
     )
     target_include_directories(crashedit_gool_tests PRIVATE src)
     if(MSVC)
