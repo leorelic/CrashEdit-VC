@@ -183,7 +183,7 @@ bool EditorUI::saveFiles(){
 #else
   localtime_r(&now,&localTime);
 #endif
-  char date[11];std::snprintf(date,sizeof(date),"%04d-%02d-%02d",localTime.tm_year+1900,localTime.tm_mon+1,localTime.tm_mday);dateStamp=date;
+  char date[11];if(std::strftime(date,sizeof(date),"%Y-%m-%d",&localTime)==0){status_="Could not format the save archive date.";Diagnostics::log(DiagnosticLevel::Error,status_);return false;}dateStamp=date;
  }
  if(!saveFilePair(nsfPath_,nsfBytes,nsdPath_,nsdBytes,editorPreferences.createSaveBackups,dateStamp,error)){
   status_="Save failed: "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;
