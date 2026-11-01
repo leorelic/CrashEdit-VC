@@ -44,7 +44,7 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] NSD GOOL map inspector with navigation to matching GOOL entries in the NSF.
 - [x] CrashEdit-compatible NSD handling: warn on zero spawn records, normalize invalid OldNSD magic to 1, and normalize nonzero reserved blank values to 0 while retaining load warnings.
 - [x] Paired NSF/NSD save stages both outputs before replacing originals and restores the first file if the second replacement fails.
-- [x] Optional Experimental setting creates pre-save `.NSF.bak` / `.NSD.bak` copies and a dated archive pair for every save; same-day saves receive numbered suffixes.
+- [x] Two independent Experimental settings control pre-save `.NSF.bak` / `.NSD.bak` copies and dated archive pairs. Either can be enabled without the other; same-day dated saves receive numbered suffixes.
 - [ ] Validate edited NSD pairs against representative real Crash 2 levels and in-game loading.
 
 ### Renderer and zone viewing
