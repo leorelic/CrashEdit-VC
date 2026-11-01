@@ -67,6 +67,19 @@ int main(){
  assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
  assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
+
+ NsfGool refGool;refGool.format=1;refGool.entryCount=1;refGool.dataPool={static_cast<std::int32_t>(0x12345678U),42};
+ auto resolved=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000000U);
+ assert(resolved.size()==2);resolveGoolOperands(resolved,refGool);
+ assert(resolved[0].resolvedText=="EID 0x12345678");
+ assert(resolved[1].resolvedText=="EID 0x12345678");
+ auto externalRef=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000400U);
+ resolveGoolOperands(externalRef,refGool);
+ assert(externalRef[0].resolvedText.find("pool unavailable")!=std::string::npos);
+ NsfGool localGool;localGool.format=0;localGool.entryCount=0;localGool.dataPool={42};
+ auto localRef=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000800U);
+ resolveGoolOperands(localRef,localGool);
+ assert(localRef[0].resolvedText=="value 0x0000002A (42)");
  std::string error;
  NsfArchive archive;
  assert(archive.loadBytes(makeGoolChunk(true),error));
