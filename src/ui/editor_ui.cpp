@@ -180,6 +180,7 @@ void EditorUI::draw(){
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  ImGui::End();
+ drawSearchWindow();
  if(!restoredLastNsfPath_){
   if(path_[0]=='\0'&&!editorPreferences.lastNsfPath.empty())
    std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
@@ -266,6 +267,7 @@ void EditorUI::drawMenu(){
   ImGui::Separator();if(ImGui::MenuItem("Exit"))std::exit(0);ImGui::EndMenu();
  }
  if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
+ if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
   bool& useModernFont=editorPreferences.useModernFont;
@@ -277,7 +279,7 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}
  ImGui::EndMenuBar();
 }
-void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
+void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
 void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF...")){openDialog_=true;centerOpenDialog_=true;}ImGui::Separator();ImGui::BeginChild("HierarchyScrollRegion",ImVec2(0,0),false,ImGuiWindowFlags_HorizontalScrollbar);if(nsfValid_){char nsdLabel[96];std::snprintf(nsdLabel,sizeof(nsdLabel),"NSD - Level ID : %02X",static_cast<unsigned>(nsd_.id)&0xFFU);if(nsdValid_){if(ImGui::Selectable(nsdLabel,selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;spawnPointsEditor_=true;}}else ImGui::TextDisabled("NSD - Level Details (unavailable)");if(openSelectedHierarchy_)ImGui::SetNextItemOpen(true,ImGuiCond_Always);if(ImGui::TreeNode("NSF - Resources##nsf")){if(ImGui::IsItemClicked()){selectedChunk_=-1;selectedEntry_=-1;selectedEntity_=-1;selectedSpawn_=-1;}for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %s | %s",i,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | %s",i,chunkTypeName(c.type));}if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconName(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid&&e.type==11)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | GOOL | %s",j,Crash::eidToEName(e.eid).c_str());else if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconName(e.type));if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetScrollHereY(0.5f);if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;if(e.valid&&((e.type==7&&e.zone.decoded)||(e.type==3&&e.scenery.decoded))){viewerChunk_=static_cast<int>(i);viewerEntry_=static_cast<int>(j);}}if(entryOpen){if(e.type==11){if(e.gool.decoded)ImGui::BulletText("GOOL | %zu instructions | %zu data words",e.gool.instructions.size(),e.gool.dataPool.size());else ImGui::TextDisabled("GOOL not decoded: %s",e.gool.error.c_str());}else if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));{ImGui::PushID(static_cast<int>(k));const bool entitySelected=selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k);if(hierarchyIconRow(entLabel,entitySelected,"Arrow")){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}ImGui::PopID();}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k){char itemLabel[96];std::snprintf(itemLabel,sizeof(itemLabel),"Item %zu | %zu bytes",k,e.items[k].size);ImGui::PushID(static_cast<int>(k));hierarchyIconRow(itemLabel,false,"Arrow");ImGui::PopID();}}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);openSelectedHierarchy_=false;ImGui::EndChild();ImGui::End();}
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;centerOpenDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
@@ -1064,6 +1066,77 @@ void EditorUI::drawSpawnPointsEditor(){
  ImGui::End();
 }
 
+
+void EditorUI::drawSearchWindow(){
+ if(!searchWindow_)return;
+ if(!nsfValid_){searchWindow_=false;return;}
+ ImGui::SetNextWindowSize(ImVec2(680.0f,520.0f),ImGuiCond_FirstUseEver);
+ if(!ImGui::Begin("Search Entries",&searchWindow_)){ImGui::End();return;}
+ ImGui::TextDisabled("Find an NSF entry and jump directly to it in the Resource Hierarchy.");
+ ImGui::SetNextItemWidth(210.0f);
+ const char*filters[]={"All entry types","Zone","Scenery","GOOL","Other"};
+ ImGui::Combo("Entry type",&searchTypeFilter_,filters,IM_ARRAYSIZE(filters));
+ ImGui::SameLine();
+ ImGui::SetNextItemWidth(-1.0f);
+ ImGui::InputTextWithHint("##EntrySearchQuery","Search by EID, entry name, type, or index...",searchQuery_,sizeof(searchQuery_));
+ ImGui::Separator();
+ std::size_t matchCount=0,totalCount=0;
+ const std::string query=searchQuery_;
+ auto containsInsensitive=[](const std::string&value,const std::string&needle){
+  if(needle.empty())return true;
+  return std::search(value.begin(),value.end(),needle.begin(),needle.end(),[](unsigned char a,unsigned char b){return std::tolower(a)==std::tolower(b);})!=value.end();
+ };
+ if(ImGui::BeginTable("EntrySearchResults",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingStretchProp,ImVec2(0,-ImGui::GetFrameHeightWithSpacing()*1.8f))){
+  ImGui::TableSetupColumn("Chunk",ImGuiTableColumnFlags_WidthFixed,62.0f);
+  ImGui::TableSetupColumn("Entry",ImGuiTableColumnFlags_WidthFixed,62.0f);
+  ImGui::TableSetupColumn("Name / EID");
+  ImGui::TableSetupColumn("Type",ImGuiTableColumnFlags_WidthFixed,105.0f);
+  ImGui::TableSetupColumn("Items",ImGuiTableColumnFlags_WidthFixed,55.0f);
+  ImGui::TableHeadersRow();
+  for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+   const auto&chunk=nsf_.chunks()[ci];
+   if(chunk.type!=0||!chunk.entryTableValid)continue;
+   for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+    const auto&entry=chunk.entries[ei];
+    ++totalCount;
+    if(!entry.valid)continue;
+    const bool typeMatch=searchTypeFilter_==0||
+      (searchTypeFilter_==1&&entry.type==7)||
+      (searchTypeFilter_==2&&entry.type==3)||
+      (searchTypeFilter_==3&&entry.type==11)||
+      (searchTypeFilter_==4&&entry.type!=7&&entry.type!=3&&entry.type!=11);
+    if(!typeMatch)continue;
+    const std::string eidName=Crash::eidToEName(entry.eid);
+    const std::string typeName=entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
+    char eidHex[16];std::snprintf(eidHex,sizeof(eidHex),"%08X",entry.eid);
+    const std::string searchable=eidName+" "+eidHex+" "+typeName+" "+std::to_string(ei)+" "+std::to_string(ci);
+    if(!containsInsensitive(searchable,query))continue;
+    ++matchCount;
+    ImGui::TableNextRow();
+    ImGui::PushID(static_cast<int>(ci*100000U+ei));
+    ImGui::TableSetColumnIndex(0);ImGui::Text("%03zu",ci);
+    ImGui::TableSetColumnIndex(1);ImGui::Text("%03zu",ei);
+    ImGui::TableSetColumnIndex(2);
+    const bool selected=selectedChunk_==static_cast<int>(ci)&&selectedEntry_==static_cast<int>(ei);
+    const std::string label=eidName+" ("+std::string(eidHex)+")";
+    if(ImGui::Selectable(label.c_str(),selected,ImGuiSelectableFlags_SpanAllColumns)){
+     selectedChunk_=static_cast<int>(ci);selectedEntry_=static_cast<int>(ei);selectedEntity_=-1;selectedSpawn_=-1;
+     openSelectedHierarchy_=true;
+     if((entry.type==7&&entry.zone.decoded)||(entry.type==3&&entry.scenery.decoded)){viewerChunk_=static_cast<int>(ci);viewerEntry_=static_cast<int>(ei);}
+     status_="Located "+typeName+" entry "+eidName+" in chunk "+std::to_string(ci)+".";
+    }
+    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted(typeName.c_str());
+    ImGui::TableSetColumnIndex(4);ImGui::Text("%u",entry.itemCount);
+    ImGui::PopID();
+   }
+  }
+  ImGui::EndTable();
+ }
+ ImGui::Text("%zu matching entries | %zu total entries",matchCount,totalCount);
+ ImGui::SameLine();
+ if(ImGui::Button("Close"))searchWindow_=false;
+ ImGui::End();
+}
 void EditorUI::drawGoolInspector(){
  if(!nsfValid_||selectedChunk_<0||selectedEntry_<0||static_cast<std::size_t>(selectedChunk_)>=nsf_.chunks().size())return;
  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
