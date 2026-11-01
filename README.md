@@ -2,6 +2,8 @@
 
 This is a separate native rewrite of CrashEdit. It does not replace or compile the original C# application.
 
+**Project direction and current progress:** see [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## Stack
 - C++20, CMake 3.24+
 - Dear ImGui docking branch (pinned commit), GLFW 3.4
