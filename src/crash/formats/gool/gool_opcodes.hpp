@@ -1,7 +1,9 @@
 #pragma once
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace CrashEdit::Crash {
 struct NsfGoolOpcodeInfo {
@@ -9,8 +11,16 @@ struct NsfGoolOpcodeInfo {
     std::string_view mnemonic = {};
     bool known = false;
 };
-
-// Crash 2 (GOOL version 2) opcode names transcribed from the original
-// CrashEdit GOOLInstructionList.cs. Unknown/reserved opcodes remain explicit.
+enum class NsfGoolOperandKind { Value, Reference, DestinationReference, ProcessField, Signed };
+struct NsfGoolOperand {
+    char name = '?';
+    std::uint8_t bitWidth = 0;
+    std::uint32_t rawValue = 0;
+    std::int32_t value = 0;
+    NsfGoolOperandKind kind = NsfGoolOperandKind::Value;
+};
 const NsfGoolOpcodeInfo& goolOpcodeInfo(NsfGoolVersion version, std::uint8_t opcode) noexcept;
+std::string_view goolOpcodeFormat(NsfGoolVersion version, std::uint8_t opcode) noexcept;
+std::vector<NsfGoolOperand> decodeGoolOperands(NsfGoolVersion version, std::uint8_t opcode, std::uint32_t operandBits);
+std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands);
 }
