@@ -294,7 +294,7 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
-  ImGui::MenuItem("Create .bak backups and dated save archives",nullptr,&editorPreferences.createSaveBackups);
+  if(ImGui::MenuItem("Create .bak backups and dated save archives",nullptr,&editorPreferences.createSaveBackups))ImGui::MarkIniSettingsDirty();
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, keep the previous NSF/NSD as .bak files and archive the new pair with today’s date.");
   bool& useModernFont=editorPreferences.useModernFont;
   if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
