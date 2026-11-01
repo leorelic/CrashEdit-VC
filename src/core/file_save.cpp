@@ -14,17 +14,23 @@ bool writeFile(const std::filesystem::path& path, const std::vector<std::uint8_t
     return true;
 }
 bool replaceFile(const std::filesystem::path& temporary, const std::filesystem::path& target, std::string& error) {
+    const auto displaced = std::filesystem::path(target.string() + ".replace.old.tmp");
     std::error_code ec;
-    std::filesystem::rename(temporary, target, ec);
-    if (!ec) return true;
-    // Windows rename does not replace an existing destination. The original is
-    // already preserved in memory and, when enabled, in the .bak file.
-    std::filesystem::remove(target, ec);
+    std::filesystem::remove(displaced, ec);
     ec.clear();
+    std::filesystem::rename(target, displaced, ec);
+    if (ec) { error = "Could not stage original file " + target.string() + ": " + ec.message(); return false; }
     std::filesystem::rename(temporary, target, ec);
-    if (!ec) return true;
-    error = "Could not replace file " + target.string() + ": " + ec.message();
-    return false;
+    if (ec) {
+        const std::string replaceError = ec.message();
+        std::error_code restoreError;
+        std::filesystem::rename(displaced, target, restoreError);
+        error = "Could not replace file " + target.string() + ": " + replaceError;
+        if (restoreError) error += "; restoring original also failed: " + restoreError.message();
+        return false;
+    }
+    std::filesystem::remove(displaced, ec);
+    return true;
 }
 std::filesystem::path datedPath(const std::filesystem::path& path, const std::string& date) {
     return path.parent_path() / (path.stem().string() + "(" + date + ")" + path.extension().string());
