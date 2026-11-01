@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 #include "core/workspace.hpp"
+#include "core/diagnostics.hpp"
 #include "ui/editor_ui.hpp"
 #include "render/gl_api.hpp"
 #include <GLFW/glfw3.h>
@@ -22,7 +23,7 @@
 #include <unistd.h>
 #endif
 namespace CrashEdit {
-static void glfwError(int c,const char*d){std::cerr<<"GLFW "<<c<<": "<<(d?d:"unknown")<<'\n';}
+static void glfwError(int c,const char*d){Diagnostics::log(DiagnosticLevel::Error,"GLFW "+std::to_string(c)+": "+(d?d:"unknown"));}
 static EditorUI* editorUiForDrop=nullptr;
 static void glfwDropFiles(GLFWwindow*,int count,const char** paths){if(editorUiForDrop)editorUiForDrop->handleDroppedFiles(count,paths);}
 
@@ -52,7 +53,7 @@ static ImFont* loadUiFont() {
   std::error_code ec;
   if (std::filesystem::is_regular_file(candidate, ec)) {
    if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 28.0f)) {
-    std::cout << "UI font: " << candidate << '\n';
+    Diagnostics::log(DiagnosticLevel::Info,std::string("UI font loaded: ")+candidate);
     return font;
    }
   }
@@ -79,16 +80,16 @@ static std::filesystem::path executableDirectory() {
 }
 
 int Application::run(){
- glfwSetErrorCallback(glfwError);if(!glfwInit()){std::cerr<<"GLFW initialization failed.\n";return 1;}
+ glfwSetErrorCallback(glfwError);if(!glfwInit()){Diagnostics::log(DiagnosticLevel::Error,"GLFW initialization failed.");return 1;}
 #if defined(__APPLE__)
  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,2);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GLFW_TRUE);
 #else
  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
 #endif
- GLFWwindow*w=glfwCreateWindow(1440,900,"CrashEdit — native editor",nullptr,nullptr);if(!w){glfwTerminate();std::cerr<<"OpenGL window creation failed.\n";return 1;}
+ GLFWwindow*w=glfwCreateWindow(1440,900,"CrashEdit — native editor",nullptr,nullptr);if(!w){Diagnostics::log(DiagnosticLevel::Error,"OpenGL window creation failed.");glfwTerminate();return 1;}
  glfwMakeContextCurrent(w);
  std::string glError;
- if(!GL::load(glError)){std::cerr<<"Required OpenGL functions are unavailable: "<<glError<<'\n';glfwDestroyWindow(w);glfwTerminate();return 1;}
+ if(!GL::load(glError)){Diagnostics::log(DiagnosticLevel::Error,"Required OpenGL functions are unavailable: "+glError);glfwDestroyWindow(w);glfwTerminate();return 1;}
  glfwSwapInterval(1);IMGUI_CHECKVERSION();ImGui::CreateContext();auto&io=ImGui::GetIO();static const std::string imguiIniPath=(executableDirectory()/"cevc.ini").string();io.IniFilename=imguiIniPath.c_str();io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_DockingEnable|ImGuiConfigFlags_ViewportsEnable;ImGui::StyleColorsDark();io.Fonts->AddFontDefault();loadUiFont();auto&style=ImGui::GetStyle();style.FramePadding=ImVec2(7.0f,5.0f);style.ItemSpacing=ImVec2(8.0f,6.0f);style.WindowPadding=ImVec2(10.0f,10.0f);
  ImGui_ImplGlfw_InitForOpenGL(w,true);
 #if defined(__APPLE__)
