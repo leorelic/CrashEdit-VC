@@ -40,7 +40,8 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] NSF and NSD save actions wired through the editor.
 - [x] Parse and serialize ProtoNSD, OldNSD, standard NSD, and Crash 3 NSD layouts.
 - [x] Preserve original prelude/compression metadata, unknown fields, fixed extra-data blocks, and trailing image data when serializing.
-- [x] Spawn-point append, delete, reorder, copy/paste, direct coordinate editing, and Get Spawn workflow.
+- [x] Spawn-point append, delete (while retaining at least one row), reorder, copy/paste, editable EIDs/coordinates, and camera-aware Get Spawn workflow.
+- [x] NSD GOOL map inspector with navigation to matching GOOL entries in the NSF.
 - [x] CrashEdit-compatible NSD warnings for zero spawn records, nonstandard OldNSD magic, and nonzero reserved blank values.
 - [x] Paired NSF/NSD save stages both outputs before replacing originals and restores the first file if the second replacement fails.
 - [x] Optional Experimental setting creates pre-save `.NSF.bak` / `.NSD.bak` copies and a dated archive pair for every save; same-day saves receive numbered suffixes.
@@ -132,7 +133,7 @@ The native NSD implementation supports the four layouts recognized by the origin
 - **Standard NSD (Crash 2):** shared metadata and index, spawn count and reserved blank field, level ID and entity count, a 64-entry GOOL map, a fixed 0xCC-byte extra-data block, 24-byte spawn records, and trailing image data.
 - **Crash 3 NSD:** the standard layout with a 128-entry GOOL map and the later spawn/extra-data offsets.
 
-The serializer preserves the original prelude/compression metadata and opaque regions while rebuilding the variable-length index and spawn sections. The editor saves the NSF and matching NSD as a pair. Optional backup mode is off by default; when enabled, each save copies the previous originals to `.NSF.bak` and `.NSD.bak`, then archives the newly serialized pair as `name(YYYY-MM-DD).NSF/.NSD`. Additional saves on the same day use numbered suffixes rather than overwriting earlier archives.
+The serializer preserves the original prelude/compression metadata and opaque regions while rebuilding the variable-length index and spawn sections. The editor provides an NSD GOOL map inspector with direct navigation to matching GOOL entries in the NSF. Spawn-point editing follows the original NSDBox workflow, including EID/camera/point/hex-coordinate fields, copy/paste, row reordering, and Get Spawn. The editor saves the NSF and matching NSD as a pair. Optional backup mode is off by default; when enabled, each save copies the previous originals to `.NSF.bak` and `.NSD.bak`, then archives the newly serialized pair as `name(YYYY-MM-DD).NSF/.NSD`. Additional saves on the same day use numbered suffixes rather than overwriting earlier archives.
 
 The native validation layer currently reports known CrashEdit-compatible conditions (zero spawn records, OldNSD magic other than 1, and a nonzero reserved blank field) and rejects negative count values before serialization. These checks do not yet prove that a modified NSD will load in the game. Representative real-file round trips and in-game validation remain open.
 
