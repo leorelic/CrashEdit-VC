@@ -162,7 +162,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  editorPreferences.lastNsfPath=file.string();
  std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
  ImGui::MarkIniSettingsDirty();
- Diagnostics::log(DiagnosticLevel::Info,"Loaded "+versionName(gameVersion_)+" NSF with "+std::to_string(nsf_.chunks().size())+" chunks.");
+ Diagnostics::log(DiagnosticLevel::Info,std::string("Loaded ")+versionName(gameVersion_)+" NSF with "+std::to_string(nsf_.chunks().size())+" chunks.");
  return true;
 }
 bool EditorUI::saveFiles(){
