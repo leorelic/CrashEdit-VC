@@ -1074,9 +1074,26 @@ void EditorUI::drawSearchWindow(){
  ImGui::SetNextWindowSize(ImVec2(680.0f,520.0f),ImGuiCond_FirstUseEver);
  if(!ImGui::Begin("Search Entries",&searchWindow_)){ImGui::End();return;}
  ImGui::TextDisabled("Find an NSF entry and jump directly to it in the Resource Hierarchy.");
+ auto entryTypeLabel=[](std::uint32_t type){
+  if(type==7)return std::string("Zone (7)");
+  if(type==3)return std::string("Scenery (3)");
+  if(type==11)return std::string("GOOL (11)");
+  return std::string("Entry type ")+std::to_string(type);
+ };
+ std::vector<std::uint32_t> availableTypes;
+ for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
+  for(const auto&entry:chunk.entries)if(entry.valid&&std::find(availableTypes.begin(),availableTypes.end(),entry.type)==availableTypes.end())availableTypes.push_back(entry.type);
+ std::sort(availableTypes.begin(),availableTypes.end());
+ const std::string currentType=searchTypeFilter_<0?"All entry types":entryTypeLabel(static_cast<std::uint32_t>(searchTypeFilter_));
  ImGui::SetNextItemWidth(210.0f);
- const char*filters[]={"All entry types","Zone","Scenery","GOOL","Other"};
- ImGui::Combo("Entry type",&searchTypeFilter_,filters,IM_ARRAYSIZE(filters));
+ if(ImGui::BeginCombo("Entry type",currentType.c_str())){
+  if(ImGui::Selectable("All entry types",searchTypeFilter_<0))searchTypeFilter_=-1;
+  for(const auto type:availableTypes){
+   const std::string label=entryTypeLabel(type);
+   if(ImGui::Selectable(label.c_str(),searchTypeFilter_==static_cast<int>(type)))searchTypeFilter_=static_cast<int>(type);
+  }
+  ImGui::EndCombo();
+ }
  ImGui::SameLine();
  ImGui::SetNextItemWidth(-1.0f);
  ImGui::InputTextWithHint("##EntrySearchQuery","Search by EID, entry name, type, or index...",searchQuery_,sizeof(searchQuery_));
@@ -1101,11 +1118,7 @@ void EditorUI::drawSearchWindow(){
     const auto&entry=chunk.entries[ei];
     ++totalCount;
     if(!entry.valid)continue;
-    const bool typeMatch=searchTypeFilter_==0||
-      (searchTypeFilter_==1&&entry.type==7)||
-      (searchTypeFilter_==2&&entry.type==3)||
-      (searchTypeFilter_==3&&entry.type==11)||
-      (searchTypeFilter_==4&&entry.type!=7&&entry.type!=3&&entry.type!=11);
+    const bool typeMatch=searchTypeFilter_<0||entry.type==static_cast<std::uint32_t>(searchTypeFilter_);
     if(!typeMatch)continue;
     const std::string eidName=Crash::eidToEName(entry.eid);
     const std::string typeName=entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
