@@ -59,11 +59,11 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
   const auto raw=operand.rawValue;
   if((raw&0x800U)==0) {
    const std::size_t offset=raw&0x3FFU;
-   const bool external=(raw&0x400U)==0;
+   const bool external=(raw&0x400U)!=0;
    const std::vector<std::int32_t>* pool=nullptr;
-   if(gool.format==1 && external) pool=&gool.dataPool;
-   else if(gool.format==0 && !external) pool=&gool.dataPool;
-   else if(gool.format==0 && external && parentData) pool=parentData;
+   if(gool.format==1 && !external) pool=&gool.dataPool;
+   else if(gool.format==0 && external) pool=&gool.dataPool;
+   else if(gool.format==0 && !external && parentData) pool=parentData;
    if(pool) {
     if(offset>=pool->size()) operand.resolvedText="unresolved pool offset "+std::to_string(offset);
     else {
