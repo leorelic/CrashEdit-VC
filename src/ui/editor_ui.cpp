@@ -200,7 +200,7 @@ void EditorUI::draw(){
  auto id=ImGui::GetID("CrashEditDockSpace");
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolInspector();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();
+ drawHierarchy();drawViewport();drawBottom();drawGoolInspector();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  ImGui::End();
@@ -1020,8 +1020,10 @@ void EditorUI::drawSpawnPointsEditor(){
  ImGui::SameLine();
  ImGui::BeginDisabled(!hasSelection);
  if(ImGui::Button("Delete")){
+  if(nsd_.spawns.size()<=1){status_="At least one spawn point must remain.";Diagnostics::log(DiagnosticLevel::Warning,status_);}else{
   nsd_.spawns.erase(nsd_.spawns.begin()+selectedSpawn_);
   selectedSpawn_=nsd_.spawns.empty()?-1:std::min(selectedSpawn_,static_cast<int>(nsd_.spawns.size())-1);
+  }
  }
  ImGui::SameLine();
  if(ImGui::Button("Copy")){
@@ -1052,6 +1054,7 @@ void EditorUI::drawSpawnPointsEditor(){
  }
  ImGui::EndDisabled();
  ImGui::SameLine();
+ ImGui::BeginDisabled(nsd_.goolMap.empty());if(ImGui::Button("GOOL Map"))nsdGoolMapWindow_=true;ImGui::EndDisabled();ImGui::SameLine();
  if(ImGui::Button("Reload")){
   Crash::NsdFile reloaded;std::string error;
   if(reloaded.load(nsdPath_,nsdVariant(gameVersion_),error)){nsd_=std::move(reloaded);selectedSpawn_=-1;status_="NSD reloaded from disk.";}
