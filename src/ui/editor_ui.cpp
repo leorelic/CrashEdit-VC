@@ -1039,14 +1039,14 @@ void EditorUI::drawSpawnPointsEditor(){
  }
  ImGui::EndDisabled();
  ImGui::SameLine();
- static int targetSpawnEntityId=0;
- ImGui::TextUnformatted("Object ID");ImGui::SameLine();ImGui::SetNextItemWidth(100.0f);ImGui::InputInt("##SpawnEntityID",&targetSpawnEntityId);
+ static int targetSpawnEntityId=0,targetSpawnCameraIndex=0;
+ ImGui::TextUnformatted("Object ID");ImGui::SameLine();ImGui::SetNextItemWidth(100.0f);ImGui::InputInt("##SpawnEntityID",&targetSpawnEntityId);ImGui::SameLine();ImGui::TextUnformatted("Camera");ImGui::SameLine();ImGui::SetNextItemWidth(55.0f);ImGui::InputInt("##SpawnCameraIndex",&targetSpawnCameraIndex);
  ImGui::SameLine();
  ImGui::BeginDisabled(!hasSelection);
  if(ImGui::Button("Get Spawn")){
   bool found=false;
   for(const auto&chunk:nsf_.chunks())for(const auto&entry:chunk.entries)if(entry.valid&&entry.type==7&&entry.zone.decoded)for(const auto&entity:entry.zone.entities)if(entity.hasId&&entity.id==targetSpawnEntityId&&!entity.positions.empty()){
-   auto&p=nsd_.spawns[static_cast<std::size_t>(selectedSpawn_)];p.zoneEid=static_cast<std::int32_t>(entry.eid);p.x=(entry.zone.x+4*entity.positions[0].x)<<8;p.y=(entry.zone.y+4*entity.positions[0].y)<<8;p.z=(entry.zone.z+4*entity.positions[0].z)<<8;found=true;break;
+   auto&p=nsd_.spawns[static_cast<std::size_t>(selectedSpawn_)];const int maxCamera=entry.zone.cameraCount>3?(entry.zone.cameraCount-1)/3:0;p.zoneEid=static_cast<std::int32_t>(entry.eid);p.camera=std::clamp(targetSpawnCameraIndex,0,maxCamera);p.point=0;p.x=(entry.zone.x+4*entity.positions[0].x)<<8;p.y=(entry.zone.y+4*entity.positions[0].y)<<8;p.z=(entry.zone.z+4*entity.positions[0].z)<<8;found=true;break;
   }
   if(!found)status_="Entity ID was not found in a decoded NSF zone.";
  }
@@ -1064,7 +1064,7 @@ void EditorUI::drawSpawnPointsEditor(){
    ImGui::TableSetColumnIndex(0);
    const bool rowSelected=selectedSpawn_==static_cast<int>(i);
    const auto eidName=Crash::eidToEName(static_cast<std::uint32_t>(p.zoneEid));
-   if(ImGui::Selectable(eidName.c_str(),rowSelected,ImGuiSelectableFlags_SpanAvailWidth))selectedSpawn_=static_cast<int>(i);
+   if(ImGui::Selectable(eidName.c_str(),rowSelected,ImGuiSelectableFlags_SpanAvailWidth))selectedSpawn_=static_cast<int>(i);ImGui::SetNextItemWidth(-FLT_MIN);ImGui::InputScalar("##ZoneEID",ImGuiDataType_S32,&p.zoneEid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal);
    if(ImGui::BeginDragDropSource()){
     const int from=static_cast<int>(i);ImGui::SetDragDropPayload("NSD_SPAWN_ROW",&from,sizeof(from));ImGui::Text("Move spawn point %zu",i);ImGui::EndDragDropSource();
    }
