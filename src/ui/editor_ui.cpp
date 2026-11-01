@@ -1128,7 +1128,7 @@ void EditorUI::drawSearchWindow(){
     }
     ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted(typeName.c_str());
     ImGui::TableSetColumnIndex(4);ImGui::Text("%u",entry.itemCount);
-    ImGui::PopID();
+    ImGui::PopID();ImGui::PopID();
    }
   }
   ImGui::EndTable();
