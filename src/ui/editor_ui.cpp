@@ -28,6 +28,7 @@ struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true;
+ int dockLayoutVersion=0;
  int sceneMoveSpeed=100;
  std::string lastNsfPath;
 };
@@ -43,12 +44,13 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
+ else if(std::sscanf(line,"DockLayoutVersion=%d",&value)==1)editorPreferences.dockLayoutVersion=value;
  else if(std::strncmp(line,"LastNSF=",8)==0)editorPreferences.lastNsfPath=line+8;
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -175,7 +177,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr){ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("GOOL Inspector",rightBottom);ImGui::DockBuilderFinish(id);}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;}
  ImGui::DockSpace(id,ImVec2(0,0),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();drawViewport();drawBottom();drawGoolInspector();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
