@@ -1260,7 +1260,7 @@ void EditorUI::drawGoolInspector(){
    ImGui::TableSetColumnIndex(3);ImGui::Text("0x%02X",static_cast<unsigned>(ins.opcode));
    ImGui::TableSetColumnIndex(4);ImGui::Text("0x%08X",ins.word);
    ImGui::TableSetColumnIndex(5);ImGui::Text("0x%06X",ins.operandBits);
-   ImGui::TableSetColumnIndex(6);const auto operands=Crash::decodeGoolOperands(g.version,ins.opcode,ins.operandBits);const auto operandText=Crash::formatGoolOperands(operands);if(!operandText.empty())ImGui::TextUnformatted(operandText.c_str());else ImGui::TextDisabled("%s",info.known?"No fields":"Unknown format");
+   ImGui::TableSetColumnIndex(6);auto operands=Crash::decodeGoolOperands(g.version,ins.opcode,ins.operandBits);Crash::resolveGoolOperands(operands,g);const auto operandText=Crash::formatGoolOperands(operands);if(!operandText.empty())ImGui::TextUnformatted(operandText.c_str());else ImGui::TextDisabled("%s",info.known?"No fields":"Unknown format");
   }
   ImGui::EndTable();
  }
