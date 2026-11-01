@@ -175,6 +175,8 @@ std::vector<std::string> NsdFile::validationWarnings() const {
 
 bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) const {
     if (originalData.empty()) { error = "Cannot save an NSD that has not been loaded."; return false; }
+    if (chunkCount < 0) { error = "NSD chunk count cannot be negative."; return false; }
+    if (entityCount < 0) { error = "NSD entity count cannot be negative."; return false; }
     if (hashKeyMap.size() != 256) { error = "NSD hash-key map must contain 256 entries."; return false; }
 
     const std::size_t indexOffset = variant == NsdVariant::Proto ? 0x408U : 0x520U;
