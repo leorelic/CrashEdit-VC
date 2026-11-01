@@ -41,7 +41,8 @@ bool saveFilePair(const std::filesystem::path& firstPath,
                   const std::vector<std::uint8_t>& firstBytes,
                   const std::filesystem::path& secondPath,
                   const std::vector<std::uint8_t>& secondBytes,
-                  bool createBackups,
+                  bool createBakBackup,
+                  bool createDatedBackup,
                   const std::string& dateStamp,
                   std::string& error) {
     if (firstPath.empty() || secondPath.empty() || firstPath == secondPath) {
@@ -68,16 +69,18 @@ bool saveFilePair(const std::filesystem::path& firstPath,
     std::filesystem::remove(secondTemp, ec); ec.clear();
     if (!writeFile(firstTemp, firstBytes, error)) return false;
     if (!writeFile(secondTemp, secondBytes, error)) { std::filesystem::remove(firstTemp, ec); return false; }
-    if (createBackups) {
-        if (dateStamp.size() != 10 || dateStamp[4] != '-' || dateStamp[7] != '-') {
-            error = "Date stamp must use YYYY-MM-DD."; std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false;
-        }
+    if (createDatedBackup && (dateStamp.size() != 10 || dateStamp[4] != '-' || dateStamp[7] != '-')) {
+        error = "Date stamp must use YYYY-MM-DD."; std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false;
+    }
+    if (createBakBackup) {
         const auto firstBackup = std::filesystem::path(firstPath.string() + ".bak");
         const auto secondBackup = std::filesystem::path(secondPath.string() + ".bak");
         std::filesystem::copy_file(firstPath, firstBackup, std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) { error = "Could not create backup " + firstBackup.string() + ": " + ec.message(); std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false; }
         std::filesystem::copy_file(secondPath, secondBackup, std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) { error = "Could not create backup " + secondBackup.string() + ": " + ec.message(); std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false; }
+    }
+    if (createDatedBackup) {
         unsigned archiveSuffix = 1;
         while (std::filesystem::exists(datedPath(firstPath, dateStamp, archiveSuffix)) ||
                std::filesystem::exists(datedPath(secondPath, dateStamp, archiveSuffix))) ++archiveSuffix;
