@@ -1242,14 +1242,14 @@ void EditorUI::drawGoolInspector(){
  ImGui::Text("Format: %d | Heap Base: 0x%X | Events: %d | Entries: %d",g.format,static_cast<unsigned>(g.heapBase),g.eventCount,g.entryCount);
  ImGui::Text("Instructions: %zu | Data words: %zu | State map: %zu | State descriptors: %zu | Frame-group bytes: %zu",g.instructions.size(),g.dataPool.size(),g.stateMap.size(),g.stateDescriptors.size(),g.frameGroupBytes);
  ImGui::Separator();
- ImGui::TextDisabled("Crash 2 opcode names are recognized from the original CrashEdit definitions. Operand fields are still raw until their formats are implemented.");
- if(ImGui::BeginTable("GOOLInstructionListing",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingStretchProp,ImVec2(0,280))){
+ ImGui::TextDisabled("Crash 2 operands are split using the original CrashEdit bit layouts. Reference values are typed but not yet resolved to their targets.");
+ if(ImGui::BeginTable("GOOLInstructionListing",7,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingStretchProp,ImVec2(0,280))){
   ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48);
   ImGui::TableSetupColumn("Offset",ImGuiTableColumnFlags_WidthFixed,72);
   ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,82);
   ImGui::TableSetupColumn("Opcode",ImGuiTableColumnFlags_WidthFixed,64);
   ImGui::TableSetupColumn("Word",ImGuiTableColumnFlags_WidthFixed,108);
-  ImGui::TableSetupColumn("Raw 24-bit operand");
+  ImGui::TableSetupColumn("Raw 24-bit operand",ImGuiTableColumnFlags_WidthFixed,142);\n  ImGui::TableSetupColumn("Decoded fields");
   ImGui::TableHeadersRow();
   for(std::size_t i=0;i<g.instructions.size();++i){
    const auto&ins=g.instructions[i];const auto&info=Crash::goolOpcodeInfo(g.version,ins.opcode);ImGui::TableNextRow();
@@ -1258,7 +1258,7 @@ void EditorUI::drawGoolInspector(){
    ImGui::TableSetColumnIndex(2);if(info.known)ImGui::Text("%.*s",static_cast<int>(info.mnemonic.size()),info.mnemonic.data());else ImGui::TextDisabled("%.*s",static_cast<int>(info.mnemonic.size()),info.mnemonic.data());
    ImGui::TableSetColumnIndex(3);ImGui::Text("0x%02X",static_cast<unsigned>(ins.opcode));
    ImGui::TableSetColumnIndex(4);ImGui::Text("0x%08X",ins.word);
-   ImGui::TableSetColumnIndex(5);ImGui::Text("0x%06X",ins.operandBits);
+   ImGui::TableSetColumnIndex(5);ImGui::Text("0x%06X",ins.operandBits);\n   ImGui::TableSetColumnIndex(6);const auto operands=Crash::decodeGoolOperands(g.version,ins.opcode,ins.operandBits);const auto operandText=Crash::formatGoolOperands(operands);if(!operandText.empty())ImGui::TextUnformatted(operandText.c_str());else ImGui::TextDisabled("%s",info.known?"No fields":"Unknown format");
   }
   ImGui::EndTable();
  }
