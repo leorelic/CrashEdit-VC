@@ -32,8 +32,9 @@ bool replaceFile(const std::filesystem::path& temporary, const std::filesystem::
     std::filesystem::remove(displaced, ec);
     return true;
 }
-std::filesystem::path datedPath(const std::filesystem::path& path, const std::string& date) {
-    return path.parent_path() / (path.stem().string() + "(" + date + ")" + path.extension().string());
+std::filesystem::path datedPath(const std::filesystem::path& path, const std::string& date, unsigned suffix) {
+    const std::string suffixText = suffix > 1 ? "(" + std::to_string(suffix) + ")" : std::string{};
+    return path.parent_path() / (path.stem().string() + "(" + date + ")" + suffixText + path.extension().string());
 }
 }
 bool saveFilePair(const std::filesystem::path& firstPath,
@@ -77,8 +78,11 @@ bool saveFilePair(const std::filesystem::path& firstPath,
         if (ec) { error = "Could not create backup " + firstBackup.string() + ": " + ec.message(); std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false; }
         std::filesystem::copy_file(secondPath, secondBackup, std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) { error = "Could not create backup " + secondBackup.string() + ": " + ec.message(); std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false; }
-        if (!writeFile(datedPath(firstPath, dateStamp), firstBytes, error) ||
-            !writeFile(datedPath(secondPath, dateStamp), secondBytes, error)) {
+        unsigned archiveSuffix = 1;
+        while (std::filesystem::exists(datedPath(firstPath, dateStamp, archiveSuffix)) ||
+               std::filesystem::exists(datedPath(secondPath, dateStamp, archiveSuffix))) ++archiveSuffix;
+        if (!writeFile(datedPath(firstPath, dateStamp, archiveSuffix), firstBytes, error) ||
+            !writeFile(datedPath(secondPath, dateStamp, archiveSuffix), secondBytes, error)) {
             std::filesystem::remove(firstTemp, ec); std::filesystem::remove(secondTemp, ec); return false;
         }
     }
