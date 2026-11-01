@@ -55,7 +55,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateSaveBackups=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
  p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
