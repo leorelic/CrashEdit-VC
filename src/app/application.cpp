@@ -58,7 +58,7 @@ static ImFont* loadUiFont() {
    }
   }
  }
- std::cerr << "No platform UI font found; using Dear ImGui's default font.\\n";
+ Diagnostics::log(DiagnosticLevel::Warning,"No platform UI font found; using Dear ImGui default font.");
  return ImGui::GetIO().Fonts->AddFontDefault();
 }
 
