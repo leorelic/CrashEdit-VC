@@ -65,8 +65,8 @@ int main() {
     writeI32(nonzeroBlank, 0x524, 0x444);
     NsdFile warningFile;
     ok &= check(warningFile.loadBytes(nonzeroBlank, NsdVariant::Standard, error) &&
-                !warningFile.validationWarnings().empty(),
-                "nonzero standard NSD reserved value should produce a warning");
+                warningFile.blank == 0 && !warningFile.validationWarnings().empty(),
+                "nonzero standard NSD reserved value should warn and normalize to zero");
 
     std::vector<std::uint8_t> crash3(0x7FC + 24, 0);
     writeI32(crash3, 0x400, 8);
@@ -86,6 +86,7 @@ int main() {
     ok &= check(parsed.loadBytes(oldNsd, NsdVariant::Old, error), "OldNSD should parse");
     ok &= check(parsed.id == 99 && parsed.startZone == 11 && parsed.camera == 12,
                 "OldNSD legacy header fields should parse");
+    ok &= check(parsed.magic == 1, "OldNSD invalid magic should be normalized to 1 like CrashEdit");
     ok &= check(!parsed.validationWarnings().empty(), "OldNSD should report a nonstandard magic value as a warning");
 
     // Serialization should round-trip all NSD variants and relocate variable-length sections safely.
