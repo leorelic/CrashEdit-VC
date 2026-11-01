@@ -35,6 +35,7 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] Global NSF entry search window with type filters, text matching, and hierarchy navigation.
 - [x] Default dock layout places entry search with Console / Diagnostics and GOOL Inspector with the 3D Zone Editor; existing saved layouts are migrated once.
 - [x] Main editor host no longer scrolls; dockspace reserves room for the bottom status line so it remains visible within the application window.
+- [x] Windows application runs without a separate console window; startup, GLFW, NSF loading, NSD availability, and save messages feed a bounded in-app Console / Diagnostics log with severity levels.
 - [x] NSF and NSD save actions wired through the editor.
 - [x] Initial NSD serialization support, including preservation of opaque/original data where required.
 
