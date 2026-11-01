@@ -170,6 +170,7 @@ bool EditorUI::saveFiles(){
  return true;
 }
 void EditorUI::draw(){
+ if(nsfValid_&&ImGui::GetIO().KeyCtrl&&ImGui::IsKeyPressed(ImGuiKey_F,false))searchWindow_=true;
  auto*v=ImGui::GetMainViewport();ImGui::SetNextWindowPos(v->WorkPos);ImGui::SetNextWindowSize(v->WorkSize);ImGui::SetNextWindowViewport(v->ID);
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
@@ -967,7 +968,7 @@ void EditorUI::drawClutEditor(){
     const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
     ImGui::PushID(row*16+col);
     ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(20.0f*uiScale,20.0f*uiScale));
-    ImGui::PopID();
+    ImGui::PopID();ImGui::PopID();
    }
   }
   ImGui::EndTable();
@@ -1109,11 +1110,11 @@ void EditorUI::drawSearchWindow(){
     const std::string eidName=Crash::eidToEName(entry.eid);
     const std::string typeName=entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
     char eidHex[16];std::snprintf(eidHex,sizeof(eidHex),"%08X",entry.eid);
-    const std::string searchable=eidName+" "+eidHex+" "+typeName+" "+std::to_string(ei)+" "+std::to_string(ci);
+    const std::string searchable=eidName+" "+eidHex+" 0x"+eidHex+" "+typeName+" "+std::to_string(entry.type)+" "+std::to_string(ei)+" "+std::to_string(ci);
     if(!containsInsensitive(searchable,query))continue;
     ++matchCount;
     ImGui::TableNextRow();
-    ImGui::PushID(static_cast<int>(ci*100000U+ei));
+    ImGui::PushID(static_cast<int>(ci));ImGui::PushID(static_cast<int>(ei));
     ImGui::TableSetColumnIndex(0);ImGui::Text("%03zu",ci);
     ImGui::TableSetColumnIndex(1);ImGui::Text("%03zu",ei);
     ImGui::TableSetColumnIndex(2);
