@@ -161,6 +161,18 @@ bool NsdFile::loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant forma
     return true;
 }
 
+std::vector<std::string> NsdFile::validationWarnings() const {
+    std::vector<std::string> warnings;
+    if (chunkCount < 0) warnings.emplace_back("NSD chunk count is negative.");
+    if (variant == NsdVariant::Old && magic != 1)
+        warnings.emplace_back("OldNSD magic value is not 1; CrashEdit normalizes this field to 1.");
+    if (variant != NsdVariant::Proto && variant != NsdVariant::Old && blank != 0)
+        warnings.emplace_back("NSD reserved blank value is nonzero; CrashEdit normalizes this field to 0.");
+    if (variant != NsdVariant::Proto && spawns.empty())
+        warnings.emplace_back("NSD has no spawn points; the original CrashEdit treats this as an ignorable warning.");
+    return warnings;
+}
+
 bool NsdFile::saveBytes(std::vector<std::uint8_t>& bytes, std::string& error) const {
     if (originalData.empty()) { error = "Cannot save an NSD that has not been loaded."; return false; }
     if (hashKeyMap.size() != 256) { error = "NSD hash-key map must contain 256 entries."; return false; }
