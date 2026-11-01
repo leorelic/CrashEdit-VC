@@ -74,7 +74,15 @@ The order is intentionally flexible: work should follow dependencies and the mos
 - Design a generator for edited or newly created scenery and camera paths.
 - Validate generated SLSTs in the actual game. Generation is not complete until the game accepts and displays the result correctly.
 
-### 4. Scenery and geometry editing
+### 4. GOOL inspection, decompilation, and editing
+- Expand instruction decoding using verified Crash 2 opcode definitions from the original source and independent samples.
+- Resolve GOOL references against local/external data pools and object fields.
+- Build control-flow analysis and a readable decompiler for selected GOOL entries, not an indiscriminate whole-game decompilation pass.
+- Preserve unknown instructions and opaque data so inspection never damages unsupported code.
+- Add safe instruction editing and reassembly, then validate modified objects in-game.
+- Link level entities and other resources to their GOOL entries for direct object-to-code navigation.
+
+### 5. Scenery and geometry editing
 - Select and inspect scenery objects and polygons.
 - Edit vertices, edges, and faces with move, rotate, and scale tools.
 - Support mesh creation and editing, polygon/material assignment, and texture/UV workflows.
@@ -82,7 +90,7 @@ The order is intentionally flexible: work should follow dependencies and the mos
 - Support zone boundaries, camera paths, and relevant scene placement data.
 - Make it possible to create custom scenery rather than only rearrange existing assets.
 
-### 5. A cohesive, beginner-friendly editing workflow
+### 6. A cohesive, beginner-friendly editing workflow
 - Undo/redo and a reliable command-based editing model.
 - Scene hierarchy, searchable resources, contextual properties, and multi-selection where appropriate.
 - Viewport navigation and gizmos with predictable controls.
@@ -90,19 +98,27 @@ The order is intentionally flexible: work should follow dependencies and the mos
 - Guided workflows for common tasks, while retaining advanced inspection tools.
 - Consistent shortcuts, menus, terminology, and panel behavior.
 
-### 6. Broader Crash game and asset support
+### 7. Broader Crash game and asset support
 - Expand beyond the current Crash 2 focus when the shared foundations are stable.
 - Add resource-specific editors for textures/palettes, models, animation, audio/music, GOOL, and other supported formats.
 - Improve import/export and compatibility through round-trip tests.
 - Document game/version-specific differences instead of silently assuming formats are interchangeable.
 
-### 7. Release quality and community documentation
+### 8. Release quality and community documentation
 - Clear installation and build instructions for supported platforms.
 - User guide and task-oriented tutorials.
 - Format notes and technical documentation for modders and researchers.
 - Sample projects and known-good test assets where licensing permits.
 - Regression test suite and documented compatibility status.
 - A clear distinction between implemented, experimental, and unsupported features.
+
+## GOOL research notes
+
+The original CrashEdit source identifies GOOL resources as entry type 11. Its loader reads a 24-byte header, an instruction item containing 32-bit words, and a data-pool item containing 32-bit values. Format 1 entries additionally contain a 16-bit state map, 16-byte state descriptors, and optionally frame-group data. The header contains ID, class, format, heap base, event count, and entry count.
+
+The native implementation currently parses these structures for the selected game version and exposes instruction words as opcode (high byte) plus raw 24-bit operand payload. This is an inspection foundation, **not yet semantic disassembly or decompilation**. Mnemonic tables, version-specific operand interpretation, control-flow recovery, editing, and reassembly remain future work. Unknown code and frame-group data must be preserved.
+
+Reference source: [GOOL entry loader](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLEntryLoader.cs), [GOOL entry model](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLEntry.cs), and [GOOL instruction decoder](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLInstruction.cs).
 
 ## SLST research notes
 
