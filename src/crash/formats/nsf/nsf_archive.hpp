@@ -59,11 +59,33 @@ struct NsfScenery {
  std::vector<std::uint32_t> animatedTextures;
  std::string error;
 };
+enum class NsfGoolVersion : std::uint8_t { Version0, Version1, Version2, Version3 };
+struct NsfGoolInstruction {
+ std::size_t byteOffset=0;
+ std::uint32_t word=0;
+ std::uint8_t opcode=0;
+ std::uint32_t operandBits=0;
+};
+struct NsfGoolStateDescriptor {
+ std::int32_t stateFlags=0, blockFlags=0;
+ std::int16_t goolIndex=0, eventHook=0, transHook=0, codeHook=0;
+};
+struct NsfGool {
+ bool decoded=false;
+ NsfGoolVersion version=NsfGoolVersion::Version2;
+ std::int32_t id=0, classId=0, format=0, heapBase=0, eventCount=0, entryCount=0;
+ std::vector<NsfGoolInstruction> instructions;
+ std::vector<std::int32_t> dataPool;
+ std::vector<std::int16_t> stateMap;
+ std::vector<NsfGoolStateDescriptor> stateDescriptors;
+ std::size_t frameGroupBytes=0;
+ std::string error;
+};
 struct NsfEntry {
  std::uint32_t eid=0, type=0, itemCount=0;
  std::size_t offset=0, size=0;
  bool valid=false; std::string error;
- std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery;
+ std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery; NsfGool gool;
 };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
@@ -76,7 +98,7 @@ public:
  bool saveUncompressed(const std::filesystem::path&,std::string&) const;
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
  std::size_t compressedChunkCount()const noexcept;
- void decodeZones(bool crash3Retail);
+ void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version);
  bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
