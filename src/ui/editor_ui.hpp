@@ -21,7 +21,7 @@ private:
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
  float textureZoom_=1.0f;
  std::uint32_t sceneCameraZoneEid_=0;
- char path_[1024]{}; char searchQuery_[256]{}; int searchTypeFilter_=0;
+ char path_[1024]{}; char searchQuery_[256]{}; int searchTypeFilter_=-1;
  std::filesystem::path nsfPath_,nsdPath_;
  int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1;
  int viewerChunk_=-1,viewerEntry_=-1;
