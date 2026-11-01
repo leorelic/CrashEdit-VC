@@ -1096,6 +1096,42 @@ void EditorUI::drawSpawnPointsEditor(){
 }
 
 
+void EditorUI::drawNsdGoolMap(){
+ if(!nsdGoolMapWindow_||!nsdValid_)return;
+ if(!ImGui::Begin("NSD GOOL Map",&nsdGoolMapWindow_)){ImGui::End();return;}
+ ImGui::Text("GOOL map entries: %zu",nsd_.goolMap.size());
+ ImGui::Separator();
+ if(ImGui::BeginTable("NsdGoolMapTable",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)){
+  ImGui::TableSetupColumn("Index",ImGuiTableColumnFlags_WidthFixed,55.0f);
+  ImGui::TableSetupColumn("GOOL EID");
+  ImGui::TableSetupColumn("NSF entry",ImGuiTableColumnFlags_WidthFixed,115.0f);
+  ImGui::TableHeadersRow();
+  for(std::size_t i=0;i<nsd_.goolMap.size();++i){
+   const auto eid=static_cast<std::uint32_t>(nsd_.goolMap[i]);
+   const auto name=Crash::eidToEName(eid);
+   int matchChunk=-1,matchEntry=-1;
+   for(std::size_t ci=0;ci<nsf_.chunks().size()&&matchChunk<0;++ci){
+    const auto&chunk=nsf_.chunks()[ci];if(chunk.type!=0)continue;
+    for(std::size_t ei=0;ei<chunk.entries.size();++ei){const auto&entry=chunk.entries[ei];if(entry.valid&&entry.type==11&&entry.eid==eid){matchChunk=static_cast<int>(ci);matchEntry=static_cast<int>(ei);break;}}
+   }
+   ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%02zu",i);
+   ImGui::TableSetColumnIndex(1);ImGui::Text("%s (%08X)",name.c_str(),eid);
+   ImGui::TableSetColumnIndex(2);
+   if(matchChunk>=0){
+    ImGui::PushID(static_cast<int>(i));
+    if(ImGui::SmallButton("Open GOOL")){
+     selectedChunk_=matchChunk;selectedEntry_=matchEntry;selectedEntity_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;
+     status_="Opened GOOL map entry "+name+".";
+    }
+    ImGui::PopID();
+   }else ImGui::TextDisabled("Not in NSF");
+  }
+  ImGui::EndTable();
+ }
+ ImGui::End();
+}
+
+
 void EditorUI::drawSearchWindow(){
  if(!searchWindow_)return;
  if(!nsfValid_){searchWindow_=false;return;}
