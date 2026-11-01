@@ -38,7 +38,13 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] Windows application runs without a separate console window; startup, GLFW, NSF loading, NSD availability, and save messages feed a bounded in-app Console / Diagnostics log with severity levels.
 - [x] Fix Console / Diagnostics ImGui Begin/End pairing and prevent file/version dialogs from repeatedly stealing focus.
 - [x] NSF and NSD save actions wired through the editor.
-- [x] Initial NSD serialization support, including preservation of opaque/original data where required.
+- [x] Parse and serialize ProtoNSD, OldNSD, standard NSD, and Crash 3 NSD layouts.
+- [x] Preserve original prelude/compression metadata, unknown fields, fixed extra-data blocks, and trailing image data when serializing.
+- [x] Spawn-point append, delete, reorder, copy/paste, direct coordinate editing, and Get Spawn workflow.
+- [x] CrashEdit-compatible NSD warnings for zero spawn records, nonstandard OldNSD magic, and nonzero reserved blank values.
+- [x] Paired NSF/NSD save stages both outputs before replacing originals and restores the first file if the second replacement fails.
+- [x] Optional Experimental setting creates pre-save `.NSF.bak` / `.NSD.bak` copies and a dated archive pair for every save; same-day saves receive numbered suffixes.
+- [ ] Validate edited NSD pairs against representative real Crash 2 levels and in-game loading.
 
 ### Renderer and zone viewing
 - [x] Initial zone geometry/viewer foundation.
@@ -116,6 +122,21 @@ The order is intentionally flexible: work should follow dependencies and the mos
 - Sample projects and known-good test assets where licensing permits.
 - Regression test suite and documented compatibility status.
 - A clear distinction between implemented, experimental, and unsupported features.
+
+## NSD format and save notes
+
+The native NSD implementation supports the four layouts recognized by the original CrashEdit source:
+
+- **ProtoNSD:** 256-entry hash-key map, chunk and entry counts, then the variable-length 8-byte index.
+- **OldNSD:** shared chunk metadata and index, followed by the legacy magic/ID/start-zone/camera/unknown fields, a 64-entry GOOL map, and trailing extra data.
+- **Standard NSD (Crash 2):** shared metadata and index, spawn count and reserved blank field, level ID and entity count, a 64-entry GOOL map, a fixed 0xCC-byte extra-data block, 24-byte spawn records, and trailing image data.
+- **Crash 3 NSD:** the standard layout with a 128-entry GOOL map and the later spawn/extra-data offsets.
+
+The serializer preserves the original prelude/compression metadata and opaque regions while rebuilding the variable-length index and spawn sections. The editor saves the NSF and matching NSD as a pair. Optional backup mode is off by default; when enabled, each save copies the previous originals to `.NSF.bak` and `.NSD.bak`, then archives the newly serialized pair as `name(YYYY-MM-DD).NSF/.NSD`. Additional saves on the same day use numbered suffixes rather than overwriting earlier archives.
+
+The native validation layer currently reports known CrashEdit-compatible conditions (zero spawn records, OldNSD magic other than 1, and a nonzero reserved blank field) and rejects negative count values before serialization. These checks do not yet prove that a modified NSD will load in the game. Representative real-file round trips and in-game validation remain open.
+
+Reference source: [NSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/NSD.cs), [OldNSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/OldNSD.cs), [ProtoNSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/ProtoNSD.cs), and [NSDController.cs](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controllers/NSDController.cs).
 
 ## GOOL research notes
 
