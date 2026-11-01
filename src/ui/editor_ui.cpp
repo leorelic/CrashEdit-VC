@@ -157,6 +157,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
  auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
+ if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
  nsf_=std::move(archive);sceneCameraInitialized_=false;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
  nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());
@@ -174,7 +175,6 @@ bool EditorUI::saveFiles(){
  std::vector<std::uint8_t> nsdBytes,nsfBytes;
  if(!nsd_.saveBytes(nsdBytes,error)){status_="Save failed (NSD serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  if(!nsf_.saveUncompressedBytes(nsfBytes,error)){status_="Save failed (NSF serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
- for(const auto&warning:nsd_.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  std::string dateStamp;
  if(editorPreferences.createSaveBackups){
   const std::time_t now=std::time(nullptr);std::tm localTime{};
