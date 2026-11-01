@@ -52,10 +52,9 @@ if(CRASHEDIT_BUILD_APP)
     target_link_libraries(crashedit_imgui PUBLIC glfw OpenGL::GL)
 
     if(WIN32)
-        add_executable(CrashEdit WIN32
-    else()
-        add_executable(CrashEdit
+        set(CRASHEDIT_EXECUTABLE_TYPE WIN32)
     endif()
+    add_executable(CrashEdit ${CRASHEDIT_EXECUTABLE_TYPE}
         src/main.cpp
         src/app/application.cpp
         src/core/workspace.cpp
