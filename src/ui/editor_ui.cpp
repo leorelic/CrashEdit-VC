@@ -30,7 +30,7 @@ static RendererDiagnostics rendererDiagnostics;
 struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
- bool showProperties=true,showConsole=true,createSaveBackups=false;
+ bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100;
  std::string lastNsfPath;
@@ -47,14 +47,16 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
- else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1)editorPreferences.createSaveBackups=value!=0;
+ else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
+ else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
+ else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
  else if(std::sscanf(line,"DockLayoutVersion=%d",&value)==1)editorPreferences.dockLayoutVersion=value;
  else if(std::strncmp(line,"LastNSF=",8)==0)editorPreferences.lastNsfPath=line+8;
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
  buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateSaveBackups=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createSaveBackups?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -176,7 +178,7 @@ bool EditorUI::saveFiles(){
  if(!nsd_.saveBytes(nsdBytes,error)){status_="Save failed (NSD serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  if(!nsf_.saveUncompressedBytes(nsfBytes,error)){status_="Save failed (NSF serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  std::string dateStamp;
- if(editorPreferences.createSaveBackups){
+ if(editorPreferences.createDatedBackup){
   const std::time_t now=std::time(nullptr);std::tm localTime{};
 #ifdef _WIN32
   localtime_s(&localTime,&now);
@@ -185,10 +187,13 @@ bool EditorUI::saveFiles(){
 #endif
   char date[11];if(std::strftime(date,sizeof(date),"%Y-%m-%d",&localTime)==0){status_="Could not format the save archive date.";Diagnostics::log(DiagnosticLevel::Error,status_);return false;}dateStamp=date;
  }
- if(!saveFilePair(nsfPath_,nsfBytes,nsdPath_,nsdBytes,editorPreferences.createSaveBackups,dateStamp,error)){
+ if(!saveFilePair(nsfPath_,nsfBytes,nsdPath_,nsdBytes,editorPreferences.createBakBackup,editorPreferences.createDatedBackup,dateStamp,error)){
   status_="Save failed: "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;
  }
- status_=editorPreferences.createSaveBackups?"Saved NSF and NSD with .bak backups and dated archives.":"Saved NSF and NSD.";
+ status_="Saved NSF and NSD.";
+ if(editorPreferences.createBakBackup&&editorPreferences.createDatedBackup)status_="Saved NSF and NSD with .bak backups and dated archives.";
+ else if(editorPreferences.createBakBackup)status_="Saved NSF and NSD with .bak backups.";
+ else if(editorPreferences.createDatedBackup)status_="Saved NSF and NSD with dated archives.";
  Diagnostics::log(DiagnosticLevel::Info,status_);
  return true;
 }
@@ -294,8 +299,10 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
-  if(ImGui::MenuItem("Create .bak backups and dated save archives",nullptr,&editorPreferences.createSaveBackups))ImGui::MarkIniSettingsDirty();
-  if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, keep the previous NSF/NSD as .bak files and archive the new pair with today’s date.");
+  if(ImGui::MenuItem("Create .bak backups during save",nullptr,&editorPreferences.createBakBackup))ImGui::MarkIniSettingsDirty();
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, copy the previous NSF and NSD to matching .bak files.");
+  if(ImGui::MenuItem("Create dated backups during save",nullptr,&editorPreferences.createDatedBackup))ImGui::MarkIniSettingsDirty();
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("After preparing the new save, archive the new NSF and NSD using today’s date.");
   bool& useModernFont=editorPreferences.useModernFont;
   if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
   ImGui::SetNextItemWidth(190.0f*static_cast<float>(uiScaling)/100.0f);
