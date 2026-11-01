@@ -1,5 +1,6 @@
 #include "ui/editor_ui.hpp"
 #include "core/diagnostics.hpp"
+#include "core/file_save.hpp"
 #include "crash/formats/eid.hpp"
 #include "render/gl_api.hpp"
 #include <imgui.h>
@@ -14,6 +15,7 @@
 #include <cfloat>
 #include <cstdint>
 #include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <tuple>
 #ifdef _WIN32
@@ -28,7 +30,7 @@ static RendererDiagnostics rendererDiagnostics;
 struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
- bool showProperties=true,showConsole=true;
+ bool showProperties=true,showConsole=true,createSaveBackups=false;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100;
  std::string lastNsfPath;
@@ -45,13 +47,14 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
+ else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1)editorPreferences.createSaveBackups=value!=0;
  else if(std::sscanf(line,"DockLayoutVersion=%d",&value)==1)editorPreferences.dockLayoutVersion=value;
  else if(std::strncmp(line,"LastNSF=",8)==0)editorPreferences.lastNsfPath=line+8;
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateSaveBackups=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createSaveBackups?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -168,9 +171,24 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
 bool EditorUI::saveFiles(){
  if(!nsfValid_||!nsdValid_){status_="Save requires both the NSF and its matching NSD.";Diagnostics::log(DiagnosticLevel::Warning,status_);return false;}
  std::string error;
- if(!nsd_.save(nsdPath_,error)){status_="Save failed (NSD): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
- if(!nsf_.saveUncompressed(nsfPath_,error)){status_="NSD saved, but NSF save failed: "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
- status_="Saved NSF and NSD.";
+ std::vector<std::uint8_t> nsdBytes,nsfBytes;
+ if(!nsd_.saveBytes(nsdBytes,error)){status_="Save failed (NSD serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
+ if(!nsf_.saveUncompressedBytes(nsfBytes,error)){status_="Save failed (NSF serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
+ for(const auto&warning:nsd_.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
+ std::string dateStamp;
+ if(editorPreferences.createSaveBackups){
+  const std::time_t now=std::time(nullptr);std::tm localTime{};
+#ifdef _WIN32
+  localtime_s(&localTime,&now);
+#else
+  localtime_r(&now,&localTime);
+#endif
+  char date[11];std::snprintf(date,sizeof(date),"%04d-%02d-%02d",localTime.tm_year+1900,localTime.tm_mon+1,localTime.tm_mday);dateStamp=date;
+ }
+ if(!saveFilePair(nsfPath_,nsfBytes,nsdPath_,nsdBytes,editorPreferences.createSaveBackups,dateStamp,error)){
+  status_="Save failed: "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;
+ }
+ status_=editorPreferences.createSaveBackups?"Saved NSF and NSD with .bak backups and dated archives.":"Saved NSF and NSD.";
  Diagnostics::log(DiagnosticLevel::Info,status_);
  return true;
 }
@@ -276,6 +294,8 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
+  ImGui::MenuItem("Create .bak backups and dated save archives",nullptr,&editorPreferences.createSaveBackups);
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, keep the previous NSF/NSD as .bak files and archive the new pair with today’s date.");
   bool& useModernFont=editorPreferences.useModernFont;
   if(ImGui::MenuItem("Use modern UI font",nullptr,&useModernFont))io.FontDefault=(useModernFont&&io.Fonts->Fonts.Size>1)?io.Fonts->Fonts[1]:nullptr;
   ImGui::SetNextItemWidth(190.0f*static_cast<float>(uiScaling)/100.0f);
@@ -1068,7 +1088,7 @@ void EditorUI::drawSpawnPointsEditor(){
   }
   ImGui::EndTable();
  }
- ImGui::TextDisabled("Spawn point edits are currently in memory; NSD serialization is not implemented yet.");
+ ImGui::TextDisabled("Spawn point changes are included when you save the level (Ctrl+S).");
  ImGui::End();
 }
 
