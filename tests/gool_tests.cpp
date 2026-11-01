@@ -51,6 +51,22 @@ int main(){
  assert(!invalid.known&&invalid.mnemonic=="UNK");
  const auto& unsupported=goolOpcodeInfo(NsfGoolVersion::Version1,0);
  assert(!unsupported.known&&unsupported.mnemonic=="UNSUPPORTED");
+ const auto addFields=decodeGoolOperands(NsfGoolVersion::Version2,0,0x345678U);
+ assert(addFields.size()==2);
+ assert(addFields[0].name=='L'&&addFields[0].bitWidth==12&&addFields[0].rawValue==0x678U);
+ assert(addFields[1].name=='R'&&addFields[1].bitWidth==12&&addFields[1].rawValue==0x345U);
+ assert(addFields[0].kind==NsfGoolOperandKind::Reference);
+ const auto setfFields=decodeGoolOperands(NsfGoolVersion::Version2,17,0xABC123U);
+ assert(setfFields.size()==2);
+ assert(setfFields[0].name=='D'&&setfFields[0].kind==NsfGoolOperandKind::DestinationReference);
+ assert(setfFields[0].rawValue==0x123U&&setfFields[1].rawValue==0xABCU);
+ const auto branchFields=decodeGoolOperands(NsfGoolVersion::Version2,50,0x3FFU);
+ assert(branchFields.size()==3);
+ assert(branchFields[0].name=='I'&&branchFields[0].kind==NsfGoolOperandKind::Signed&&branchFields[0].value==-1);
+ assert(branchFields[1].name=='V'&&branchFields[1].bitWidth==4);
+ assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
+ assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
+ assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
  std::string error;
  NsfArchive archive;
  assert(archive.loadBytes(makeGoolChunk(true),error));
@@ -77,5 +93,5 @@ int main(){
  archive.decodeGools(NsfGoolVersion::Version2);
  const auto&basic=archive.chunks()[0].entries[0].gool;
  assert(basic.decoded&&basic.format==0&&basic.instructions.size()==2&&basic.dataPool.size()==2);
- std::cout<<"GOOL entry parsing and Crash 2 opcode recognition checks passed\\n";
+ std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\\n";
 }
