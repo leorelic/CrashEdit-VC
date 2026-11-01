@@ -107,6 +107,7 @@ bool NsdFile::loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant forma
             error = "Old NSD metadata after the index is truncated."; return false;
         }
         parsed.magic = readI32(bytes, tail);
+        if (parsed.magic != 1) { parsed.loadWarnings.emplace_back("OldNSD magic value was not 1; normalized to 1 as in CrashEdit."); parsed.magic = 1; }
         parsed.id = readI32(bytes, tail + 4);
         parsed.startZone = readI32(bytes, tail + 8);
         parsed.camera = readI32(bytes, tail + 12);
@@ -125,6 +126,7 @@ bool NsdFile::loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant forma
         const std::int32_t spawnCount = readI32(bytes, tail);
         if (spawnCount < 0) { error = "NSD spawn-point count is negative."; return false; }
         parsed.blank = readI32(bytes, tail + 4);
+        if (parsed.blank != 0) { parsed.loadWarnings.emplace_back("NSD reserved blank value was nonzero; normalized to 0 as in CrashEdit."); parsed.blank = 0; }
         parsed.id = readI32(bytes, tail + 8);
         parsed.entityCount = readI32(bytes, tail + 12);
 
@@ -162,12 +164,8 @@ bool NsdFile::loadBytes(const std::vector<std::uint8_t>& bytes, NsdVariant forma
 }
 
 std::vector<std::string> NsdFile::validationWarnings() const {
-    std::vector<std::string> warnings;
+    std::vector<std::string> warnings = loadWarnings;
     if (chunkCount < 0) warnings.emplace_back("NSD chunk count is negative.");
-    if (variant == NsdVariant::Old && magic != 1)
-        warnings.emplace_back("OldNSD magic value is not 1; CrashEdit normalizes this field to 1.");
-    if (variant != NsdVariant::Proto && variant != NsdVariant::Old && blank != 0)
-        warnings.emplace_back("NSD reserved blank value is nonzero; CrashEdit normalizes this field to 0.");
     if (variant != NsdVariant::Proto && spawns.empty())
         warnings.emplace_back("NSD has no spawn points; the original CrashEdit treats this as an ignorable warning.");
     return warnings;
