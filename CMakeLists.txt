@@ -109,6 +109,17 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_nsd_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME nsd_file_tests COMMAND crashedit_nsd_tests)
+    add_executable(crashedit_file_save_tests
+        tests/file_save_tests.cpp
+        src/core/file_save.cpp
+    )
+    target_include_directories(crashedit_file_save_tests PRIVATE src)
+    if(MSVC)
+        target_compile_options(crashedit_file_save_tests PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(crashedit_file_save_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME file_save_tests COMMAND crashedit_file_save_tests)
     add_executable(crashedit_gool_tests
         tests/gool_tests.cpp
         src/crash/formats/nsf/nsf_archive.cpp
