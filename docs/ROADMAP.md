@@ -33,6 +33,7 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] NSF file loading foundation and initial physical chunk reader/tests.
 - [x] NSF drag-and-drop into the application, including UTF-8 path handling.
 - [x] Global NSF entry search window with type filters, text matching, and hierarchy navigation.
+- [x] Default dock layout places entry search with Console / Diagnostics and GOOL Inspector with the 3D Zone Editor; existing saved layouts are migrated once.
 - [x] NSF and NSD save actions wired through the editor.
 - [x] Initial NSD serialization support, including preservation of opaque/original data where required.
 
