@@ -1,6 +1,7 @@
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <array>
 #include <cstdio>
+#include <algorithm>
 
 namespace CrashEdit::Crash {
 namespace {
@@ -50,6 +51,35 @@ std::vector<NsfGoolOperand> decodeGoolOperands(NsfGoolVersion version,std::uint8
   active=c;value|=((bits>>bit)&1U)<<width;++width;++bit;
  }
  flush();return out;
+}
+
+void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& gool, const std::vector<std::int32_t>* parentData) {
+ for(auto& operand:operands) {
+  if(operand.kind!=NsfGoolOperandKind::Reference && operand.kind!=NsfGoolOperandKind::DestinationReference) continue;
+  const auto raw=operand.rawValue;
+  if((raw&0x800U)==0) {
+   const std::size_t offset=raw&0x3FFU;
+   const bool external=(raw&0x400U)==0;
+   const std::vector<std::int32_t>* pool=nullptr;
+   if(gool.format==1 && external) pool=&gool.dataPool;
+   else if(gool.format==0 && !external) pool=&gool.dataPool;
+   else if(gool.format==0 && external && parentData) pool=parentData;
+   if(pool) {
+    if(offset>=pool->size()) operand.resolvedText="unresolved pool offset "+std::to_string(offset);
+    else {
+     const auto value=static_cast<std::uint32_t>((*pool)[offset]);
+     char text[64];
+     if(offset<static_cast<std::size_t>(std::max(0,gool.entryCount)))
+      std::snprintf(text,sizeof(text),"EID 0x%08X",value);
+     else std::snprintf(text,sizeof(text),"value 0x%08X (%d)",value,static_cast<std::int32_t>(value));
+     operand.resolvedText=text;
+    }
+   } else operand.resolvedText=(external?"external":"local")+std::string(" reference @")+std::to_string(offset)+" (pool unavailable)";
+  } else {
+   if(operand.kind==NsfGoolOperandKind::DestinationReference) operand.resolvedText="special writable reference (raw 0x"+[] (std::uint32_t v){char b[16];std::snprintf(b,sizeof(b),"%03X",v);return std::string(b);}(raw)+")";
+   else operand.resolvedText="special reference (raw 0x"+[] (std::uint32_t v){char b[16];std::snprintf(b,sizeof(b),"%03X",v);return std::string(b);}(raw)+")";
+  }
+ }
 }
 std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
  std::string out;char buf[64];
