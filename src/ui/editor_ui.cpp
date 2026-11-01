@@ -151,25 +151,27 @@ void EditorUI::handleDroppedFiles(int count,const char** paths){
  status_="No NSF file found in the dropped files.";
 }
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
- Crash::NsfArchive archive;if(!archive.load(file,error))return false;if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
+ Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
  auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
- if(!workspace_.open(file.parent_path(),error))return false;
+ if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
  nsf_=std::move(archive);sceneCameraInitialized_=false;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
  nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
- if(!haveNsd)status_+=" Matching NSD unavailable: "+nsdError;
+ if(!haveNsd){status_+=" Matching NSD unavailable: "+nsdError;Diagnostics::log(DiagnosticLevel::Warning,"Matching NSD unavailable: "+nsdError);}
  editorPreferences.lastNsfPath=file.string();
  std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
  ImGui::MarkIniSettingsDirty();
+ Diagnostics::log(DiagnosticLevel::Info,"Loaded "+versionName(gameVersion_)+" NSF with "+std::to_string(nsf_.chunks().size())+" chunks.");
  return true;
 }
 bool EditorUI::saveFiles(){
- if(!nsfValid_||!nsdValid_){status_="Save requires both the NSF and its matching NSD.";return false;}
+ if(!nsfValid_||!nsdValid_){status_="Save requires both the NSF and its matching NSD.";Diagnostics::log(DiagnosticLevel::Warning,status_);return false;}
  std::string error;
- if(!nsd_.save(nsdPath_,error)){status_="Save failed (NSD): "+error;return false;}
- if(!nsf_.saveUncompressed(nsfPath_,error)){status_="NSD saved, but NSF save failed: "+error;return false;}
+ if(!nsd_.save(nsdPath_,error)){status_="Save failed (NSD): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
+ if(!nsf_.saveUncompressed(nsfPath_,error)){status_="NSD saved, but NSF save failed: "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  status_="Saved NSF and NSD.";
+ Diagnostics::log(DiagnosticLevel::Info,status_);
  return true;
 }
 void EditorUI::draw(){
