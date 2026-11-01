@@ -47,7 +47,7 @@ int main() {
     writeI32(standard, 0x418, 0x111); // uncompressed chunk section
     writeI32(standard, 0x41C, 0x222); // prelude count
     writeI32(standard, 0x420, 0x333); // first compressed chunk info
-    writeI32(standard, 0x524, 0x444); // blank/reserved value
+    writeI32(standard, 0x524, 0); // reserved blank value
     standard[0x630] = 0xA5; // opaque extra data
     standard[0x6FC + 24] = 0x5A; // trailing image data
     writeI32(standard, 0x6FC, 0x77); // spawn zone EID
@@ -61,6 +61,12 @@ int main() {
     ok &= check(parsed.spawns.size() == 1 && parsed.spawns[0].zoneEid == 0x77 && parsed.spawns[0].z == 300,
                 "standard NSD spawn record should parse");
     ok &= check(parsed.validationWarnings().empty(), "valid standard NSD should have no validation warnings");
+    auto nonzeroBlank = standard;
+    writeI32(nonzeroBlank, 0x524, 0x444);
+    NsdFile warningFile;
+    ok &= check(warningFile.loadBytes(nonzeroBlank, NsdVariant::Standard, error) &&
+                !warningFile.validationWarnings().empty(),
+                "nonzero standard NSD reserved value should produce a warning");
 
     std::vector<std::uint8_t> crash3(0x7FC + 24, 0);
     writeI32(crash3, 0x400, 8);
