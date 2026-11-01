@@ -59,6 +59,7 @@ if(CRASHEDIT_BUILD_APP)
         src/app/application.cpp
         src/core/workspace.cpp
         src/core/diagnostics.cpp
+        src/core/file_save.cpp
         src/crash/formats/nsf/nsf_archive.cpp
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
