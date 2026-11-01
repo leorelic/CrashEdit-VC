@@ -1,4 +1,5 @@
 #include "crash/formats/nsf/nsf_archive.hpp"
+#include "crash/formats/gool/gool_opcodes.hpp"
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -36,6 +37,20 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
 }
 
 int main(){
+ const auto& add=goolOpcodeInfo(NsfGoolVersion::Version2,0);
+ assert(add.known&&add.mnemonic=="ADD");
+ const auto& setf=goolOpcodeInfo(NsfGoolVersion::Version2,17);
+ assert(setf.known&&setf.mnemonic=="SETF");
+ const auto& branch=goolOpcodeInfo(NsfGoolVersion::Version2,50);
+ assert(branch.known&&branch.mnemonic=="BRA");
+ const auto& mips=goolOpcodeInfo(NsfGoolVersion::Version2,73);
+ assert(mips.known&&mips.mnemonic=="MIPS");
+ const auto& reserved=goolOpcodeInfo(NsfGoolVersion::Version2,72);
+ assert(!reserved.known&&reserved.mnemonic=="UNK");
+ const auto& invalid=goolOpcodeInfo(NsfGoolVersion::Version2,250);
+ assert(!invalid.known&&invalid.mnemonic=="UNK");
+ const auto& unsupported=goolOpcodeInfo(NsfGoolVersion::Version1,0);
+ assert(!unsupported.known&&unsupported.mnemonic=="UNSUPPORTED");
  std::string error;
  NsfArchive archive;
  assert(archive.loadBytes(makeGoolChunk(true),error));
@@ -62,5 +77,5 @@ int main(){
  archive.decodeGools(NsfGoolVersion::Version2);
  const auto&basic=archive.chunks()[0].entries[0].gool;
  assert(basic.decoded&&basic.format==0&&basic.instructions.size()==2&&basic.dataPool.size()==2);
- std::cout<<"GOOL entry and instruction-word decoding checks passed\\n";
+ std::cout<<"GOOL entry parsing and Crash 2 opcode recognition checks passed\\n";
 }
