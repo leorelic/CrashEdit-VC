@@ -18,7 +18,7 @@ std::vector<std::uint8_t> read(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 bool check(bool value, const char* message) {
-    if (!value) std::cerr << "FAIL: " << message << '\\n';
+    if (!value) std::cerr << "FAIL: " << message << '\n';
     return value;
 }
 }
@@ -73,6 +73,6 @@ int main() {
     ok &= check(read(root/"S000000E(2026-11-01)(2).NSF")==newerNsf &&
                 read(root/"S000000E(2026-11-01)(2).NSD")==newerNsd, "keep a separate archive for each save on the same day");
     std::filesystem::remove_all(root, ec);
-    std::cout << (ok ? "All paired-save tests passed.\\n" : "Paired-save tests failed.\\n");
+    std::cout << (ok ? "All paired-save tests passed.\n" : "Paired-save tests failed.\n");
     return ok ? 0 : 1;
 }
