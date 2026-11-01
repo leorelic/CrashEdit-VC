@@ -48,6 +48,7 @@ struct NsdFile {
     std::int32_t startZone = 0;
     std::int32_t camera = 0;
     std::vector<std::uint8_t> originalData;
+    std::vector<std::string> loadWarnings;
     std::size_t trailingDataBytes = 0;
 
     bool load(const std::filesystem::path& file, NsdVariant format, std::string& error);
