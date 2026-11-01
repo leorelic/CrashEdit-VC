@@ -96,6 +96,7 @@ class NsfArchive {
 public:
  bool load(const std::filesystem::path&,std::string&); bool loadBytes(const std::vector<std::uint8_t>&,std::string&);
  bool saveUncompressed(const std::filesystem::path&,std::string&) const;
+ bool saveUncompressedBytes(std::vector<std::uint8_t>&,std::string&) const;
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
  std::size_t compressedChunkCount()const noexcept;
  void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version);
