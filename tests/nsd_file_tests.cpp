@@ -60,6 +60,7 @@ int main() {
     ok &= check(parsed.id == 42 && parsed.entityCount == 9, "standard NSD header fields should parse");
     ok &= check(parsed.spawns.size() == 1 && parsed.spawns[0].zoneEid == 0x77 && parsed.spawns[0].z == 300,
                 "standard NSD spawn record should parse");
+    ok &= check(parsed.validationWarnings().empty(), "valid standard NSD should have no validation warnings");
 
     std::vector<std::uint8_t> crash3(0x7FC + 24, 0);
     writeI32(crash3, 0x400, 8);
@@ -79,6 +80,7 @@ int main() {
     ok &= check(parsed.loadBytes(oldNsd, NsdVariant::Old, error), "OldNSD should parse");
     ok &= check(parsed.id == 99 && parsed.startZone == 11 && parsed.camera == 12,
                 "OldNSD legacy header fields should parse");
+    ok &= check(!parsed.validationWarnings().empty(), "OldNSD should report a nonstandard magic value as a warning");
 
     // Serialization should round-trip all NSD variants and relocate variable-length sections safely.
     std::vector<std::uint8_t> saved;
