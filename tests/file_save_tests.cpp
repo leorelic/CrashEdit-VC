@@ -41,8 +41,8 @@ int main() {
     ok &= check(CrashEdit::saveFilePair(nsf,newerNsf,nsd,newerNsd,true,"2026-11-01",error), "save same-day pair again");
     ok &= check(read(root/"S000000E.NSF.bak")==newNsf && read(root/"S000000E.NSD.bak")==newNsd,
                 "refresh .bak files with immediately previous originals");
-    ok &= check(read(root/"S000000E(2026-11-01).NSF")==newerNsf &&
-                read(root/"S000000E(2026-11-01).NSD")==newerNsd, "replace same-day archive with latest pair");
+    ok &= check(read(root/"S000000E(2026-11-01)(2).NSF")==newerNsf &&
+                read(root/"S000000E(2026-11-01)(2).NSD")==newerNsd, "keep a separate archive for each save on the same day");
     std::filesystem::remove_all(root, ec);
     std::cout << (ok ? "All paired-save tests passed.\n" : "Paired-save tests failed.\n");
     return ok ? 0 : 1;
