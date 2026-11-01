@@ -221,9 +221,16 @@ bool NsfArchive::setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIn
  }
  return false;
 }
+bool NsfArchive::saveUncompressedBytes(std::vector<std::uint8_t>&out,std::string&e)const{
+ out.clear();out.reserve(chunks_.size()*NsfChunkSize);
+ for(const auto&c:chunks_){if(c.bytes.size()!=NsfChunkSize){e="Invalid in-memory NSF chunk size.";return false;}auto b=c.bytes;checksum(b);out.insert(out.end(),b.begin(),b.end());}
+ e.clear();return true;
+}
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
+ std::vector<std::uint8_t> bytes;if(!saveUncompressedBytes(bytes,e))return false;
  std::ofstream s(f,std::ios::binary|std::ios::trunc);if(!s){e="Could not create NSF output.";return false;}
- for(const auto&c:chunks_){if(c.bytes.size()!=NsfChunkSize){e="Invalid in-memory NSF chunk size.";return false;}auto b=c.bytes;checksum(b);s.write(reinterpret_cast<const char*>(b.data()),static_cast<std::streamsize>(b.size()));if(!s){e="Failed writing NSF output.";return false;}}return true;
+ if(!bytes.empty())s.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
+ if(!s){e="Failed writing NSF output.";return false;}e.clear();return true;
 }
 std::size_t NsfArchive::compressedChunkCount()const noexcept{return std::count_if(chunks_.begin(),chunks_.end(),[](const auto&c){return c.wasCompressed;});}
 }
