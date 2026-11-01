@@ -1109,7 +1109,7 @@ void EditorUI::drawNsdGoolMap(){
  if(!ImGui::Begin("NSD GOOL Map",&nsdGoolMapWindow_)){ImGui::End();return;}
  ImGui::Text("GOOL map entries: %zu",nsd_.goolMap.size());
  ImGui::Separator();
- if(ImGui::BeginTable("NsdGoolMapTable",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
+ if(ImGui::BeginTable("NsdGoolMapTable",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0),900.0f)){
   ImGui::TableSetupColumn("Index",ImGuiTableColumnFlags_WidthFixed,55.0f);
   ImGui::TableSetupColumn("GOOL EID");
   ImGui::TableSetupColumn("NSF entry",ImGuiTableColumnFlags_WidthFixed,115.0f);
@@ -1265,7 +1265,7 @@ void EditorUI::drawGoolInspector(){
   ImGui::EndTable();
  }
  if(ImGui::TreeNode("Data pool")){
-  if(ImGui::BeginTable("GOOLDataPool",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
+  if(ImGui::BeginTable("GOOLDataPool",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0),900.0f)){
    ImGui::TableSetupColumn("Index");ImGui::TableSetupColumn("Hex");ImGui::TableSetupColumn("Signed value");ImGui::TableHeadersRow();
    for(std::size_t i=0;i<g.dataPool.size();++i){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",i);ImGui::TableSetColumnIndex(1);ImGui::Text("0x%08X",static_cast<std::uint32_t>(g.dataPool[i]));ImGui::TableSetColumnIndex(2);ImGui::Text("%d",g.dataPool[i]);}
    ImGui::EndTable();
@@ -1277,7 +1277,7 @@ void EditorUI::drawGoolInspector(){
   ImGui::TreePop();
  }
  if(!g.stateDescriptors.empty()&&ImGui::TreeNode("State descriptors")){
-  if(ImGui::BeginTable("GOOLStateDescriptors",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){
+  if(ImGui::BeginTable("GOOLStateDescriptors",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,0),1200.0f)){
    ImGui::TableSetupColumn("State flags");ImGui::TableSetupColumn("Block flags");ImGui::TableSetupColumn("GOOL index");ImGui::TableSetupColumn("Event hook");ImGui::TableSetupColumn("Transition hook");ImGui::TableSetupColumn("Code hook");ImGui::TableHeadersRow();
    for(const auto&d:g.stateDescriptors){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("0x%08X",static_cast<unsigned>(d.stateFlags));ImGui::TableSetColumnIndex(1);ImGui::Text("0x%08X",static_cast<unsigned>(d.blockFlags));ImGui::TableSetColumnIndex(2);ImGui::Text("%d",d.goolIndex);ImGui::TableSetColumnIndex(3);ImGui::Text("%d",d.eventHook);ImGui::TableSetColumnIndex(4);ImGui::Text("%d",d.transHook);ImGui::TableSetColumnIndex(5);ImGui::Text("%d",d.codeHook);}
    ImGui::EndTable();
