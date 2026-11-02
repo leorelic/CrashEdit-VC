@@ -444,7 +444,23 @@ void EditorUI::drawViewport(){
  canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  ImGui::InvisibleButton("ZoneViewportCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool canvasHovered=ImGui::IsItemHovered();
- ImGui::OpenPopupOnItemClick("ViewportOptions",ImGuiPopupFlags_MouseButtonRight);
+ const bool canvasActive=ImGui::IsItemActive();
+ // A compact in-canvas toolbar replaces the old right-click context menu.
+ // Its hit area is excluded from camera gestures so toolbar clicks never pan
+ // or orbit the scene underneath it.
+ const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
+ ImGui::SetCursorScreenPos(toolbarMin);
+ ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6.0f,4.0f));
+ ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,3.0f);
+ const bool toolbarButton=ImGui::InvisibleButton("##ViewportToolbarMenu",ImVec2(28.0f,26.0f));
+ const ImVec2 toolbarMax=ImGui::GetItemRectMax();
+ const bool toolbarHovered=ImGui::IsItemHovered();
+ ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
+ const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
+ const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
+ if(toolbarHovered)ImGui::SetTooltip("Viewport settings");
+ if(toolbarButton)ImGui::OpenPopup("ViewportOptions");
  if(ImGui::BeginPopup("ViewportOptions")){
   ImGui::TextUnformatted("Renderer");
   ImGui::Checkbox("Software rendering",&editorPreferences.softwareRendering);
@@ -458,7 +474,8 @@ void EditorUI::drawViewport(){
   ImGui::SliderInt("##MovementSpeed",&editorPreferences.sceneMoveSpeed,100,300,"%d%%");
   ImGui::EndPopup();
  }
- const bool canvasActive=ImGui::IsItemActive();
+ const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("ViewportOptions");
+ ImGui::PopStyleVar(2);
  ImDrawList*dl=ImGui::GetWindowDrawList();
  const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(20,25,33,255));
@@ -548,22 +565,22 @@ void EditorUI::drawViewport(){
   }
  }
  const ImGuiIO&io=ImGui::GetIO();
- if(canvasActive&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+ if(canvasActive&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
   sceneYaw_-=io.MouseDelta.x*0.005f;
   scenePitch_=std::clamp(scenePitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
  }
- if(canvasActive&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+ if(canvasActive&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
   const float pan=sceneDistance_*0.0018f;
   const float cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);
   sceneTargetX_-=(-cy*io.MouseDelta.x+sy*io.MouseDelta.y)*pan;
   sceneTargetZ_-=(-sy*io.MouseDelta.x-cy*io.MouseDelta.y)*pan;
  }
- if(canvasHovered&&io.MouseWheel!=0.0f){
+ if(canvasHovered&&!viewportToolbarOwnsMouse&&io.MouseWheel!=0.0f){
   const float delta=io.MouseWheel*(0.3f+1.7f*(sceneDistance_/100.0f));
   sceneDistance_=std::clamp(sceneDistance_-delta,0.2f,200.0f);
  }
- if(canvasHovered&&ImGui::IsKeyDown(ImGuiKey_R)){sceneCameraInitialized_=false;}
- if(canvasHovered){
+ if(canvasHovered&&!viewportToolbarOwnsMouse&&ImGui::IsKeyDown(ImGuiKey_R)){sceneCameraInitialized_=false;}
+ if(canvasHovered&&!viewportToolbarOwnsMouse){
   const float moveSpeed=(2.0f*float(editorPreferences.sceneMoveSpeed)/100.0f)*(0.2f+0.8f*(sceneDistance_/20.0f))*io.DeltaTime;
   const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
   const float cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);
