@@ -105,7 +105,7 @@ int main(){
  sourceRef[0].rawValue=0xC08U; resolveGoolOperands(sourceRef,destinationContext);
  assert(sourceRef[0].resolvedText=="self->x");
  sourceRef[0].rawValue=0xC89U; resolveGoolOperands(sourceRef,destinationContext);
- assert(sourceRef[0].resolvedText=="parent->y");
+ assert(sourceRef[0].resolvedText=="brother->y");
  sourceRef[0].rawValue=0xE1FU; resolveGoolOperands(sourceRef,destinationContext);
  assert(sourceRef[0].resolvedText=="[sp]");
  sourceRef[0].rawValue=0xE40U; resolveGoolOperands(sourceRef,destinationContext);
