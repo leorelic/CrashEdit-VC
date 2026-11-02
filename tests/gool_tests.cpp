@@ -19,7 +19,7 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
  const std::size_t entry=24;
  const std::size_t count=extended?6:3;
  const std::size_t tableSize=16+(count+1)*4;
- const std::size_t sizesExtended[]={24,8,8,4,16,116};
+ const std::size_t sizesExtended[]={24,20,8,4,16,116};
  const std::size_t sizesBasic[]={24,8,8};
  std::size_t offsets[7]{};offsets[0]=tableSize;
  for(std::size_t i=0;i<count;++i)offsets[i+1]=offsets[i]+(extended?sizesExtended[i]:sizesBasic[i]);
@@ -29,7 +29,7 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
  const std::size_t header=entry+offsets[0];
  p32(b,header,0x10203040);p32(b,header+4,0x55667788);p32(b,header+8,extended?1:0);
  p32(b,header+12,0x100);p32(b,header+16,4);p32(b,header+20,2);
- const std::size_t code=entry+offsets[1];p32(b,code,0x12345678);p32(b,code+4,0xABCDEF01);
+ const std::size_t code=entry+offsets[1];if(extended){p32(b,code,0x49000000);p32(b,code+4,0x012A4021);p32(b,code+8,0x03E00008);p32(b,code+12,0);p32(b,code+16,0x12000000);}else{p32(b,code,0x12345678);p32(b,code+4,0xABCDEF01);}
  const std::size_t data=entry+offsets[2];p32(b,data,0x11112222);p32(b,data+4,0x33334444);
  if(extended){
   const std::size_t map=entry+offsets[3];p16(b,map,0xffff);p16(b,map+2,3);
@@ -56,6 +56,13 @@ int main(){
  assert(mips.known&&mips.mnemonic=="MIPS");
  const auto& reserved=goolOpcodeInfo(NsfGoolVersion::Version2,72);
  assert(!reserved.known&&reserved.mnemonic=="UNK");
+ std::string mipsName,mipsArgs;bool mipsKnown=false;
+ decodeMipsInstruction(0x012A4021U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="addu"&&mipsArgs=="$t0,$t1,$t2");
+ decodeMipsInstruction(0x8C880010U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="lw"&&mipsArgs=="$t0,16($a0)");
+ decodeMipsInstruction(0xFFFFFFFFU,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0xFFFFFFFF");
  const auto& invalid=goolOpcodeInfo(NsfGoolVersion::Version2,250);
  assert(!invalid.known&&invalid.mnemonic=="UNK");
  const auto& unsupported=goolOpcodeInfo(NsfGoolVersion::Version1,0);
@@ -170,10 +177,12 @@ int main(){
  assert(static_cast<std::uint32_t>(g.id)==0x10203040U);
  assert(static_cast<std::uint32_t>(g.classId)==0x55667788U);
  assert(g.format==1&&g.heapBase==0x100&&g.eventCount==4&&g.entryCount==2);
- assert(g.instructions.size()==2);
- assert(g.instructions[0].byteOffset==0&&g.instructions[0].word==0x12345678U);
- assert(g.instructions[0].opcode==0x12&&g.instructions[0].operandBits==0x345678U);
- assert(g.instructions[1].opcode==0xAB&&g.instructions[1].operandBits==0xCDEF01U);
+ assert(g.instructions.size()==5);
+ assert(g.instructions[0].opcode==73&&g.instructions[0].mnemonic=="MIPS"&&!g.instructions[0].isMips);
+ assert(g.instructions[1].isMips&&g.instructions[1].mipsKnown&&g.instructions[1].mnemonic=="addu"&&g.instructions[1].arguments=="$t0,$t1,$t2");
+ assert(g.instructions[2].isMips&&g.instructions[2].mnemonic=="jr"&&g.instructions[2].arguments=="$ra");
+ assert(g.instructions[3].isMips&&g.instructions[3].mnemonic=="nop");
+ assert(!g.instructions[4].isMips&&g.instructions[4].opcode==0x12&&g.instructions[4].mnemonic=="ORL");
  assert(g.dataPool.size()==2&&static_cast<std::uint32_t>(g.dataPool[1])==0x33334444U);
  assert(g.stateMap.size()==2&&g.stateMap[0]==-1&&g.stateMap[1]==3);
  assert(g.stateDescriptors.size()==1&&g.stateDescriptors[0].stateFlags==0x01020304);
