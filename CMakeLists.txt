@@ -91,6 +91,7 @@ if(CRASHEDIT_BUILD_TESTS)
     add_executable(crashedit_nsf_tests
         tests/nsf_archive_tests.cpp
         src/crash/formats/nsf/nsf_archive.cpp
+        src/crash/formats/gool/gool_opcodes.cpp
     )
     target_include_directories(crashedit_nsf_tests PRIVATE src)
     if(MSVC)
