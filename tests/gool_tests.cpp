@@ -74,7 +74,7 @@ int main(){
  assert(unknown46.size()==2);
  assert(unknown46[0].name=='D'&&unknown46[0].kind==NsfGoolOperandKind::DestinationReference);
  assert(unknown46[1].name=='S'&&unknown46[1].kind==NsfGoolOperandKind::Reference);
- for(std::uint8_t opcode=72;opcode<=77;++opcode){
+ for(const std::uint8_t opcode : {std::uint8_t{72},std::uint8_t{74},std::uint8_t{75},std::uint8_t{76},std::uint8_t{77}}){
   const auto& info=goolOpcodeInfo(NsfGoolVersion::Version2,opcode);
   assert(!info.known);
   const auto fields=decodeGoolOperands(NsfGoolVersion::Version2,opcode,0x123456U);
@@ -82,6 +82,9 @@ int main(){
   assert(fields[0].name=='A'&&fields[0].kind==NsfGoolOperandKind::Reference);
   assert(fields[1].name=='B'&&fields[1].kind==NsfGoolOperandKind::Reference);
  }
+ assert(goolOpcodeInfo(NsfGoolVersion::Version2,73).known);
+ assert(goolOpcodeInfo(NsfGoolVersion::Version2,73).mnemonic=="MIPS");
+ assert(decodeGoolOperands(NsfGoolVersion::Version2,73,0x000000U).empty());
  // Every declared Crash 2 format must account for exactly 24 operand bits.
  for(unsigned opcode=0;opcode<256;++opcode){
   const auto format=goolOpcodeFormat(NsfGoolVersion::Version2,static_cast<std::uint8_t>(opcode));
