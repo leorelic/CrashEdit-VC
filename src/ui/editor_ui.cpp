@@ -210,9 +210,9 @@ void EditorUI::draw(){
  drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
+ drawResourceActionDialog();
  ImGui::End();
  drawSearchWindow();
- drawResourceActionDialog();
  if(!restoredLastNsfPath_){
   if(path_[0]=='\0'&&!editorPreferences.lastNsfPath.empty())
    std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
