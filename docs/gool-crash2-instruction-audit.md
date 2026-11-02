@@ -100,3 +100,25 @@ The reference loader accepts entry item counts of 3, 5, or 6 before interpreting
 ## Next audit step
 
 Use representative real Crash 2 GOOL entries to validate the runtime behavior of the documented reference classes and the control-flow fields (especially the branch/call family). The current inventory is a format/registry audit, not a claim that every instruction's gameplay semantics are fully understood.
+
+
+## Real Crash 2 sample validation: `entry_7_0_DispC.bin`
+
+A user-supplied exported Crash 2 GOOL entry (20,492 bytes) was inspected against the original loader and frame-group record readers. Its entry item table contains six items with boundaries:
+
+| Item | Offset | Size | Interpretation |
+|---|---:|---:|---|
+| 0 | 0x2C | 24 | GOOL header |
+| 1 | 0x44 | 13,100 | 3,275 instruction words |
+| 2 | 0x3370 | 524 | 131 data-pool words |
+| 3 | 0x357C | 216 | 108 signed 16-bit state-map values |
+| 4 | 0x3654 | 592 | 37 state descriptors (16 bytes each) |
+| 5 | 0x38A4 | 5,992 | Frame-group stream |
+
+The header decodes to ID 4, class 0x200, format 1, heap base 81, event count 80, and entry count 2. All 37 state descriptors' GOOLIndex values are within the 131-word data pool.
+
+The frame-group stream consumes exactly 5,992 bytes when decoded with the original Crash 2 record sizes: two type-2 sprite groups (14 and 1 frames), seven type-1 vertex groups (one frame each), two type-3 font groups (65 frames each), and one type-4 text group (151 NUL-terminated strings, padded to a 4-byte boundary). All 12 records fit exactly; there are no trailing bytes or truncated records.
+
+This sample also exercises the native-code marker (opcode 0x49 / MIPS) and embedded MIPS load/store instructions. The current native inspector still needs explicit MIPS-mode tracking/disassembly; treating every word after the marker as an ordinary GOOL opcode is not sufficient. This is a separate follow-up from the byte-layout parser.
+
+During this audit, comparison with the original `GOOLInstruction.GetRefVal` exposed a missing source-reference case: when bits 0x800, 0x200, and 0x100 are set but bit 0x80 is clear, the low 7 bits encode a signed stack/argument index. The native resolver now handles this case and has regression tests for positive stack and negative argument indices.
