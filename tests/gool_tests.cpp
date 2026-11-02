@@ -1,3 +1,7 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <cassert>
