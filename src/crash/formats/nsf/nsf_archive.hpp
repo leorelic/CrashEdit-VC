@@ -70,6 +70,15 @@ struct NsfGoolStateDescriptor {
  std::int32_t stateFlags=0, blockFlags=0;
  std::int16_t goolIndex=0, eventHook=0, transHook=0, codeHook=0;
 };
+struct NsfGoolFrameGroup {
+ std::uint16_t type=0;
+ std::int16_t frameCount=0;
+ std::uint32_t eid=0;
+ std::size_t byteOffset=0, byteSize=0;
+ std::uint32_t partCount=0;
+ std::int32_t font=0;
+ bool interpolated=false;
+};
 struct NsfGool {
  bool decoded=false;
  NsfGoolVersion version=NsfGoolVersion::Version2;
@@ -79,6 +88,9 @@ struct NsfGool {
  std::vector<std::int16_t> stateMap;
  std::vector<NsfGoolStateDescriptor> stateDescriptors;
  std::size_t frameGroupBytes=0;
+ bool frameGroupsDecoded=false;
+ std::vector<NsfGoolFrameGroup> frameGroups;
+ std::string frameGroupError;
  std::string error;
 };
 struct NsfEntry {
