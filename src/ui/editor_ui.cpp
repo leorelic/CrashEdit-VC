@@ -1120,7 +1120,7 @@ void EditorUI::drawClutEditor(){
     const ImU32 color=IM_COL32(expand5(raw&31U),expand5((raw>>5)&31U),expand5((raw>>10)&31U),255);
     ImGui::PushID(row*16+col);
     ImGui::ColorButton("##Color",ImGui::ColorConvertU32ToFloat4(color),ImGuiColorEditFlags_NoTooltip|ImGuiColorEditFlags_NoDragDrop,ImVec2(20.0f*uiScale,20.0f*uiScale));
-    ImGui::PopID();ImGui::PopID();
+    ImGui::PopID();
    }
   }
   ImGui::EndTable();
