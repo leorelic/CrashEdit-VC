@@ -148,4 +148,54 @@ std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
  }
  return out;
 }
+
+void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string& arguments,bool& known){
+ static constexpr const char* regs[]={"zr","at","v0","v1","a0","a1","a2","a3","t0","t1","t2","t3","t4","t5","t6","t7","s0","s1","s2","s3","s4","s5","s6","s7","t8","t9","k0","k1","gp","sp","s8","ra"};
+ const auto op=(word>>26U)&63U,rs=(word>>21U)&31U,rt=(word>>16U)&31U,rd=(word>>11U)&31U,sh=(word>>6U)&31U,fn=word&63U;
+ const auto imm=static_cast<std::int16_t>(word&0xFFFFU);
+ auto reg=[](unsigned n){return std::string("$")+regs[n&31U];};
+ mnemonic.clear();arguments.clear();known=true;
+ auto args=[&](std::string a){arguments=std::move(a);};
+ switch(op){
+ case 0:
+  switch(fn){
+  case 0:mnemonic="sll";args(reg(rd)+","+reg(rt)+","+std::to_string(sh));break;
+  case 2:mnemonic="srl";args(reg(rd)+","+reg(rt)+","+std::to_string(sh));break;
+  case 3:mnemonic="sra";args(reg(rd)+","+reg(rt)+","+std::to_string(sh));break;
+  case 4:mnemonic="sllv";args(reg(rd)+","+reg(rt)+","+reg(rs));break;
+  case 6:mnemonic="srlv";args(reg(rd)+","+reg(rt)+","+reg(rs));break;
+  case 7:mnemonic="srav";args(reg(rd)+","+reg(rt)+","+reg(rs));break;
+  case 8:mnemonic="jr";args(reg(rs));break;
+  case 9:mnemonic="jalr";args(reg(rs)+","+reg(rd));break;
+  case 12:mnemonic="syscall";break;case 13:mnemonic="break";break;
+  case 16:mnemonic="mfhi";args(reg(rd));break;case 17:mnemonic="mthi";args(reg(rd));break;
+  case 18:mnemonic="mflo";args(reg(rd));break;case 19:mnemonic="mtlo";args(reg(rd));break;
+  case 24:mnemonic="mult";args(reg(rs)+","+reg(rt));break;case 25:mnemonic="multu";args(reg(rs)+","+reg(rt));break;
+  case 26:mnemonic="div";args(reg(rs)+","+reg(rt));break;case 27:mnemonic="divu";args(reg(rs)+","+reg(rt));break;
+  case 32:mnemonic="add";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 33:mnemonic="addu";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
+  case 34:mnemonic="sub";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 35:mnemonic="subu";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
+  case 36:mnemonic="and";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 37:mnemonic="or";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
+  case 38:mnemonic="xor";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 39:mnemonic="nor";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
+  case 42:mnemonic="slt";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 43:mnemonic="sltu";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
+  default:known=false;break;
+  }break;
+ case 1:
+  if(rt==0)mnemonic="bltz";else if(rt==1)mnemonic="bgez";else if(rt==16)mnemonic="bltzal";else if(rt==17)mnemonic="bgezal";else{known=false;break;}
+  args(reg(rs)+","+std::to_string(imm));break;
+ case 2:case 3:mnemonic=op==2?"j":"jal";args(std::to_string(word&0x03FFFFFFU));break;
+ case 4:case 5:mnemonic=op==4?"beq":"bne";args(reg(rs)+","+reg(rt)+","+std::to_string(imm));break;
+ case 6:case 7:mnemonic=op==6?"blez":"bgtz";args(reg(rs)+","+std::to_string(imm));break;
+ case 8:case 9:case 10:case 11:case 12:case 13:case 14:
+  {static constexpr const char* names[]={"addi","addiu","slti","sltiu","andi","ori","xori"};mnemonic=names[op-8];args(reg(rt)+","+reg(rs)+","+std::to_string((op>=12)?(word&0xFFFFU):static_cast<std::uint32_t>(static_cast<std::int32_t>(imm))));}break;
+ case 15:mnemonic="lui";args(reg(rt)+","+std::to_string(word&0xFFFFU));break;
+ case 32:case 33:case 34:case 35:case 36:case 37:case 38:case 40:case 41:case 42:case 43:case 46:
+  {static constexpr const char* names[]={"lb","lh","lwl","lw","lbu","lhu","lwr","","sb","sh","swl","sw","swr"};const char* name=nullptr;
+   switch(op){case 32:name="lb";break;case 33:name="lh";break;case 34:name="lwl";break;case 35:name="lw";break;case 36:name="lbu";break;case 37:name="lhu";break;case 38:name="lwr";break;case 40:name="sb";break;case 41:name="sh";break;case 42:name="swl";break;case 43:name="sw";break;case 46:name="swr";break;default:break;}
+   (void)names;mnemonic=name;args(reg(rt)+","+std::to_string(imm)+"("+reg(rs)+")");}break;
+ default:known=false;break;
+ }
+ if(word==0){mnemonic="nop";arguments.clear();known=true;}
+ if(!known){mnemonic="???";arguments="0x";char hex[9];std::snprintf(hex,sizeof(hex),"%08X",word);arguments+=hex;}
+}
+
 }
