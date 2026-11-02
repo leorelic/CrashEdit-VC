@@ -74,6 +74,10 @@ int main(){
  assert(destination[0].resolvedText=="stack[5]");
  destination[0].rawValue=0x07FU; resolveGoolOperands(destination,destinationContext);
  assert(destination[0].resolvedText=="arg[0]");
+ destination[0].rawValue=0x37FU; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="arg[0]");
+ destination[0].rawValue=0x380U; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="stack[0]");
  destination[0].rawValue=0x408U; resolveGoolOperands(destination,destinationContext);
  assert(destination[0].resolvedText=="x");
  destination[0].rawValue=0x489U; resolveGoolOperands(destination,destinationContext);
