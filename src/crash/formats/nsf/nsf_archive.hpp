@@ -65,6 +65,8 @@ struct NsfGoolInstruction {
  std::uint32_t word=0;
  std::uint8_t opcode=0;
  std::uint32_t operandBits=0;
+ bool isMips=false, mipsKnown=false;
+ std::string mnemonic, arguments;
 };
 struct NsfGoolStateDescriptor {
  std::int32_t stateFlags=0, blockFlags=0;
