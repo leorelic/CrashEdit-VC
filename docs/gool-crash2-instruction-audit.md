@@ -23,6 +23,8 @@ Crash 2 opcode `0x11` (`SETF`) uses `DefaultFormatDS2`, i.e. **`{DDDDDDDDDDDD} [
 
 The same destination-reference form is used by the Crash 2 definitions for opcodes 18 (NOT), 20 (LEA), 23 (NOTL), 39 (ANIS), 43 (SIN), 44 (COS), and 46 (unidentified), where the registry specifies that format.
 
+The reference implementation decodes `{D}` differently from `[S]`: destination values with bit `0x400` clear are signed 7-bit stack/argument indices; with bit `0x400` set, they address an object field, a linked object's field, or the special stack pointer field. The C++ resolver now follows that split and displays the resolved destination alongside its raw 12-bit value. It does not route a destination reference through the data-pool resolver.
+
 ## Crash 2 opcode inventory
 
 | Opcode range / value | Registry name(s) | Audit status |
