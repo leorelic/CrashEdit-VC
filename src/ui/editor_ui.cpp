@@ -537,14 +537,14 @@ void EditorUI::drawViewport(){
  }else{
   frameMin=boundsMin;frameMax=boundsMax;
  }
- const std::uint32_t cameraResourceEid=zoneEntry?zoneEntry->eid:(sceneryEntry?sceneryEntry->eid:0U);
+ const bool cameraTargetChanged=viewerChunk_!=sceneCameraChunk_||viewerEntry_!=sceneCameraEntry_;
  if(!sceneryEntries.empty()&&sceneryCount>0){
-  if(sceneCameraZoneEid_!=cameraResourceEid)sceneCameraInitialized_=false;
+  if(cameraTargetChanged){sceneCameraInitialized_=false;sceneYaw_=0.0f;scenePitch_=0.261799f;}
   if(!sceneCameraInitialized_&&frameMin.x!=FLT_MAX){
    sceneTargetX_=(frameMin.x+frameMax.x)*0.5f;sceneTargetY_=(frameMin.y+frameMax.y)*0.5f;sceneTargetZ_=(frameMin.z+frameMax.z)*0.5f;
    const float dx=frameMax.x-frameMin.x,dy=frameMax.y-frameMin.y,dz=frameMax.z-frameMin.z;
    const float radius=std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f;
-   sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraZoneEid_=cameraResourceEid;sceneCameraInitialized_=true;
+   sceneDistance_=std::clamp(radius*1.65f+0.75f,2.0f,80.0f);sceneCameraChunk_=viewerChunk_;sceneCameraEntry_=viewerEntry_;sceneCameraInitialized_=true;
   }
  }
  const ImGuiIO&io=ImGui::GetIO();
