@@ -90,7 +90,7 @@ int main(){
 
  assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
  // CrashEdit's Crash 2 instruction definitions retain operand layouts even
- // for the explicitly unidentified opcodes 46 and 72-77.
+ // for the explicitly unidentified opcodes 46, 72, and 74-77.
  const auto unknown46=decodeGoolOperands(NsfGoolVersion::Version2,46,0xABC123U);
  assert(unknown46.size()==2);
  assert(unknown46[0].name=='D'&&unknown46[0].kind==NsfGoolOperandKind::DestinationReference);
