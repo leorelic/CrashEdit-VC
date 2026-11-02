@@ -444,6 +444,8 @@ void EditorUI::drawViewport(){
  canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  ImGui::InvisibleButton("ZoneViewportCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool canvasHovered=ImGui::IsItemHovered();
+ // Let the toolbar's later hit target take precedence over the full-canvas button.
+ ImGui::SetItemAllowOverlap();
  const bool canvasActive=ImGui::IsItemActive();
  // A compact in-canvas toolbar replaces the old right-click context menu.
  // Its hit area is excluded from camera gestures so toolbar clicks never pan
