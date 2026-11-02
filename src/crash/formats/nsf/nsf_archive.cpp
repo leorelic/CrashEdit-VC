@@ -1,4 +1,5 @@
 #include "crash/formats/nsf/nsf_archive.hpp"
+#include "crash/formats/gool/gool_opcodes.hpp"
 #include <algorithm>
 #include <fstream>
 #include <limits>
@@ -249,11 +250,23 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
    }else if(gool.format==0){
     if(entry.items.size()!=3){fail("GOOL format 0 must contain exactly 3 items.");continue;}
    }else{fail("Unsupported GOOL format value "+std::to_string(gool.format)+".");continue;}
+   for(std::size_t p=0;p<data.size;p+=4)gool.dataPool.push_back(i32(chunk.bytes,data.offset+p));
+   bool mipsMode=false;
    for(std::size_t p=0;p<code.size;p+=4){
     const std::uint32_t word=u32(chunk.bytes,code.offset+p);
-    gool.instructions.push_back({p,word,static_cast<std::uint8_t>(word>>24U),word&0x00ffffffU});
+    NsfGoolInstruction instruction;instruction.byteOffset=p;instruction.word=word;instruction.isMips=mipsMode;
+    if(mipsMode)decodeMipsInstruction(word,instruction.mnemonic,instruction.arguments,instruction.mipsKnown);
+    else{
+     instruction.opcode=static_cast<std::uint8_t>(word>>24U);instruction.operandBits=word&0x00FFFFFFU;
+     const auto&info=goolOpcodeInfo(version,instruction.opcode);instruction.mnemonic=std::string(info.mnemonic);
+     auto operands=decodeGoolOperands(version,instruction.opcode,instruction.operandBits);resolveGoolOperands(operands,gool);
+     instruction.arguments=formatGoolOperands(operands);
+    }
+    gool.instructions.push_back(std::move(instruction));
+    if(mipsMode){
+     if(gool.instructions.size()>=2U){const auto&previous=gool.instructions[gool.instructions.size()-2U];if(previous.isMips&&(previous.word==0x03E0A809U||previous.word==0x03E00008U))mipsMode=false;}
+    }else if(version==NsfGoolVersion::Version2||version==NsfGoolVersion::Version3)mipsMode=gool.instructions.back().opcode==73U;
    }
-   for(std::size_t p=0;p<data.size;p+=4)gool.dataPool.push_back(i32(chunk.bytes,data.offset+p));
    gool.decoded=true;entry.gool=std::move(gool);
   }
  }
