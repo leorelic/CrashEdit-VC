@@ -48,7 +48,7 @@ std::string goolObjectFieldName(std::uint32_t field) {
 
 }
 const NsfGoolOpcodeInfo& goolOpcodeInfo(NsfGoolVersion version,std::uint8_t opcode) noexcept {
- static const auto table=[] {std::array<NsfGoolOpcodeInfo,256> t{};for(std::size_t i=0;i<t.size();++i)t[i]=unknown(static_cast<std::uint8_t>(i));for(std::size_t i=0;i<t.size();++i)if(!names[i].empty())t[i]={static_cast<std::uint8_t>(i),names[i],i!=46&&!(i>=72&&i<=77)};return t;}();
+ static const auto table=[] {std::array<NsfGoolOpcodeInfo,256> t{};for(std::size_t i=0;i<t.size();++i)t[i]=unknown(static_cast<std::uint8_t>(i));for(std::size_t i=0;i<t.size();++i)if(!names[i].empty())t[i]={static_cast<std::uint8_t>(i),names[i],i!=46};return t;}();
  static const NsfGoolOpcodeInfo unsupported{0,"UNSUPPORTED",false};
  if(version!=NsfGoolVersion::Version2)return unsupported;return table[opcode];
 }
