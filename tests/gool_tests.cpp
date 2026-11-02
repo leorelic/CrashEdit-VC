@@ -98,6 +98,10 @@ int main(){
  assert(sourceRef[0].resolvedText=="immediate -256");
  sourceRef[0].rawValue=0xA80U; resolveGoolOperands(sourceRef,destinationContext);
  assert(sourceRef[0].resolvedText=="immediate -128");
+ sourceRef[0].rawValue=0xB05U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="stack[5]");
+ sourceRef[0].rawValue=0xB7FU; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="arg[0]");
  sourceRef[0].rawValue=0xBE0U; resolveGoolOperands(sourceRef,destinationContext);
  assert(sourceRef[0].resolvedText=="[null]");
  sourceRef[0].rawValue=0xBF0U; resolveGoolOperands(sourceRef,destinationContext);
