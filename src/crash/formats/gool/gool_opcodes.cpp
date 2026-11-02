@@ -108,8 +108,29 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
     }
    } else operand.resolvedText=(external?"external":"local")+std::string(" reference @")+std::to_string(offset)+" (pool unavailable)";
   } else {
-   if(operand.kind==NsfGoolOperandKind::DestinationReference) operand.resolvedText="special writable reference (raw 0x"+[] (std::uint32_t v){char b[16];std::snprintf(b,sizeof(b),"%03X",v);return std::string(b);}(raw)+")";
-   else operand.resolvedText="special reference (raw 0x"+[] (std::uint32_t v){char b[16];std::snprintf(b,sizeof(b),"%03X",v);return std::string(b);}(raw)+")";
+   if(operand.kind==NsfGoolOperandKind::DestinationReference) {
+    operand.resolvedText="special writable reference (raw 0x"+[] (std::uint32_t v){char b[16];std::snprintf(b,sizeof(b),"%03X",v);return std::string(b);}(raw)+")";
+   } else if((raw&0x400U)==0) {
+    if((raw&0x200U)==0) {
+     operand.resolvedText="immediate "+std::to_string(signExtend(raw&0x1FFU,9));
+    } else if((raw&0x100U)==0) {
+     operand.resolvedText="immediate "+std::to_string(signExtend(raw&0xFFU,8));
+    } else if(raw==0xBE0U) {
+     operand.resolvedText="[null]";
+    } else if(raw==0xBF0U) {
+     operand.resolvedText="[sp2]";
+    } else {
+     char text[64];std::snprintf(text,sizeof(text),"reserved special reference (raw 0x%03X)",raw);operand.resolvedText=text;
+    }
+   } else if((raw&0x200U)==0) {
+    const auto link=(raw>>6U)&0x7U;
+    const auto field=raw&0x3FU;
+    operand.resolvedText=goolObjectFieldName(link)+"->"+goolObjectFieldName(field);
+   } else if((raw&0x1FFU)==0x1FU) {
+    operand.resolvedText="[sp]";
+   } else {
+    operand.resolvedText=goolObjectFieldName(raw&0x1FFU);
+   }
   }
  }
 }
