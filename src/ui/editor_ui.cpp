@@ -384,7 +384,7 @@ void EditorUI::drawResourceActionDialog(){
     else if(resourceTargetKind_==1){const auto&e=chunk.entries[static_cast<std::size_t>(resourceTargetEntry_)];valid=e.valid;offset=e.offset;size=e.size;}
     else{const auto&e=chunk.entries[static_cast<std::size_t>(resourceTargetEntry_)];if(resourceTargetItem_<0||static_cast<std::size_t>(resourceTargetItem_)>=e.items.size())valid=false;else{const auto&item=e.items[static_cast<std::size_t>(resourceTargetItem_)];offset=item.offset;size=item.size;}}
     if(!valid||offset>chunk.bytes.size()||size>chunk.bytes.size()-offset){status_="Resource export/import failed: selected byte range is invalid.";resourceAction_=0;}
-    else if(resourceActionPath_[0]=='\\0')status_="Enter a file path first.";
+    else if(resourceActionPath_[0]=='\0')status_="Enter a file path first.";
     else if(!importing){
      std::ofstream out(std::filesystem::u8path(resourceActionPath_),std::ios::binary|std::ios::trunc);
      if(!out)status_="Could not create export file.";
