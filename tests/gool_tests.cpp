@@ -19,7 +19,7 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
  const std::size_t entry=24;
  const std::size_t count=extended?6:3;
  const std::size_t tableSize=16+(count+1)*4;
- const std::size_t sizesExtended[]={24,8,8,4,16,4};
+ const std::size_t sizesExtended[]={24,8,8,4,16,116};
  const std::size_t sizesBasic[]={24,8,8};
  std::size_t offsets[7]{};offsets[0]=tableSize;
  for(std::size_t i=0;i<count;++i)offsets[i+1]=offsets[i]+(extended?sizesExtended[i]:sizesBasic[i]);
@@ -35,7 +35,12 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
   const std::size_t map=entry+offsets[3];p16(b,map,0xffff);p16(b,map+2,3);
   const std::size_t desc=entry+offsets[4];p32(b,desc,0x01020304);p32(b,desc+4,0x05060708);
   p16(b,desc+8,9);p16(b,desc+10,10);p16(b,desc+12,11);p16(b,desc+14,12);
-  p32(b,entry+offsets[5],0xDEADBEEF);
+  const std::size_t fg=entry+offsets[5];
+  p16(b,fg,1);p16(b,fg+2,2);p32(b,fg+4,0x02001234);p32(b,fg+8,1);
+  p16(b,fg+12,2);p16(b,fg+14,1);p32(b,fg+16,0x02005678);
+  p16(b,fg+36,3);p16(b,fg+38,1);p32(b,fg+40,0x02009ABC);
+  p16(b,fg+64,4);p16(b,fg+66,1);p32(b,fg+68,0x0200DEF0);p32(b,fg+72,0x02001111);b[fg+76]='x';b[fg+77]=0;
+  p16(b,fg+80,5);p16(b,fg+82,1);p32(b,fg+84,0x02002222);p32(b,fg+88,1);
  }
  return b;
 }
@@ -174,7 +179,14 @@ int main(){
  assert(g.stateDescriptors.size()==1&&g.stateDescriptors[0].stateFlags==0x01020304);
  assert(g.stateDescriptors[0].blockFlags==0x05060708&&g.stateDescriptors[0].goolIndex==9);
  assert(g.stateDescriptors[0].eventHook==10&&g.stateDescriptors[0].transHook==11&&g.stateDescriptors[0].codeHook==12);
- assert(g.frameGroupBytes==4);
+ assert(g.frameGroupBytes==116);
+ assert(g.frameGroupsDecoded&&g.frameGroupError.empty()&&g.frameGroups.size()==5);
+ assert(g.frameGroups[0].type==1&&g.frameGroups[0].frameCount==2&&g.frameGroups[0].interpolated);
+ assert(g.frameGroups[0].eid==0x02001234U&&g.frameGroups[0].byteOffset==0&&g.frameGroups[0].byteSize==12);
+ assert(g.frameGroups[1].type==2&&g.frameGroups[1].byteSize==24);
+ assert(g.frameGroups[2].type==3&&g.frameGroups[2].byteSize==28);
+ assert(g.frameGroups[3].type==4&&g.frameGroups[3].font==0x02001111&&g.frameGroups[3].byteSize==16);
+ assert(g.frameGroups[4].type==5&&g.frameGroups[4].partCount==1&&g.frameGroups[4].byteSize==36);
 
  assert(archive.loadBytes(makeGoolChunk(false),error));
  archive.decodeGools(NsfGoolVersion::Version2);
