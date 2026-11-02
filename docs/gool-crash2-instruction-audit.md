@@ -21,7 +21,7 @@ The registry explicitly marks some opcodes as unidentified. Those entries are no
 
 Crash 2 opcode `0x11` (`SETF`) uses `DefaultFormatDS2`, i.e. **`{DDDDDDDDDDDD} [SSSSSSSSSSSS]`**. The destination is therefore a writable/destination reference, not an ordinary source reference. This is now explicitly covered by the C++ unit test.
 
-The same destination-reference form is used by the Crash 2 definitions for opcodes 18 (NOT), 20 (LEA), 23 (NOTL), 39 (ANIS), 43 (SIN), 44 (COS), 45 (ATAN), and 46 (unidentified), where the registry specifies that format.
+The same destination-reference form is used by the Crash 2 definitions for opcodes 18 (NOT), 20 (LEA), 23 (NOTL), 39 (ANIS), 43 (SIN), 44 (COS), and 46 (unidentified), where the registry specifies that format.
 
 ## Crash 2 opcode inventory
 
