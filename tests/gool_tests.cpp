@@ -92,6 +92,25 @@ int main(){
  assert(destination[0].resolvedText=="mem1");
  assert(formatGoolOperands(destination).find("-> mem1")!=std::string::npos);
 
+ // Source-reference special encodings follow GOOLInstruction.GetRefVal.
+ auto sourceRef=decodeGoolOperands(NsfGoolVersion::Version2,0,0U);
+ sourceRef[0].rawValue=0x900U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="immediate -256");
+ sourceRef[0].rawValue=0xA80U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="immediate -128");
+ sourceRef[0].rawValue=0xBE0U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="[null]");
+ sourceRef[0].rawValue=0xBF0U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="[sp2]");
+ sourceRef[0].rawValue=0xC08U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="self->x");
+ sourceRef[0].rawValue=0xC89U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="parent->y");
+ sourceRef[0].rawValue=0xE1FU; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="[sp]");
+ sourceRef[0].rawValue=0xE40U; resolveGoolOperands(sourceRef,destinationContext);
+ assert(sourceRef[0].resolvedText=="mem1");
+
  assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
  // CrashEdit's Crash 2 instruction definitions retain operand layouts even
  // for the explicitly unidentified opcodes 46, 72, and 74-77.
