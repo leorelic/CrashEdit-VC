@@ -29,6 +29,7 @@ A mature release should be easy to recommend because people can open it, underst
 - [x] C++20 / CMake project foundation.
 - [x] Dear ImGui docking workspace and portable OpenGL viewport foundation.
 - [x] Dockable workspace panels, including resource hierarchy, properties, console, and asset browser.
+- [x] 3D viewport options toolbar with working hit-testing and popup controls for renderer mode, depth buffer, diagnostics, and camera speed; left-drag orbit and right-click-and-hold navigation remain independent. This is a reusable foundation for future viewport tools and controls.
 - [x] Cross-platform Windows, Linux, and macOS CI build configuration.
 - [x] NSF file loading foundation and initial physical chunk reader/tests.
 - [x] NSF drag-and-drop into the application, including UTF-8 path handling.
