@@ -10,6 +10,53 @@ static bool has(const std::vector<std::uint8_t>&d,std::size_t p,std::size_t n){r
 static void checksum(std::vector<std::uint8_t>&d){std::uint32_t c=0x12345678;for(std::size_t i=0;i<NsfChunkSize;++i){if(i<12||i>=16)c+=d[i];c=(c<<3)|(c>>29);}for(int i=0;i<4;++i)d[12+i]=std::uint8_t(c>>(8*i));}
 
 static std::size_t align4(std::size_t n){return (n+3U)&~std::size_t(3U);}
+static bool parseGoolFrameGroups(const std::vector<std::uint8_t>&bytes,const NsfItem&item,NsfGool&gool){
+ const std::size_t end=item.offset+item.size;
+ if(!has(bytes,item.offset,item.size)){gool.frameGroupError="Frame-group item exceeds its chunk.";return false;}
+ std::size_t p=item.offset;
+ while(p<end){
+  if(end-p<4U){gool.frameGroupError="Truncated frame-group header.";return false;}
+  const auto type=u16(bytes,p);
+  const auto count=static_cast<std::int16_t>(u16(bytes,p+2));
+  if(count<0){gool.frameGroupError="Negative frame count in frame group.";return false;}
+  NsfGoolFrameGroup group;group.type=type;group.frameCount=count;group.byteOffset=p-item.offset;
+  std::size_t size=0;
+  if(type==1U){
+   if(end-p<12U){gool.frameGroupError="Truncated Crash 2 vertex-group header.";return false;}
+   group.eid=u32(bytes,p+4);group.interpolated=u32(bytes,p+8)!=0;size=12U;
+  }else if(type==2U||type==3U){
+   if(end-p<8U){gool.frameGroupError="Truncated sprite/font-group header.";return false;}
+   group.eid=u32(bytes,p+4);const std::size_t stride=type==2U?16U:20U;
+   if(static_cast<std::size_t>(count)>(end-p-8U)/stride){gool.frameGroupError="Sprite/font frame records exceed the frame-group item.";return false;}
+   size=8U+static_cast<std::size_t>(count)*stride;
+  }else if(type==4U){
+   if(end-p<12U){gool.frameGroupError="Truncated text-group header.";return false;}
+   group.eid=u32(bytes,p+4);group.font=static_cast<std::int32_t>(u32(bytes,p+8));
+   std::size_t q=p+12U;
+   for(std::int16_t i=0;i<count;++i){
+    const auto zero=std::find(bytes.begin()+static_cast<std::ptrdiff_t>(q),bytes.begin()+static_cast<std::ptrdiff_t>(end),std::uint8_t{0});
+    if(zero==bytes.begin()+static_cast<std::ptrdiff_t>(end)){gool.frameGroupError="Unterminated text string in text frame group.";return false;}
+    q=static_cast<std::size_t>(zero-bytes.begin())+1U;
+   }
+   size=((q-item.offset+3U)&~std::size_t(3U))-(p-item.offset);
+   if(size>end-p){gool.frameGroupError="Text-group alignment exceeds the frame-group item.";return false;}
+  }else if(type==5U){
+   if(end-p<12U){gool.frameGroupError="Truncated image-group header.";return false;}
+   group.eid=u32(bytes,p+4);group.partCount=u32(bytes,p+8);
+   const std::size_t available=end-p-12U;
+   if(group.partCount!=0U&&static_cast<std::size_t>(count)>available/(24U*static_cast<std::size_t>(group.partCount))){gool.frameGroupError="Image-group frame records exceed the frame-group item.";return false;}
+   const std::size_t records=static_cast<std::size_t>(count)*static_cast<std::size_t>(group.partCount);
+   if(records>available/24U){gool.frameGroupError="Image-group part records exceed the frame-group item.";return false;}
+   size=12U+records*24U;
+  }else{
+   char message[128];std::snprintf(message,sizeof(message),"Unknown frame-group type %u at item offset 0x%zX.",static_cast<unsigned>(type),p-item.offset);
+   gool.frameGroupError=message;return false;
+  }
+  if(size==0U||size>end-p){gool.frameGroupError="Invalid frame-group record size.";return false;}
+  group.byteSize=size;gool.frameGroups.push_back(group);p+=size;
+ }
+ gool.frameGroupsDecoded=true;return true;
+}
 static bool parseScenery(const std::vector<std::uint8_t>&bytes,const NsfEntry&entry,bool crash3,NsfScenery&out){
  out.isCrash3=crash3;
  auto fail=[&](const char*message){out.error=message;return false;};
@@ -198,7 +245,7 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
      const std::size_t q=descriptors.offset+p;
      gool.stateDescriptors.push_back({i32(chunk.bytes,q),i32(chunk.bytes,q+4),static_cast<std::int16_t>(u16(chunk.bytes,q+8)),static_cast<std::int16_t>(u16(chunk.bytes,q+10)),static_cast<std::int16_t>(u16(chunk.bytes,q+12)),static_cast<std::int16_t>(u16(chunk.bytes,q+14))});
     }
-    if(entry.items.size()==6)gool.frameGroupBytes=entry.items[5].size;
+    if(entry.items.size()==6){gool.frameGroupBytes=entry.items[5].size;parseGoolFrameGroups(chunk.bytes,entry.items[5],gool);}
    }else if(gool.format==0){
     if(entry.items.size()!=3){fail("GOOL format 0 must contain exactly 3 items.");continue;}
    }else{fail("Unsupported GOOL format value "+std::to_string(gool.format)+".");continue;}
