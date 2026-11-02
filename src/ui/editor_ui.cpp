@@ -324,7 +324,8 @@ void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
    if(kind==1)selectedItem_=-1;
    resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
   }
-  if(ImGui::BeginPopupContextItem("HierarchyResourceContext")){
+  char popupId[96];std::snprintf(popupId,sizeof(popupId),"HierarchyResourceContext_%d_%d_%d_%d",kind,chunkIndex,entryIndex,itemIndex);
+  if(ImGui::BeginPopupContextItem(popupId)){
    ImGui::TextUnformatted(title);ImGui::Separator();
    if(ImGui::MenuItem("Export raw bytes...")){
     resourceAction_=1;resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
