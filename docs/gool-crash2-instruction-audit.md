@@ -25,6 +25,18 @@ The same destination-reference form is used by the Crash 2 definitions for opcod
 
 The reference implementation decodes `{D}` differently from `[S]`: destination values with bit `0x400` clear are signed 7-bit stack/argument indices; with bit `0x400` set, they address an object field, a linked object's field, or the special stack pointer field. The C++ resolver now follows that split and displays the resolved destination alongside its raw 12-bit value. It does not route a destination reference through the data-pool resolver.
 
+## Source-reference special encodings
+
+The source resolver also needs to preserve the distinctions in the original `GOOLInstruction.GetRefVal` implementation. When bit `0x800` is set, the value is not a pool offset:
+
+- With `0x400` clear and `0x200` clear, the low 9 bits are a signed immediate.
+- With `0x400` clear, `0x200` set, and `0x100` clear, the low 8 bits are a signed immediate.
+- The exact values `0xBE0` and `0xBF0` are the null and secondary stack-pointer markers.
+- With `0x400` set and `0x200` clear, the reference names a linked object's field. The original formatter displays the link explicitly, including `self->field` for link zero.
+- With `0x400` and `0x200` set, `0x1F` in the low 9 bits is `[sp]`; other values identify object fields.
+
+The C++ resolver now formats these cases instead of collapsing all of them into an opaque raw special-reference label. Unit tests cover both signed-immediate widths, the two exact markers, self/parent links, `[sp]`, and a memory field.
+
 ## Crash 2 opcode inventory
 
 | Opcode range / value | Registry name(s) | Audit status |
