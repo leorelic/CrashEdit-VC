@@ -182,7 +182,7 @@ int main(){
  assert(g.instructions[1].isMips&&g.instructions[1].mipsKnown&&g.instructions[1].mnemonic=="addu"&&g.instructions[1].arguments=="$t0,$t1,$t2");
  assert(g.instructions[2].isMips&&g.instructions[2].mnemonic=="jr"&&g.instructions[2].arguments=="$ra");
  assert(g.instructions[3].isMips&&g.instructions[3].mnemonic=="nop");
- assert(!g.instructions[4].isMips&&g.instructions[4].opcode==0x12&&g.instructions[4].mnemonic=="ORL");
+ assert(!g.instructions[4].isMips&&g.instructions[4].opcode==0x12&&g.instructions[4].mnemonic=="NOT");
  assert(g.dataPool.size()==2&&static_cast<std::uint32_t>(g.dataPool[1])==0x33334444U);
  assert(g.stateMap.size()==2&&g.stateMap[0]==-1&&g.stateMap[1]==3);
  assert(g.stateDescriptors.size()==1&&g.stateDescriptors[0].stateFlags==0x01020304);
