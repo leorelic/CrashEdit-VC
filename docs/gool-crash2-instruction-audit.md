@@ -64,6 +64,30 @@ The C++ resolver now formats these cases instead of collapsing all of them into 
 
 The registry's final named entry is opcode 78 (0x4E, ARRS); opcode 73 (0x49) is MIPS. The five opcodes 72 and 74-77 are explicitly registered as unidentified and use the generic A/B reference format. Opcode 46 is also explicitly unidentified, with the D/S format. These are shown as unknown in the UI while retaining their operand structure.
 
+## Entry-loader comparison and current parser boundary
+
+The original `GOOLEntryLoader.LoadGOOL` confirms the item order used by the C++ parser:
+
+1. 24-byte header
+2. instruction words
+3. 32-bit data-pool words
+4. optional 16-bit state map
+5. optional 16-byte state descriptors
+6. optional frame-group stream
+
+The original `GOOLEntry` constructor decodes the instruction stream from item 2 in that list's one-based wording (array index 1), not from the temporary integer array built from item index 2 in the loader. That temporary array is not passed to the constructor; the C++ parser correctly reads instructions from item index 1 and data from item index 2.
+
+The C++ parser currently validates and decodes the header, instruction words, data pool, state map, and state descriptors. It validates the frame-group item's bounds but currently records only its byte length. This is an explicit coverage gap, not a fully decoded frame-group implementation. For Crash 2, the reference loader dispatches frame-group records by a 16-bit type:
+- type 1: 12-byte vertex-group header (`type`, frame count, EID, interpolation flag)
+- type 2: 8-byte header followed by 16 bytes per sprite frame
+- type 3: 8-byte header followed by 20 bytes per font frame
+- type 4: text-group record (still to be audited)
+- type 5: 12-byte header followed by `frameCount * partCount` records of 24 bytes each
+
+The source loader also supports a Crash 3-to-Crash 2 compatibility path for type 1 vertex groups; that variant consumes 20 bytes rather than the standard 12-byte record. Its selection depends on a user setting and heuristics over the following fields, so it should not be silently assumed for every Crash 2 entry.
+
+The reference loader accepts entry item counts of 3, 5, or 6 before interpreting the optional items. The C++ parser additionally checks the header's `format` field and currently requires the canonical 3-item layout for format 0 and 5/6-item layout for format 1. Keep this stricter behavior documented until representative files establish whether noncanonical combinations occur in Crash 2.
+
 ## Decoder guardrails
 
 1. Keep the raw 32-bit word and raw 24-bit operand payload authoritative.
