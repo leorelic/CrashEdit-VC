@@ -18,6 +18,7 @@
 #include <chrono>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <tuple>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -211,6 +212,7 @@ void EditorUI::draw(){
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  ImGui::End();
  drawSearchWindow();
+ drawResourceActionDialog();
  if(!restoredLastNsfPath_){
   if(path_[0]=='\0'&&!editorPreferences.lastNsfPath.empty())
    std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
@@ -313,8 +315,100 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}
  ImGui::EndMenuBar();
 }
-void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);ImGui::Button("Import");ImGui::SameLine();ImGui::Button("Export");ImGui::EndDisabled();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
-void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");if(ImGui::Button("Open NSF...")){openDialog_=true;centerOpenDialog_=true;}ImGui::Separator();ImGui::BeginChild("HierarchyScrollRegion",ImVec2(0,0),false,ImGuiWindowFlags_HorizontalScrollbar);if(nsfValid_){char nsdLabel[96];std::snprintf(nsdLabel,sizeof(nsdLabel),"NSD - Level ID : %02X",static_cast<unsigned>(nsd_.id)&0xFFU);if(nsdValid_){if(ImGui::Selectable(nsdLabel,selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;spawnPointsEditor_=true;}}else ImGui::TextDisabled("NSD - Level Details (unavailable)");if(openSelectedHierarchy_)ImGui::SetNextItemOpen(true,ImGuiCond_Always);if(ImGui::TreeNode("NSF - Resources##nsf")){if(ImGui::IsItemClicked()){selectedChunk_=-1;selectedEntry_=-1;selectedEntity_=-1;selectedSpawn_=-1;}for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %s | %s",i,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | %s",i,chunkTypeName(c.type));}if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconName(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedSpawn_=-1;}if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid&&e.type==11)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | GOOL | %s",j,Crash::eidToEName(e.eid).c_str());else if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconName(e.type));if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetScrollHereY(0.5f);if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=-1;selectedSpawn_=-1;if(e.valid&&((e.type==7&&e.zone.decoded)||(e.type==3&&e.scenery.decoded))){viewerChunk_=static_cast<int>(i);viewerEntry_=static_cast<int>(j);}}if(entryOpen){if(e.type==11){if(e.gool.decoded)ImGui::BulletText("GOOL | %zu instructions | %zu data words",e.gool.instructions.size(),e.gool.dataPool.size());else ImGui::TextDisabled("GOOL not decoded: %s",e.gool.error.c_str());}else if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));{ImGui::PushID(static_cast<int>(k));const bool entitySelected=selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k);if(hierarchyIconRow(entLabel,entitySelected,"Arrow")){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}ImGui::PopID();}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k){char itemLabel[96];std::snprintf(itemLabel,sizeof(itemLabel),"Item %zu | %zu bytes",k,e.items[k].size);ImGui::PushID(static_cast<int>(k));hierarchyIconRow(itemLabel,false,"Arrow");ImGui::PopID();}}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);openSelectedHierarchy_=false;ImGui::EndChild();ImGui::End();}
+void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
+void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
+ auto drawResourceContext=[&](int kind,int chunkIndex,int entryIndex,int itemIndex,const char* title){
+  if(ImGui::IsItemClicked(ImGuiMouseButton_Right)){
+   selectedChunk_=chunkIndex;selectedEntry_=entryIndex;selectedItem_=itemIndex;selectedEntity_=-1;selectedSpawn_=-1;
+   if(kind==0){selectedEntry_=-1;selectedItem_=-1;}
+   if(kind==1)selectedItem_=-1;
+   resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
+  }
+  if(ImGui::BeginPopupContextItem("HierarchyResourceContext")){
+   ImGui::TextUnformatted(title);ImGui::Separator();
+   if(ImGui::MenuItem("Export raw bytes...")){
+    resourceAction_=1;resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
+    const std::string name=kind==0?"chunk_"+std::to_string(chunkIndex)+".bin":kind==1?"entry_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+".bin":"item_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+"_"+std::to_string(itemIndex)+".bin";
+    std::snprintf(resourceActionPath_,sizeof(resourceActionPath_),"%s",name.c_str());
+   }
+   if(ImGui::MenuItem("Import / replace raw bytes...")){
+    resourceAction_=2;resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
+    const std::string name=kind==0?"chunk_"+std::to_string(chunkIndex)+".bin":kind==1?"entry_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+".bin":"item_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+"_"+std::to_string(itemIndex)+".bin";
+    std::snprintf(resourceActionPath_,sizeof(resourceActionPath_),"%s",name.c_str());
+   }
+   ImGui::EndPopup();
+  }
+ };
+if(ImGui::Button("Open NSF...")){openDialog_=true;centerOpenDialog_=true;}ImGui::Separator();ImGui::BeginChild("HierarchyScrollRegion",ImVec2(0,0),false,ImGuiWindowFlags_HorizontalScrollbar);if(nsfValid_){char nsdLabel[96];std::snprintf(nsdLabel,sizeof(nsdLabel),"NSD - Level ID : %02X",static_cast<unsigned>(nsd_.id)&0xFFU);if(nsdValid_){if(ImGui::Selectable(nsdLabel,selectedChunk_==-2,ImGuiSelectableFlags_SpanAvailWidth)){selectedChunk_=-2;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;spawnPointsEditor_=true;}}else ImGui::TextDisabled("NSD - Level Details (unavailable)");if(openSelectedHierarchy_)ImGui::SetNextItemOpen(true,ImGuiCond_Always);if(ImGui::TreeNode("NSF - Resources##nsf")){if(ImGui::IsItemClicked()){selectedChunk_=-1;selectedEntry_=-1;selectedEntity_=-1;selectedSpawn_=-1;}for(std::size_t i=0;i<nsf_.chunks().size();++i){const auto&c=nsf_.chunks()[i];char label[192];if(c.type==1){const auto textureEid=static_cast<std::uint32_t>(c.chunkId);const auto textureName=Crash::eidToEName(textureEid);std::snprintf(label,sizeof(label),"Chunk %03zu | EID %s | %s",i,textureName.c_str(),chunkTypeName(c.type));}else{std::snprintf(label,sizeof(label),"Chunk %03zu | %s",i,chunkTypeName(c.type));}if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool opened=treeNodeWithIcon(label,ImGuiTreeNodeFlags_SpanAvailWidth,chunkIconName(c.type));if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=-1;selectedItem_=-1;selectedSpawn_=-1;}drawResourceContext(0,static_cast<int>(i),-1,-1,"Chunk");if(opened){if(c.type==0){if(!c.entryTableValid)ImGui::TextDisabled("%s",c.entryTableError.empty()?"Entry table unavailable":c.entryTableError.c_str());else for(std::size_t j=0;j<c.entries.size();++j){const auto&e=c.entries[j];char entryLabel[192];if(e.valid&&e.type==11)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | GOOL | %s",j,Crash::eidToEName(e.eid).c_str());else if(e.valid)std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | %s | Type %u | Items %u",j,Crash::eidToEName(e.eid).c_str(),e.type,e.itemCount);else std::snprintf(entryLabel,sizeof(entryLabel),"Entry %03zu | Invalid",j);if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetNextItemOpen(true,ImGuiCond_Always);bool entryOpen=treeNodeWithIcon(entryLabel,ImGuiTreeNodeFlags_SpanAvailWidth,entryIconName(e.type));if(openSelectedHierarchy_&&selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j))ImGui::SetScrollHereY(0.5f);if(ImGui::IsItemClicked()){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedItem_=-1;selectedEntity_=-1;selectedSpawn_=-1;if(e.valid&&((e.type==7&&e.zone.decoded)||(e.type==3&&e.scenery.decoded))){viewerChunk_=static_cast<int>(i);viewerEntry_=static_cast<int>(j);}}drawResourceContext(1,static_cast<int>(i),static_cast<int>(j),-1,e.type==11?"GOOL Entry":"Entry");if(entryOpen){if(e.type==11){if(e.gool.decoded)ImGui::BulletText("GOOL | %zu instructions | %zu data words",e.gool.instructions.size(),e.gool.dataPool.size());else ImGui::TextDisabled("GOOL not decoded: %s",e.gool.error.c_str());}else if(e.type==7){if(e.zone.decoded){ImGui::BulletText("Zone Header | %d entities | %d cameras",e.zone.entityCount,e.zone.cameraCount);ImGui::BulletText("Layout | %d x %d x %d",e.zone.width,e.zone.height,e.zone.depth);for(std::size_t k=0;k<e.zone.entities.size();++k){const auto&ent=e.zone.entities[k];const bool camera=k<static_cast<std::size_t>(e.zone.cameraCount);char entLabel[128];if(camera){const int cameraIndex=static_cast<int>(k/3);const int cameraSubIndex=static_cast<int>(k%3);std::snprintf(entLabel,sizeof(entLabel),"Camera [%d]-%d",cameraIndex,cameraSubIndex);}else if(!ent.name.empty()&&ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)std::snprintf(entLabel,sizeof(entLabel),"Entity [ID %d]",ent.id);else std::snprintf(entLabel,sizeof(entLabel),"Entity %03zu",k-static_cast<std::size_t>(e.zone.cameraCount));{ImGui::PushID(static_cast<int>(k));const bool entitySelected=selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedEntity_==static_cast<int>(k);if(hierarchyIconRow(entLabel,entitySelected,"Arrow")){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedEntity_=static_cast<int>(k);selectedSpawn_=-1;}ImGui::PopID();}}}else ImGui::TextDisabled("Zone not decoded: %s",e.zone.error.c_str());}else{for(std::size_t k=0;k<e.items.size();++k){char itemLabel[96];std::snprintf(itemLabel,sizeof(itemLabel),"Item %zu | %zu bytes",k,e.items[k].size);ImGui::PushID(static_cast<int>(k));const bool itemSelected=selectedChunk_==static_cast<int>(i)&&selectedEntry_==static_cast<int>(j)&&selectedItem_==static_cast<int>(k);if(hierarchyIconRow(itemLabel,itemSelected,"Arrow")){selectedChunk_=static_cast<int>(i);selectedEntry_=static_cast<int>(j);selectedItem_=static_cast<int>(k);selectedEntity_=-1;selectedSpawn_=-1;}drawResourceContext(2,static_cast<int>(i),static_cast<int>(j),static_cast<int>(k),"Entry Item");ImGui::PopID();}}ImGui::TreePop();}}}ImGui::TreePop();}}ImGui::TreePop();}}else if(!workspace_.isOpen())ImGui::TextDisabled("No NSF archive loaded.");else for(const auto&n:workspace_.resources())drawNode(n);openSelectedHierarchy_=false;ImGui::EndChild();ImGui::End();}
+void EditorUI::drawResourceActionDialog(){
+ if(resourceAction_==0)return;
+ const bool importing=resourceAction_==2;
+ const char* title=importing?"Import / Replace Resource":"Export Resource";
+ const ImGuiWindowFlags flags=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings;
+ ImGui::OpenPopup(title);
+ if(ImGui::BeginPopupModal(title,nullptr,flags)){
+  ImGui::TextWrapped(importing?"The replacement must have exactly the same byte length as the selected resource.":"Exports the selected resource's original bytes without decoding or rebuilding it.");
+  ImGui::SetNextItemWidth(420.0f);ImGui::InputText("File path",resourceActionPath_,sizeof(resourceActionPath_));
+  ImGui::SameLine();
+  if(ImGui::Button("Browse...")){
+#ifdef _WIN32
+   char selected[MAX_PATH]{};OPENFILENAMEA ofn{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;
+   ofn.lpstrFilter="Binary files (*.bin)\0*.bin\0All files (*.*)\0*.*\0";ofn.Flags=OFN_PATHMUSTEXIST|OFN_EXPLORER|(importing?OFN_FILEMUSTEXIST:0);
+   const BOOL ok=importing?GetOpenFileNameA(&ofn):GetSaveFileNameA(&ofn);
+   if(ok)std::snprintf(resourceActionPath_,sizeof(resourceActionPath_),"%s",selected);
+#else
+   status_="Enter the file path manually; native file browsing is not yet available on this platform.";
+#endif
+  }
+  if(ImGui::Button(importing?"Replace":"Export")){
+   const auto&chunks=nsf_.chunks();
+   if(resourceTargetChunk_<0||static_cast<std::size_t>(resourceTargetChunk_)>=chunks.size()){status_="Resource export/import failed: chunk selection is no longer valid.";resourceAction_=0;}
+   else{
+    const auto&chunk=chunks[static_cast<std::size_t>(resourceTargetChunk_)];
+    std::size_t offset=0,size=0;bool valid=true;
+    if(resourceTargetKind_==0){size=chunk.bytes.size();}
+    else if(resourceTargetEntry_<0||static_cast<std::size_t>(resourceTargetEntry_)>=chunk.entries.size()){valid=false;}
+    else if(resourceTargetKind_==1){const auto&e=chunk.entries[static_cast<std::size_t>(resourceTargetEntry_)];valid=e.valid;offset=e.offset;size=e.size;}
+    else{const auto&e=chunk.entries[static_cast<std::size_t>(resourceTargetEntry_)];if(resourceTargetItem_<0||static_cast<std::size_t>(resourceTargetItem_)>=e.items.size())valid=false;else{const auto&item=e.items[static_cast<std::size_t>(resourceTargetItem_)];offset=item.offset;size=item.size;}}
+    if(!valid||offset>chunk.bytes.size()||size>chunk.bytes.size()-offset){status_="Resource export/import failed: selected byte range is invalid.";resourceAction_=0;}
+    else if(resourceActionPath_[0]=='\\0')status_="Enter a file path first.";
+    else if(!importing){
+     std::ofstream out(std::filesystem::u8path(resourceActionPath_),std::ios::binary|std::ios::trunc);
+     if(!out)status_="Could not create export file.";
+     else{out.write(reinterpret_cast<const char*>(chunk.bytes.data()+offset),static_cast<std::streamsize>(size));if(!out)status_="Failed writing export file.";else status_="Exported "+std::to_string(size)+" raw bytes to "+resourceActionPath_;}
+     if(out)resourceAction_=0;
+    }else{
+     std::ifstream in(std::filesystem::u8path(resourceActionPath_),std::ios::binary|std::ios::ate);
+     if(!in)status_="Could not open import file.";
+     else{
+      const auto end=in.tellg();
+      if(end<0||static_cast<std::uintmax_t>(end)!=size)status_="Import rejected: replacement size must exactly match the selected resource ("+std::to_string(size)+" bytes).";
+      else{
+       std::vector<std::uint8_t> replacement(size);in.seekg(0);
+       if(size&&!in.read(reinterpret_cast<char*>(replacement.data()),static_cast<std::streamsize>(size)))status_="Could not read the complete import file.";
+       else{
+        std::vector<std::uint8_t> archiveBytes;std::string error;
+        if(!nsf_.saveUncompressedBytes(archiveBytes,error))status_="Import failed while preparing NSF: "+error;
+        else{
+         const std::size_t absolute=static_cast<std::size_t>(resourceTargetChunk_)*Crash::NsfChunkSize+offset;
+         if(absolute>archiveBytes.size()||size>archiveBytes.size()-absolute)status_="Import rejected: target range is outside the serialized archive.";
+         else{
+          std::copy(replacement.begin(),replacement.end(),archiveBytes.begin()+static_cast<std::ptrdiff_t>(absolute));
+          if(!nsf_.loadBytes(archiveBytes,error))status_="Import failed while reparsing NSF: "+error;
+          else{if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3BetaMAY14||gameVersion_==GameVersion::Crash3)nsf_.decodeZones(gameVersion_==GameVersion::Crash3);nsf_.decodeGools(nsfGoolVersion(gameVersion_));status_="Replaced resource bytes successfully. Review the entry before saving.";}
+         }
+        }
+       }
+      }
+      if(status_.find("Import rejected")!=0&&status_.find("Import failed")!=0)resourceAction_=0;
+     }
+    }
+   }
+  }
+  ImGui::SameLine();if(ImGui::Button("Cancel"))resourceAction_=0;
+  ImGui::EndPopup();
+ }
+}
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;centerOpenDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
