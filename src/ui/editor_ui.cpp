@@ -444,8 +444,6 @@ void EditorUI::drawViewport(){
  canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  ImGui::InvisibleButton("ZoneViewportCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool canvasHovered=ImGui::IsItemHovered();
- // Let the toolbar's later hit target take precedence over the full-canvas button.
- ImGui::SetItemAllowOverlap();
  const bool canvasActive=ImGui::IsItemActive();
  // A compact in-canvas toolbar replaces the old right-click context menu.
  // Its hit area is excluded from camera gestures so toolbar clicks never pan
@@ -454,6 +452,7 @@ void EditorUI::drawViewport(){
  ImGui::SetCursorScreenPos(toolbarMin);
  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6.0f,4.0f));
  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,3.0f);
+ ImGui::SetNextItemAllowOverlap();
  const bool toolbarButton=ImGui::InvisibleButton("##ViewportToolbarMenu",ImVec2(28.0f,26.0f));
  const ImVec2 toolbarMax=ImGui::GetItemRectMax();
  const bool toolbarHovered=ImGui::IsItemHovered();
