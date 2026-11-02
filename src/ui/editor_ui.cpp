@@ -455,10 +455,6 @@ void EditorUI::drawViewport(){
  const bool toolbarButton=ImGui::InvisibleButton("##ViewportToolbarMenu",ImVec2(28.0f,26.0f));
  const ImVec2 toolbarMax=ImGui::GetItemRectMax();
  const bool toolbarHovered=ImGui::IsItemHovered();
- ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
- const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
- const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
- for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
  if(toolbarHovered)ImGui::SetTooltip("Viewport settings");
  if(toolbarButton)ImGui::OpenPopup("ViewportOptions");
  if(ImGui::BeginPopup("ViewportOptions")){
@@ -479,6 +475,11 @@ void EditorUI::drawViewport(){
  ImDrawList*dl=ImGui::GetWindowDrawList();
  const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(20,25,33,255));
+ ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
+ toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
+ const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
+ const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
  // All projected geometry, markers, and labels must stay inside this panel.
  dl->PushClipRect(canvasMin,canvasMax,true);
  const Crash::NsfZone*zone=nullptr;const Crash::NsfEntry*zoneEntry=nullptr;
