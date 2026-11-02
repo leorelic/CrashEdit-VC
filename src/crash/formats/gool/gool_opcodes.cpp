@@ -21,12 +21,12 @@ constexpr std::array<std::string_view,256> formats=[] {
  f[17]=ds;f[18]=ds;f[19]=lr;f[20]=ds;f[21]=lr;f[22]=ab;f[23]=ds;
  f[24]="IIIIIIIIIIIIII E 000 (RRRRRR)";f[25]=ds;f[26]="BBBBBBBBBBBB PP SS DDDD T 000";f[27]=ab;
  f[28]="[XXXXXXXXXXXX] (LLL) SSSSS PPPP";f[29]=ab;f[30]=lr;f[31]="[IIIIIIIIIIII] 000001111101";f[32]="[IIIIIIIIIIII] [SSSSSSSSSSSS]";
- f[33]=lr;f[34]=lr;f[35]="000001111101 LLL IIIIII 000";f[36]="[CCCCCCCCCCCC] LLL IIIIII 000";f[37]=lr;f[38]=ab;f[39]=ds;f[40]=ab;f[41]=ab;f[42]=lr;f[43]=ds;f[44]=ds;f[45]=ab;
+ f[33]=lr;f[34]=lr;f[35]="000001111101 LLL IIIIII 000";f[36]="[CCCCCCCCCCCC] LLL IIIIII 000";f[37]=lr;f[38]=ab;f[39]=ds;f[40]=ab;f[41]=ab;f[42]=lr;f[43]=ds;f[44]=ds;f[45]=ab;f[46]=ds;
  f[47]="101111100000101111100000";f[48]=ab;f[49]="0000000000 0000 100110 00 01";
  f[50]="<IIIIIIIIII> VVVV (RRRRRR) 00 00";f[51]="<IIIIIIIIII> VVVV (RRRRRR) 10 00";f[52]="<IIIIIIIIII> VVVV (RRRRRR) 01 00";
  f[53]="SSSSSSSSSS VVVV (RRRRRR) 00 10";f[54]="SSSSSSSSSS VVVV (RRRRRR) 10 10";f[55]="SSSSSSSSSS VVVV (RRRRRR) 01 10";
  f[56]="FFFFFFF SSSSSSSSS TTTTTT HH";f[57]="[FFFFFFFFFFFF] 0000 TTTTTT HH";f[58]="[VVVVVVVVVVVV] AAA BBB TTT (LLL)";f[59]="IIIIIIIIIIIIII E 00000 VVVV";
- f[60]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[61]="IIIIIIIIII VVVV (RRRRRR) CC TT";f[62]=f[61];f[63]="CCCCCC SSSSSS TTTTTTTT AAAA";f[64]="[EEEEEEEEEEEE] [TTTTTTTTTTTT]";f[65]=ab;f[66]="[SSSSSSSSSSSS] (RRRRRR) FF TTTT";f[67]="[VVVVVVVVVVVV] AAA BBB TTT (LLL)";f[68]="[EEEEEEEEEEEE] (RRRRRR) AAA LLL";f[69]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[70]=f[63];f[71]=ab;f[73]="101111100000101111100000";f[78]=lr;
+ f[60]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[61]="IIIIIIIIII VVVV (RRRRRR) CC TT";f[62]=f[61];f[63]="CCCCCC SSSSSS TTTTTTTT AAAA";f[64]="[EEEEEEEEEEEE] [TTTTTTTTTTTT]";f[65]=ab;f[66]="[SSSSSSSSSSSS] (RRRRRR) FF TTTT";f[67]="[VVVVVVVVVVVV] AAA BBB TTT (LLL)";f[68]="[EEEEEEEEEEEE] (RRRRRR) AAA LLL";f[69]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[70]=f[63];f[71]=ab;f[73]="101111100000101111100000";for(int i=72;i<=77;++i)f[static_cast<std::size_t>(i)]=ab;f[78]=lr;
  return f;
 }();
 std::int32_t signExtend(std::uint32_t v,unsigned bits){if(bits==0||bits>=32)return static_cast<std::int32_t>(v);const std::uint32_t mask=1U<<(bits-1U);return static_cast<std::int32_t>((v^mask)-mask);}
