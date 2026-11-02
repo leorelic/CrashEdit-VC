@@ -317,6 +317,17 @@ void EditorUI::drawMenu(){
 }
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
 void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
+ auto resourceDefaultFilename=[&](int kind,int chunkIndex,int entryIndex,int itemIndex){
+  std::string name=kind==0?"chunk_"+std::to_string(chunkIndex):kind==1?"entry_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex):"item_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+"_"+std::to_string(itemIndex);
+  if(kind!=0&&chunkIndex>=0&&static_cast<std::size_t>(chunkIndex)<nsf_.chunks().size()){
+   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(chunkIndex)];
+   if(entryIndex>=0&&static_cast<std::size_t>(entryIndex)<chunk.entries.size()){
+    const auto eid=chunk.entries[static_cast<std::size_t>(entryIndex)].eid;
+    name+="_"+(Crash::isValidEid(eid)?Crash::eidToEName(eid):std::string("UnknownEID"));
+   }
+  }
+  return name+".bin";
+ };
  auto drawResourceContext=[&](int kind,int chunkIndex,int entryIndex,int itemIndex,const char* title){
   if(ImGui::IsItemClicked(ImGuiMouseButton_Right)){
    selectedChunk_=chunkIndex;selectedEntry_=entryIndex;selectedItem_=itemIndex;selectedEntity_=-1;selectedSpawn_=-1;
@@ -329,7 +340,7 @@ void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
    ImGui::TextUnformatted(title);ImGui::Separator();
    if(ImGui::MenuItem("Export raw bytes...")){
     resourceAction_=1;resourceTargetKind_=kind;resourceTargetChunk_=chunkIndex;resourceTargetEntry_=entryIndex;resourceTargetItem_=itemIndex;
-    const std::string name=kind==0?"chunk_"+std::to_string(chunkIndex)+".bin":kind==1?"entry_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+".bin":"item_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+"_"+std::to_string(itemIndex)+".bin";
+    const std::string name=resourceDefaultFilename(kind,chunkIndex,entryIndex,itemIndex);
     std::snprintf(resourceActionPath_,sizeof(resourceActionPath_),"%s",name.c_str());
    }
    if(ImGui::MenuItem("Import / replace raw bytes...")){
