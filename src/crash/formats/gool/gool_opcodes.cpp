@@ -166,10 +166,10 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   case 6:mnemonic="srlv";args(reg(rd)+","+reg(rt)+","+reg(rs));break;
   case 7:mnemonic="srav";args(reg(rd)+","+reg(rt)+","+reg(rs));break;
   case 8:mnemonic="jr";args(reg(rs));break;
-  case 9:mnemonic="jalr";args(reg(rs)+","+reg(rd));break;
+  case 9:mnemonic="jalr";args(reg(rd)+","+reg(rs));break;
   case 12:mnemonic="syscall";break;case 13:mnemonic="break";break;
-  case 16:mnemonic="mfhi";args(reg(rd));break;case 17:mnemonic="mthi";args(reg(rd));break;
-  case 18:mnemonic="mflo";args(reg(rd));break;case 19:mnemonic="mtlo";args(reg(rd));break;
+  case 16:mnemonic="mfhi";args(reg(rd));break;case 17:mnemonic="mthi";args(reg(rs));break;
+  case 18:mnemonic="mflo";args(reg(rd));break;case 19:mnemonic="mtlo";args(reg(rs));break;
   case 24:mnemonic="mult";args(reg(rs)+","+reg(rt));break;case 25:mnemonic="multu";args(reg(rs)+","+reg(rt));break;
   case 26:mnemonic="div";args(reg(rs)+","+reg(rt));break;case 27:mnemonic="divu";args(reg(rs)+","+reg(rt));break;
   case 32:mnemonic="add";args(reg(rd)+","+reg(rs)+","+reg(rt));break;case 33:mnemonic="addu";args(reg(rd)+","+reg(rs)+","+reg(rt));break;
