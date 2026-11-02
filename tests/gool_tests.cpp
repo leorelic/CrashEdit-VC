@@ -128,7 +128,7 @@ int main(){
  resolveGoolOperands(externalRef,refGool);
  assert(externalRef[0].resolvedText.find("pool unavailable")!=std::string::npos);
  NsfGool localGool;localGool.format=0;localGool.entryCount=0;localGool.dataPool={42};
- auto localRef=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000800U);
+ auto localRef=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000400U);
  resolveGoolOperands(localRef,localGool);
  assert(localRef[0].resolvedText=="value 0x0000002A (42)");
  std::string error;
