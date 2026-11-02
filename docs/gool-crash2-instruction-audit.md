@@ -41,12 +41,14 @@ The same destination-reference form is used by the Crash 2 definitions for opcod
 | 0x1A | CPAD | Named; fixed immediate subfields |
 | 0x1B-0x2D | VEL, MISC, PSIN, SYNC, GVAR, GVAW, DEGD, SEEK, COLR, COLW, DSEK, PSHP, ANIS, EFLR, EFLV, ARRL, SIN, COS, ATAN | Named; per-opcode layouts in the C++ format table |
 | 0x2E | UNK46 | Explicitly unidentified; D/S destination/source format retained |
-| 0x2F-0x47 | NOP, DBG, RET, BRA, BNEZ, BEQZ, GO, GNEZ, GEQZ, ANIM, ANIF, VEC, CALL, SEVT, RJEV, ACEV, SPWN, CHNK, SNDP, SNDA, COLL, BEVT, CEVT, SPWF, CALR, MIPS | Named; per-opcode layouts in the C++ format table |
-| 0x48 | ARRS | Named; L/R references |
-| 0x49-0x4D | — | Not registered by the Crash 2 reference table |
-| 0x4E-0x4D? | — | Reserved for follow-up audit; do not infer semantics |
+| 0x2F | NOP | Named; fixed marker bits |
+| 0x30-0x47 | DBG, RET, BRA, BNEZ, BEQZ, GO, GNEZ, GEQZ, ANIM, ANIF, VEC, CALL, SEVT, RJEV, ACEV, SPWN, CHNK, SNDP, SNDA, COLL, BEVT, CEVT, SPWF, CALR | Named; per-opcode layouts in the C++ format table |
+| 0x48 | UNK72 | Explicitly unidentified; generic A/B reference layout |
+| 0x49 | MIPS | Named native-code marker; not a GOOL operand layout |
+| 0x4A-0x4D | UNK74-UNK77 | Explicitly unidentified; generic A/B reference layout |
+| 0x4E | ARRS | Named; L/R references |
 
-**Unknown opcodes 0x48?** The registry's final named entry is opcode 78 (0x4E, ARRS); opcode 73 (0x49) is MIPS. The six opcodes 72 and 74-77 are explicitly registered as unidentified and use the generic A/B reference format. Opcode 46 is also explicitly unidentified, with the D/S format. These are shown as unknown in the UI while retaining their operand structure.
+The registry's final named entry is opcode 78 (0x4E, ARRS); opcode 73 (0x49) is MIPS. The five opcodes 72 and 74-77 are explicitly registered as unidentified and use the generic A/B reference format. Opcode 46 is also explicitly unidentified, with the D/S format. These are shown as unknown in the UI while retaining their operand structure.
 
 ## Decoder guardrails
 
