@@ -122,3 +122,25 @@ The frame-group stream consumes exactly 5,992 bytes when decoded with the origin
 This sample also exercises the native-code marker (opcode 0x49 / MIPS) and embedded MIPS load/store instructions. The current native inspector still needs explicit MIPS-mode tracking/disassembly; treating every word after the marker as an ordinary GOOL opcode is not sufficient. This is a separate follow-up from the byte-layout parser.
 
 During this audit, comparison with the original `GOOLInstruction.GetRefVal` exposed a missing source-reference case: when bits 0x800, 0x200, and 0x100 are set but bit 0x80 is clear, the low 7 bits encode a signed stack/argument index. The native resolver now handles this case and has regression tests for positive stack and negative argument indices.
+
+
+## Second real Crash 2 sample: `entry_13_1_WillC.bin`
+
+A second user-supplied entry was checked independently (28,184 bytes). It uses the same six-item format-1 layout but has a different GOOL class and a substantially larger state table:
+
+| Item | Offset | Size | Interpretation |
+|---|---:|---:|---|
+| 0 | 0x2C | 24 | GOOL header |
+| 1 | 0x44 | 22,124 | 5,531 instruction words |
+| 2 | 0x56B0 | 1,664 | 416 data-pool words |
+| 3 | 0x5D30 | 172 | 86 signed 16-bit state-map values |
+| 4 | 0x5DDC | 2,128 | 133 state descriptors (16 bytes each) |
+| 5 | 0x662C | 2,028 | Frame-group stream |
+
+Header values: GOOL ID 0, class 0x100, format 1, heap base 108, event count 80, entry count 86. The 133 descriptor GOOLIndex values observed in this sample range from 0 to 11; this is recorded as an observation, not interpreted as a data-pool index.
+
+The frame-group stream consists of exactly 169 Crash 2 type-1 vertex groups. Each uses the 12-byte `VertexGroup2` header (type, frame count, EID, interpolation flag). The 169 records consume all 2,028 bytes exactly. This confirms the 12-byte type-1 layout on a second real entry and exercises both interpolated and non-interpolated groups.
+
+The instruction stream contains 5,531 words, including eight opcode-0x49 MIPS markers. Native MIPS mode and the meaning of these markers still require a separate instruction-level audit.
+
+The native parser now records Crash 2 frame-group boundaries and metadata for types 1–5. Type 1 is parsed as the 12-byte Crash 2 `VertexGroup2` header; type 2 sprite records use 16-byte frames; type 3 font records use 20-byte frames; type 4 text records are NUL-terminated and 4-byte aligned; and type 5 image records use a 12-byte header plus 24 bytes per frame-part. Unknown, truncated, or out-of-range records leave the GOOL entry decoded but set a frame-group-specific diagnostic, preserving the raw item for inspection.
