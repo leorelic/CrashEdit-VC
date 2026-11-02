@@ -115,6 +115,9 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
      operand.resolvedText="immediate "+std::to_string(signExtend(raw&0x1FFU,9));
     } else if((raw&0x100U)==0) {
      operand.resolvedText="immediate "+std::to_string(signExtend(raw&0xFFU,8));
+    } else if((raw&0x80U)==0) {
+     const auto index=signExtend(raw&0x7FU,7);
+     operand.resolvedText=index>=0?"stack["+std::to_string(index)+"]":"arg["+std::to_string(-index-1)+"]";
     } else if(raw==0xBE0U) {
      operand.resolvedText="[null]";
     } else if(raw==0xBF0U) {
