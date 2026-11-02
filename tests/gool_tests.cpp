@@ -65,7 +65,24 @@ int main(){
  assert(branchFields[0].name=='I'&&branchFields[0].kind==NsfGoolOperandKind::Signed&&branchFields[0].value==-1);
  assert(branchFields[1].name=='V'&&branchFields[1].bitWidth==4);
  assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
+
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
+ // Destination references use their own encoding, not the source-pool format.
+ NsfGool destinationContext;
+ auto destination=decodeGoolOperands(NsfGoolVersion::Version2,17,0x00000000U);
+ destination[0].rawValue=5; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="stack[5]");
+ destination[0].rawValue=0x07FU; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="arg[0]");
+ destination[0].rawValue=0x408U; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="x");
+ destination[0].rawValue=0x489U; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="brother->y");
+ destination[0].rawValue=0x61FU; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="[sp]");
+ destination[0].rawValue=0x640U; resolveGoolOperands(destination,destinationContext);
+ assert(destination[0].resolvedText=="mem1");
+ assert(formatGoolOperands(destination).find("-> mem1")!=std::string::npos);
 
  assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
  // CrashEdit's Crash 2 instruction definitions retain operand layouts even
