@@ -66,7 +66,30 @@ int main(){
  assert(branchFields[1].name=='V'&&branchFields[1].bitWidth==4);
  assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
+
  assert(goolOpcodeFormat(NsfGoolVersion::Version1,0).empty());
+ // CrashEdit's Crash 2 instruction definitions retain operand layouts even
+ // for the explicitly unidentified opcodes 46 and 72-77.
+ const auto unknown46=decodeGoolOperands(NsfGoolVersion::Version2,46,0xABC123U);
+ assert(unknown46.size()==2);
+ assert(unknown46[0].name=='D'&&unknown46[0].kind==NsfGoolOperandKind::DestinationReference);
+ assert(unknown46[1].name=='S'&&unknown46[1].kind==NsfGoolOperandKind::Reference);
+ for(std::uint8_t opcode=72;opcode<=77;++opcode){
+  const auto& info=goolOpcodeInfo(NsfGoolVersion::Version2,opcode);
+  assert(!info.known);
+  const auto fields=decodeGoolOperands(NsfGoolVersion::Version2,opcode,0x123456U);
+  assert(fields.size()==2);
+  assert(fields[0].name=='A'&&fields[0].kind==NsfGoolOperandKind::Reference);
+  assert(fields[1].name=='B'&&fields[1].kind==NsfGoolOperandKind::Reference);
+ }
+ // Every declared Crash 2 format must account for exactly 24 operand bits.
+ for(unsigned opcode=0;opcode<256;++opcode){
+  const auto format=goolOpcodeFormat(NsfGoolVersion::Version2,static_cast<std::uint8_t>(opcode));
+  if(format.empty())continue;
+  unsigned bitCount=0;
+  for(char ch:format)if(ch!=' '&&ch!='\\t')++bitCount;
+  assert(bitCount==24);
+ }
 
  NsfGool refGool;refGool.format=1;refGool.entryCount=1;refGool.dataPool={static_cast<std::int32_t>(0x12345678U),42};
  auto resolved=decodeGoolOperands(NsfGoolVersion::Version2,0,0x00000000U);
