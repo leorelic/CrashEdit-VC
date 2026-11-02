@@ -90,7 +90,7 @@ int main(){
   const auto format=goolOpcodeFormat(NsfGoolVersion::Version2,static_cast<std::uint8_t>(opcode));
   if(format.empty())continue;
   unsigned bitCount=0;
-  for(char ch:format)if(ch!=' '&&ch!='\\t')++bitCount;
+  for(char ch:format)if((ch>='A'&&ch<='Z')||ch=='0'||ch=='1'||ch=='-')++bitCount;
   assert(bitCount==24);
  }
 
