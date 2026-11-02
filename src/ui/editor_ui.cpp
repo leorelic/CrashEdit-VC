@@ -437,7 +437,7 @@ void EditorUI::drawResourceActionDialog(){
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;centerOpenDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor");
- ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Right click: renderer and movement speed");
+ ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Viewport options: top-left button");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  // Never make the interaction canvas larger than the space actually available.
@@ -476,11 +476,6 @@ void EditorUI::drawViewport(){
  ImDrawList*dl=ImGui::GetWindowDrawList();
  const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(20,25,33,255));
- ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
- toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
- const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
- const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
- for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
  // All projected geometry, markers, and labels must stay inside this panel.
  dl->PushClipRect(canvasMin,canvasMax,true);
  const Crash::NsfZone*zone=nullptr;const Crash::NsfEntry*zoneEntry=nullptr;
@@ -1004,7 +999,7 @@ void EditorUI::drawViewport(){
   char stats[384];std::snprintf(stats,sizeof(stats),"Scenery: %zu | Vertices: %zu | Faces: %zu | Textured: %zu | TPAG OK: %zu | Missing: %zu | Distance: %.2f",sceneryCount,vertexCount,faceCount,texturedFaceCount,resolvedTexturePageCount,missingTexturePageCount,sceneDistance_);
   char performanceStats[384];std::snprintf(performanceStats,sizeof(performanceStats),"CPU scene build: %.2f ms | GPU submit (CPU): %.2f ms | Draw calls: %zu | Upload: %.1f KiB | Texture cache: %zu (%.2f MiB)",rendererDiagnostics.sceneBuildMs,rendererDiagnostics.gpuSubmitCpuMs,rendererDiagnostics.gpuDrawCalls,double(rendererDiagnostics.gpuUploadBytes)/1024.0,rendererDiagnostics.cachedTextureCount,double(rendererDiagnostics.cachedTextureBytes)/(1024.0*1024.0));
   const char* resourceLabel=zoneEntry?Crash::eidToEName(zoneEntry->eid).c_str():(sceneryEntry?Crash::eidToEName(sceneryEntry->eid).c_str():"No scenery selected");
-  dl->AddText(ImVec2(canvasMin.x+12,canvasMin.y+10),IM_COL32(230,235,242,255),resourceLabel);
+  dl->AddText(ImVec2(canvasMin.x+44,canvasMin.y+14),IM_COL32(230,235,242,255),resourceLabel);
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-(editorPreferences.rendererDiagnosticsVisible?40.0f:22.0f)),IM_COL32(180,194,210,255),stats);
   if(editorPreferences.rendererDiagnosticsVisible)dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(145,190,210,255),performanceStats);
   if(faceCount==0)dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+34),IM_COL32(245,190,105,255),"No visible scenery faces at this camera position");
@@ -1012,6 +1007,12 @@ void EditorUI::drawViewport(){
   dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+16),IM_COL32(205,211,220,255),nsfValid_?"Select a decoded zone entry to view its scenery":"No zone loaded — open an NSF");
  }
  dl->PopClipRect();
+ // Draw the toolbar last so scene geometry and status labels cannot cover it.
+ ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
+ toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
+ const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
+ const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
  ImGui::End();
 }
 void EditorUI::drawTextureViewer(){
