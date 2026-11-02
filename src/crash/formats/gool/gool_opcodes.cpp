@@ -75,7 +75,7 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
   const auto raw=operand.rawValue;
   if(operand.kind==NsfGoolOperandKind::DestinationReference) {
    if((raw&0x400U)==0) {
-    const auto index=signExtend(raw,7);
+    const auto index=signExtend(raw&0x7FU,7);
     operand.resolvedText=index>=0?"stack["+std::to_string(index)+"]":"arg["+std::to_string(-index-1)+"]";
    } else if((raw&0x200U)==0) {
     const auto link=(raw>>6U)&0x7U;
