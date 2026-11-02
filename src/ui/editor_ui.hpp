@@ -10,7 +10,7 @@ public:
  explicit EditorUI(Workspace& w); void draw();
  void handleDroppedFiles(int count,const char** paths);
 private:
- void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawViewport(); void drawBottom(); void drawGoolDataWindows();
+ void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows();
  void drawNode(const ResourceNode&); void drawSearchWindow(); void drawGoolInspector(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
@@ -25,7 +25,9 @@ private:
  std::uint32_t sceneCameraZoneEid_=0;
  char path_[1024]{}; char searchQuery_[256]{}; int searchTypeFilter_=-1;
  std::filesystem::path nsfPath_,nsdPath_;
- int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1;
+ int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1,selectedItem_=-1;
+ int resourceAction_=0,resourceTargetKind_=0,resourceTargetChunk_=-1,resourceTargetEntry_=-1,resourceTargetItem_=-1;
+ char resourceActionPath_[1024]{};
  int viewerChunk_=-1,viewerEntry_=-1;
  std::string status_="Ready — open a Crash 2 level archive.";
  GameVersion pendingVersion_=GameVersion::Crash2,gameVersion_=GameVersion::Crash2;
