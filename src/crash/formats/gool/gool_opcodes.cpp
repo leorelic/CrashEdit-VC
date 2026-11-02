@@ -30,6 +30,22 @@ constexpr std::array<std::string_view,256> formats=[] {
  return f;
 }();
 std::int32_t signExtend(std::uint32_t v,unsigned bits){if(bits==0||bits>=32)return static_cast<std::int32_t>(v);const std::uint32_t mask=1U<<(bits-1U);return static_cast<std::int32_t>((v^mask)-mask);}
+std::string goolObjectFieldName(std::uint32_t field) {
+ static constexpr std::array<std::string_view,64> names = {
+  "self","parent","brother","child","creator","player","collider","interrupter",
+  "x","y","z","rotx","roty","rotz","scax","scay","scaz","velx","vely","velz",
+  "trotx","troty","trotz","vecx","vecy","vecz","statusa","statusb","blockflag",
+  "subtype","id","sp","pc","fp","tpc","epc","hpc","misc","var","frametime",
+  "statetime","stalltime","framegroup","framenum","entity","pathprog","pathlen",
+  "groundy","stateflag","speed","displaymode","field_51","groundtime","groundvel",
+  "zindex","eventreceived","vfx","yzapproach","density","voice","field_60",
+  "field_61","field_62","field_63"
+ };
+ if(field<names.size()) return std::string(names[field]);
+ if(field<=126U) return "mem"+std::to_string(field-63U);
+ return "field #"+std::to_string(field);
+}
+
 }
 const NsfGoolOpcodeInfo& goolOpcodeInfo(NsfGoolVersion version,std::uint8_t opcode) noexcept {
  static const auto table=[] {std::array<NsfGoolOpcodeInfo,256> t{};for(std::size_t i=0;i<t.size();++i)t[i]=unknown(static_cast<std::uint8_t>(i));for(std::size_t i=0;i<t.size();++i)if(!names[i].empty())t[i]={static_cast<std::uint8_t>(i),names[i],i!=46&&!(i>=72&&i<=77)};return t;}();
@@ -57,6 +73,22 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
  for(auto& operand:operands) {
   if(operand.kind!=NsfGoolOperandKind::Reference && operand.kind!=NsfGoolOperandKind::DestinationReference) continue;
   const auto raw=operand.rawValue;
+  if(operand.kind==NsfGoolOperandKind::DestinationReference) {
+   if((raw&0x400U)==0) {
+    const auto index=signExtend(raw,7);
+    operand.resolvedText=index>=0?"stack["+std::to_string(index)+"]":"arg["+std::to_string(-index-1)+"]";
+   } else if((raw&0x200U)==0) {
+    const auto link=(raw>>6U)&0x7U;
+    const auto field=raw&0x3FU;
+    const auto fieldName=goolObjectFieldName(field);
+    operand.resolvedText=link==0?fieldName:goolObjectFieldName(link)+"->"+fieldName;
+   } else if((raw&0x1FFU)==0x1FU) {
+    operand.resolvedText="[sp]";
+   } else {
+    operand.resolvedText=goolObjectFieldName(raw&0x1FFU);
+   }
+   continue;
+  }
   if((raw&0x800U)==0) {
    const std::size_t offset=raw&0x3FFU;
    const bool external=(raw&0x400U)!=0;
@@ -88,6 +120,7 @@ std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
   else std::snprintf(buf,sizeof(buf),"0x%X",a.rawValue);
   out+=buf;
   switch(a.kind){case NsfGoolOperandKind::Reference:out+=" [ref]";break;case NsfGoolOperandKind::DestinationReference:out+=" [dest]";break;case NsfGoolOperandKind::ProcessField:out+=" [field]";break;default:break;}
+  if(!a.resolvedText.empty()) out+=" -> "+a.resolvedText;
  }
  return out;
 }
