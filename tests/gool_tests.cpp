@@ -61,6 +61,12 @@ int main(){
  assert(mipsKnown&&mipsName=="addu"&&mipsArgs=="$t0,$t1,$t2");
  decodeMipsInstruction(0x8C880010U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="lw"&&mipsArgs=="$t0,16($a0)");
+ decodeMipsInstruction(0x03E0A809U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="jalr"&&mipsArgs=="$ra,$ra");
+ decodeMipsInstruction(0x01200011U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mthi"&&mipsArgs=="$t1");
+ decodeMipsInstruction(0x01200013U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mtlo"&&mipsArgs=="$t1");
  decodeMipsInstruction(0xFFFFFFFFU,mipsName,mipsArgs,mipsKnown);
  assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0xFFFFFFFF");
  const auto& invalid=goolOpcodeInfo(NsfGoolVersion::Version2,250);
