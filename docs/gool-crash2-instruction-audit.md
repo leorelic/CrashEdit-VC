@@ -144,3 +144,12 @@ The frame-group stream consists of exactly 169 Crash 2 type-1 vertex groups. Eac
 The instruction stream contains 5,531 words, including eight opcode-0x49 MIPS markers. Native MIPS mode and the meaning of these markers still require a separate instruction-level audit.
 
 The native parser now records Crash 2 frame-group boundaries and metadata for types 1–5. Type 1 is parsed as the 12-byte Crash 2 `VertexGroup2` header; type 2 sprite records use 16-byte frames; type 3 font records use 20-byte frames; type 4 text records are NUL-terminated and 4-byte aligned; and type 5 image records use a 12-byte header plus 24 bytes per frame-part. Unknown, truncated, or out-of-range records leave the GOOL entry decoded but set a frame-group-specific diagnostic, preserving the raw item for inspection.
+
+
+## Project-authored extension: PlayStation COP2/GTE disassembly
+
+The original CrashEdit MIPS decoder does not provide PlayStation COP2/GTE instruction decoding; these words are left unidentified by that reference implementation. CrashEdit-VC is therefore extending the native MIPS disassembler with COP2/GTE awareness as **new project-authored functionality**, rather than porting an existing CrashEdit feature.
+
+This is a disassembly/inspection feature, not GTE emulation. The implementation will distinguish GTE command instructions from COP2 register transfers and load/store forms, decode recognized command functions and their encoded flags/parameters, and retain unknown or reserved encodings as raw words. The command/function names and bitfield interpretation must be checked against PlayStation R3000A/COP2 and Geometry Transformation Engine documentation, not inferred from the GOOL opcode registry.
+
+A real word observed in the DispC native instruction stream, `0x49BE0BE0`, is a motivating test case: its primary opcode is COP2 and its GTE function field identifies `NCT` (Normal Color Triple). It should no longer appear as an undifferentiated `???` once this extension is implemented. This section records planned work; it does not imply that COP2/GTE decoding is already implemented.
