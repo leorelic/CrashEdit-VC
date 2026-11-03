@@ -69,6 +69,16 @@ int main(){
  assert(mipsKnown&&mipsName=="mthi"&&mipsArgs=="$t1");
  decodeMipsInstruction(0x01200013U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mtlo"&&mipsArgs=="$t1");
+ decodeMipsInstruction(0x4A180001U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="rtps"&&mipsArgs=="sf=1,lm=0");
+ decodeMipsInstruction(0x4BBE0BE0U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="nct"&&mipsArgs=="sf=1,lm=0");
+ decodeMipsInstruction(0x4A000012U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mvmva"&&mipsArgs=="sf=0,lm=0,mx=rotation,v=V0,cv=TR");
+ decodeMipsInstruction(0x49BE0BE0U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x49BE0BE0");
+ decodeMipsInstruction(0x4A00003CU,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x4A00003C");
  decodeMipsInstruction(0xFFFFFFFFU,mipsName,mipsArgs,mipsKnown);
  assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0xFFFFFFFF");
  const auto& invalid=goolOpcodeInfo(NsfGoolVersion::Version2,250);

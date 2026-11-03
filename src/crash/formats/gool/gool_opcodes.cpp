@@ -29,6 +29,34 @@ constexpr std::array<std::string_view,256> formats=[] {
  f[60]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[61]="IIIIIIIIII VVVV (RRRRRR) CC TT";f[62]=f[61];f[63]="CCCCCC SSSSSS TTTTTTTT AAAA";f[64]="[EEEEEEEEEEEE] [TTTTTTTTTTTT]";f[65]=ab;f[66]="[SSSSSSSSSSSS] (RRRRRR) FF TTTT";f[67]="[VVVVVVVVVVVV] AAA BBB TTT (LLL)";f[68]="[EEEEEEEEEEEE] (RRRRRR) AAA LLL";f[69]="[EEEEEEEEEEEE] (RRRRRR) AAA (LLL)";f[70]=f[63];f[71]=ab;f[73]="000001111101000001111101";f[72]=ab;for(int i=74;i<=77;++i)f[static_cast<std::size_t>(i)]=ab;f[78]=lr;
  return f;
 }();
+const char* gteCommandName(std::uint32_t function) {
+ switch(function) {
+ case 0x01:return "rtps"; case 0x06:return "nclip"; case 0x0C:return "op";
+ case 0x10:return "dpcs"; case 0x11:return "intpl"; case 0x12:return "mvmva";
+ case 0x13:return "ncds"; case 0x14:return "cdp"; case 0x16:return "ncdt";
+ case 0x1B:return "nccs"; case 0x1C:return "cc"; case 0x1E:return "ncs";
+ case 0x20:return "nct"; case 0x28:return "sqr"; case 0x29:return "dcpl";
+ case 0x2A:return "dpct"; case 0x2D:return "avsz3"; case 0x2E:return "avsz4";
+ case 0x30:return "rtpt"; case 0x3D:return "gpf"; case 0x3E:return "gpl";
+ case 0x3F:return "ncct"; default:return nullptr;
+ }
+}
+void decodeGteCommand(std::uint32_t word,std::string& mnemonic,std::string& arguments,bool& known) {
+ const auto function=word&0x3FU;
+ const char* name=gteCommandName(function);
+ if(!name) { known=false; return; }
+ mnemonic=name;
+ arguments="sf="+std::to_string((word>>19U)&1U)+",lm="+std::to_string((word>>10U)&1U);
+ if(function==0x12U) {
+  static constexpr const char* matrices[]={"rotation","light","color","reserved"};
+  static constexpr const char* vectors[]={"V0","V1","V2","IR"};
+  static constexpr const char* translations[]={"TR","BK","FC","none"};
+  arguments+=",mx=";arguments+=matrices[(word>>17U)&3U];
+  arguments+=",v=";arguments+=vectors[(word>>15U)&3U];
+  arguments+=",cv=";arguments+=translations[(word>>13U)&3U];
+ }
+ known=true;
+}
 std::int32_t signExtend(std::uint32_t v,unsigned bits){if(bits==0||bits>=32)return static_cast<std::int32_t>(v);const std::uint32_t mask=1U<<(bits-1U);return static_cast<std::int32_t>((v^mask)-mask);}
 std::string goolObjectFieldName(std::uint32_t field) {
  static constexpr std::array<std::string_view,64> names = {
@@ -188,6 +216,10 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
  case 8:case 9:case 10:case 11:case 12:case 13:case 14:
   {static constexpr const char* names[]={"addi","addiu","slti","sltiu","andi","ori","xori"};mnemonic=names[op-8];args(reg(rt)+","+reg(rs)+","+std::to_string((op>=12)?(word&0xFFFFU):static_cast<std::uint32_t>(static_cast<std::int32_t>(imm))));}break;
  case 15:mnemonic="lui";args(reg(rt)+","+std::to_string(word&0xFFFFU));break;
+ case 18:
+  if((rs&0x10U)!=0) decodeGteCommand(word,mnemonic,arguments,known);
+  else known=false;
+  break;
  case 32:case 33:case 34:case 35:case 36:case 37:case 38:case 40:case 41:case 42:case 43:case 46:
   {static constexpr const char* names[]={"lb","lh","lwl","lw","lbu","lhu","lwr","","sb","sh","swl","sw","swr"};const char* name=nullptr;
    switch(op){case 32:name="lb";break;case 33:name="lh";break;case 34:name="lwl";break;case 35:name="lw";break;case 36:name="lbu";break;case 37:name="lhu";break;case 38:name="lwr";break;case 40:name="sb";break;case 41:name="sh";break;case 42:name="swl";break;case 43:name="sw";break;case 46:name="swr";break;default:break;}
