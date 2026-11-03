@@ -72,11 +72,12 @@ struct NsfGoolStateDescriptor {
  std::int32_t stateFlags=0, blockFlags=0;
  std::int16_t goolIndex=0, eventHook=0, transHook=0, codeHook=0;
 };
-enum class NsfGoolStateReferenceStatus : std::uint8_t { InvalidDataIndex, Local, Resolved, Missing, Ambiguous };
+enum class NsfGoolStateReferenceStatus : std::uint8_t { InvalidDataIndex, Local, External, Ambiguous };
 struct NsfGoolStateReference {
  std::size_t descriptorIndex=0, targetChunkIndex=0, targetEntryIndex=0;
  std::int32_t dataPoolIndex=0;
  std::uint32_t eid=0;
+ bool targetFound=false;
  NsfGoolStateReferenceStatus status=NsfGoolStateReferenceStatus::InvalidDataIndex;
 };
 struct NsfGoolFrameGroup {

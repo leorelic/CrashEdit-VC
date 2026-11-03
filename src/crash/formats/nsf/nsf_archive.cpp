@@ -288,22 +288,31 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
      gool.stateReferences.push_back(reference);continue;
     }
     reference.eid=static_cast<std::uint32_t>(gool.dataPool[static_cast<std::size_t>(dataPoolIndex)]);
-    const auto allMatches=findEntriesByEid(reference.eid);
-    std::vector<NsfEntryLocation> goolMatches;
-    for(const auto& match:allMatches){
-     const auto& targetChunk=chunks_[match.chunkIndex];
-     if(match.entryIndex<targetChunk.entries.size()){
-      const auto& targetEntry=targetChunk.entries[match.entryIndex];
-      if(targetEntry.valid&&targetEntry.type==11)goolMatches.push_back(match);
+    // CrashEdit treats a Data Pool word equal to this entry's EID as local;
+    // every other value is an external GOOL identity, whether or not its
+    // resource is present in the currently loaded NSF.
+    if(reference.eid==sourceEntry.eid){
+     reference.status=NsfGoolStateReferenceStatus::Local;
+     reference.targetChunkIndex=sourceChunkIndex;
+     reference.targetEntryIndex=sourceEntryIndex;
+     reference.targetFound=true;
+    }else{
+     reference.status=NsfGoolStateReferenceStatus::External;
+     const auto allMatches=findEntriesByEid(reference.eid);
+     std::vector<NsfEntryLocation> goolMatches;
+     for(const auto& match:allMatches){
+      const auto& targetChunk=chunks_[match.chunkIndex];
+      if(match.entryIndex<targetChunk.entries.size()){
+       const auto& targetEntry=targetChunk.entries[match.entryIndex];
+       if(targetEntry.valid&&targetEntry.type==11)goolMatches.push_back(match);
+      }
      }
-    }
-    if(goolMatches.empty())reference.status=NsfGoolStateReferenceStatus::Missing;
-    else if(goolMatches.size()>1)reference.status=NsfGoolStateReferenceStatus::Ambiguous;
-    else{
-     reference.targetChunkIndex=goolMatches[0].chunkIndex;
-     reference.targetEntryIndex=goolMatches[0].entryIndex;
-     reference.status=reference.targetChunkIndex==sourceChunkIndex&&reference.targetEntryIndex==sourceEntryIndex
-      ?NsfGoolStateReferenceStatus::Local:NsfGoolStateReferenceStatus::Resolved;
+     if(goolMatches.size()>1)reference.status=NsfGoolStateReferenceStatus::Ambiguous;
+     else if(goolMatches.size()==1){
+      reference.targetChunkIndex=goolMatches[0].chunkIndex;
+      reference.targetEntryIndex=goolMatches[0].entryIndex;
+      reference.targetFound=true;
+     }
     }
     gool.stateReferences.push_back(reference);
    }

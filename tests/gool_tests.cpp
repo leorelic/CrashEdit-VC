@@ -300,7 +300,7 @@ int main(){
  assert(externalArchive.loadBytes(externalBytes,error));
  externalArchive.decodeGools(NsfGoolVersion::Version2);
  const auto&externalStateReference=externalArchive.chunks()[0].entries[0].gool.stateReferences[0];
- assert(externalStateReference.eid==0x0200007CU&&externalStateReference.status==NsfGoolStateReferenceStatus::Resolved);
+ assert(externalStateReference.eid==0x0200007CU&&externalStateReference.status==NsfGoolStateReferenceStatus::External&&externalStateReference.targetFound);
  assert(externalStateReference.targetChunkIndex==1&&externalStateReference.targetEntryIndex==0);
 
  NsfArchive localArchive;
@@ -311,13 +311,13 @@ int main(){
  NsfArchive missingArchive;
  assert(missingArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007DU),error));
  missingArchive.decodeGools(NsfGoolVersion::Version2);
- assert(missingArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Missing);
+ assert(missingArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::External);\n assert(!missingArchive.chunks()[0].entries[0].gool.stateReferences[0].targetFound);
 
  std::vector<std::uint8_t> ambiguousBytes=externalBytes;
  ambiguousBytes.insert(ambiguousBytes.end(),targetChunk.begin(),targetChunk.end());
  NsfArchive ambiguousArchive;
  assert(ambiguousArchive.loadBytes(ambiguousBytes,error));
  ambiguousArchive.decodeGools(NsfGoolVersion::Version2);
- assert(ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Ambiguous);
+ assert(ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Ambiguous);\n assert(!ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].targetFound);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\\n";
 }
