@@ -61,6 +61,10 @@ int main(){
  assert(mipsKnown&&mipsName=="addu"&&mipsArgs=="$t0,$t1,$t2");
  decodeMipsInstruction(0x8C880010U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="lw"&&mipsArgs=="$t0,16($a0)");
+ decodeMipsInstruction(0xC0890010U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="lwc2"&&mipsArgs=="IR1,16($a0)");
+ decodeMipsInstruction(0xE0AAFFFCU,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="swc2"&&mipsArgs=="IR2,-4($a1)");
  decodeMipsInstruction(0x03E0F809U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="jalr"&&mipsArgs=="$ra,$ra");
  decodeMipsInstruction(0x03E0A809U,mipsName,mipsArgs,mipsKnown);
