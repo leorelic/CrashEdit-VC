@@ -208,7 +208,7 @@ std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGool
   const auto* target=find('I');
   const bool isExternal=external&&external->rawValue!=0;
   std::string result="subroutine "+number('I')+(isExternal?" (external)":" (local)");
-  if(!isExternal&&target) result+=relativeTarget(target->value);
+  if(!isExternal&&target) { const auto offset=target->value; if(offset>=0&&static_cast<std::uint64_t>(offset)<gool.instructions.size()) result+=" (target instruction "+std::to_string(offset)+")"; else result+=" (target out of range: "+std::to_string(offset)+")"; }
   result+=", arguments "+number('V');
   return result;
  }

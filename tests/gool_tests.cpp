@@ -151,7 +151,7 @@ int main(){
  const auto validGoArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000000U);
  assert(formatGoolControlFlow(53,validGoArgs,controlFlowGool,2)=="state 0, arguments 0 (descriptor 0, GOOL 0x12345678)");
  const auto callArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000000U);
- assert(formatGoolControlFlow(59,callArgs,controlFlowGool,2)=="subroutine 0 (local) (target instruction 1), arguments 0");
+ assert(formatGoolControlFlow(59,callArgs,controlFlowGool,2)=="subroutine 0 (local) (target instruction 0), arguments 0");
  const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x004000U);
  assert(formatGoolControlFlow(59,externalCallArgs,controlFlowGool,2)=="subroutine 0 (external), arguments 0");
  // Destination references use their own encoding, not the source-pool format.
