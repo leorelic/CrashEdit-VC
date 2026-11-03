@@ -299,9 +299,9 @@ int main(){
  NsfArchive externalArchive;
  assert(externalArchive.loadBytes(externalBytes,error));
  externalArchive.decodeGools(NsfGoolVersion::Version2);
- const auto&externalRef=externalArchive.chunks()[0].entries[0].gool.stateReferences[0];
- assert(externalRef.eid==0x0200007CU&&externalRef.status==NsfGoolStateReferenceStatus::Resolved);
- assert(externalRef.targetChunkIndex==1&&externalRef.targetEntryIndex==0);
+ const auto&externalStateReference=externalArchive.chunks()[0].entries[0].gool.stateReferences[0];
+ assert(externalStateReference.eid==0x0200007CU&&externalStateReference.status==NsfGoolStateReferenceStatus::Resolved);
+ assert(externalStateReference.targetChunkIndex==1&&externalStateReference.targetEntryIndex==0);
 
  NsfArchive localArchive;
  assert(localArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU),error));
