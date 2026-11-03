@@ -2,7 +2,7 @@
 
 This is a separate native rewrite of CrashEdit. It does not replace or compile the original C# application.
 
-**Project direction and current progress:** see [docs/ROADMAP.md](docs/ROADMAP.md).\n\n**Reverse-engineering discoveries and implementation notes:** see [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md), including the distinction between original CrashEdit behavior, native improvements, and findings still under investigation.
+**Reverse-engineering discoveries and implementation notes:** see [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md), including the distinction between original CrashEdit behavior, native improvements, and findings still under investigation.
 
 ## Stack
 - C++20, CMake 3.24+
