@@ -101,6 +101,7 @@ struct NsfEntry {
  bool valid=false; std::string error;
  std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery; NsfGool gool;
 };
+struct NsfEntryLocation { std::size_t chunkIndex=0, entryIndex=0; };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
  std::int32_t chunkId=0; std::uint16_t type=0; bool wasCompressed=false;
@@ -112,6 +113,7 @@ public:
  bool saveUncompressed(const std::filesystem::path&,std::string&) const;
  bool saveUncompressedBytes(std::vector<std::uint8_t>&,std::string&) const;
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
+ std::vector<NsfEntryLocation> findEntriesByEid(std::uint32_t eid) const;
  std::size_t compressedChunkCount()const noexcept;
  void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version);
  bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);

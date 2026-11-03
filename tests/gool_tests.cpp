@@ -243,6 +243,9 @@ int main(){
  archive.decodeGools(NsfGoolVersion::Version2);
  const auto&entry=archive.chunks()[0].entries[0];
  assert(entry.valid&&entry.type==11&&entry.gool.decoded);
+ const auto eidMatches=archive.findEntriesByEid(0x0200007BU);
+ assert(eidMatches.size()==1&&eidMatches[0].chunkIndex==0&&eidMatches[0].entryIndex==0);
+ assert(archive.findEntriesByEid(0xDEADBEEFU).empty());
  const auto&g=entry.gool;
  assert(g.version==NsfGoolVersion::Version2);
  assert(static_cast<std::uint32_t>(g.id)==0x10203040U);

@@ -294,5 +294,17 @@ bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)co
  if(!bytes.empty())s.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
  if(!s){e="Failed writing NSF output.";return false;}e.clear();return true;
 }
+std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
+ std::vector<NsfEntryLocation> matches;
+ for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){
+  const auto& chunk=chunks_[chunkIndex];
+  if(chunk.type!=0||!chunk.entryTableValid)continue;
+  for(std::size_t entryIndex=0;entryIndex<chunk.entries.size();++entryIndex){
+   const auto& entry=chunk.entries[entryIndex];
+   if(entry.valid&&entry.eid==eid)matches.push_back({chunkIndex,entryIndex});
+  }
+ }
+ return matches;
+}
 std::size_t NsfArchive::compressedChunkCount()const noexcept{return std::count_if(chunks_.begin(),chunks_.end(),[](const auto&c){return c.wasCompressed;});}
 }
