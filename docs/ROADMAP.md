@@ -24,6 +24,8 @@ A mature release should be easy to recommend because people can open it, underst
 
 ## Current progress
 
+Detailed historical findings and implementation notes are maintained in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). That log distinguishes source-confirmed behavior, real-file observations, native improvements, and open hypotheses; update it as discoveries are made rather than waiting for a release.
+
 ### Foundation and application
 - [x] Separate native C++ rewrite established; original C# application remains separate.
 - [x] C++20 / CMake project foundation.
@@ -89,6 +91,10 @@ The order is intentionally flexible: work should follow dependencies and the mos
 
 ### 4. GOOL inspection, decompilation, and editing
 - [x] Add Crash 2 opcode names and decode operand bitfields from the original CrashEdit instruction format definitions.
+- [x] Add native MIPS-mode tracking and an initial R3000A instruction decoder for GOOL streams.
+- [ ] Complete the MIPS decoder audit against original CrashEdit behavior, including its exact mode-return sentinel and delay-slot handling.
+- [ ] Audit and add PlayStation COP2/GTE disassembly beyond the original CrashEdit decoder, preserving unknown encodings.
+- [ ] Build a MIPS assembler before exposing safe native-instruction editing.
 - [x] Resolve data-pool references when the required local or parent pool is available; explicitly label unresolved external pools and special references rather than guessing.
 - [ ] Resolve object-field references to symbolic field names and connect external GOOL entries.
 - Build control-flow analysis and a readable decompiler for selected GOOL entries, not an indiscriminate whole-game decompilation pass.
