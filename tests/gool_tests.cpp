@@ -13,7 +13,7 @@ using namespace CrashEdit::Crash;
 static void p16(std::vector<std::uint8_t>&b,std::size_t p,std::uint16_t v){b[p]=static_cast<std::uint8_t>(v);b[p+1]=static_cast<std::uint8_t>(v>>8U);}
 static void p32(std::vector<std::uint8_t>&b,std::size_t p,std::uint32_t v){for(int i=0;i<4;++i)b[p+static_cast<std::size_t>(i)]=static_cast<std::uint8_t>(v>>(8U*static_cast<unsigned>(i)));}
 
-static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateReturn=false){
+static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateReturn=false,std::uint32_t entryEid=0x0200007BU,std::int16_t stateGoolIndex=9,std::uint32_t firstDataWord=0x11112222U){
  std::vector<std::uint8_t>b(NsfChunkSize);
  p16(b,0,0x1234);p16(b,2,0);p32(b,4,0x12345678);p32(b,8,1);
  const std::size_t entry=24;
@@ -24,17 +24,17 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateRetur
  std::size_t offsets[7]{};offsets[0]=tableSize;
  for(std::size_t i=0;i<count;++i)offsets[i+1]=offsets[i]+(extended?sizesExtended[i]:sizesBasic[i]);
  p32(b,16,static_cast<std::uint32_t>(entry));p32(b,20,static_cast<std::uint32_t>(entry+offsets[count]));
- p32(b,entry,0x0100ffff);p32(b,entry+4,0x0200007b);p32(b,entry+8,11);p32(b,entry+12,static_cast<std::uint32_t>(count));
+ p32(b,entry,0x0100ffff);p32(b,entry+4,entryEid);p32(b,entry+8,11);p32(b,entry+12,static_cast<std::uint32_t>(count));
  for(std::size_t i=0;i<=count;++i)p32(b,entry+16+i*4,static_cast<std::uint32_t>(offsets[i]));
  const std::size_t header=entry+offsets[0];
  p32(b,header,0x10203040);p32(b,header+4,0x55667788);p32(b,header+8,extended?1:0);
  p32(b,header+12,0x100);p32(b,header+16,4);p32(b,header+20,2);
  const std::size_t code=entry+offsets[1];if(extended){p32(b,code,0x49000000);p32(b,code+4,0x012A4021);p32(b,code+8,alternateReturn?0x03E0A809U:0x03E00008U);p32(b,code+12,0);p32(b,code+16,0x12000000);}else{p32(b,code,0x12345678);p32(b,code+4,0xABCDEF01);}
- const std::size_t data=entry+offsets[2];p32(b,data,0x11112222);p32(b,data+4,0x33334444);
+ const std::size_t data=entry+offsets[2];p32(b,data,firstDataWord);p32(b,data+4,0x33334444);
  if(extended){
   const std::size_t map=entry+offsets[3];p16(b,map,0xffff);p16(b,map+2,3);
   const std::size_t desc=entry+offsets[4];p32(b,desc,0x01020304);p32(b,desc+4,0x05060708);
-  p16(b,desc+8,9);p16(b,desc+10,10);p16(b,desc+12,11);p16(b,desc+14,12);
+  p16(b,desc+8,static_cast<std::uint16_t>(stateGoolIndex));p16(b,desc+10,10);p16(b,desc+12,11);p16(b,desc+14,12);
   const std::size_t fg=entry+offsets[5];
   p16(b,fg,1);p16(b,fg+2,2);p32(b,fg+4,0x02001234);p32(b,fg+8,1);
   p16(b,fg+12,2);p16(b,fg+14,1);p32(b,fg+16,0x02005678);
@@ -243,6 +243,7 @@ int main(){
  archive.decodeGools(NsfGoolVersion::Version2);
  const auto&entry=archive.chunks()[0].entries[0];
  assert(entry.valid&&entry.type==11&&entry.gool.decoded);
+ assert(entry.gool.stateReferences.size()==1&&entry.gool.stateReferences[0].status==NsfGoolStateReferenceStatus::InvalidDataIndex);
  const auto eidMatches=archive.findEntriesByEid(0x0200007BU);
  assert(eidMatches.size()==1&&eidMatches[0].chunkIndex==0&&eidMatches[0].entryIndex==0);
  assert(archive.findEntriesByEid(0xDEADBEEFU).empty());
@@ -288,5 +289,35 @@ int main(){
  archive.decodeGools(NsfGoolVersion::Version2);
  const auto&basic=archive.chunks()[0].entries[0].gool;
  assert(basic.decoded&&basic.format==0&&basic.instructions.size()==2&&basic.dataPool.size()==2);
+
+ // State descriptor GOOL indices select an EID from the source data pool.
+ // Resolve only unique GOOL entries; preserve missing and duplicate targets.
+ const auto sourceChunk=makeGoolChunk(true,false,0x0200007BU,0,0x0200007CU);
+ const auto targetChunk=makeGoolChunk(true,false,0x0200007CU);
+ std::vector<std::uint8_t> externalBytes=sourceChunk;
+ externalBytes.insert(externalBytes.end(),targetChunk.begin(),targetChunk.end());
+ NsfArchive externalArchive;
+ assert(externalArchive.loadBytes(externalBytes,error));
+ externalArchive.decodeGools(NsfGoolVersion::Version2);
+ const auto&externalRef=externalArchive.chunks()[0].entries[0].gool.stateReferences[0];
+ assert(externalRef.eid==0x0200007CU&&externalRef.status==NsfGoolStateReferenceStatus::Resolved);
+ assert(externalRef.targetChunkIndex==1&&externalRef.targetEntryIndex==0);
+
+ NsfArchive localArchive;
+ assert(localArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU),error));
+ localArchive.decodeGools(NsfGoolVersion::Version2);
+ assert(localArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Local);
+
+ NsfArchive missingArchive;
+ assert(missingArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007DU),error));
+ missingArchive.decodeGools(NsfGoolVersion::Version2);
+ assert(missingArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Missing);
+
+ std::vector<std::uint8_t> ambiguousBytes=externalBytes;
+ ambiguousBytes.insert(ambiguousBytes.end(),targetChunk.begin(),targetChunk.end());
+ NsfArchive ambiguousArchive;
+ assert(ambiguousArchive.loadBytes(ambiguousBytes,error));
+ ambiguousArchive.decodeGools(NsfGoolVersion::Version2);
+ assert(ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Ambiguous);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\\n";
 }

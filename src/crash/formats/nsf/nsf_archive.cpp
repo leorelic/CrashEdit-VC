@@ -272,6 +272,43 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
    gool.decoded=true;entry.gool=std::move(gool);
   }
  }
+ for(std::size_t sourceChunkIndex=0;sourceChunkIndex<chunks_.size();++sourceChunkIndex){
+  auto& sourceChunk=chunks_[sourceChunkIndex];
+  if(sourceChunk.type!=0||!sourceChunk.entryTableValid)continue;
+  for(std::size_t sourceEntryIndex=0;sourceEntryIndex<sourceChunk.entries.size();++sourceEntryIndex){
+   auto& sourceEntry=sourceChunk.entries[sourceEntryIndex];
+   if(!sourceEntry.valid||sourceEntry.type!=11||!sourceEntry.gool.decoded)continue;
+   auto& gool=sourceEntry.gool;
+   gool.stateReferences.clear();
+   for(std::size_t descriptorIndex=0;descriptorIndex<gool.stateDescriptors.size();++descriptorIndex){
+    const auto dataPoolIndex=gool.stateDescriptors[descriptorIndex].goolIndex;
+    NsfGoolStateReference reference;reference.descriptorIndex=descriptorIndex;reference.dataPoolIndex=dataPoolIndex;
+    if(dataPoolIndex<0||static_cast<std::size_t>(dataPoolIndex)>=gool.dataPool.size()){
+     reference.status=NsfGoolStateReferenceStatus::InvalidDataIndex;
+     gool.stateReferences.push_back(reference);continue;
+    }
+    reference.eid=static_cast<std::uint32_t>(gool.dataPool[static_cast<std::size_t>(dataPoolIndex)]);
+    const auto allMatches=findEntriesByEid(reference.eid);
+    std::vector<NsfEntryLocation> goolMatches;
+    for(const auto& match:allMatches){
+     const auto& targetChunk=chunks_[match.chunkIndex];
+     if(match.entryIndex<targetChunk.entries.size()){
+      const auto& targetEntry=targetChunk.entries[match.entryIndex];
+      if(targetEntry.valid&&targetEntry.type==11)goolMatches.push_back(match);
+     }
+    }
+    if(goolMatches.empty())reference.status=NsfGoolStateReferenceStatus::Missing;
+    else if(goolMatches.size()>1)reference.status=NsfGoolStateReferenceStatus::Ambiguous;
+    else{
+     reference.targetChunkIndex=goolMatches[0].chunkIndex;
+     reference.targetEntryIndex=goolMatches[0].entryIndex;
+     reference.status=reference.targetChunkIndex==sourceChunkIndex&&reference.targetEntryIndex==sourceEntryIndex
+      ?NsfGoolStateReferenceStatus::Local:NsfGoolStateReferenceStatus::Resolved;
+    }
+    gool.stateReferences.push_back(reference);
+   }
+  }
+ }
 }
 bool NsfArchive::setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(entryIndex>=chunk.entries.size())return false;auto&entry=chunk.entries[entryIndex];if(!entry.zone.decoded||entityIndex>=entry.zone.entities.size())return false;auto&entity=entry.zone.entities[entityIndex];
