@@ -340,6 +340,37 @@ bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)co
  if(!bytes.empty())s.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
  if(!s){e="Failed writing NSF output.";return false;}e.clear();return true;
 }
+bool NsfArchive::setGoolStateDescriptor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t descriptorIndex,const NsfGoolStateDescriptor& descriptor){
+ if(chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=11||!entry.gool.decoded||entry.gool.format!=1||entry.items.size()<5||descriptorIndex>=entry.gool.stateDescriptors.size())return false;
+ const auto& item=entry.items[4];const std::size_t offset=item.offset+descriptorIndex*16U;
+ if(!has(chunk.bytes,offset,16U))return false;
+ const auto write32=[&](std::size_t p,std::uint32_t value){for(unsigned i=0;i<4;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(value>>(i*8U));};
+ const auto write16=[&](std::size_t p,std::uint16_t value){chunk.bytes[p]=static_cast<std::uint8_t>(value);chunk.bytes[p+1]=static_cast<std::uint8_t>(value>>8U);};
+ write32(offset,static_cast<std::uint32_t>(descriptor.stateFlags));
+ write32(offset+4U,static_cast<std::uint32_t>(descriptor.blockFlags));
+ write16(offset+8U,static_cast<std::uint16_t>(descriptor.goolIndex));
+ write16(offset+10U,static_cast<std::uint16_t>(descriptor.eventHook));
+ write16(offset+12U,static_cast<std::uint16_t>(descriptor.transHook));
+ write16(offset+14U,static_cast<std::uint16_t>(descriptor.codeHook));
+ entry.gool.stateDescriptors[descriptorIndex]=descriptor;
+ return true;
+}
+bool NsfArchive::setGoolDataPoolWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t wordIndex,std::uint32_t value){
+ if(chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=11||!entry.gool.decoded||entry.items.size()<3||wordIndex>=entry.gool.dataPool.size())return false;
+ const auto& item=entry.items[2];const std::size_t offset=item.offset+wordIndex*4U;
+ if(!has(chunk.bytes,offset,4U))return false;
+ for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(value>>(i*8U));
+ entry.gool.dataPool[wordIndex]=static_cast<std::int32_t>(value);
+ return true;
+}
 std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
  std::vector<NsfEntryLocation> matches;
  for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){
