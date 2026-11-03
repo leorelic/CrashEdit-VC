@@ -147,7 +147,7 @@ int main(){
  assert(formatGoolControlFlow(53,goArgs)=="state 291, arguments 0");
  const auto callArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000000U);
  assert(formatGoolControlFlow(59,callArgs)=="subroutine 0 (local), arguments 0");
- const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000010U);
+ const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x004000U);
  assert(formatGoolControlFlow(59,externalCallArgs)=="subroutine 0 (external), arguments 0");
  // Destination references use their own encoding, not the source-pool format.
  NsfGool destinationContext;
