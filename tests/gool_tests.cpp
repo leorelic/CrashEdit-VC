@@ -79,6 +79,16 @@ int main(){
  assert(mipsKnown&&mipsName=="mthi"&&mipsArgs=="$t1");
  decodeMipsInstruction(0x01200013U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mtlo"&&mipsArgs=="$t1");
+ decodeMipsInstruction(0x40086000U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mfc0"&&mipsArgs=="$t0,Status");
+ decodeMipsInstruction(0x40886000U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mtc0"&&mipsArgs=="$t0,Status");
+ decodeMipsInstruction(0x40076000U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mfc0"&&mipsArgs=="$t0,BadVaddr");
+ decodeMipsInstruction(0x42000010U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="rfe"&&mipsArgs.empty());
+ decodeMipsInstruction(0x42000001U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x42000001");
  decodeMipsInstruction(0x48084800U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mfc2"&&mipsArgs=="$t0,IR1");
  decodeMipsInstruction(0x4849F800U,mipsName,mipsArgs,mipsKnown);
