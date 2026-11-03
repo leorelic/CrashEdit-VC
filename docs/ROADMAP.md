@@ -24,45 +24,20 @@ A mature release should be easy to recommend because people can open it, underst
 
 ## Current progress
 
-Detailed historical findings and implementation notes are maintained in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). That log distinguishes source-confirmed behavior, real-file observations, native improvements, and open hypotheses; update it as discoveries are made rather than waiting for a release.
+Detailed technical findings, source comparisons, sample measurements, and implementation notes belong in [RESEARCH_NOTES.md](RESEARCH_NOTES.md), not in this high-level roadmap.
 
-### Foundation and application
-- [x] Separate native C++ rewrite established; original C# application remains separate.
-- [x] C++20 / CMake project foundation.
-- [x] Dear ImGui docking workspace and portable OpenGL viewport foundation.
-- [x] Dockable workspace panels, including resource hierarchy, properties, console, and asset browser.
-- [x] 3D viewport options toolbar with working hit-testing and popup controls for renderer mode, depth buffer, diagnostics, and camera speed; left-drag orbit and right-click-and-hold navigation remain independent. This is a reusable foundation for future viewport tools and controls.
-- [x] Cross-platform Windows, Linux, and macOS CI build configuration.
-- [x] NSF file loading foundation and initial physical chunk reader/tests.
-- [x] NSF drag-and-drop into the application, including UTF-8 path handling.
-- [x] Global NSF entry search window with type filters, text matching, and hierarchy navigation.
-- [x] Default dock layout places entry search with Console / Diagnostics and GOOL Inspector with the 3D Zone Editor; existing saved layouts are migrated once.
-- [x] Main editor host no longer scrolls; dockspace reserves room for the bottom status line so it remains visible within the application window.
-- [x] Windows application runs without a separate console window; startup, GLFW, NSF loading, NSD availability, and save messages feed a bounded in-app Console / Diagnostics log with severity levels.
-- [x] Fix Console / Diagnostics ImGui Begin/End pairing and prevent file/version dialogs from repeatedly stealing focus.
-- [x] NSF and NSD save actions wired through the editor.
-- [x] Parse and serialize ProtoNSD, OldNSD, standard NSD, and Crash 3 NSD layouts.
-- [x] Preserve original prelude/compression metadata, unknown fields, fixed extra-data blocks, and trailing image data when serializing.
-- [x] Spawn-point append, delete (while retaining at least one row), reorder, copy/paste, editable EIDs/coordinates, and camera-aware Get Spawn workflow.
-- [x] NSD GOOL map inspector with navigation to matching GOOL entries in the NSF.
-- [x] CrashEdit-compatible NSD handling: warn on zero spawn records, normalize invalid OldNSD magic to 1, and normalize nonzero reserved blank values to 0 while retaining load warnings.
-- [x] Paired NSF/NSD save stages both outputs before replacing originals and restores the first file if the second replacement fails.
-- [x] Two independent Experimental settings control pre-save `.NSF.bak` / `.NSD.bak` copies and dated archive pairs. Either can be enabled without the other; same-day dated saves receive numbered suffixes.
-- [ ] Validate edited NSD pairs against representative real Crash 2 levels and in-game loading.
+### Achieved
+- [x] Established the native, cross-platform C++ application foundation.
+- [x] Implemented core NSF/NSD loading, inspection, editing, and paired saving.
+- [x] Added Crash 2 zone viewing with textured scenery, transparency, and depth-aware rendering.
+- [x] Built GOOL entry inspection, including instruction decoding, data-reference resolution, state information, and frame-group parsing.
+- [x] Added an initial MIPS decoder and native-code mode handling for GOOL instruction streams.
+- [x] Established automated Windows, Linux, and macOS build workflows.
 
-### Renderer and zone viewing
-- [x] Initial zone geometry/viewer foundation.
-- [x] Texture-page (TPAG) matching and textured-polygon identification in the current test zone.
-- [ ] Finish reliable texture display in the viewport; matching texture records does not yet guarantee correct rendered output.
-- [ ] Correct depth/occlusion behavior so scenery properly hides camera guides and scene objects where appropriate.
-- [ ] Continue matching the original editor's zone-viewing behavior while improving clarity and controls.
-
-### Format research
-- [x] Began tracing the original CrashEdit source alongside the native implementation.
-- [x] Identified SLST as a camera-dependent polygon sort/display list used by the original viewer path.
-- [ ] Document the exact Crash 2 SLST binary structure and record semantics from source and real files.
-- [ ] Confirm how Crash 2 camera positions map to SLST records.
-- [ ] Establish what the game expects from SLST data at runtime; do not assume viewer behavior alone proves game behavior.
+### In progress
+- [ ] Validate file edits and renderer behavior against more real Crash 2 levels and the game itself.
+- [ ] Complete the native MIPS decoder audit and investigate COP2/GTE instruction support.
+- [ ] Continue reverse-engineering SLST and other formats needed for custom scenery.
 
 ## Roadmap
 
@@ -132,41 +107,9 @@ The order is intentionally flexible: work should follow dependencies and the mos
 - Regression test suite and documented compatibility status.
 - A clear distinction between implemented, experimental, and unsupported features.
 
-## NSD format and save notes
+## Technical documentation
 
-The native NSD implementation supports the four layouts recognized by the original CrashEdit source:
-
-- **ProtoNSD:** 256-entry hash-key map, chunk and entry counts, then the variable-length 8-byte index.
-- **OldNSD:** shared chunk metadata and index, followed by the legacy magic/ID/start-zone/camera/unknown fields, a 64-entry GOOL map, and trailing extra data.
-- **Standard NSD (Crash 2):** shared metadata and index, spawn count and reserved blank field, level ID and entity count, a 64-entry GOOL map, a fixed 0xCC-byte extra-data block, 24-byte spawn records, and trailing image data.
-- **Crash 3 NSD:** the standard layout with a 128-entry GOOL map and the later spawn/extra-data offsets.
-
-The serializer preserves the original prelude/compression metadata and opaque regions while rebuilding the variable-length index and spawn sections. The editor provides an NSD GOOL map inspector with direct navigation to matching GOOL entries in the NSF. Spawn-point editing follows the original NSDBox workflow, including EID/camera/point/hex-coordinate fields, copy/paste, row reordering, and Get Spawn. The editor saves the NSF and matching NSD as a pair. Optional backup mode is off by default; when enabled, each save copies the previous originals to `.NSF.bak` and `.NSD.bak`, then archives the newly serialized pair as `name(YYYY-MM-DD).NSF/.NSD`. Additional saves on the same day use numbered suffixes rather than overwriting earlier archives.
-
-The native validation layer currently reports known CrashEdit-compatible conditions (zero spawn records, OldNSD magic other than 1, and a nonzero reserved blank field) and rejects negative count values before serialization. These checks do not yet prove that a modified NSD will load in the game. Representative real-file round trips and in-game validation remain open.
-
-Reference source: [NSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/NSD.cs), [OldNSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/OldNSD.cs), [ProtoNSD.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/NSD/ProtoNSD.cs), and [NSDController.cs](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controllers/NSDController.cs).
-
-## GOOL research notes
-
-The original CrashEdit source identifies GOOL resources as entry type 11. Its loader reads a 24-byte header, an instruction item containing 32-bit words, and a data-pool item containing 32-bit values. Format 1 entries additionally contain a 16-bit state map, 16-byte state descriptors, and optionally frame-group data. The header contains ID, class, format, heap base, event count, and entry count.
-
-The native implementation parses these structures and now has a version-scoped Crash 2 opcode-name table sourced from the original `GOOLInstructionList.cs`. The inspector displays recognized mnemonics alongside the unchanged instruction word and raw 24-bit payload. Reserved or unrecognized opcodes are explicitly shown as unknown; other GOOL versions are not incorrectly assigned the Crash 2 table. This is the first semantic-decoding step, **not yet full instruction decoding or decompilation**. The inspector now splits each Crash 2 instruction's 24-bit payload according to the original format strings, retaining each field's name, width, raw value, and type (GOOL reference, destination reference, process field, signed value, or plain value). The raw word and payload remain visible for verification. The inspector now resolves supported data-pool references to EIDs or constant values when the relevant pool is available. Missing external pools and special stack/object references remain explicitly labeled rather than guessed. Symbolic object-field resolution and cross-entry parent/external pool linking remain open. Unknown code and frame-group data must be preserved.
-
-Reference source: [GOOL entry loader](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLEntryLoader.cs), [GOOL entry model](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLEntry.cs), and [GOOL instruction decoder](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/GOOL/GOOLInstruction.cs).
-
-## SLST research notes
-
-Current working understanding: SLST is a sort/display list associated with camera-dependent polygon visibility and rendering order. In the original CrashEdit source, the older viewer decodes a list for a camera position and uses its polygon references to decide which scenery polygons to render. This is more than simply clipping individual vertices outside the screen.
-
-Important caveat: the exact Crash 2 record semantics, interpolation rules, and runtime constraints still need to be confirmed. Do not treat the current understanding as a complete specification, and do not implement a generator based only on assumptions from the viewer.
-
-Useful upstream source locations (reference only; the native implementation belongs in this repository):
-- Original source branch: [airumu/CrashEdit — t/net9](https://github.com/airumu/CrashEdit/tree/t/net9)
-- [SLST format directory](https://github.com/airumu/CrashEdit/tree/t/net9/Crash/Formats/Crash%20Formats/SLST)
-- [Old zone viewer](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controls/3D/OldZoneEntryViewer.cs)
-- [Old scenery viewer](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controls/3D/OldSceneryEntryViewer.cs)
-- [Newer scenery viewer](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controls/3D/SceneryEntryViewer.cs)
+Detailed format specifications, reverse-engineering evidence, original-source comparisons, sample analyses, and implementation history are maintained in [RESEARCH_NOTES.md](RESEARCH_NOTES.md) and the focused audit documents under `docs/`. Keep this roadmap focused on project-level achievements and upcoming goals; put low-level implementation details in the research documentation.
 
 ## Definition of success
 
