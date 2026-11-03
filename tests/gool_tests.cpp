@@ -321,5 +321,21 @@ int main(){
  ambiguousArchive.decodeGools(NsfGoolVersion::Version2);
  assert(ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Ambiguous);
  assert(!ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].targetFound);
+ NsfArchive editableArchive;
+ assert(editableArchive.loadBytes(makeGoolChunk(true,false),error));
+ editableArchive.decodeGools(NsfGoolVersion::Version2);
+ auto editedDescriptor=editableArchive.chunks()[0].entries[0].gool.stateDescriptors[0];
+ editedDescriptor.stateFlags=0x11223344;editedDescriptor.blockFlags=0x55667788;editedDescriptor.goolIndex=1;editedDescriptor.eventHook=21;editedDescriptor.transHook=22;editedDescriptor.codeHook=23;
+ assert(editableArchive.setGoolStateDescriptor(0,0,0,editedDescriptor));
+ assert(editableArchive.setGoolDataPoolWord(0,0,1,0x0200ABCDU));
+ std::vector<std::uint8_t> editedBytes;
+ assert(editableArchive.saveUncompressedBytes(editedBytes,error));
+ NsfArchive reloadedEditableArchive;
+ assert(reloadedEditableArchive.loadBytes(editedBytes,error));
+ reloadedEditableArchive.decodeGools(NsfGoolVersion::Version2);
+ const auto&roundTripDescriptor=reloadedEditableArchive.chunks()[0].entries[0].gool.stateDescriptors[0];
+ assert(roundTripDescriptor.stateFlags==0x11223344&&roundTripDescriptor.blockFlags==0x55667788);
+ assert(roundTripDescriptor.goolIndex==1&&roundTripDescriptor.eventHook==21&&roundTripDescriptor.transHook==22&&roundTripDescriptor.codeHook==23);
+ assert(static_cast<std::uint32_t>(reloadedEditableArchive.chunks()[0].entries[0].gool.dataPool[1])==0x0200ABCDU);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }

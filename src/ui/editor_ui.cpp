@@ -1464,17 +1464,21 @@ void EditorUI::drawGoolDataWindows(){
    const auto&selectedDescriptor=gool->stateDescriptors[static_cast<std::size_t>(selectedExternalDescriptor)];
    const auto*selectedReference=static_cast<std::size_t>(selectedExternalDescriptor)<gool->stateReferences.size()?&gool->stateReferences[static_cast<std::size_t>(selectedExternalDescriptor)]:nullptr;
    const bool validPoolIndex=selectedDescriptor.goolIndex>=0&&static_cast<std::size_t>(selectedDescriptor.goolIndex)<gool->dataPool.size();
-   const bool isExternal=selectedReference&&(selectedReference->status==Crash::NsfGoolStateReferenceStatus::External||selectedReference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous);
-   if(isExternal&&validPoolIndex){
+   if(validPoolIndex){
+    static int cachedExternalDescriptor=-1;static std::uint32_t externalEidValue=0;
+    if(cachedExternalDescriptor!=selectedExternalDescriptor){cachedExternalDescriptor=selectedExternalDescriptor;externalEidValue=static_cast<std::uint32_t>(gool->dataPool[static_cast<std::size_t>(selectedDescriptor.goolIndex)]);}
     ImGui::Separator();ImGui::Text("External GOOL");
-    bool externalEnabled=true;
-    if(ImGui::Checkbox("Enabled",&externalEnabled)&&!externalEnabled){const auto index=static_cast<std::size_t>(selectedDescriptor.goolIndex);if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),index,goolEid)){nsf_.decodeGools(nsfGoolVersion(gameVersion_));gool=&nsf_.chunks()[static_cast<std::size_t>(activeGoolChunk_)].entries[static_cast<std::size_t>(activeGoolEntry_)].gool;}}
-    std::uint32_t externalEid=static_cast<std::uint32_t>(gool->dataPool[static_cast<std::size_t>(selectedDescriptor.goolIndex)]);
-    if(ImGui::InputScalar("External GOOL EID",ImGuiDataType_U32,&externalEid,nullptr,nullptr,"%08X")){if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedDescriptor.goolIndex),externalEid)){nsf_.decodeGools(nsfGoolVersion(gameVersion_));gool=&nsf_.chunks()[static_cast<std::size_t>(activeGoolChunk_)].entries[static_cast<std::size_t>(activeGoolEntry_)].gool;}}
+    const bool isExternal=selectedReference&&(selectedReference->status==Crash::NsfGoolStateReferenceStatus::External||selectedReference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous);
+    bool externalEnabled=isExternal;
+    ImGui::InputScalar("External GOOL EID",ImGuiDataType_U32,&externalEidValue,nullptr,nullptr,"%08X");
+    if(ImGui::Checkbox("Enabled",&externalEnabled)){
+     const auto index=static_cast<std::size_t>(selectedDescriptor.goolIndex);
+     const auto value=externalEnabled?externalEidValue:goolEid;
+     if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),index,value)){nsf_.decodeGools(nsfGoolVersion(gameVersion_));gool=&nsf_.chunks()[static_cast<std::size_t>(activeGoolChunk_)].entries[static_cast<std::size_t>(activeGoolEntry_)].gool;}
+    }
     int externalIndex=selectedDescriptor.goolIndex;
-    if(ImGui::InputInt("External GOOL Index",&externalIndex)&&externalIndex>=0&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(std::clamp(externalIndex,0,32767));if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited)){nsf_.decodeGools(nsfGoolVersion(gameVersion_));gool=&nsf_.chunks()[static_cast<std::size_t>(activeGoolChunk_)].entries[static_cast<std::size_t>(activeGoolEntry_)].gool;}}
+    if(ImGui::InputInt("External GOOL Index",&externalIndex)&&externalIndex>=0&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(std::clamp(externalIndex,0,32767));if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited)){nsf_.decodeGools(nsfGoolVersion(gameVersion_));gool=&nsf_.chunks()[static_cast<std::size_t>(activeGoolChunk_)].entries[static_cast<std::size_t>(activeGoolEntry_)].gool;cachedExternalDescriptor=-1;}}
    }
-  }else ImGui::TextDisabled("No state descriptors in this GOOL entry.");
   }else ImGui::TextDisabled("No state descriptors in this GOOL entry.");
  }ImGui::End();focusGoolDataPool_=false;
 }
