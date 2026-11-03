@@ -1213,8 +1213,7 @@ void EditorUI::drawSpawnPointsEditor(){
   for(std::size_t i=0;i<nsd_.spawns.size();++i){
    auto&p=nsd_.spawns[i];ImGui::PushID(static_cast<int>(i));ImGui::TableNextRow();
    ImGui::TableSetColumnIndex(0);
-   const bool rowSelected=selectedSpawn_==static_cast<int>(i);
-   const auto currentZoneEid=static_cast<std::uint32_t>(p.zoneEid);
+    const auto currentZoneEid=static_cast<std::uint32_t>(p.zoneEid);
    const auto eidName=Crash::eidToEName(currentZoneEid);
    std::string zonePreview=Crash::isValidEid(currentZoneEid)?eidName:"Unknown EID";
    if(!Crash::isValidEid(currentZoneEid)){char unknown[16];std::snprintf(unknown,sizeof(unknown)," (%08X)",currentZoneEid);zonePreview+=unknown;}
@@ -1230,7 +1229,6 @@ void EditorUI::drawSpawnPointsEditor(){
     }
     ImGui::EndCombo();
    }
-   if(ImGui::IsItemActivated())selectedSpawn_=static_cast<int>(i);
    if(ImGui::BeginDragDropSource()){
     const int from=static_cast<int>(i);ImGui::SetDragDropPayload("NSD_SPAWN_ROW",&from,sizeof(from));ImGui::Text("Move spawn point %zu",i);ImGui::EndDragDropSource();
    }
