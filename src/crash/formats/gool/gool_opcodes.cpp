@@ -1,6 +1,8 @@
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <array>
 #include <cstdio>
+#include <iomanip>
+#include <sstream>
 #include <algorithm>
 
 namespace CrashEdit::Crash {
@@ -206,7 +208,7 @@ std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGool
   const auto* target=find('I');
   const bool isExternal=external&&external->rawValue!=0;
   std::string result="subroutine "+number('I')+(isExternal?" (external)":" (local)");
-  if(!isExternal&&target) result+=relativeTarget(target->value).replace(0,0,"");
+  if(!isExternal&&target) result+=relativeTarget(target->value);
   result+=", arguments "+number('V');
   return result;
  }

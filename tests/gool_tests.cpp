@@ -149,8 +149,8 @@ int main(){
  assert(formatGoolControlFlow(53,goArgs,controlFlowGool,2)=="state 291, arguments 0 (state descriptor out of range)");
  controlFlowGool.dataPool={static_cast<std::int32_t>(0x12345678U)};
  controlFlowGool.stateDescriptors.resize(1); controlFlowGool.stateDescriptors[0].goolIndex=0;
- const auto validGoArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000001U);
- assert(formatGoolControlFlow(53,validGoArgs,controlFlowGool,2)=="state 1, arguments 0 (descriptor 1, GOOL 0x12345678)");
+ const auto validGoArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000000U);
+ assert(formatGoolControlFlow(53,validGoArgs,controlFlowGool,2)=="state 0, arguments 0 (descriptor 0, GOOL 0x12345678)");
  const auto callArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000000U);
  assert(formatGoolControlFlow(59,callArgs,controlFlowGool,2)=="subroutine 0 (local) (target instruction 1), arguments 0");
  const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x004000U);
