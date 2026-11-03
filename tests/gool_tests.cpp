@@ -83,7 +83,7 @@ int main(){
  assert(mipsKnown&&mipsName=="mfc0"&&mipsArgs=="$t0,Status");
  decodeMipsInstruction(0x40886000U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mtc0"&&mipsArgs=="$t0,Status");
- decodeMipsInstruction(0x40076000U,mipsName,mipsArgs,mipsKnown);
+ decodeMipsInstruction(0x40084000U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mfc0"&&mipsArgs=="$t0,BadVaddr");
  decodeMipsInstruction(0x42000010U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="rfe"&&mipsArgs.empty());

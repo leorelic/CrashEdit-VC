@@ -221,8 +221,8 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   // registers named where their hardware meanings are known.
   if(rs==0U || rs==4U) {
    static constexpr const char* systemRegisters[]={
-    "Index","Random","EntryLo","BPC","BDA","JUMPDEST","DCIC","BadVaddr",
-    "BDAM","BPCM","Reserved10","Reserved11","Status","Cause","EPC","PRId",
+    "Index","Random","EntryLo","BPC","BDA","JUMPDEST","DCIC","Reserved7",
+    "BadVaddr","BDAM","BPCM","Reserved11","Status","Cause","EPC","PRId",
     "Reserved16","Reserved17","Reserved18","Reserved19","Reserved20","Reserved21","Reserved22","Reserved23",
     "Reserved24","Reserved25","Reserved26","Reserved27","Reserved28","Reserved29","Reserved30","Reserved31"
    };
