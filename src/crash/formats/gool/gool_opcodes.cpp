@@ -165,29 +165,54 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
   }
  }
 }
-std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGoolOperand>& operands) {
+std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGoolOperand>& operands, const NsfGool& gool, std::size_t instructionIndex) {
  auto find=[&](char name)->const NsfGoolOperand* { for(const auto& operand:operands) if(operand.name==name) return &operand; return nullptr; };
  auto number=[&](char name)->std::string { const auto* operand=find(name); return operand?std::to_string(operand->value):"?"; };
  auto field=[&]()->std::string { const auto* operand=find('R'); return operand?goolObjectFieldName(operand->rawValue):"unknown"; };
+ auto relativeTarget=[&](std::int32_t displacement)->std::string {
+  const auto target=static_cast<std::int64_t>(instructionIndex)+1+displacement;
+  if(target<0||static_cast<std::uint64_t>(target)>=gool.instructions.size()) return " (target out of range: "+std::to_string(target)+")";
+  return " (target instruction "+std::to_string(target)+")";
+ };
  if(opcode>=50U&&opcode<=52U) {
-  std::string result="relative "+number('I')+" instructions";
+  const auto* offset=find('I');
+  const auto displacement=offset?offset->value:0;
+  std::string result="relative "+number('I')+" instructions"+relativeTarget(displacement);
   result+=", pop "+number('V');
   if(opcode==51U) result+=", if "+field()+" is true";
   else if(opcode==52U) result+=", if "+field()+" is false";
   return result;
  }
  if(opcode>=53U&&opcode<=55U) {
+  const auto* state=find('S');
+  const auto index=state?state->rawValue:0U;
   std::string result="state "+number('S')+", arguments "+number('V');
+  if(index<gool.stateDescriptors.size()) {
+   const auto& descriptor=gool.stateDescriptors[index];
+   result+=" (descriptor "+std::to_string(index);
+   if(descriptor.goolIndex>=0&&static_cast<std::size_t>(descriptor.goolIndex)<gool.dataPool.size()) {
+    std::ostringstream eid;
+    eid<<"0x"<<std::uppercase<<std::hex<<std::setw(8)<<std::setfill('0')<<static_cast<std::uint32_t>(gool.dataPool[static_cast<std::size_t>(descriptor.goolIndex)]);
+    result+=", GOOL "+eid.str();
+   } else result+=", invalid GOOL data index "+std::to_string(descriptor.goolIndex);
+   result+=")";
+  } else result+=" (state descriptor out of range)";
   if(opcode==54U) result+=", if "+field()+" is true";
   else if(opcode==55U) result+=", if "+field()+" is false";
   return result;
  }
  if(opcode==59U) {
   const auto* external=find('E');
-  return "subroutine "+number('I')+(external&&external->rawValue?" (external)":" (local)")+", arguments "+number('V');
+  const auto* target=find('I');
+  const bool isExternal=external&&external->rawValue!=0;
+  std::string result="subroutine "+number('I')+(isExternal?" (external)":" (local)");
+  if(!isExternal&&target) result+=relativeTarget(target->value).replace(0,0,"");
+  result+=", arguments "+number('V');
+  return result;
  }
  return {};
 }
+
 std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
  std::string out;char buf[64];
  for(const auto&a:operands){if(!out.empty())out+=", ";std::snprintf(buf,sizeof(buf),"%c=",a.name);out+=buf;

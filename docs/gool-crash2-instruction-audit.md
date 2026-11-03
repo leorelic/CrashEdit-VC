@@ -163,3 +163,10 @@ The original Crash 2 opcode classes in `GOOLInstructionList.cs` distinguish thre
 - `CALL` uses a 14-bit `I` subroutine number, one-bit `E` local/external selector, and 4-bit `V` argument count. It is not a 14-bit byte or instruction offset.
 
 The inspector now presents those meanings in the instruction argument column while retaining the original instruction word and operand bits in the parsed record. Target-address calculation and state/subroutine resolution remain deferred until their indexing bases and cross-entry relationships are established.
+
+
+## Local control-flow target validation
+
+Control-flow formatting now receives the parsed GOOL entry and current instruction index. Relative branch destinations use the original CrashEdit rule `instruction index + 1 + signed displacement`, and are checked against the decoded instruction stream. Local CALL targets are checked against the same stream; external calls remain explicitly external and are not assigned a local destination.
+
+GO/GNEZ/GEQZ state operands are checked against the state-descriptor table. For a valid descriptor, its GOOL data-pool index is validated and the referenced EID is shown. Invalid state indices or data-pool indices are reported rather than dereferenced. This is metadata-level resolution only: mapping external EIDs to other parsed NSF entries and resolving external hooks is a separate archive-level step.

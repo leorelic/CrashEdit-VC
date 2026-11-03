@@ -140,15 +140,21 @@ int main(){
 
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
  const auto branchArgs=decodeGoolOperands(NsfGoolVersion::Version2,51,0x3FFU);
- assert(formatGoolControlFlow(51,branchArgs)=="relative -1 instructions, pop 0, if self is true");
+ NsfGool controlFlowGool; controlFlowGool.instructions.resize(8);
+ const auto branchArgs=decodeGoolOperands(NsfGoolVersion::Version2,51,0x3FFU);
+ assert(formatGoolControlFlow(51,branchArgs,controlFlowGool,2)=="relative -1 instructions (target instruction 2), pop 0, if self is true");
  const auto equalBranchArgs=decodeGoolOperands(NsfGoolVersion::Version2,52,0x000000U);
- assert(formatGoolControlFlow(52,equalBranchArgs)=="relative 0 instructions, pop 0, if self is false");
+ assert(formatGoolControlFlow(52,equalBranchArgs,controlFlowGool,2)=="relative 0 instructions (target instruction 3), pop 0, if self is false");
  const auto goArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000123U);
- assert(formatGoolControlFlow(53,goArgs)=="state 291, arguments 0");
+ assert(formatGoolControlFlow(53,goArgs,controlFlowGool,2)=="state 291, arguments 0 (state descriptor out of range)");
+ controlFlowGool.dataPool={static_cast<std::int32_t>(0x12345678U)};
+ controlFlowGool.stateDescriptors.resize(1); controlFlowGool.stateDescriptors[0].goolIndex=0;
+ const auto validGoArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000001U);
+ assert(formatGoolControlFlow(53,validGoArgs,controlFlowGool,2)=="state 1, arguments 0 (descriptor 1, GOOL 0x12345678)");
  const auto callArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000000U);
- assert(formatGoolControlFlow(59,callArgs)=="subroutine 0 (local), arguments 0");
+ assert(formatGoolControlFlow(59,callArgs,controlFlowGool,2)=="subroutine 0 (local) (target instruction 1), arguments 0");
  const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x004000U);
- assert(formatGoolControlFlow(59,externalCallArgs)=="subroutine 0 (external), arguments 0");
+ assert(formatGoolControlFlow(59,externalCallArgs,controlFlowGool,2)=="subroutine 0 (external), arguments 0");
  // Destination references use their own encoding, not the source-pool format.
  NsfGool destinationContext;
  auto destination=decodeGoolOperands(NsfGoolVersion::Version2,17,0x00000000U);

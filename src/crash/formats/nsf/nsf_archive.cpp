@@ -261,7 +261,7 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
      const auto&info=goolOpcodeInfo(version,instruction.opcode);instruction.mnemonic=std::string(info.mnemonic);
      auto operands=decodeGoolOperands(version,instruction.opcode,instruction.operandBits);resolveGoolOperands(operands,gool);
      instruction.arguments=formatGoolOperands(operands);
-     const auto controlFlow=formatGoolControlFlow(instruction.opcode,operands);
+     const auto controlFlow=formatGoolControlFlow(instruction.opcode,operands,gool,gool.instructions.size()-1U);
      if(!controlFlow.empty())instruction.arguments=controlFlow;
     }
     gool.instructions.push_back(std::move(instruction));
