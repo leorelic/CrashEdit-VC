@@ -65,6 +65,12 @@ int main(){
  assert(mipsKnown&&mipsName=="lwc2"&&mipsArgs=="IR1,16($a0)");
  decodeMipsInstruction(0xE8AAFFFCU,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="swc2"&&mipsArgs=="IR2,-4($a1)");
+ decodeMipsInstruction(0x49000004U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="bc2f"&&mipsArgs=="4");
+ decodeMipsInstruction(0x49010004U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="bc2t"&&mipsArgs=="4");
+ decodeMipsInstruction(0x49020004U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x49020004");
  decodeMipsInstruction(0x03E0F809U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="jalr"&&mipsArgs=="$ra,$ra");
  decodeMipsInstruction(0x03E0A809U,mipsName,mipsArgs,mipsKnown);
