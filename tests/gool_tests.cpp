@@ -139,7 +139,6 @@ int main(){
  assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
 
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
- const auto branchArgs=decodeGoolOperands(NsfGoolVersion::Version2,51,0x3FFU);
  NsfGool controlFlowGool; controlFlowGool.instructions.resize(8);
  const auto branchArgs=decodeGoolOperands(NsfGoolVersion::Version2,51,0x3FFU);
  assert(formatGoolControlFlow(51,branchArgs,controlFlowGool,2)=="relative -1 instructions (target instruction 2), pop 0, if self is true");
