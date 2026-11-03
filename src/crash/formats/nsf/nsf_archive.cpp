@@ -264,7 +264,7 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
     }
     gool.instructions.push_back(std::move(instruction));
     if(mipsMode){
-     if(gool.instructions.size()>=2U){const auto&previous=gool.instructions[gool.instructions.size()-2U];if(previous.isMips&&(previous.word==0x03E0F809U||previous.word==0x03E00008U))mipsMode=false;}
+     if(gool.instructions.size()>=2U){const auto&previous=gool.instructions[gool.instructions.size()-2U];if(previous.isMips&&(previous.word==0x03E0A809U||previous.word==0x03E00008U))mipsMode=false;}
     }else if(version==NsfGoolVersion::Version2||version==NsfGoolVersion::Version3)mipsMode=gool.instructions.back().opcode==73U;
    }
    gool.decoded=true;entry.gool=std::move(gool);

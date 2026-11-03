@@ -13,7 +13,7 @@ using namespace CrashEdit::Crash;
 static void p16(std::vector<std::uint8_t>&b,std::size_t p,std::uint16_t v){b[p]=static_cast<std::uint8_t>(v);b[p+1]=static_cast<std::uint8_t>(v>>8U);}
 static void p32(std::vector<std::uint8_t>&b,std::size_t p,std::uint32_t v){for(int i=0;i<4;++i)b[p+static_cast<std::size_t>(i)]=static_cast<std::uint8_t>(v>>(8U*static_cast<unsigned>(i)));}
 
-static std::vector<std::uint8_t> makeGoolChunk(bool extended){
+static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateReturn=false){
  std::vector<std::uint8_t>b(NsfChunkSize);
  p16(b,0,0x1234);p16(b,2,0);p32(b,4,0x12345678);p32(b,8,1);
  const std::size_t entry=24;
@@ -29,7 +29,7 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended){
  const std::size_t header=entry+offsets[0];
  p32(b,header,0x10203040);p32(b,header+4,0x55667788);p32(b,header+8,extended?1:0);
  p32(b,header+12,0x100);p32(b,header+16,4);p32(b,header+20,2);
- const std::size_t code=entry+offsets[1];if(extended){p32(b,code,0x49000000);p32(b,code+4,0x012A4021);p32(b,code+8,0x03E00008);p32(b,code+12,0);p32(b,code+16,0x12000000);}else{p32(b,code,0x12345678);p32(b,code+4,0xABCDEF01);}
+ const std::size_t code=entry+offsets[1];if(extended){p32(b,code,0x49000000);p32(b,code+4,0x012A4021);p32(b,code+8,alternateReturn?0x03E0A809U:0x03E00008U);p32(b,code+12,0);p32(b,code+16,0x12000000);}else{p32(b,code,0x12345678);p32(b,code+4,0xABCDEF01);}
  const std::size_t data=entry+offsets[2];p32(b,data,0x11112222);p32(b,data+4,0x33334444);
  if(extended){
   const std::size_t map=entry+offsets[3];p16(b,map,0xffff);p16(b,map+2,3);
@@ -63,6 +63,8 @@ int main(){
  assert(mipsKnown&&mipsName=="lw"&&mipsArgs=="$t0,16($a0)");
  decodeMipsInstruction(0x03E0F809U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="jalr"&&mipsArgs=="$ra,$ra");
+ decodeMipsInstruction(0x03E0A809U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="jalr"&&mipsArgs=="$s5,$ra");
  decodeMipsInstruction(0x01200011U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mthi"&&mipsArgs=="$t1");
  decodeMipsInstruction(0x01200013U,mipsName,mipsArgs,mipsKnown);
@@ -202,6 +204,19 @@ int main(){
  assert(g.frameGroups[2].type==3&&g.frameGroups[2].byteSize==28);
  assert(g.frameGroups[3].type==4&&g.frameGroups[3].font==0x02001111&&g.frameGroups[3].byteSize==16);
  assert(g.frameGroups[4].type==5&&g.frameGroups[4].partCount==1&&g.frameGroups[4].byteSize==36);
+
+ // The original parser also treats 0x03E0A809 as a return sentinel,
+ // even though the instruction itself disassembles as jalr $s5,$ra.
+ assert(archive.loadBytes(makeGoolChunk(true,true),error));
+ archive.decodeGools(NsfGoolVersion::Version2);
+ const auto&sentinel=archive.chunks()[0].entries[0].gool;
+ assert(sentinel.decoded&&sentinel.instructions.size()==5);
+ assert(sentinel.instructions[0].opcode==73&&!sentinel.instructions[0].isMips);
+ assert(sentinel.instructions[1].isMips&&sentinel.instructions[1].mnemonic=="addu");
+ assert(sentinel.instructions[2].isMips&&sentinel.instructions[2].word==0x03E0A809U);
+ assert(sentinel.instructions[2].mnemonic=="jalr"&&sentinel.instructions[2].arguments=="$s5,$ra");
+ assert(sentinel.instructions[3].isMips&&sentinel.instructions[3].mnemonic=="nop");
+ assert(!sentinel.instructions[4].isMips&&sentinel.instructions[4].opcode==0x12);
 
  assert(archive.loadBytes(makeGoolChunk(false),error));
  archive.decodeGools(NsfGoolVersion::Version2);
