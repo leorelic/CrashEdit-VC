@@ -219,7 +219,7 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
  case 16:
   // R3000A COP0 register transfers (MFC0/MTC0). Keep the PS1 debug
   // registers named where their hardware meanings are known.
-  if(rs==0U || rs==4U) {
+  if((rs==0U || rs==4U) && (word&0x7FFU)==0U) {
    static constexpr const char* systemRegisters[]={
     "Index","Random","EntryLo","BPC","BDA","JUMPDEST","DCIC","Reserved7",
     "BadVaddr","BDAM","BPCM","Reserved11","Status","Cause","EPC","PRId",
@@ -228,7 +228,7 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
    };
    mnemonic=rs==0U?"mfc0":"mtc0";
    args(reg(rt)+","+systemRegisters[rd]);
-  } else if(rs==16U && (word&63U)==0x10U) {
+  } else if(rs==16U && (word&0x001FFFC0U)==0U && (word&63U)==0x10U) {
    // RFE is the R3000A's return-from-exception instruction.
    mnemonic="rfe";
   } else {
@@ -257,6 +257,7 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
     "OFX","OFY","H","DQA","DQB","ZSF3","ZSF4","FLAG"
    };
    const char* cop2Register=nullptr;
+   if((word&0x7FFU)!=0U) { known=false; break; }
    switch(rs) {
    case 0:mnemonic="mfc2";cop2Register=dataRegisters[rd];break;
    case 2:mnemonic="cfc2";cop2Register=controlRegisters[rd];break;

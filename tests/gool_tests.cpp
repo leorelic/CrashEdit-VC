@@ -89,6 +89,14 @@ int main(){
  assert(mipsKnown&&mipsName=="rfe"&&mipsArgs.empty());
  decodeMipsInstruction(0x42000001U,mipsName,mipsArgs,mipsKnown);
  assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x42000001");
+ // COP0 transfer and RFE encodings reserve their low/unused fields.
+ decodeMipsInstruction(0x40084001U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x40084001");
+ decodeMipsInstruction(0x42000810U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x42000810");
+ // COP2 register transfers likewise require zero in the low 11 bits.
+ decodeMipsInstruction(0x48084801U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x48084801");
  decodeMipsInstruction(0x48084800U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mfc2"&&mipsArgs=="$t0,IR1");
  decodeMipsInstruction(0x4849F800U,mipsName,mipsArgs,mipsKnown);
