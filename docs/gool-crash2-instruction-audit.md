@@ -153,3 +153,13 @@ The original CrashEdit MIPS decoder does not provide PlayStation COP2/GTE instru
 This is a disassembly/inspection feature, not GTE emulation. The implementation will distinguish GTE command instructions from COP2 register transfers and load/store forms, decode recognized command functions and their encoded flags/parameters, and retain unknown or reserved encodings as raw words. The command/function names and bitfield interpretation must be checked against PlayStation R3000A/COP2 and Geometry Transformation Engine documentation, not inferred from the GOOL opcode registry.
 
 A real word observed in the DispC native instruction stream, `0x49BE0BE0`, is a motivating test case: its primary opcode is COP2 and its GTE function field identifies `NCT` (Normal Color Triple). It should no longer appear as an undifferentiated `???` once this extension is implemented. This section records planned work; it does not imply that COP2/GTE decoding is already implemented.
+
+## Control-flow operand semantics confirmed from CrashEdit source
+
+The original Crash 2 opcode classes in `GOOLInstructionList.cs` distinguish three control-flow families:
+
+- `BRA`, `BNEZ`, and `BEQZ` use a signed 10-bit `I` displacement described by the source as moving a number of **instructions**, a 4-bit `V` stack-pop count, and a 6-bit process-field `R` condition for the conditional forms. The C++ inspector reports the relative instruction displacement and stack-pop count; it does not invent an absolute instruction address.
+- `GO`, `GNEZ`, and `GEQZ` use a 10-bit `S` state number, a 4-bit `V` argument count, and a 6-bit process-field `R` condition for the conditional forms. These are state transitions, not instruction-relative branches.
+- `CALL` uses a 14-bit `I` subroutine number, one-bit `E` local/external selector, and 4-bit `V` argument count. It is not a 14-bit byte or instruction offset.
+
+The inspector now presents those meanings in the instruction argument column while retaining the original instruction word and operand bits in the parsed record. Target-address calculation and state/subroutine resolution remain deferred until their indexing bases and cross-entry relationships are established.

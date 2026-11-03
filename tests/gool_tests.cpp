@@ -139,6 +139,16 @@ int main(){
  assert(branchFields[2].name=='R'&&branchFields[2].kind==NsfGoolOperandKind::ProcessField);
 
  assert(goolOpcodeFormat(NsfGoolVersion::Version2,50).find("<IIII")!=std::string_view::npos);
+ const auto branchArgs=decodeGoolOperands(NsfGoolVersion::Version2,51,0x3FFU);
+ assert(formatGoolControlFlow(51,branchArgs)=="relative -1 instructions, pop 0, if self is true");
+ const auto equalBranchArgs=decodeGoolOperands(NsfGoolVersion::Version2,52,0x000000U);
+ assert(formatGoolControlFlow(52,equalBranchArgs)=="relative 0 instructions, pop 0, if self is false");
+ const auto goArgs=decodeGoolOperands(NsfGoolVersion::Version2,53,0x000123U);
+ assert(formatGoolControlFlow(53,goArgs)=="state 291, arguments 0");
+ const auto callArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000000U);
+ assert(formatGoolControlFlow(59,callArgs)=="subroutine 0 (local), arguments 0");
+ const auto externalCallArgs=decodeGoolOperands(NsfGoolVersion::Version2,59,0x000010U);
+ assert(formatGoolControlFlow(59,externalCallArgs)=="subroutine 0 (external), arguments 0");
  // Destination references use their own encoding, not the source-pool format.
  NsfGool destinationContext;
  auto destination=decodeGoolOperands(NsfGoolVersion::Version2,17,0x00000000U);

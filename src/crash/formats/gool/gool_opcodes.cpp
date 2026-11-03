@@ -165,6 +165,29 @@ void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& g
   }
  }
 }
+std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGoolOperand>& operands) {
+ auto find=[&](char name)->const NsfGoolOperand* { for(const auto& operand:operands) if(operand.name==name) return &operand; return nullptr; };
+ auto number=[&](char name)->std::string { const auto* operand=find(name); return operand?std::to_string(operand->value):"?"; };
+ auto field=[&]()->std::string { const auto* operand=find('R'); return operand?goolObjectFieldName(operand->rawValue):"unknown"; };
+ if(opcode>=50U&&opcode<=52U) {
+  std::string result="relative "+number('I')+" instructions";
+  result+=", pop "+number('V');
+  if(opcode==51U) result+=", if "+field()+" is true";
+  else if(opcode==52U) result+=", if "+field()+" is false";
+  return result;
+ }
+ if(opcode>=53U&&opcode<=55U) {
+  std::string result="state "+number('S')+", arguments "+number('V');
+  if(opcode==54U) result+=", if "+field()+" is true";
+  else if(opcode==55U) result+=", if "+field()+" is false";
+  return result;
+ }
+ if(opcode==59U) {
+  const auto* external=find('E');
+  return "subroutine "+number('I')+(external&&external->rawValue?" (external)":" (local)")+", arguments "+number('V');
+ }
+ return {};
+}
 std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
  std::string out;char buf[64];
  for(const auto&a:operands){if(!out.empty())out+=", ";std::snprintf(buf,sizeof(buf),"%c=",a.name);out+=buf;
