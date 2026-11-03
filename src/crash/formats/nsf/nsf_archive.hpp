@@ -125,7 +125,9 @@ public:
  std::vector<NsfEntryLocation> findEntriesByEid(std::uint32_t eid) const;
  std::size_t compressedChunkCount()const noexcept;
  void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version);
- bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);\n bool setGoolStateDescriptor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t descriptorIndex,const NsfGoolStateDescriptor& descriptor);\n bool setGoolDataPoolWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t wordIndex,std::uint32_t value);
+ bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);
+ bool setGoolStateDescriptor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t descriptorIndex,const NsfGoolStateDescriptor& descriptor);
+ bool setGoolDataPoolWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t wordIndex,std::uint32_t value);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;
