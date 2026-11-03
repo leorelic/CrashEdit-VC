@@ -217,8 +217,31 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   {static constexpr const char* names[]={"addi","addiu","slti","sltiu","andi","ori","xori"};mnemonic=names[op-8];args(reg(rt)+","+reg(rs)+","+std::to_string((op>=12)?(word&0xFFFFU):static_cast<std::uint32_t>(static_cast<std::int32_t>(imm))));}break;
  case 15:mnemonic="lui";args(reg(rt)+","+std::to_string(word&0xFFFFU));break;
  case 18:
-  if((rs&0x10U)!=0) decodeGteCommand(word,mnemonic,arguments,known);
-  else known=false;
+  if((rs&0x10U)!=0) {
+   decodeGteCommand(word,mnemonic,arguments,known);
+  } else {
+   static constexpr const char* dataRegisters[]={
+    "VXY0","VZ0","VXY1","VZ1","VXY2","VZ2","RGBC","OTZ",
+    "IR0","IR1","IR2","IR3","SXY0","SXY1","SXY2","SXYP",
+    "SZ0","SZ1","SZ2","SZ3","RGB0","RGB1","RGB2","RES1",
+    "MAC0","MAC1","MAC2","MAC3","IRGB","ORGB","LZCS","LZCR"
+   };
+   static constexpr const char* controlRegisters[]={
+    "RT11RT12","RT13RT21","RT22RT23","RT31RT32","RT33","TRX","TRY","TRZ",
+    "L11L12","L13L21","L22L23","L31L32","L33","RBK","GBK","BBK",
+    "LR1LR2","LR3LG1","LG2LG3","LB1LB2","LB3","RFC","GFC","BFC",
+    "OFX","OFY","H","DQA","DQB","ZSF3","ZSF4","FLAG"
+   };
+   const char* cop2Register=nullptr;
+   switch(rs) {
+   case 0:mnemonic="mfc2";cop2Register=dataRegisters[rd];break;
+   case 2:mnemonic="cfc2";cop2Register=controlRegisters[rd];break;
+   case 4:mnemonic="mtc2";cop2Register=dataRegisters[rd];break;
+   case 6:mnemonic="ctc2";cop2Register=controlRegisters[rd];break;
+   default:known=false;break;
+   }
+   if(cop2Register) args(reg(rt)+","+cop2Register);
+  }
   break;
  case 32:case 33:case 34:case 35:case 36:case 37:case 38:case 40:case 41:case 42:case 43:case 46:
   {static constexpr const char* names[]={"lb","lh","lwl","lw","lbu","lhu","lwr","","sb","sh","swl","sw","swr"};const char* name=nullptr;

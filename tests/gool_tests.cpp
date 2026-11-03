@@ -69,6 +69,16 @@ int main(){
  assert(mipsKnown&&mipsName=="mthi"&&mipsArgs=="$t1");
  decodeMipsInstruction(0x01200013U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="mtlo"&&mipsArgs=="$t1");
+ decodeMipsInstruction(0x48004800U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mfc2"&&mipsArgs=="$t0,IR1");
+ decodeMipsInstruction(0x4849F800U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="cfc2"&&mipsArgs=="$t1,FLAG");
+ decodeMipsInstruction(0x488A7000U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="mtc2"&&mipsArgs=="$t2,IR2");
+ decodeMipsInstruction(0x48CBF800U,mipsName,mipsArgs,mipsKnown);
+ assert(mipsKnown&&mipsName=="ctc2"&&mipsArgs=="$t3,FLAG");
+ decodeMipsInstruction(0x48E04800U,mipsName,mipsArgs,mipsKnown);
+ assert(!mipsKnown&&mipsName=="???"&&mipsArgs=="0x48E04800");
  decodeMipsInstruction(0x4A180001U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="rtps"&&mipsArgs=="sf=1,lm=0");
  decodeMipsInstruction(0x4BBE0BE0U,mipsName,mipsArgs,mipsKnown);
