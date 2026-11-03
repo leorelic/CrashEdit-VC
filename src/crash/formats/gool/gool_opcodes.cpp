@@ -217,7 +217,12 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   {static constexpr const char* names[]={"addi","addiu","slti","sltiu","andi","ori","xori"};mnemonic=names[op-8];args(reg(rt)+","+reg(rs)+","+std::to_string((op>=12)?(word&0xFFFFU):static_cast<std::uint32_t>(static_cast<std::int32_t>(imm))));}break;
  case 15:mnemonic="lui";args(reg(rt)+","+std::to_string(word&0xFFFFU));break;
  case 18:
-  if((rs&0x10U)!=0) {
+  if(rs==8U) {
+   if(rt==0U) mnemonic="bc2f";
+   else if(rt==1U) mnemonic="bc2t";
+   else {known=false;break;}
+   args(std::to_string(imm));
+  } else if((rs&0x10U)!=0) {
    decodeGteCommand(word,mnemonic,arguments,known);
   } else {
    static constexpr const char* dataRegisters[]={
