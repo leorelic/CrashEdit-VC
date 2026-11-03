@@ -243,10 +243,16 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
    if(cop2Register) args(reg(rt)+","+cop2Register);
   }
   break;
- case 32:case 33:case 34:case 35:case 36:case 37:case 38:case 40:case 41:case 42:case 43:case 46:
-  {static constexpr const char* names[]={"lb","lh","lwl","lw","lbu","lhu","lwr","","sb","sh","swl","sw","swr"};const char* name=nullptr;
-   switch(op){case 32:name="lb";break;case 33:name="lh";break;case 34:name="lwl";break;case 35:name="lw";break;case 36:name="lbu";break;case 37:name="lhu";break;case 38:name="lwr";break;case 40:name="sb";break;case 41:name="sh";break;case 42:name="swl";break;case 43:name="sw";break;case 46:name="swr";break;default:break;}
-   (void)names;mnemonic=name;args(reg(rt)+","+std::to_string(imm)+"("+reg(rs)+")");}break;
+ case 32:case 33:case 34:case 35:case 36:case 37:case 38:case 40:case 41:case 42:case 43:case 46:case 50:case 58:
+  {static constexpr const char* cop2DataRegisters[]={
+    "VXY0","VZ0","VXY1","VZ1","VXY2","VZ2","RGBC","OTZ",
+    "IR0","IR1","IR2","IR3","SXY0","SXY1","SXY2","SXYP",
+    "SZ0","SZ1","SZ2","SZ3","RGB0","RGB1","RGB2","RES1",
+    "MAC0","MAC1","MAC2","MAC3","IRGB","ORGB","LZCS","LZCR"
+   };static constexpr const char* names[]={"lb","lh","lwl","lw","lbu","lhu","lwr","","sb","sh","swl","sw","swr"};const char* name=nullptr;
+   switch(op){case 32:name="lb";break;case 33:name="lh";break;case 34:name="lwl";break;case 35:name="lw";break;case 36:name="lbu";break;case 37:name="lhu";break;case 38:name="lwr";break;case 40:name="sb";break;case 41:name="sh";break;case 42:name="swl";break;case 43:name="sw";break;case 46:name="swr";break;case 50:name="lwc2";break;case 58:name="swc2";break;default:break;}
+   if(op==50||op==58)args(std::string(cop2DataRegisters[rt])+","+std::to_string(imm)+"("+reg(rs)+")");
+   else args(reg(rt)+","+std::to_string(imm)+"("+reg(rs)+")");mnemonic=name;}break;
  default:known=false;break;
  }
  if(word==0){mnemonic="nop";arguments.clear();known=true;}
