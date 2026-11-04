@@ -1768,8 +1768,7 @@ void EditorUI::drawGoolBlueprintGraph(){
  float contentHeight=40.0f;
  for(float height:rowHeights)contentHeight+=height+rowGap;
  const float canvasHeight=std::max(ImGui::GetContentRegionAvail().y,contentHeight);
- const float canvasViewportHeight=std::max(160.0f,ImGui::GetContentRegionAvail().y-285.0f);
- if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,canvasViewportHeight),true,ImGuiWindowFlags_HorizontalScrollbar)){
+ if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
   const ImVec2 origin=ImGui::GetCursorScreenPos();
   const ImVec2 extent(canvasWidth,canvasHeight);
   ImGui::Dummy(extent);
