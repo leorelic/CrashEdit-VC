@@ -1,5 +1,6 @@
 #include "crash/formats/gool/gool_ir.hpp"
-#include "crash/formats/gool/gool_control_flow.hpp"\n#include <utility>
+#include "crash/formats/gool/gool_control_flow.hpp"
+#include <utility>
 #include "crash/formats/gool/gool_opcodes.hpp"
 
 namespace CrashEdit::Crash {
