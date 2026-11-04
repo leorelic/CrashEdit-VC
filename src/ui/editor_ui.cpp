@@ -1454,30 +1454,32 @@ void EditorUI::drawGoolDataWindows(){
  if(ImGui::Begin("GOOL State Descriptions",&showGoolStateDescriptions_,flags)){
   ImGui::Text("State descriptors: %zu",gool->stateDescriptors.size());
   bool goolReferencesNeedRefresh=false;
-  if(!gool->stateDescriptors.empty()&&ImGui::BeginTable("GOOLStateDescriptorsV2",9,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX|ImGuiTableFlags_ScrollY)){
-   ImGui::TableSetupColumn("State flags",ImGuiTableColumnFlags_WidthFixed,115.0f);ImGui::TableSetupColumn("Block flags",ImGuiTableColumnFlags_WidthFixed,115.0f);ImGui::TableSetupColumn("GOOL index",ImGuiTableColumnFlags_WidthFixed,90.0f);ImGui::TableSetupColumn("Event hook",ImGuiTableColumnFlags_WidthFixed,95.0f);ImGui::TableSetupColumn("Transition hook",ImGuiTableColumnFlags_WidthFixed,125.0f);ImGui::TableSetupColumn("Code hook",ImGuiTableColumnFlags_WidthFixed,90.0f);ImGui::TableSetupColumn("Referenced EID",ImGuiTableColumnFlags_WidthFixed,185.0f);ImGui::TableSetupColumn("GOOL reference",ImGuiTableColumnFlags_WidthFixed,125.0f);ImGui::TableSetupColumn("Target",ImGuiTableColumnFlags_WidthFixed,155.0f);ImGui::TableHeadersRow();
+  if(!gool->stateDescriptors.empty()&&ImGui::BeginTable("GOOLStateDescriptorsV2",10,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX|ImGuiTableFlags_ScrollY,ImVec2(0,190))){
+   ImGui::TableSetupColumn("Edit",ImGuiTableColumnFlags_WidthFixed,48.0f);ImGui::TableSetupColumn("State flags",ImGuiTableColumnFlags_WidthFixed,115.0f);ImGui::TableSetupColumn("Block flags",ImGuiTableColumnFlags_WidthFixed,115.0f);ImGui::TableSetupColumn("GOOL index",ImGuiTableColumnFlags_WidthFixed,90.0f);ImGui::TableSetupColumn("Event hook",ImGuiTableColumnFlags_WidthFixed,95.0f);ImGui::TableSetupColumn("Transition hook",ImGuiTableColumnFlags_WidthFixed,125.0f);ImGui::TableSetupColumn("Code hook",ImGuiTableColumnFlags_WidthFixed,90.0f);ImGui::TableSetupColumn("Referenced EID",ImGuiTableColumnFlags_WidthFixed,185.0f);ImGui::TableSetupColumn("GOOL reference",ImGuiTableColumnFlags_WidthFixed,125.0f);ImGui::TableSetupColumn("Target",ImGuiTableColumnFlags_WidthFixed,155.0f);ImGui::TableHeadersRow();
    static int selectedExternalDescriptor=0;
    selectedExternalDescriptor=std::clamp(selectedExternalDescriptor,0,static_cast<int>(gool->stateDescriptors.size()-1));
    for(std::size_t i=0;i<gool->stateDescriptors.size();++i){
     auto d=gool->stateDescriptors[i];const auto*reference=i<gool->stateReferences.size()?&gool->stateReferences[i]:nullptr;bool changed=false;
     ImGui::TableNextRow();ImGui::PushID(static_cast<int>(i));
-    ImGui::TableSetColumnIndex(0);std::uint32_t stateFlags=static_cast<std::uint32_t>(d.stateFlags);if(ImGui::InputScalar("##stateFlags",ImGuiDataType_U32,&stateFlags,nullptr,nullptr,"%08X")){d.stateFlags=static_cast<std::int32_t>(stateFlags);changed=true;}
-    ImGui::TableSetColumnIndex(1);std::uint32_t blockFlags=static_cast<std::uint32_t>(d.blockFlags);if(ImGui::InputScalar("##blockFlags",ImGuiDataType_U32,&blockFlags,nullptr,nullptr,"%08X")){d.blockFlags=static_cast<std::int32_t>(blockFlags);changed=true;}
-    ImGui::TableSetColumnIndex(2);std::int16_t goolIndex=d.goolIndex;if(ImGui::InputScalar("##goolIndex",ImGuiDataType_S16,&goolIndex)){d.goolIndex=goolIndex;changed=true;}if(ImGui::IsItemClicked())selectedExternalDescriptor=static_cast<int>(i);
-    ImGui::TableSetColumnIndex(3);std::int16_t eventHook=d.eventHook;if(ImGui::InputScalar("##eventHook",ImGuiDataType_S16,&eventHook)){d.eventHook=eventHook;changed=true;}
-    ImGui::TableSetColumnIndex(4);std::int16_t transHook=d.transHook;if(ImGui::InputScalar("##transHook",ImGuiDataType_S16,&transHook)){d.transHook=transHook;changed=true;}
-    ImGui::TableSetColumnIndex(5);std::int16_t codeHook=d.codeHook;if(ImGui::InputScalar("##codeHook",ImGuiDataType_S16,&codeHook)){d.codeHook=codeHook;changed=true;}
+    ImGui::TableSetColumnIndex(0);if(ImGui::Selectable("Edit",selectedExternalDescriptor==static_cast<int>(i),ImGuiSelectableFlags_None,ImVec2(0,ImGui::GetFrameHeight())))selectedExternalDescriptor=static_cast<int>(i);
+    ImGui::TableSetColumnIndex(1);std::uint32_t stateFlags=static_cast<std::uint32_t>(d.stateFlags);if(ImGui::InputScalar("##stateFlags",ImGuiDataType_U32,&stateFlags,nullptr,nullptr,"%08X")){d.stateFlags=static_cast<std::int32_t>(stateFlags);changed=true;}
+    ImGui::TableSetColumnIndex(2);std::uint32_t blockFlags=static_cast<std::uint32_t>(d.blockFlags);if(ImGui::InputScalar("##blockFlags",ImGuiDataType_U32,&blockFlags,nullptr,nullptr,"%08X")){d.blockFlags=static_cast<std::int32_t>(blockFlags);changed=true;}
+    ImGui::TableSetColumnIndex(3);std::int16_t goolIndex=d.goolIndex;if(ImGui::InputScalar("##goolIndex",ImGuiDataType_S16,&goolIndex)){d.goolIndex=goolIndex;changed=true;}
+    ImGui::TableSetColumnIndex(4);std::int16_t eventHook=d.eventHook;if(ImGui::InputScalar("##eventHook",ImGuiDataType_S16,&eventHook)){d.eventHook=eventHook;changed=true;}
+    ImGui::TableSetColumnIndex(5);std::int16_t transHook=d.transHook;if(ImGui::InputScalar("##transHook",ImGuiDataType_S16,&transHook)){d.transHook=transHook;changed=true;}
+    ImGui::TableSetColumnIndex(6);std::int16_t codeHook=d.codeHook;if(ImGui::InputScalar("##codeHook",ImGuiDataType_S16,&codeHook)){d.codeHook=codeHook;changed=true;}
     if(changed&&nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),i,d))goolReferencesNeedRefresh=true;
-    ImGui::TableSetColumnIndex(6);reference=i<gool->stateReferences.size()?&gool->stateReferences[i]:nullptr;
+    ImGui::TableSetColumnIndex(7);reference=i<gool->stateReferences.size()?&gool->stateReferences[i]:nullptr;
     if(reference&&reference->status!=Crash::NsfGoolStateReferenceStatus::InvalidDataIndex){const bool external=reference->status==Crash::NsfGoolStateReferenceStatus::External||reference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous;if(Crash::isValidEid(reference->eid)){if(external)ImGui::TextColored(ImVec4(.25f,.85f,1.0f,1.0f),"%08X (%s)",reference->eid,Crash::eidToEName(reference->eid).c_str());else ImGui::Text("%08X (%s)",reference->eid,Crash::eidToEName(reference->eid).c_str());}else ImGui::Text("0x%08X",reference->eid);}else ImGui::TextDisabled("-");
-    ImGui::TableSetColumnIndex(7);if(!reference)ImGui::TextDisabled("Unavailable");else{const char*status=reference->status==Crash::NsfGoolStateReferenceStatus::InvalidDataIndex?"Invalid data index":reference->status==Crash::NsfGoolStateReferenceStatus::Local?"Local":reference->status==Crash::NsfGoolStateReferenceStatus::External?"External":"Ambiguous";ImGui::TextUnformatted(status);}
-    ImGui::TableSetColumnIndex(8);if(reference&&reference->targetFound&&reference->status==Crash::NsfGoolStateReferenceStatus::Local)ImGui::TextUnformatted("This entry");else if(reference&&reference->targetFound)ImGui::Text("Chunk %03zu / Entry %03zu",reference->targetChunkIndex,reference->targetEntryIndex);else if(reference&&reference->status==Crash::NsfGoolStateReferenceStatus::External)ImGui::TextDisabled("Not in this NSF");else ImGui::TextDisabled("-");
+    ImGui::TableSetColumnIndex(8);if(!reference)ImGui::TextDisabled("Unavailable");else{const char*status=reference->status==Crash::NsfGoolStateReferenceStatus::InvalidDataIndex?"Invalid data index":reference->status==Crash::NsfGoolStateReferenceStatus::Local?"Local":reference->status==Crash::NsfGoolStateReferenceStatus::External?"External":"Ambiguous";ImGui::TextUnformatted(status);}
+    ImGui::TableSetColumnIndex(9);if(reference&&reference->targetFound&&reference->status==Crash::NsfGoolStateReferenceStatus::Local)ImGui::TextUnformatted("This entry");else if(reference&&reference->targetFound)ImGui::Text("Chunk %03zu / Entry %03zu",reference->targetChunkIndex,reference->targetEntryIndex);else if(reference&&reference->status==Crash::NsfGoolStateReferenceStatus::External)ImGui::TextDisabled("Not in this NSF");else ImGui::TextDisabled("-");
     ImGui::PopID();
    }ImGui::EndTable();
-   ImGui::TextDisabled("Select a descriptor row to edit its GOOL target. The index points to a shared Data Pool word.");
+   ImGui::Separator();
+   ImGui::Text("External GOOL target — descriptor %d",selectedExternalDescriptor);
+   ImGui::TextDisabled("Use the Edit button in the table to choose which descriptor to modify.");
    const auto&selectedDescriptor=gool->stateDescriptors[static_cast<std::size_t>(selectedExternalDescriptor)];
    const bool validPoolIndex=selectedDescriptor.goolIndex>=0&&static_cast<std::size_t>(selectedDescriptor.goolIndex)<gool->dataPool.size();
-   ImGui::Separator();ImGui::Text("External GOOL");
    int externalIndex=selectedDescriptor.goolIndex;
    ImGui::SetNextItemWidth(180.0f);
    if(ImGui::InputInt("Data Pool index",&externalIndex)&&externalIndex>=0&&externalIndex<=32767&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){
