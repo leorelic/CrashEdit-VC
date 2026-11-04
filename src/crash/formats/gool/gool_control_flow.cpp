@@ -2,6 +2,7 @@
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <algorithm>
 #include <set>
+#include <utility>
 
 namespace CrashEdit::Crash {
 namespace {
