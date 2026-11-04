@@ -70,6 +70,36 @@ static void registerEditorSettingsHandler(){
 static void grid(ImDrawList*d,ImVec2 a,ImVec2 b){ImVec2 c((a.x+b.x)/2,a.y+(b.y-a.y)*.58f);float h=a.y+(b.y-a.y)*.3f;d->AddRectFilled(a,b,IM_COL32(25,30,38,255));d->AddRectFilled(a,ImVec2(b.x,h),IM_COL32(29,36,46,255));for(int i=-12;i<=12;++i)d->AddLine(ImVec2(c.x+i*42,h),ImVec2(c.x+i*115,b.y),IM_COL32(86,105,126,95));for(int i=1;i<=12;++i){float t=float(i)/12;float y=h+(b.y-h)*t*t;d->AddLine(ImVec2(a.x,y),ImVec2(b.x,y),IM_COL32(86,105,126,95));}}
 static const char* versionName(GameVersion v){switch(v){case GameVersion::Crash1Beta1995:return "Crash 1 — 1995 Beta";case GameVersion::Crash1BetaMAR08:return "Crash 1 — March 8 Beta";case GameVersion::Crash1BetaMAY11:return "Crash 1 — May 11 Beta";case GameVersion::Crash1:return "Crash 1";case GameVersion::Crash2:return "Crash 2";case GameVersion::Crash3BetaMAY14:return "Crash 3 — May 14 Beta";case GameVersion::Crash3:return "Crash 3";}return "Unknown";}
 static Crash::NsdVariant nsdVariant(GameVersion v){if(v==GameVersion::Crash3||v==GameVersion::Crash3BetaMAY14)return Crash::NsdVariant::Crash3;if(v==GameVersion::Crash1Beta1995||v==GameVersion::Crash1BetaMAR08||v==GameVersion::Crash1BetaMAY11)return Crash::NsdVariant::Proto;if(v==GameVersion::Crash1)return Crash::NsdVariant::Old;return Crash::NsdVariant::Standard;}
+static std::string lowercase(std::string value){std::transform(value.begin(),value.end(),value.begin(),[](unsigned char ch){return static_cast<char>(std::tolower(ch));});return value;}
+static bool hasExtension(const std::filesystem::path& file,const char* extension){return lowercase(file.extension().string())==extension;}
+static std::filesystem::path findNsdSidecar(const std::filesystem::path& nsf){
+ auto expected=nsf;expected.replace_extension(".nsd");
+ std::error_code ec;if(std::filesystem::is_regular_file(expected,ec))return expected;
+ const std::string wantedStem=lowercase(nsf.stem().string());
+ const auto directory=nsf.has_parent_path()?nsf.parent_path():std::filesystem::path(".");
+ for(std::filesystem::directory_iterator it(directory,ec),end;!ec&&it!=end;it.increment(ec)){
+  const auto& candidate=it->path();
+  if(hasExtension(candidate,".nsd")&&lowercase(candidate.stem().string())==wantedStem){
+   std::error_code fileError;if(std::filesystem::is_regular_file(candidate,fileError))return candidate;
+  }
+ }
+ return expected;
+}
+#ifndef _WIN32
+static std::string browseNsfPath(){
+#ifdef __APPLE__
+ const char* command="osascript -e 'POSIX path of (choose file with prompt \"Select a Crash NSF\")' 2>/dev/null";
+#else
+ const char* command="zenity --file-selection --title='Open CrashEdit NSF' --file-filter='Crash NSF | *.nsf *.NSF' 2>/dev/null";
+#endif
+ std::FILE* pipe=::popen(command,"r");if(!pipe)return {};
+ char buffer[4096]{};std::string result;
+ while(std::fgets(buffer,sizeof(buffer),pipe))result+=buffer;
+ ::pclose(pipe);
+ while(!result.empty()&&(result.back()=='\\n'||result.back()=='\\r'))result.pop_back();
+ return result;
+}
+#endif
 static Crash::NsfGoolVersion nsfGoolVersion(GameVersion v){
  switch(v){
   case GameVersion::Crash1Beta1995:
@@ -135,7 +165,7 @@ static const char* entryIconName(std::uint32_t type){
  switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 6:case 15:case 17:return "ThingOrange";case 11:return "ThingCode";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
-EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();}
+EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();openDialog_=true;centerOpenDialog_=true;}
 void EditorUI::handleDroppedFiles(int count,const char** paths){
  for(int i=0;i<count;++i){
   if(!paths||!paths[i])continue;
@@ -159,7 +189,7 @@ void EditorUI::handleDroppedFiles(int count,const char** paths){
 }
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
- auto sidecar=file;sidecar.replace_extension(".nsd");Crash::NsdFile level;std::string nsdError;
+ auto sidecar=findNsdSidecar(file);Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
@@ -238,12 +268,12 @@ void EditorUI::draw(){
 #ifdef _WIN32
     OPENFILENAMEA ofn{};char selected[MAX_PATH]{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=selected;ofn.nMaxFile=MAX_PATH;ofn.lpstrFilter="Crash Bandicoot level archives (*.nsf)\0*.nsf;*.NSF\0All files (*.*)\0*.*\0";ofn.nFilterIndex=1;ofn.Flags=OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameA(&ofn))std::snprintf(path_,sizeof(path_),"%s",selected);
 #else
-    status_="Enter the NSF path above; native file browsing is not yet available on this platform.";
+    const std::string selected=browseNsfPath();if(!selected.empty()){if(selected.size()<sizeof(path_)){std::snprintf(path_,sizeof(path_),"%s",selected.c_str());status_="Selected NSF: "+selected;}else status_="Selected NSF path is too long.";}else status_="No file selected. If the file picker is unavailable, enter the NSF path manually.";
 #endif
    }
    if(ImGui::Button("Continue")){
     std::filesystem::path p=std::filesystem::u8path(path_);
-    if(p.extension()==".nsf"||p.extension()==".NSF"){versionDialog_=true;centerVersionDialog_=true;openDialog_=false;}
+    if(hasExtension(p,".nsf")){versionDialog_=true;centerVersionDialog_=true;openDialog_=false;}
     else status_="Please select an .nsf file.";
    }
    ImGui::SameLine();
