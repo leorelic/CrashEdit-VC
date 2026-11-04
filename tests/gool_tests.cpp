@@ -447,11 +447,11 @@ int main(){
  assert(ambiguousEffects.operandsKnown);
  assert(std::any_of(ambiguousEffects.operandEffects.begin(),ambiguousEffects.operandEffects.end(),[](const auto& effect){return effect.access==NsfGoolOperandAccess::Unknown;}));
  NsfGoolInstruction native;native.isMips=true;native.mnemonic="addu";effectGool.instructions.push_back(native);
- const auto nativeEffects=analyzeGoolInstruction(effectGool,3);
+ const auto nativeEffects=analyzeGoolInstruction(effectGool,4);
  assert(!nativeEffects.operandsKnown&&nativeEffects.operandEffects.empty());
  assert(nativeEffects.executionEffect.find("not yet analyzed")!=std::string::npos);
  NsfGoolInstruction unknownOpcode;unknownOpcode.opcode=250;effectGool.instructions.push_back(unknownOpcode);
- const auto unknownEffects=analyzeGoolInstruction(effectGool,4);
+ const auto unknownEffects=analyzeGoolInstruction(effectGool,5);
  assert(!unknownEffects.operandsKnown&&unknownEffects.operandEffects.empty());
  assert(unknownEffects.executionEffect.find("not inferred")!=std::string::npos);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
