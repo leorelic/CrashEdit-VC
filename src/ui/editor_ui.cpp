@@ -1721,8 +1721,8 @@ void EditorUI::drawGoolBlueprintGraph(){
  if(!selectedEntry||!gool)return;
  static bool dockInitialized=false;
  if(!dockInitialized){
-  if(ImGuiWindow* graph=ImGui::FindWindowByName("GOOL Graph"))
-   if(graph->DockNode){ImGui::SetNextWindowDockID(graph->DockNode->ID,ImGuiCond_FirstUseEver);dockInitialized=true;}
+  if(ImGuiWindow* inspector=ImGui::FindWindowByName("GOOL Inspector"))
+   if(inspector->DockNode){ImGui::SetNextWindowDockID(inspector->DockNode->ID,ImGuiCond_FirstUseEver);dockInitialized=true;}
  }
  ImGui::Begin("GOOL Blueprint");
  ImGui::Text("%s  ·  %zu instructions",Crash::eidToEName(selectedEntry->eid).c_str(),gool->instructions.size());
@@ -1742,10 +1742,11 @@ void EditorUI::drawGoolBlueprintGraph(){
  ImGui::SameLine();
  ImGui::TextDisabled("%zu blocks  |  %zu connections",graph.blocks.size(),graph.edges.size());
  ImGui::Separator();
- const float nodeWidth=250.0f,nodeHeight=122.0f,columnGap=150.0f,rowGap=76.0f;
+ const float nodeWidth=250.0f,nodeHeight=140.0f,columnGap=150.0f,rowGap=76.0f;
  const std::size_t columns=3;
  const std::size_t rows=(graph.blocks.size()+columns-1U)/columns;
- const float canvasWidth=std::max(ImGui::GetContentRegionAvail().x,40.0f+static_cast<float>(columns)*(nodeWidth+columnGap));
+ const float gridWidth=static_cast<float>(columns)*nodeWidth+static_cast<float>(columns-1U)*columnGap;
+ const float canvasWidth=std::max(ImGui::GetContentRegionAvail().x,gridWidth+40.0f);
  const float canvasHeight=std::max(ImGui::GetContentRegionAvail().y,40.0f+static_cast<float>(rows)*(nodeHeight+rowGap));
  if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
   const ImVec2 origin=ImGui::GetCursorScreenPos();
@@ -1757,7 +1758,8 @@ void EditorUI::drawGoolBlueprintGraph(){
   draw->PushClipRect(clipMin,clipMax,true);
   auto nodePosition=[&](std::size_t block){
    const std::size_t col=block%columns,row=block/columns;
-   return ImVec2(origin.x+20.0f+static_cast<float>(col)*(nodeWidth+columnGap),origin.y+20.0f+static_cast<float>(row)*(nodeHeight+rowGap));
+   const float centeredOffset=(canvasWidth-gridWidth)*0.5f;
+   return ImVec2(origin.x+centeredOffset+static_cast<float>(col)*(nodeWidth+columnGap),origin.y+20.0f+static_cast<float>(row)*(nodeHeight+rowGap));
   };
   std::vector<std::size_t> instructionToBlock(gool->instructions.size(),0U);
   for(std::size_t b=0;b<graph.blocks.size();++b)
@@ -1825,12 +1827,12 @@ void EditorUI::drawGoolBlueprintGraph(){
    if(first<gool->instructions.size()){
     const auto&ins=gool->instructions[first];
     const std::string line=ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
-    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+59),IM_COL32(225,225,215,255),line.c_str(),nullptr,nodeWidth-20.0f);
+    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+61),IM_COL32(225,225,215,255),line.c_str(),nullptr,nodeWidth-20.0f);
    }
    if(last<gool->instructions.size()&&last!=first){
     const auto&ins=gool->instructions[last];
     const std::string line="End: "+ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
-    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+80),IM_COL32(190,205,220,255),line.c_str(),nullptr,nodeWidth-20.0f);
+    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+90),IM_COL32(190,205,220,255),line.c_str(),nullptr,nodeWidth-20.0f);
    }
    draw->AddCircleFilled(ImVec2(min.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
    draw->AddCircleFilled(ImVec2(max.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
