@@ -104,7 +104,11 @@ struct GoolIRProgram {
     std::int32_t heapBase = 0;
     std::int32_t eventCount = 0;
     std::int32_t entryCount = 0;
-    std::vector<GoolIRInstruction> instructions;\n    std::vector<std::size_t> instructionToBlock;\n    std::vector<GoolIRBasicBlock> basicBlocks;\n    std::vector<GoolIRFlowEdge> flowEdges;\n    std::vector<std::string> controlFlowDiagnostics;
+    std::vector<GoolIRInstruction> instructions;
+    std::vector<std::size_t> instructionToBlock;
+    std::vector<GoolIRBasicBlock> basicBlocks;
+    std::vector<GoolIRFlowEdge> flowEdges;
+    std::vector<std::string> controlFlowDiagnostics;
     std::vector<std::int32_t> dataPool;
     std::vector<std::int16_t> stateMap;
     std::vector<GoolIRStateDescriptor> stateDescriptors;
