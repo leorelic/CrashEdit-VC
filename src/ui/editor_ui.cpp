@@ -1717,7 +1717,7 @@ void EditorUI::drawGoolDataWindows(){
   }
  }
  if(!gool){showGoolDataPool_=showGoolStateMap_=showGoolStateDescriptions_=showGoolFrameGroups_=false;activeGoolChunk_=-1;activeGoolEntry_=-1;return;}
- if(activeGoolChunk_!=selectedChunk_||activeGoolEntry_!=selectedEntry_){activeGoolChunk_=selectedChunk_;activeGoolEntry_=selectedEntry_;showGoolDataPool_=showGoolStateMap_=showGoolStateDescriptions_=showGoolFrameGroups_=true;focusGoolDataPool_=true;}
+ if(activeGoolChunk_!=selectedChunk_||activeGoolEntry_!=selectedEntry_){activeGoolChunk_=selectedChunk_;activeGoolEntry_=selectedEntry_;showGoolDataPool_=showGoolStateMap_=showGoolStateDescriptions_=showGoolFrameGroups_=true;focusGoolDataPool_=true;frameGroupEidBuffers_.clear();frameGroupEidBuffers_.resize(gool->frameGroups.size());for(std::size_t i=0;i<gool->frameGroups.size();++i){const auto name=Crash::eidToEName(gool->frameGroups[i].eid);std::snprintf(frameGroupEidBuffers_[i].data(),frameGroupEidBuffers_[i].size(),"%s",name.c_str());}}
  ImGuiID consoleDockId=0;
  if(ImGuiWindow* console=ImGui::FindWindowByName("Console / Diagnostics"))if(console->DockNode)consoleDockId=console->DockNode->ID;
  const ImGuiWindowFlags flags=ImGuiWindowFlags_HorizontalScrollbar;
@@ -1834,46 +1834,64 @@ void EditorUI::drawGoolDataWindows(){
  }ImGui::End();
  if(consoleDockId!=0)ImGui::SetNextWindowDockID(consoleDockId,ImGuiCond_FirstUseEver);
  if(ImGui::Begin("GOOL Frame Groups",&showGoolFrameGroups_,flags)){
-  ImGui::Text("%s | Frame-group item: %zu bytes",Crash::eidToEName(goolEid).c_str(),gool->frameGroupBytes);
-  ImGui::TextDisabled("The EID is decoded from each group header; its exact resource role is still being investigated. Model and animation entries are not yet decoded.");
-  if(!gool->frameGroupError.empty()){
-   ImGui::TextColored(ImVec4(1.0f,.45f,.35f,1.0f),"Frame-group decoding failed: %s",gool->frameGroupError.c_str());
-  }else if(gool->frameGroups.empty()){
-   if(gool->frameGroupsDecoded)ImGui::TextDisabled("The frame-group item is empty.");
-   else ImGui::TextDisabled("This GOOL entry has no decoded frame-group item.");
-  }else{
-   auto frameGroupTypeName=[](std::uint16_t type)->const char*{
-    switch(type){case 1:return "Vertex";case 2:return "Sprite";case 3:return "Font";case 4:return "Text";case 5:return "Image";default:return "Unknown";}
-   };
-   if(ImGui::BeginTable("GOOLFrameGroupsV1",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX|ImGuiTableFlags_ScrollY)){
-    ImGui::TableSetupColumn("Group",ImGuiTableColumnFlags_WidthFixed,58.0f);
-    ImGui::TableSetupColumn("Type",ImGuiTableColumnFlags_WidthFixed,85.0f);
-    ImGui::TableSetupColumn("Frames",ImGuiTableColumnFlags_WidthFixed,65.0f);
-    ImGui::TableSetupColumn("EID reference",ImGuiTableColumnFlags_WidthFixed,205.0f);
-    ImGui::TableSetupColumn("Parts",ImGuiTableColumnFlags_WidthFixed,60.0f);
-    ImGui::TableSetupColumn("Font",ImGuiTableColumnFlags_WidthFixed,90.0f);
-    ImGui::TableSetupColumn("Interpolated",ImGuiTableColumnFlags_WidthFixed,100.0f);
-    ImGui::TableSetupColumn("Item range",ImGuiTableColumnFlags_WidthFixed,150.0f);
-    ImGui::TableHeadersRow();
-    for(std::size_t i=0;i<gool->frameGroups.size();++i){
-     const auto&group=gool->frameGroups[i];
-     ImGui::TableNextRow();ImGui::PushID(static_cast<int>(i));
-     ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",i);
-     ImGui::TableSetColumnIndex(1);ImGui::Text("%s (%u)",frameGroupTypeName(group.type),static_cast<unsigned>(group.type));
-     ImGui::TableSetColumnIndex(2);ImGui::Text("%d",static_cast<int>(group.frameCount));
-     ImGui::TableSetColumnIndex(3);
-     if(Crash::isValidEid(group.eid))ImGui::Text("%08X — %s",group.eid,Crash::eidToEName(group.eid).c_str());
-     else ImGui::TextDisabled("%08X",group.eid);
-     ImGui::TableSetColumnIndex(4);if(group.type==5U)ImGui::Text("%u",group.partCount);else ImGui::TextDisabled("-");
-     ImGui::TableSetColumnIndex(5);if(group.type==4U)ImGui::Text("%08X",static_cast<std::uint32_t>(group.font));else ImGui::TextDisabled("-");
-     ImGui::TableSetColumnIndex(6);if(group.type==1U)ImGui::TextUnformatted(group.interpolated?"Yes":"No");else ImGui::TextDisabled("-");
-     ImGui::TableSetColumnIndex(7);ImGui::Text("0x%zX - 0x%zX",group.byteOffset,group.byteOffset+group.byteSize);
-     ImGui::PopID();
+   ImGui::Text("%s | Frame-group item: %zu bytes",Crash::eidToEName(goolEid).c_str(),gool->frameGroupBytes);
+   ImGui::TextDisabled("Index columns are item-relative offsets and are read-only. EID is editable; Frames and Interpolated are editable for supported vertex groups.");
+   if(!gool->frameGroupError.empty()){
+    ImGui::TextColored(ImVec4(1.0f,.45f,.35f,1.0f),"Frame-group decoding failed: %s",gool->frameGroupError.c_str());
+   }else if(gool->frameGroups.empty()){
+    if(gool->frameGroupsDecoded)ImGui::TextDisabled("The frame-group item is empty.");
+    else ImGui::TextDisabled("This GOOL entry has no decoded frame-group item.");
+   }else{
+    if(frameGroupEidBuffers_.size()!=gool->frameGroups.size()){
+     frameGroupEidBuffers_.resize(gool->frameGroups.size());
+     for(std::size_t i=0;i<gool->frameGroups.size();++i){const auto name=Crash::eidToEName(gool->frameGroups[i].eid);std::snprintf(frameGroupEidBuffers_[i].data(),frameGroupEidBuffers_[i].size(),"%s",name.c_str());}
     }
-    ImGui::EndTable();
+    if(ImGui::BeginTable("GOOLFrameGroupsV2",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX|ImGuiTableFlags_ScrollY)){
+     ImGui::TableSetupColumn("Index",ImGuiTableColumnFlags_WidthFixed,70.0f);
+     ImGui::TableSetupColumn("Index (Alt)",ImGuiTableColumnFlags_WidthFixed,100.0f);
+     ImGui::TableSetupColumn("EID",ImGuiTableColumnFlags_WidthFixed,115.0f);
+     ImGui::TableSetupColumn("Frames",ImGuiTableColumnFlags_WidthFixed,75.0f);
+     ImGui::TableSetupColumn("Interpolated",ImGuiTableColumnFlags_WidthFixed,105.0f);
+     ImGui::TableHeadersRow();
+     for(std::size_t i=0;i<gool->frameGroups.size();++i){
+      const auto&group=gool->frameGroups[i];
+      const std::size_t index=group.byteOffset/4U;
+      ImGui::TableNextRow();ImGui::PushID(static_cast<int>(i));
+      ImGui::TableSetColumnIndex(0);
+      if(index>64U)ImGui::Text("0x%zX",index);else ImGui::Text("%zu",index);
+      ImGui::SetItemTooltip("Group type %u | item-relative offset 0x%zX",static_cast<unsigned>(group.type),group.byteOffset);
+      ImGui::TableSetColumnIndex(1);ImGui::Text("0x%zX00",index);
+      ImGui::TableSetColumnIndex(2);
+      ImGui::SetNextItemWidth(-1.0f);
+      if(ImGui::InputText("##eid",frameGroupEidBuffers_[i].data(),frameGroupEidBuffers_[i].size(),ImGuiInputTextFlags_CharsNoBlank)){
+       try{
+        const auto eid=Crash::eNameToEid(frameGroupEidBuffers_[i].data());
+        if(!nsf_.setGoolFrameGroupEid(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,eid))status_="Could not write the Frame Group EID.";
+       }catch(const std::invalid_argument&){status_="Frame Group EID must be a valid five-character EName.";}
+      }
+      ImGui::TableSetColumnIndex(3);
+      if(group.type==1U){
+       int frames=static_cast<int>(group.frameCount);
+       ImGui::SetNextItemWidth(-1.0f);
+       if(ImGui::InputInt("##frames",&frames,1,10)){
+        if(frames>=0&&frames<=255){
+         if(!nsf_.setGoolFrameGroupFrameCount(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,static_cast<std::uint16_t>(frames)))status_="Could not write the Frame Group frame count.";
+        }else status_="Frame Group frame count must be between 0 and 255.";
+       }
+      }else ImGui::TextDisabled("%d",static_cast<int>(group.frameCount));
+      ImGui::TableSetColumnIndex(4);
+      if(group.type==1U){
+       bool interpolated=group.interpolated;
+       if(ImGui::Checkbox("##interpolated",&interpolated)){
+        if(!nsf_.setGoolFrameGroupInterpolated(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,interpolated))status_="Could not write the Frame Group interpolation flag.";
+       }
+      }else ImGui::TextDisabled("-");
+      ImGui::PopID();
+     }
+     ImGui::EndTable();
+    }
    }
-  }
- }ImGui::End();focusGoolDataPool_=false;
+  }ImGui::End();focusGoolDataPool_=false;
 }
 void EditorUI::drawBottom(){if(editorPreferences.showConsole){ImGui::Begin("Console / Diagnostics",&editorPreferences.showConsole);const auto&messages=Diagnostics::messages();ImGui::Text("Messages: %zu  |  Warnings: %zu  |  Errors: %zu",messages.size(),Diagnostics::count(DiagnosticLevel::Warning),Diagnostics::count(DiagnosticLevel::Error));ImGui::SameLine();if(ImGui::SmallButton("Clear"))Diagnostics::clear();ImGui::Separator();if(ImGui::BeginChild("DiagnosticsLog",ImVec2(0,0),false,ImGuiWindowFlags_HorizontalScrollbar)){for(const auto&message:Diagnostics::messages()){const char*prefix=message.level==DiagnosticLevel::Error?"[error]":message.level==DiagnosticLevel::Warning?"[warning]":"[info]";const ImVec4 color=message.level==DiagnosticLevel::Error?ImVec4(1.0f,.38f,.34f,1.0f):message.level==DiagnosticLevel::Warning?ImVec4(1.0f,.78f,.30f,1.0f):ImVec4(.78f,.82f,.88f,1.0f);ImGui::TextColored(color,"%s",prefix);ImGui::SameLine();ImGui::TextWrapped("%s",message.message.c_str());}if(ImGui::GetScrollY()>=ImGui::GetScrollMaxY()-2.0f)ImGui::SetScrollHereY(1.0f);}ImGui::EndChild();ImGui::End();}if(editorPreferences.showProperties){ImGui::Begin("Properties",&editorPreferences.showProperties,ImGuiWindowFlags_HorizontalScrollbar);if(nsfValid_&&selectedChunk_==-2&&nsdValid_){ImGui::Text("NSD: %s",nsdPath_.filename().string().c_str());ImGui::Text("Game: %s",versionName(gameVersion_));ImGui::Text("Level ID: %08X",static_cast<unsigned>(nsd_.id));ImGui::Text("Total entities: %d",nsd_.entityCount);ImGui::Text("Chunks: %d | Index entries: %zu",nsd_.chunkCount,nsd_.index.size());ImGui::Text("Spawn points: %zu",nsd_.spawns.size());if(selectedSpawn_>=0&&static_cast<std::size_t>(selectedSpawn_)<nsd_.spawns.size()){const auto&p=nsd_.spawns[static_cast<std::size_t>(selectedSpawn_)];ImGui::Separator();ImGui::Text("Spawn %d",selectedSpawn_);ImGui::Text("Zone EID: %s (%08X)",Crash::eidToEName(static_cast<std::uint32_t>(p.zoneEid)).c_str(),static_cast<unsigned>(p.zoneEid));ImGui::Text("Camera: %d",p.camera);ImGui::Text("Point: %d",p.point);ImGui::Text("X: %08X  Y: %08X  Z: %08X",static_cast<std::uint32_t>(p.x),static_cast<std::uint32_t>(p.y),static_cast<std::uint32_t>(p.z));if(ImGui::Button("Open matching NSF zone")){bool found=false;for(std::size_t ci=0;ci<nsf_.chunks().size()&&!found;++ci){const auto&chunk=nsf_.chunks()[ci];for(std::size_t ei=0;ei<chunk.entries.size();++ei){const auto&entry=chunk.entries[ei];if(entry.valid&&entry.type==7&&entry.eid==static_cast<std::uint32_t>(p.zoneEid)){selectedChunk_=static_cast<int>(ci);selectedEntry_=static_cast<int>(ei);selectedEntity_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;viewerChunk_=static_cast<int>(ci);viewerEntry_=static_cast<int>(ei);sceneCameraInitialized_=false;found=true;break;}}}if(!found)status_="No matching zone entry was found in this NSF.";}}}else if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){const auto&c=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];ImGui::Text("Chunk %d",selectedChunk_);ImGui::Text("Type: %s (%u)",chunkTypeName(c.type),static_cast<unsigned>(c.type));ImGui::Text("Chunk ID: %04X",static_cast<unsigned>(c.chunkId));ImGui::Text("Size: %zu bytes",c.bytes.size());ImGui::Text("Compressed in NSF: %s",c.wasCompressed?"Yes":"No");if(c.type==0){ImGui::Text("Entry count: %zu",c.entries.size());ImGui::Text("Entry table: %s",c.entryTableValid?"Valid":"Invalid / unavailable");if(!c.entryTableError.empty())ImGui::TextWrapped("%s",c.entryTableError.c_str());if(selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<c.entries.size()){const auto&e=c.entries[static_cast<std::size_t>(selectedEntry_)];ImGui::Separator();ImGui::Text("Entry %d",selectedEntry_);if(e.valid){ImGui::Text("EID: %s (%08X)",Crash::eidToEName(e.eid).c_str(),e.eid);ImGui::Text("Type: %u",e.type);ImGui::Text("Items: %u",e.itemCount);ImGui::Text("Offset: 0x%zX | Size: %zu",e.offset,e.size);if(e.type==7&&e.zone.decoded){const auto&z=e.zone;ImGui::Separator();ImGui::Text("Zone Header: %zu bytes",z.headerSize);ImGui::Text("Worlds: %d | Zones: %d",z.worldCount,z.zoneCount);ImGui::Text("Cameras: %d | Entities: %d | Info: %d",z.cameraCount,z.entityCount,z.infoCount);ImGui::Text("Music: %d | Flags: %08X",z.music,static_cast<unsigned>(z.zoneFlags));ImGui::Separator();ImGui::Text("Layout position: %d, %d, %d",z.x,z.y,z.z);ImGui::Text("Dimensions: %d x %d x %d",z.width,z.height,z.depth);ImGui::Text("Collision depth: %u, %u, %u",z.collisionDepthX,z.collisionDepthY,z.collisionDepthZ);if(selectedEntity_>=0&&static_cast<std::size_t>(selectedEntity_)<z.entities.size()){const auto&ent=z.entities[static_cast<std::size_t>(selectedEntity_)];ImGui::Separator();if(ent.hasCameraIndex&&ent.hasCameraSubIndex){ImGui::Text("Camera [%d]-%d",ent.cameraIndex,ent.cameraSubIndex);ImGui::Separator();ImGui::Text("Camera Index: %s",ent.hasCameraIndex?std::to_string(ent.cameraIndex).c_str():"Not present");ImGui::Text("Camera SubIndex: %s",ent.hasCameraSubIndex?std::to_string(ent.cameraSubIndex).c_str():"Not present");ImGui::TextDisabled("Camera entities are the first CameraCount entities in the zone.");}else{if(!ent.name.empty()&&ent.hasId)ImGui::Text("%s [ID %d]",ent.name.c_str(),ent.id);else if(ent.hasId)ImGui::Text("Entity [ID %d]",ent.id);else ImGui::Text("Entity %d",selectedEntity_-z.cameraCount);ImGui::Separator();if(ent.hasGoolType&&ent.hasSubtype){const auto goolEid=static_cast<std::uint32_t>(ent.goolType);if(Crash::isValidEid(goolEid))ImGui::Text("GOOL: %s (%08X) | Subtype: %d",Crash::eidToEName(goolEid).c_str(),goolEid,ent.subtype);else ImGui::Text("GOOL: %08X | Subtype: %d",goolEid,ent.subtype);if(ImGui::Button("Open matching GOOL entry")){bool found=false;for(std::size_t gi=0;gi<nsf_.chunks().size()&&!found;++gi){const auto&gc=nsf_.chunks()[gi];if(gc.type!=0)continue;for(std::size_t ge=0;ge<gc.entries.size();++ge){const auto&gEntry=gc.entries[ge];if(gEntry.valid&&gEntry.type==11&&gEntry.eid==goolEid){selectedChunk_=static_cast<int>(gi);selectedEntry_=static_cast<int>(ge);selectedEntity_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;found=true;break;}}}if(!found)status_="No matching GOOL entry was found for this entity.";}}else ImGui::TextDisabled("GOOL Type/Subtype not defined");if(ent.hasId){int v=ent.id;if(ImGui::InputInt("Object ID",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x009fU,0,v))entityDataChanged_=true;}}if(ent.hasGoolType){int v=ent.goolType;if(ImGui::InputInt("GOOL Type / EID",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a9U,0,v))entityDataChanged_=true;}}if(ent.hasSubtype){int v=ent.subtype;if(ImGui::InputInt("GOOL Subtype",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00aaU,0,v))entityDataChanged_=true;}}if(ent.hasAlternateId)ImGui::Text("Alternate ID: %d",ent.alternateId);if(!ent.positions.empty()){ImGui::Text("Positions: %zu",ent.positions.size());for(std::size_t pi=0;pi<ent.positions.size();++pi){const auto&pos=ent.positions[pi];ImGui::BulletText("[%zu] X %d  Y %d  Z %d",pi,pos.x,pos.y,pos.z);}}if(!ent.settings.empty()){ImGui::Separator();ImGui::Text("GOOL Arguments / Settings (%zu)",ent.settings.size());if(ImGui::BeginTable("GoolSettingsV2",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,55.0f);ImGui::TableSetupColumn("A (8-bit)",ImGuiTableColumnFlags_WidthFixed,105.0f);ImGui::TableSetupColumn("B (signed 24-bit)",ImGuiTableColumnFlags_WidthFixed,185.0f);ImGui::TableHeadersRow();for(std::size_t si=0;si<ent.settings.size();++si){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",si);ImGui::TableSetColumnIndex(1);int argA=ent.settings[si].valueA;if(ImGui::InputInt(("##argA"+std::to_string(si)).c_str(),&argA)){argA=std::clamp(argA,0,255);const auto raw=(static_cast<std::uint32_t>(ent.settings[si].valueB)<<8)|(static_cast<std::uint32_t>(argA)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a4U,si,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}ImGui::TableSetColumnIndex(2);int argB=ent.settings[si].valueB;if(ImGui::InputInt(("##argB"+std::to_string(si)).c_str(),&argB)){argB=std::clamp(argB,-8388608,8388607);const auto raw=(static_cast<std::uint32_t>(argB)<<8)|(static_cast<std::uint32_t>(ent.settings[si].valueA)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x00a4U,si,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}ImGui::EndTable();}}if(!ent.victims.empty()){ImGui::Separator();ImGui::Text("Victim List (%zu)",ent.victims.size());for(std::size_t vi=0;vi<ent.victims.size();++vi){int victim=ent.victims[vi];ImGui::PushID(static_cast<int>(vi));if(ImGui::InputInt("Object ID",&victim)){victim=std::clamp(victim,-32768,32767);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0287U,vi,victim))entityDataChanged_=true;}ImGui::PopID();}}if(ent.hasBoxCount){int v=ent.boxCount;if(ImGui::InputInt("Box Count (Willy)",&v)){const auto raw=(static_cast<std::uint32_t>(v)<<8)|(static_cast<std::uint32_t>(ent.properties.empty()?0:0)&0xffU);if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x028bU,0,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}if(ent.hasDdaSettings){int v=ent.ddaDeathCount;if(ImGui::InputInt("DDA Death / 1-Up Count",&v)){const auto raw=static_cast<std::uint32_t>(v)<<8;if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0277U,0,static_cast<std::int32_t>(raw)))entityDataChanged_=true;}}if(ent.hasDdaSection){int v=ent.ddaSection;if(ImGui::InputInt("DDA Section",&v)){if(nsf_.setEntityPropertyInt(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(selectedEntity_),0x0288U,0,v))entityDataChanged_=true;}}}ImGui::Text("Declared length: %u | Properties: %zu",ent.declaredLength,ent.properties.size());if(!ent.error.empty())ImGui::TextWrapped("%s",ent.error.c_str());if(ImGui::BeginTable("EntityPropertyTableV2",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX)){ImGui::TableSetupColumn("Property",ImGuiTableColumnFlags_WidthFixed,170.0f);ImGui::TableSetupColumn("ID",ImGuiTableColumnFlags_WidthFixed,65.0f);ImGui::TableSetupColumn("Type",ImGuiTableColumnFlags_WidthFixed,85.0f);ImGui::TableSetupColumn("Rows",ImGuiTableColumnFlags_WidthFixed,65.0f);ImGui::TableSetupColumn("Decoded values",ImGuiTableColumnFlags_WidthFixed,320.0f);ImGui::TableHeadersRow();for(const auto&prop:ent.properties){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted(entityPropertyName(static_cast<std::uint16_t>(prop.id)));ImGui::TableSetColumnIndex(1);ImGui::Text("0x%03X",static_cast<unsigned>(static_cast<std::uint16_t>(prop.id)));ImGui::TableSetColumnIndex(2);ImGui::Text("%u / %u B",prop.type,prop.elementSize);ImGui::TableSetColumnIndex(3);ImGui::Text("%d",prop.rowCount);ImGui::TableSetColumnIndex(4);if(!prop.error.empty())ImGui::TextDisabled("%s",prop.error.c_str());else if(!prop.positions.empty()){for(const auto&v:prop.positions)ImGui::Text("%d, %d, %d",v.x,v.y,v.z);}else if(!prop.intValues.empty()){std::string vals;for(std::size_t vi=0;vi<std::min<std::size_t>(prop.intValues.size(),8);++vi){if(vi)vals+=", ";vals+=std::to_string(prop.intValues[vi]);}if(prop.intValues.size()>8)vals+=" ...";ImGui::TextWrapped("%s",vals.c_str());}else ImGui::TextDisabled("%zu bytes (raw)",prop.dataSize);}ImGui::EndTable();}}}}else ImGui::TextWrapped("Entry could not be decoded: %s",e.error.c_str());}}else ImGui::TextDisabled("Specialized resource decoding is pending.");}else ImGui::TextDisabled("Select an NSD, spawn point, or NSF chunk.");ImGui::End();}if(entityDataChanged_){nsf_.decodeZones(gameVersion_==GameVersion::Crash3);entityDataChanged_=false;}}
 }
