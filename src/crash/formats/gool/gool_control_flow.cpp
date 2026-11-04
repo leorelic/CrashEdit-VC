@@ -36,7 +36,7 @@ NsfGoolControlFlowGraph analyzeGoolControlFlow(const NsfGool& gool) {
                 opcode==51U?NsfGoolFlowEdgeKind::BranchTrue:NsfGoolFlowEdgeKind::BranchFalse;
             addTarget(i,target,kind);
             if(opcode!=50U&&i+1U<count) leaders.insert(i+1U);
-        } else if(opcode==59U) {
+        } else if(opcode>=53U&&opcode<=55U) {\n            const auto kind=opcode==53U?NsfGoolFlowEdgeKind::StateTransition:\n                opcode==54U?NsfGoolFlowEdgeKind::StateTransitionTrue:NsfGoolFlowEdgeKind::StateTransitionFalse;\n            pending.push_back({i,0U,kind,false,\"GOOL state transition destination is resolved through state descriptors and hooks.\"});\n            if(opcode!=53U&&i+1U<count) leaders.insert(i+1U);\n        } else if(opcode==59U) {
             const auto operands=decodeGoolOperands(gool.version,opcode,instruction.operandBits);
             const auto* external=findOperand(operands,'E');
             const auto* target=findOperand(operands,'I');
