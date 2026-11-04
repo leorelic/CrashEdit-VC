@@ -43,7 +43,7 @@ NsfGoolControlFlowGraph analyzeGoolControlFlow(const NsfGool& gool) {
             // Their destinations are interpreted through state descriptors and hooks;
             // this is expected behavior, not an analysis diagnostic.
             pending.push_back({i,0U,kind,false,{}});
-            if(opcode!=53U&&i+1U<count) leaders.insert(i+1U);
+            if(i+1U<count) leaders.insert(i+1U);
         } else if(opcode==59U) {
             const auto operands=decodeGoolOperands(gool.version,opcode,instruction.operandBits);
             const auto* external=findOperand(operands,'E');
