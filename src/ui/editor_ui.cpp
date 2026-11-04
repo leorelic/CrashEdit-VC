@@ -1431,8 +1431,11 @@ void EditorUI::drawGoolGraph(){
   }
  }
  if(!selectedEntry||!gool)return;
- if(ImGuiWindow* inspector=ImGui::FindWindowByName("GOOL Inspector"))
-  if(inspector->DockNode)ImGui::SetNextWindowDockID(inspector->DockNode->ID,ImGuiCond_FirstUseEver);
+ static bool graphDockInitialized=false;
+ if(!graphDockInitialized){
+  if(ImGuiWindow* hierarchy=ImGui::FindWindowByName("Resource Hierarchy"))
+   if(hierarchy->DockNode){ImGui::SetNextWindowDockID(hierarchy->DockNode->ID,ImGuiCond_Always);graphDockInitialized=true;}
+ }
  ImGui::Begin("GOOL Graph");
  if(!gool->decoded){
   ImGui::Text("%s | 0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
