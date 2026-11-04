@@ -1431,8 +1431,8 @@ void EditorUI::drawGoolGraph(){
   }
  }
  if(!selectedEntry||!gool)return;
- if(ImGuiWindow* viewport=ImGui::FindWindowByName("3D Zone Editor"))
-  if(viewport->DockNode)ImGui::SetNextWindowDockID(viewport->DockNode->ID,ImGuiCond_FirstUseEver);
+ if(ImGuiWindow* inspector=ImGui::FindWindowByName("GOOL Inspector"))
+  if(inspector->DockNode)ImGui::SetNextWindowDockID(inspector->DockNode->ID,ImGuiCond_FirstUseEver);
  ImGui::Begin("GOOL Graph");
  if(!gool->decoded){
   ImGui::Text("%s | 0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
@@ -1476,20 +1476,31 @@ void EditorUI::drawGoolGraph(){
   else if(hook.status==Crash::NsfGoolStateHookStatus::Local||hook.status==Crash::NsfGoolStateHookStatus::External)++validHooks;
   else ++problemHooks;
  }
- ImGui::TextDisabled("A top-to-bottom view of the selected entry's decoded relationships.");
- ImGui::SameLine();
- ImGui::Text("%s  |  0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
  ImGui::Separator();
  if(ImGui::BeginChild("GOOLGraphCanvas",ImVec2(0,0),false,ImGuiWindowFlags_AlwaysVerticalScrollbar)){
   const float available=ImGui::GetContentRegionAvail().x;
+  auto centeredText=[&](const char*text,ImVec4 color,bool disabled=false,float scale=1.0f){
+   const float size=ImGui::GetFontSize()*scale;
+   const ImVec2 extent=ImGui::GetFont()->CalcTextSizeA(size,available,available,text);
+   const ImVec2 pos(ImGui::GetCursorScreenPos().x+std::max(0.0f,(available-extent.x)*.5f),ImGui::GetCursorScreenPos().y);
+   ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(),size,pos,disabled?ImGui::GetColorU32(ImGuiCol_TextDisabled):ImGui::GetColorU32(color),text,nullptr,available);
+   ImGui::Dummy(ImVec2(1.0f,extent.y+ImGui::GetStyle().ItemSpacing.y));
+  };
   const float cardWidth=std::max(available*.76f,300.0f);
   const float sideWidth=std::max((available-24.0f)*.5f,180.0f);
   auto centerCard=[&](const char*id,const char*title,const char*subtitle,ImVec4 tint){
    ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(tint.x*.20f,tint.y*.20f,tint.z*.20f,.95f));
    ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(tint.x,tint.y,tint.z,.75f));
-   ImGui::BeginChild(id,ImVec2(cardWidth,66.0f),true,ImGuiWindowFlags_NoScrollbar);
-   ImGui::TextColored(tint,"%s",title);ImGui::TextDisabled("%s",subtitle);
+   if(ImGui::BeginChild(id,ImVec2(cardWidth,112.0f),true,ImGuiWindowFlags_NoScrollbar)){
+    const float inner=ImGui::GetContentRegionAvail().x;
+    const ImVec2 titleSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.6f,inner,inner,title);
+    ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(inner-titleSize.x)*.5f+ImGui::GetStyle().WindowPadding.x));
+    ImGui::SetWindowFontScale(1.6f);ImGui::TextColored(tint,"%s",title);ImGui::SetWindowFontScale(1.0f);
+    const ImVec2 nameSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.35f,inner,inner,subtitle);
+    ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(inner-nameSize.x)*.5f+ImGui::GetStyle().WindowPadding.x));
+    ImGui::SetWindowFontScale(1.35f);ImGui::TextUnformatted(subtitle);ImGui::SetWindowFontScale(1.0f);
+   }
    ImGui::EndChild();ImGui::PopStyleColor(2);
   };
   auto connector=[&](){
@@ -1504,10 +1515,11 @@ void EditorUI::drawGoolGraph(){
   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.17f,.23f,.96f));
   ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.48f,.68f,.8f));
   if(ImGui::BeginChild("GOOLGraphStates",ImVec2(cardWidth,116),true)){
-   ImGui::TextColored(ImVec4(.48f,.72f,1,1),"STATE LOGIC");
-   ImGui::TextWrapped("This entry is organized into state descriptors. Each descriptor selects the GOOL code responsible for a part of the object's behaviour.");
+   centeredText("STATE LOGIC",ImVec4(.48f,.72f,1,1));
+   centeredText("This entry is organized into state descriptors. Each descriptor selects the GOOL code responsible for a part of the object's behaviour.",ImGui::GetStyleColorVec4(ImGuiCol_Text));
    ImGui::Separator();
-   ImGui::Text("%zu states · %zu resolved references",gool->stateDescriptors.size(),gool->stateReferences.size()-std::min(gool->stateReferences.size(),unresolved));
+   char stateSummary[128];std::snprintf(stateSummary,sizeof(stateSummary),"%zu states · %zu resolved references",gool->stateDescriptors.size(),gool->stateReferences.size()-std::min(gool->stateReferences.size(),unresolved));
+   centeredText(stateSummary,ImGui::GetStyleColorVec4(ImGuiCol_Text));
   }
   ImGui::EndChild();ImGui::PopStyleColor(2);
   connector();
@@ -1516,20 +1528,26 @@ void EditorUI::drawGoolGraph(){
    ImGui::TableSetColumnIndex(0);
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.18f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.55f,.82f,.8f));
    if(ImGui::BeginChild("GOOLGraphPoolCard",ImVec2(sideWidth,150),true)){
-    ImGui::TextColored(ImVec4(.48f,.72f,1,1),"DATA POOL");
-    ImGui::TextWrapped("A descriptor's GOOL index selects a word here. That word supplies the EID used to resolve the target GOOL.");
+    centeredText("DATA POOL",ImVec4(.48f,.72f,1,1));
+    centeredText("A descriptor's GOOL index selects a word here. That word supplies the EID used to resolve the target GOOL.",ImGui::GetStyleColorVec4(ImGuiCol_Text));
     ImGui::Separator();
-    ImGui::TextDisabled("%zu local · %zu external references",localCount,externalCount);
+    char poolSummary[128];std::snprintf(poolSummary,sizeof(poolSummary),"%zu local · %zu external references",localCount,externalCount);
+    centeredText(poolSummary,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
+    const float buttonWidth=ImGui::CalcTextSize("Open Data Pool").x+ImGui::GetStyle().FramePadding.x*2;
+    ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(ImGui::GetContentRegionAvail().x-buttonWidth)*.5f+ImGui::GetStyle().WindowPadding.x));
     if(ImGui::SmallButton("Open Data Pool"))showGoolDataPool_=true;
    }ImGui::EndChild();ImGui::PopStyleColor(2);
    ImGui::TableSetColumnIndex(1);
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.19f,.15f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.62f,.43f,.83f,.8f));
    if(ImGui::BeginChild("GOOLGraphHooksCard",ImVec2(sideWidth,150),true)){
-    ImGui::TextColored(ImVec4(.76f,.59f,1,1),"HOOKS");
-    ImGui::TextWrapped("Event, Transition, and Code hooks route execution to instruction offsets, locally or in another GOOL.");
+    centeredText("HOOKS",ImVec4(.76f,.59f,1,1));
+    centeredText("Event, Transition, and Code hooks route execution to instruction offsets, locally or in another GOOL.",ImGui::GetStyleColorVec4(ImGuiCol_Text));
     ImGui::Separator();
-    ImGui::TextColored(ImVec4(.38f,.82f,.58f,1),"%zu resolved destinations",validHooks);
-    if(problemHooks)ImGui::TextColored(ImVec4(1,.68f,.30f,1),"%zu unresolved destinations",problemHooks);
+    char hookSummary[96];std::snprintf(hookSummary,sizeof(hookSummary),"%zu resolved destinations",validHooks);
+    centeredText(hookSummary,ImVec4(.38f,.82f,.58f,1));
+    if(problemHooks){char problemSummary[96];std::snprintf(problemSummary,sizeof(problemSummary),"%zu unresolved destinations",problemHooks);centeredText(problemSummary,ImVec4(1,.68f,.30f,1));}
+    const float buttonWidth=ImGui::CalcTextSize("Open State Descriptions").x+ImGui::GetStyle().FramePadding.x*2;
+    ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(ImGui::GetContentRegionAvail().x-buttonWidth)*.5f+ImGui::GetStyle().WindowPadding.x));
     if(ImGui::SmallButton("Open State Descriptions"))showGoolStateDescriptions_=true;
    }ImGui::EndChild();ImGui::PopStyleColor(2);
    ImGui::EndTable();
@@ -1539,10 +1557,11 @@ void EditorUI::drawGoolGraph(){
   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.13f,.21f,.17f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.32f,.70f,.48f,.8f));
   const float dependencyHeight=std::max(100.0f,70.0f+static_cast<float>(dependencies.size())*48.0f);
   if(ImGui::BeginChild("GOOLGraphDependencies",ImVec2(cardWidth,dependencyHeight),true)){
-   ImGui::TextColored(ImVec4(.42f,.82f,.57f,1),"GOOL DEPENDENCIES");
-   ImGui::TextDisabled("%zu unique loaded external GOOL entries",dependencies.size());
+   centeredText("GOOL DEPENDENCIES",ImVec4(.42f,.82f,.57f,1));
+   char dependencyCount[128];std::snprintf(dependencyCount,sizeof(dependencyCount),"%zu unique loaded external GOOL entries",dependencies.size());
+   centeredText(dependencyCount,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
    ImGui::Separator();
-   if(dependencies.empty())ImGui::TextDisabled("No resolved external GOOL dependencies were found.");
+   if(dependencies.empty())centeredText("No resolved external GOOL dependencies were found.",ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
    for(const auto&location:dependencies){
     if(location.first>=nsf_.chunks().size()||location.second>=nsf_.chunks()[location.first].entries.size())continue;
     const auto&target=nsf_.chunks()[location.first].entries[location.second];
@@ -1552,12 +1571,13 @@ void EditorUI::drawGoolGraph(){
      selectedChunk_=static_cast<int>(location.first);selectedEntry_=static_cast<int>(location.second);
      selectedEntity_=-1;selectedItem_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;
     }
-    ImGui::TextDisabled("Chunk %zu · Entry %zu%s",location.first,location.second,target.gool.decoded?"":" · not decoded");
+    char locationText[128];std::snprintf(locationText,sizeof(locationText),"Chunk %zu · Entry %zu%s",location.first,location.second,target.gool.decoded?"":" · not decoded");
+    centeredText(locationText,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
     ImGui::PopID();
    }
-   if(unresolved>0)ImGui::TextColored(ImVec4(1,.65f,.30f,1),"%zu unresolved or invalid state references",unresolved);
-   if(externalCount>dependencies.size())ImGui::TextDisabled("%zu external/ambiguous descriptor references in total",externalCount);
-   if(localCount>0)ImGui::TextDisabled("%zu local descriptor references remain within this GOOL",localCount);
+   if(unresolved>0){char t[128];std::snprintf(t,sizeof(t),"%zu unresolved or invalid state references",unresolved);centeredText(t,ImVec4(1,.65f,.30f,1));}
+   if(externalCount>dependencies.size()){char t[128];std::snprintf(t,sizeof(t),"%zu external/ambiguous descriptor references in total",externalCount);centeredText(t,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);}
+   if(localCount>0){char t[128];std::snprintf(t,sizeof(t),"%zu local descriptor references remain within this GOOL",localCount);centeredText(t,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);}
   }
   ImGui::EndChild();ImGui::PopStyleColor(2);
   ImGui::Spacing();
