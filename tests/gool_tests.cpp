@@ -442,6 +442,10 @@ int main(){
  assert(conditionalEffects.operandsKnown&&conditionalEffects.operandEffects.size()==1);
  assert(conditionalEffects.operandEffects[0].access==NsfGoolOperandAccess::Read);
  assert(conditionalEffects.executionEffect.find("target instruction")!=std::string::npos);
+ NsfGoolInstruction ambiguousField;ambiguousField.opcode=28;ambiguousField.operandBits=0U;effectGool.instructions.push_back(ambiguousField);
+ const auto ambiguousEffects=analyzeGoolInstruction(effectGool,3);
+ assert(ambiguousEffects.operandsKnown);
+ assert(std::any_of(ambiguousEffects.operandEffects.begin(),ambiguousEffects.operandEffects.end(),[](const auto& effect){return effect.access==NsfGoolOperandAccess::Unknown;}));
  NsfGoolInstruction native;native.isMips=true;native.mnemonic="addu";effectGool.instructions.push_back(native);
  const auto nativeEffects=analyzeGoolInstruction(effectGool,3);
  assert(!nativeEffects.operandsKnown&&nativeEffects.operandEffects.empty());
