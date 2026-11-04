@@ -3,6 +3,7 @@
 #include "core/file_save.hpp"
 #include "crash/formats/eid.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
+#include "crash/formats/gool/gool_control_flow.hpp"
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -1429,27 +1430,72 @@ void EditorUI::drawGoolInspector(){
  ImGui::Text("Format: %d | Heap Base: 0x%X | Events: %d | Entries: %d",g.format,static_cast<unsigned>(g.heapBase),g.eventCount,g.entryCount);
  ImGui::Text("Instructions: %zu | Data words: %zu | State map: %zu | State descriptors: %zu | Frame-group bytes: %zu",g.instructions.size(),g.dataPool.size(),g.stateMap.size(),g.stateDescriptors.size(),g.frameGroupBytes);
  ImGui::Separator();
- ImGui::TextDisabled("GOOL and embedded R3000A instructions are decoded separately, following the original CrashEdit native-mode markers and return delay slots.");
- if(ImGui::BeginTable("GOOLInstructionListing",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,280),1800.0f)){
-  ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48);
-  ImGui::TableSetupColumn("Offset",ImGuiTableColumnFlags_WidthFixed,72);
-  ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,100);
-  ImGui::TableSetupColumn("Mode / Opcode",ImGuiTableColumnFlags_WidthFixed,100);
-  ImGui::TableSetupColumn("Word",ImGuiTableColumnFlags_WidthFixed,108);
-  ImGui::TableSetupColumn("Operands");
-  ImGui::TableHeadersRow();
-  for(std::size_t i=0;i<g.instructions.size();++i){
-   const auto&ins=g.instructions[i];const auto&info=Crash::goolOpcodeInfo(g.version,ins.opcode);ImGui::TableNextRow();
-   ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",i);
-   ImGui::TableSetColumnIndex(1);ImGui::Text("0x%04zX",ins.byteOffset);
-   ImGui::TableSetColumnIndex(2);if(ins.mipsKnown||!ins.isMips)ImGui::TextUnformatted(ins.mnemonic.c_str());else ImGui::TextDisabled("%s",ins.mnemonic.c_str());
-   ImGui::TableSetColumnIndex(3);if(ins.isMips)ImGui::Text("MIPS");else ImGui::Text("GOOL 0x%02X",static_cast<unsigned>(ins.opcode));
-   ImGui::TableSetColumnIndex(4);ImGui::Text("0x%08X",ins.word);
-   ImGui::TableSetColumnIndex(5);
-   if(ins.isMips){if(!ins.arguments.empty())ImGui::TextUnformatted(ins.arguments.c_str());else ImGui::TextDisabled("No operands");}
-   else if(!ins.arguments.empty())ImGui::TextUnformatted(ins.arguments.c_str());else ImGui::TextDisabled("%s",info.known?"No operands":"Unknown format");
+ if(ImGui::BeginTabBar("GOOLInspectorTabs")){
+  if(ImGui::BeginTabItem("Instructions")){
+   ImGui::TextDisabled("GOOL and embedded R3000A instructions are decoded separately, following the original CrashEdit native-mode markers and return delay slots.");
+   if(ImGui::BeginTable("GOOLInstructionListing",6,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,280),1800.0f)){
+    ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48);
+    ImGui::TableSetupColumn("Offset",ImGuiTableColumnFlags_WidthFixed,72);
+    ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,100);
+    ImGui::TableSetupColumn("Mode / Opcode",ImGuiTableColumnFlags_WidthFixed,100);
+    ImGui::TableSetupColumn("Word",ImGuiTableColumnFlags_WidthFixed,108);
+    ImGui::TableSetupColumn("Operands");
+    ImGui::TableHeadersRow();
+    for(std::size_t i=0;i<g.instructions.size();++i){
+     const auto&ins=g.instructions[i];const auto&info=Crash::goolOpcodeInfo(g.version,ins.opcode);ImGui::TableNextRow();
+     ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",i);
+     ImGui::TableSetColumnIndex(1);ImGui::Text("0x%04zX",ins.byteOffset);
+     ImGui::TableSetColumnIndex(2);if(ins.mipsKnown||!ins.isMips)ImGui::TextUnformatted(ins.mnemonic.c_str());else ImGui::TextDisabled("%s",ins.mnemonic.c_str());
+     ImGui::TableSetColumnIndex(3);if(ins.isMips)ImGui::Text("MIPS");else ImGui::Text("GOOL 0x%02X",static_cast<unsigned>(ins.opcode));
+     ImGui::TableSetColumnIndex(4);ImGui::Text("0x%08X",ins.word);
+     ImGui::TableSetColumnIndex(5);
+     if(ins.isMips){if(!ins.arguments.empty())ImGui::TextUnformatted(ins.arguments.c_str());else ImGui::TextDisabled("No operands");}
+     else if(!ins.arguments.empty())ImGui::TextUnformatted(ins.arguments.c_str());else ImGui::TextDisabled("%s",info.known?"No operands":"Unknown format");
+    }
+    ImGui::EndTable();
+   }
+   ImGui::EndTabItem();
   }
-  ImGui::EndTable();
+  if(ImGui::BeginTabItem("Control Flow")){
+   const auto graph=Crash::analyzeGoolControlFlow(g);
+   ImGui::Text("%zu basic blocks | %zu control-flow edges | %zu diagnostics",graph.blocks.size(),graph.edges.size(),graph.diagnostics.size());
+   ImGui::TextDisabled("Instruction ranges are inclusive in this view. State-transition destinations are dynamic and are resolved separately through the State Map and hooks.");
+   if(ImGui::BeginTable("GOOLControlFlowBlocks",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,150))){
+    ImGui::TableSetupColumn("Block",ImGuiTableColumnFlags_WidthFixed,72);
+    ImGui::TableSetupColumn("Instructions",ImGuiTableColumnFlags_WidthFixed,150);
+    ImGui::TableSetupColumn("Count",ImGuiTableColumnFlags_WidthFixed,70);
+    ImGui::TableHeadersRow();
+    for(std::size_t i=0;i<graph.blocks.size();++i){const auto&block=graph.blocks[i];ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("BB%zu",i);ImGui::TableSetColumnIndex(1);ImGui::Text("%zu - %zu",block.startInstruction,block.endInstruction-1U);ImGui::TableSetColumnIndex(2);ImGui::Text("%zu",block.endInstruction-block.startInstruction);}
+    ImGui::EndTable();
+   }
+   auto edgeKindName=[](Crash::NsfGoolFlowEdgeKind kind)->const char*{
+    switch(kind){
+     case Crash::NsfGoolFlowEdgeKind::Fallthrough:return "Fallthrough";
+     case Crash::NsfGoolFlowEdgeKind::Branch:return "Branch";
+     case Crash::NsfGoolFlowEdgeKind::BranchTrue:return "Branch (true)";
+     case Crash::NsfGoolFlowEdgeKind::BranchFalse:return "Branch (false)";
+     case Crash::NsfGoolFlowEdgeKind::Call:return "Local call";
+     case Crash::NsfGoolFlowEdgeKind::ExternalCall:return "External call";
+     case Crash::NsfGoolFlowEdgeKind::StateTransition:return "State transition";
+     case Crash::NsfGoolFlowEdgeKind::StateTransitionTrue:return "State transition (true)";
+     case Crash::NsfGoolFlowEdgeKind::StateTransitionFalse:return "State transition (false)";
+     case Crash::NsfGoolFlowEdgeKind::Return:return "Return";
+    }return "Unknown";
+   };
+   if(ImGui::BeginTable("GOOLControlFlowEdges",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_ScrollX,ImVec2(0,190))){
+    ImGui::TableSetupColumn("From",ImGuiTableColumnFlags_WidthFixed,65);
+    ImGui::TableSetupColumn("Flow",ImGuiTableColumnFlags_WidthFixed,150);
+    ImGui::TableSetupColumn("Destination",ImGuiTableColumnFlags_WidthFixed,115);
+    ImGui::TableSetupColumn("Details");
+    ImGui::TableHeadersRow();
+    for(const auto&edge:graph.edges){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("BB%zu",edge.sourceBlock);ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted(edgeKindName(edge.kind));ImGui::TableSetColumnIndex(2);if(edge.targetValid)ImGui::Text("Instruction %zu",edge.targetInstruction);else ImGui::TextDisabled("Dynamic / unresolved");ImGui::TableSetColumnIndex(3);if(!edge.diagnostic.empty())ImGui::TextWrapped("%s",edge.diagnostic.c_str());else ImGui::TextDisabled("—");}
+    ImGui::EndTable();
+   }
+   if(!graph.diagnostics.empty()){ImGui::Separator();ImGui::Text("Analysis diagnostics");for(const auto&diagnostic:graph.diagnostics)ImGui::BulletText("%s",diagnostic.c_str());}
+   if(graph.blocks.empty())ImGui::TextDisabled("No instructions are available to analyze.");
+   ImGui::EndTabItem();
+  }
+  ImGui::EndTabBar();
  }
  ImGui::End();
 }
