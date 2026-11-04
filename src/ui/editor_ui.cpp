@@ -1887,19 +1887,22 @@ void EditorUI::drawGoolBlueprintGraph(){
      if(!target.empty())target+=", ";
      target+=effect.reference;
     }
-    std::string from,usedBy;
+    std::vector<std::string> fromEntries,usedByEntries;
     for(const auto&use:dataFlow.uses) if(use.instructionIndex==instructionIndex&&!use.reachingDefinitions.empty()){
-     if(!from.empty())from+=", ";
-     from+=use.location+" <- ";
-     for(std::size_t n=0;n<use.reachingDefinitions.size();++n){if(n)from+="/";from+="#"+std::to_string(dataFlow.definitions[use.reachingDefinitions[n]].instructionIndex);}
+     std::string relation=use.location+" <- ";
+     for(std::size_t n=0;n<use.reachingDefinitions.size();++n){if(n)relation+="/";relation+="#"+std::to_string(dataFlow.definitions[use.reachingDefinitions[n]].instructionIndex);}
+     if(std::find(fromEntries.begin(),fromEntries.end(),relation)==fromEntries.end())fromEntries.push_back(std::move(relation));
     }
     for(std::size_t definitionId=0;definitionId<dataFlow.definitions.size();++definitionId){
      if(dataFlow.definitions[definitionId].instructionIndex!=instructionIndex)continue;
      for(const auto&use:dataFlow.uses) if(std::find(use.reachingDefinitions.begin(),use.reachingDefinitions.end(),definitionId)!=use.reachingDefinitions.end()){
-      if(!usedBy.empty())usedBy+=", ";
-      usedBy+=use.location+" -> #"+std::to_string(use.instructionIndex);
+      const std::string relation=use.location+" -> #"+std::to_string(use.instructionIndex);
+      if(std::find(usedByEntries.begin(),usedByEntries.end(),relation)==usedByEntries.end())usedByEntries.push_back(relation);
      }
     }
+    std::string from,usedBy;
+    for(const auto&entry:fromEntries){if(!from.empty())from+=", ";from+=entry;}
+    for(const auto&entry:usedByEntries){if(!usedBy.empty())usedBy+=", ";usedBy+=entry;}
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",instructionIndex);
     ImGui::TableSetColumnIndex(1);ImGui::Text("%s",instruction.mnemonic.c_str());
