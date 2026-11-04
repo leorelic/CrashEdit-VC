@@ -68,15 +68,38 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [ ] Verify that saved files reopen correctly and, where practical, validate behavior in-game.
 - [ ] Keep GOOL editing and NSF save capabilities gated by the maturity of the decoder, compiler, and regression suite.
 
+## Product direction: approachable Crash 2 modding
+
+The ultimate purpose of GOOL work in CrashEdit-VC is to make Crash 2 object modding approachable to newcomers, not merely to provide a more convenient way for experts to inspect instructions. The editing experience should eventually offer three complementary levels:
+
+1. **GOOL Blueprints — visual editing for newcomers.** Users should be able to assemble behaviour from discoverable, pre-made event, condition, and action/function nodes; connect execution pins; configure exposed values; and receive clear validation feedback. The experience should take inspiration from the accessibility of Unreal Engine Blueprints. The current Blueprint tab is an analysis/visualization foundation, not yet this visual authoring system.
+2. **GOOL Script — readable text editing.** A purpose-built, Crash 2-targeted scripting language should let users understand and modify object behaviour without dealing directly with packed operands, instruction indices, or raw machine code. GDScript is a usability reference for clarity and low boilerplate, not a syntax or semantics template. The language must be derived from verified Crash 2 GOOL behaviour rather than invented abstractions.
+3. **GOOL Inspector — legacy, low-level editing.** This is the expert workflow for inspecting and modifying actual GOOL instructions, operands, data pools, state descriptors, and supported native MIPS. It preserves the precise instruction-level workflow familiar to users of traditional CrashEdit tools. This is not a separate new scripting tier; it is the low-level/legacy editing experience.
+
+All three experiences must ultimately operate on the same underlying GOOL representation. A user should be able to create or modify behaviour in Blueprints, refine it in GOOL Script, and inspect the resulting low-level instructions in the GOOL Inspector without maintaining three independent implementations. The views should remain synchronized through the shared representation and its validation rules.
+
+Do not implement the full visual authoring system or finalize GOOL Script syntax ahead of the semantic and representation work. First establish what Crash 2 GOOL actually does, build a faithful shared representation, and prove readable decompilation and recompilation on real objects. Design the authoring abstractions from those verified capabilities.
+
+## Four major technical goals
+
+The product direction above is served by four major technical goals. These are the priority for current development; new authoring UI, language syntax, and other polish must not displace them:
+
+1. **Correct GOOL execution semantics.** Establish opcode meanings, operand effects, MIPS interactions, calls/returns, state transitions, event dispatch, and relevant side effects using evidence from source, binaries, and tests. Unknown semantics must remain explicitly unknown rather than guessed.
+2. **A reusable intermediate representation (IR).** Separate Crash 2 binary decoding/encoding from shared GOOL semantics. The IR must preserve instruction identity and locations, operands, control flow, states, references, native code, and unknown instructions so analysis and editing can build on one faithful model.
+3. **Readable decompilation.** Produce genuinely understandable source-like output from real Crash 2 GOOL routines. Start with a small, representative routine and expand coverage incrementally; do not wait for every opcode to be understood. Unsupported instructions must remain visible and faithfully preserved.
+4. **Recompilation and validation.** Rebuild valid GOOL data from the representation/source, preserve unsupported content where possible, and prove correctness through round-trip tests, real NSF samples, reopen tests, and eventual in-game validation before routine save workflows are enabled.
+
+Every proposed milestone should pass this test: **Does it bring us closer to readable, editable, recompilable GOOL and easier Crash 2 modding?** If not, defer it. Prefer small, independently testable steps and evidence-backed semantics over broad UI expansion.
+
 ## Design direction
 
 The long-term GOOL workflow should provide three complementary ways to understand and work with an entry:
 
-1. **GOOL Inspector** — detailed decoded data, instruction fields, references, and diagnostics.
-2. **GOOL Blueprint** — a visual explanation of execution flow and relationships, eventually with visual authoring.
-3. **GOOL Script Editor** — a readable source-like representation, eventually with manual editing.
+1. **GOOL Inspector** — detailed decoded data, instruction fields, references, and diagnostics; eventually the low-level legacy editing surface.
+2. **GOOL Blueprint** — currently a visual explanation of execution flow and relationships; eventually a visual authoring interface.
+3. **GOOL Script** — a readable source-like representation, eventually with manual editing.
 
-These are different views of the same underlying GOOL model, not separate implementations of the format. The Inspector remains useful for precise technical inspection; Blueprint emphasizes structure and flow; the Script Editor emphasizes readability and authoring.
+These are different views of the same underlying GOOL model, not separate implementations of the format. The Inspector remains useful for precise technical inspection; Blueprint emphasizes visual structure and approachable authoring; GOOL Script emphasizes readability and text-based authoring.
 
 ## Progress policy
 
