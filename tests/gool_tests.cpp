@@ -395,7 +395,7 @@ int main(){
  assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Fallthrough&&e.targetValid&&e.targetInstruction==2;}));
  assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Call&&e.targetValid&&e.targetInstruction==0;}));
  assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Return&&!e.targetValid;}));
- NsfGool invalidFlow;invalidFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction invalidBranch;invalidBranch.opcode=50;invalidBranch.operandBits=0x3FFU;invalidFlow.instructions.push_back(invalidBranch);
+ NsfGool invalidFlow;invalidFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction invalidBranch;invalidBranch.opcode=50;invalidBranch.operandBits=0x3FEU;invalidFlow.instructions.push_back(invalidBranch);
  const auto invalidGraph=analyzeGoolControlFlow(invalidFlow);
  assert(invalidGraph.blocks.size()==1&&invalidGraph.edges.size()==1&&!invalidGraph.edges[0].targetValid&&!invalidGraph.diagnostics.empty());
  NsfGool externalFlow;externalFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction externalCall;externalCall.opcode=59;externalCall.operandBits=0x004000U;externalFlow.instructions.push_back(externalCall);
