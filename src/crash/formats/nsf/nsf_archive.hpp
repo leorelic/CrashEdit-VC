@@ -73,6 +73,15 @@ struct NsfGoolStateDescriptor {
  std::int16_t goolIndex=0, eventHook=0, transHook=0, codeHook=0;
 };
 enum class NsfGoolStateReferenceStatus : std::uint8_t { InvalidDataIndex, Local, External, Ambiguous };
+enum class NsfGoolStateHookKind : std::uint8_t { Event, Transition, Code };
+enum class NsfGoolStateHookStatus : std::uint8_t { Absent, InvalidDataIndex, MissingTarget, AmbiguousTarget, TargetUndecoded, OffsetOutOfRange, Local, External };
+struct NsfGoolStateHookReference {
+ std::size_t descriptorIndex=0, targetChunkIndex=0, targetEntryIndex=0;
+ NsfGoolStateHookKind kind=NsfGoolStateHookKind::Event;
+ std::uint16_t rawValue=0, instructionOffset=0;
+ bool external=false, targetFound=false;
+ NsfGoolStateHookStatus status=NsfGoolStateHookStatus::Absent;
+};
 struct NsfGoolStateReference {
  std::size_t descriptorIndex=0, targetChunkIndex=0, targetEntryIndex=0;
  std::int32_t dataPoolIndex=0;
@@ -98,6 +107,7 @@ struct NsfGool {
  std::vector<std::int16_t> stateMap;
  std::vector<NsfGoolStateDescriptor> stateDescriptors;
  std::vector<NsfGoolStateReference> stateReferences;
+ std::vector<NsfGoolStateHookReference> stateHookReferences;
  std::size_t frameGroupBytes=0;
  bool frameGroupsDecoded=false;
  std::vector<NsfGoolFrameGroup> frameGroups;

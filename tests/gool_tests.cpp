@@ -13,7 +13,7 @@ using namespace CrashEdit::Crash;
 static void p16(std::vector<std::uint8_t>&b,std::size_t p,std::uint16_t v){b[p]=static_cast<std::uint8_t>(v);b[p+1]=static_cast<std::uint8_t>(v>>8U);}
 static void p32(std::vector<std::uint8_t>&b,std::size_t p,std::uint32_t v){for(int i=0;i<4;++i)b[p+static_cast<std::size_t>(i)]=static_cast<std::uint8_t>(v>>(8U*static_cast<unsigned>(i)));}
 
-static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateReturn=false,std::uint32_t entryEid=0x0200007BU,std::int16_t stateGoolIndex=9,std::uint32_t firstDataWord=0x11112222U){
+static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateReturn=false,std::uint32_t entryEid=0x0200007BU,std::int16_t stateGoolIndex=9,std::uint32_t firstDataWord=0x11112222U,std::int16_t eventHook=10,std::int16_t transHook=11,std::int16_t codeHook=12){
  std::vector<std::uint8_t>b(NsfChunkSize);
  p16(b,0,0x1234);p16(b,2,0);p32(b,4,0x12345678);p32(b,8,1);
  const std::size_t entry=24;
@@ -34,7 +34,7 @@ static std::vector<std::uint8_t> makeGoolChunk(bool extended,bool alternateRetur
  if(extended){
   const std::size_t map=entry+offsets[3];p16(b,map,0xffff);p16(b,map+2,3);
   const std::size_t desc=entry+offsets[4];p32(b,desc,0x01020304);p32(b,desc+4,0x05060708);
-  p16(b,desc+8,static_cast<std::uint16_t>(stateGoolIndex));p16(b,desc+10,10);p16(b,desc+12,11);p16(b,desc+14,12);
+  p16(b,desc+8,static_cast<std::uint16_t>(stateGoolIndex));p16(b,desc+10,static_cast<std::uint16_t>(eventHook));p16(b,desc+12,static_cast<std::uint16_t>(transHook));p16(b,desc+14,static_cast<std::uint16_t>(codeHook));
   const std::size_t fg=entry+offsets[5];
   p16(b,fg,1);p16(b,fg+2,2);p32(b,fg+4,0x02001234);p32(b,fg+8,1);
   p16(b,fg+12,2);p16(b,fg+14,1);p32(b,fg+16,0x02005678);
@@ -302,11 +302,34 @@ int main(){
  const auto&externalStateReference=externalArchive.chunks()[0].entries[0].gool.stateReferences[0];
  assert(externalStateReference.eid==0x0200007CU&&externalStateReference.status==NsfGoolStateReferenceStatus::External&&externalStateReference.targetFound);
  assert(externalStateReference.targetChunkIndex==1&&externalStateReference.targetEntryIndex==0);
+  NsfArchive externalHookArchive;
+  const auto externalHookSource=makeGoolChunk(true,false,0x0200007BU,0,0x0200007CU,0x4002,0x4003,0x4004);
+  std::vector<std::uint8_t> externalHookBytes=externalHookSource;
+  externalHookBytes.insert(externalHookBytes.end(),targetChunk.begin(),targetChunk.end());
+  assert(externalHookArchive.loadBytes(externalHookBytes,error));
+  externalHookArchive.decodeGools(NsfGoolVersion::Version2);
+  const auto&externalHooks=externalHookArchive.chunks()[0].entries[0].gool.stateHookReferences;
+  assert(externalHooks.size()==3);
+  assert(externalHooks[0].status==NsfGoolStateHookStatus::External&&externalHooks[0].instructionOffset==2&&externalHooks[0].targetChunkIndex==1);
+  assert(externalHooks[1].status==NsfGoolStateHookStatus::External&&externalHooks[1].instructionOffset==3&&externalHooks[1].targetChunkIndex==1);
+  assert(externalHooks[2].status==NsfGoolStateHookStatus::External&&externalHooks[2].instructionOffset==4&&externalHooks[2].targetChunkIndex==1);
+  NsfArchive absentHookArchive;
+  assert(absentHookArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU,0x3FFF,1,5),error));
+  absentHookArchive.decodeGools(NsfGoolVersion::Version2);
+  const auto&absentHooks=absentHookArchive.chunks()[0].entries[0].gool.stateHookReferences;
+  assert(absentHooks[0].status==NsfGoolStateHookStatus::Absent);
+  assert(absentHooks[1].status==NsfGoolStateHookStatus::Local);
+  assert(absentHooks[2].status==NsfGoolStateHookStatus::OffsetOutOfRange);
 
  NsfArchive localArchive;
  assert(localArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU),error));
  localArchive.decodeGools(NsfGoolVersion::Version2);
  assert(localArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Local);
+  const auto&localHooks=localArchive.chunks()[0].entries[0].gool.stateHookReferences;
+  assert(localHooks.size()==3);
+  assert(localHooks[0].kind==NsfGoolStateHookKind::Event&&localHooks[0].status==NsfGoolStateHookStatus::Local&&localHooks[0].instructionOffset==1);
+  assert(localHooks[1].kind==NsfGoolStateHookKind::Transition&&localHooks[1].status==NsfGoolStateHookStatus::Local&&localHooks[1].instructionOffset==2);
+  assert(localHooks[2].kind==NsfGoolStateHookKind::Code&&localHooks[2].status==NsfGoolStateHookStatus::Local&&localHooks[2].instructionOffset==4);
 
  NsfArchive missingArchive;
  assert(missingArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007DU),error));
@@ -321,6 +344,20 @@ int main(){
  ambiguousArchive.decodeGools(NsfGoolVersion::Version2);
  assert(ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Ambiguous);
  assert(!ambiguousArchive.chunks()[0].entries[0].gool.stateReferences[0].targetFound);
+  NsfArchive ambiguousHookArchive;
+  std::vector<std::uint8_t> ambiguousHookBytes=externalHookBytes;
+  ambiguousHookBytes.insert(ambiguousHookBytes.end(),targetChunk.begin(),targetChunk.end());
+  assert(ambiguousHookArchive.loadBytes(ambiguousHookBytes,error));
+  ambiguousHookArchive.decodeGools(NsfGoolVersion::Version2);
+  assert(ambiguousHookArchive.chunks()[0].entries[0].gool.stateHookReferences[0].status==NsfGoolStateHookStatus::AmbiguousTarget);
+  NsfArchive missingHookArchive;
+  assert(missingHookArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007DU,0x4001,0x4002,0x4003),error));
+  missingHookArchive.decodeGools(NsfGoolVersion::Version2);
+  assert(missingHookArchive.chunks()[0].entries[0].gool.stateHookReferences[0].status==NsfGoolStateHookStatus::MissingTarget);
+  NsfArchive invalidIndexHookArchive;
+  assert(invalidIndexHookArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,9,0x0200007DU,0x4001,0x4002,0x4003),error));
+  invalidIndexHookArchive.decodeGools(NsfGoolVersion::Version2);
+  assert(invalidIndexHookArchive.chunks()[0].entries[0].gool.stateHookReferences[0].status==NsfGoolStateHookStatus::InvalidDataIndex);
  NsfArchive editableArchive;
  assert(editableArchive.loadBytes(makeGoolChunk(true,false),error));
  editableArchive.decodeGools(NsfGoolVersion::Version2);

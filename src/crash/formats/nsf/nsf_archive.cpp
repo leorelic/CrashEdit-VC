@@ -316,6 +316,47 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
     }
     gool.stateReferences.push_back(reference);
    }
+   gool.stateHookReferences.clear();
+   for(std::size_t descriptorIndex=0;descriptorIndex<gool.stateDescriptors.size();++descriptorIndex){
+    const auto& descriptor=gool.stateDescriptors[descriptorIndex];
+    auto addHook=[&](NsfGoolStateHookKind kind,std::int16_t encodedHook){
+     NsfGoolStateHookReference hook;hook.descriptorIndex=descriptorIndex;hook.kind=kind;
+     hook.rawValue=static_cast<std::uint16_t>(encodedHook);
+     hook.instructionOffset=static_cast<std::uint16_t>(hook.rawValue&0x3FFFU);
+     hook.external=(hook.rawValue&0x4000U)!=0;
+     if(hook.instructionOffset==0x3FFFU){hook.status=NsfGoolStateHookStatus::Absent;gool.stateHookReferences.push_back(hook);return;}
+     const NsfGool* targetGool=nullptr;
+     if(!hook.external){
+      hook.targetChunkIndex=sourceChunkIndex;hook.targetEntryIndex=sourceEntryIndex;hook.targetFound=true;targetGool=&gool;
+     }else{
+      if(descriptorIndex>=gool.stateReferences.size()){
+       hook.status=NsfGoolStateHookStatus::InvalidDataIndex;gool.stateHookReferences.push_back(hook);return;
+      }
+      const auto& stateReference=gool.stateReferences[descriptorIndex];
+      if(stateReference.status==NsfGoolStateReferenceStatus::InvalidDataIndex){
+       hook.status=NsfGoolStateHookStatus::InvalidDataIndex;gool.stateHookReferences.push_back(hook);return;
+      }
+      if(stateReference.status==NsfGoolStateReferenceStatus::Ambiguous){
+       hook.status=NsfGoolStateHookStatus::AmbiguousTarget;gool.stateHookReferences.push_back(hook);return;
+      }
+      if(!stateReference.targetFound){
+       hook.status=NsfGoolStateHookStatus::MissingTarget;gool.stateHookReferences.push_back(hook);return;
+      }
+      hook.targetChunkIndex=stateReference.targetChunkIndex;hook.targetEntryIndex=stateReference.targetEntryIndex;hook.targetFound=true;
+      if(hook.targetChunkIndex>=chunks_.size()||hook.targetEntryIndex>=chunks_[hook.targetChunkIndex].entries.size()){
+       hook.targetFound=false;hook.status=NsfGoolStateHookStatus::MissingTarget;gool.stateHookReferences.push_back(hook);return;
+      }
+      targetGool=&chunks_[hook.targetChunkIndex].entries[hook.targetEntryIndex].gool;
+     }
+     if(!targetGool||!targetGool->decoded)hook.status=NsfGoolStateHookStatus::TargetUndecoded;
+     else if(static_cast<std::size_t>(hook.instructionOffset)>=targetGool->instructions.size())hook.status=NsfGoolStateHookStatus::OffsetOutOfRange;
+     else hook.status=hook.external?NsfGoolStateHookStatus::External:NsfGoolStateHookStatus::Local;
+     gool.stateHookReferences.push_back(hook);
+    };
+    addHook(NsfGoolStateHookKind::Event,descriptor.eventHook);
+    addHook(NsfGoolStateHookKind::Transition,descriptor.transHook);
+    addHook(NsfGoolStateHookKind::Code,descriptor.codeHook);
+   }
   }
  }
 }
