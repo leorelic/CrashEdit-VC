@@ -63,6 +63,7 @@ if(CRASHEDIT_BUILD_APP)
         src/crash/formats/nsf/nsf_archive.cpp
         src/crash/formats/gool/gool_opcodes.cpp
         src/crash/formats/gool/gool_control_flow.cpp
+        src/crash/formats/gool/gool_ir.cpp
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
     )
@@ -129,6 +130,7 @@ if(CRASHEDIT_BUILD_TESTS)
         src/crash/formats/nsf/nsf_archive.cpp
         src/crash/formats/gool/gool_opcodes.cpp
         src/crash/formats/gool/gool_control_flow.cpp
+        src/crash/formats/gool/gool_ir.cpp
     )
     target_include_directories(crashedit_gool_tests PRIVATE src)
     if(MSVC)
@@ -137,4 +139,17 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_gool_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME gool_tests COMMAND crashedit_gool_tests)
+
+    add_executable(crashedit_gool_ir_tests
+        tests/gool_ir_tests.cpp
+        src/crash/formats/gool/gool_ir.cpp
+        src/crash/formats/gool/gool_opcodes.cpp
+    )
+    target_include_directories(crashedit_gool_ir_tests PRIVATE src)
+    if(MSVC)
+        target_compile_options(crashedit_gool_ir_tests PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(crashedit_gool_ir_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME gool_ir_tests COMMAND crashedit_gool_ir_tests)
 endif()
