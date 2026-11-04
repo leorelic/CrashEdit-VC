@@ -1517,21 +1517,19 @@ void EditorUI::drawGoolGraph(){
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.18f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.55f,.82f,.8f));
    if(ImGui::BeginChild("GOOLGraphPoolCard",ImVec2(sideWidth,150),true)){
     ImGui::TextColored(ImVec4(.48f,.72f,1,1),"DATA POOL");
-    ImGui::Text("%zu words",gool->dataPool.size());
+    ImGui::TextWrapped("A descriptor's GOOL index selects a word here. That word supplies the EID used to resolve the target GOOL.");
     ImGui::Separator();
-    ImGui::TextDisabled("%zu descriptor references",gool->stateReferences.size());
-    ImGui::TextDisabled("%zu unique external targets",dependencies.size());
+    ImGui::TextDisabled("%zu local · %zu external references",localCount,externalCount);
     if(ImGui::SmallButton("Open Data Pool"))showGoolDataPool_=true;
    }ImGui::EndChild();ImGui::PopStyleColor(2);
    ImGui::TableSetColumnIndex(1);
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.19f,.15f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.62f,.43f,.83f,.8f));
    if(ImGui::BeginChild("GOOLGraphHooksCard",ImVec2(sideWidth,150),true)){
     ImGui::TextColored(ImVec4(.76f,.59f,1,1),"HOOKS");
-    ImGui::Text("%zu destinations",gool->stateHookReferences.size());
+    ImGui::TextWrapped("Event, Transition, and Code hooks route execution to instruction offsets, locally or in another GOOL.");
     ImGui::Separator();
-    ImGui::TextColored(ImVec4(.38f,.82f,.58f,1),"%zu resolved",validHooks);
-    ImGui::TextColored(ImVec4(1,.68f,.30f,1),"%zu unresolved",problemHooks);
-    ImGui::TextDisabled("%zu absent",absentHooks);
+    ImGui::TextColored(ImVec4(.38f,.82f,.58f,1),"%zu resolved destinations",validHooks);
+    if(problemHooks)ImGui::TextColored(ImVec4(1,.68f,.30f,1),"%zu unresolved destinations",problemHooks);
     if(ImGui::SmallButton("Open State Descriptions"))showGoolStateDescriptions_=true;
    }ImGui::EndChild();ImGui::PopStyleColor(2);
    ImGui::EndTable();
@@ -1563,11 +1561,7 @@ void EditorUI::drawGoolGraph(){
   }
   ImGui::EndChild();ImGui::PopStyleColor(2);
   ImGui::Spacing();
-  ImGui::TextDisabled("Hook details:");
-  for(const auto&hook:gool->stateHookReferences){
-   if(hook.status==Crash::NsfGoolStateHookStatus::Absent)continue;
-   ImGui::BulletText("State %02zu · %s · instruction %04X · %s",hook.descriptorIndex,hookKindName(hook.kind),hook.instructionOffset,hookStatusName(hook.status));
-  }
+
  }
  ImGui::EndChild();
  ImGui::End();
