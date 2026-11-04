@@ -407,6 +407,7 @@ int main(){
  NsfGoolInstruction conditionalState;conditionalState.opcode=54;stateFlow.instructions.push_back(conditionalState);
  stateFlow.instructions.push_back(NsfGoolInstruction{});
  const auto stateGraph=analyzeGoolControlFlow(stateFlow);
+ assert(stateGraph.blocks.size()==3&&stateGraph.blocks[0].startInstruction==0&&stateGraph.blocks[0].endInstruction==1);
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransition&&!e.targetValid;}));
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransitionTrue&&!e.targetValid;}));
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Fallthrough&&e.targetValid&&e.targetInstruction==2;}));
