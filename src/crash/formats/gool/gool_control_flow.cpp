@@ -146,7 +146,8 @@ NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size
         if(reference.empty()&&operand.kind==NsfGoolOperandKind::ProcessField)
             reference=goolObjectFieldName(operand.rawValue);
         if(reference.empty()) reference=std::string(1,operand.name);
-        analysis.operandEffects.push_back({operand.name,access,std::move(reference)});
+        const bool trackable=(operand.kind==NsfGoolOperandKind::Reference || operand.kind==NsfGoolOperandKind::DestinationReference) && (operand.rawValue&0x800U)!=0U;
+        analysis.operandEffects.push_back({operand.name,access,std::move(reference),trackable});
     }
 
     const auto opcode=instruction.opcode;
@@ -160,6 +161,84 @@ NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size
     else
         analysis.executionEffect="Sequential control flow; no transfer is encoded by this instruction.";
     return analysis;
+}
+
+
+NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
+    NsfGoolDataFlowResult result;
+    const std::size_t count=gool.instructions.size();
+    if(count==0U) return result;
+    std::vector<NsfGoolInstructionAnalysis> analyses;
+    analyses.reserve(count);
+    for(std::size_t i=0;i<count;++i) analyses.push_back(analyzeGoolInstruction(gool,i));
+
+    std::vector<std::vector<std::size_t>> successors(count),predecessors(count);
+    const auto graph=analyzeGoolControlFlow(gool);
+    for(const auto& block:graph.blocks)
+        for(std::size_t i=block.startInstruction;i+1U<block.endInstruction&&i+1U<count;++i)
+            successors[i].push_back(i+1U);
+    for(const auto& edge:graph.edges) {
+        if(!edge.targetValid || edge.kind==NsfGoolFlowEdgeKind::Call) continue;
+        if(edge.sourceBlock>=graph.blocks.size() || edge.targetInstruction>=count) continue;
+        const auto source=graph.blocks[edge.sourceBlock].endInstruction-1U;
+        if(source<count) successors[source].push_back(edge.targetInstruction);
+    }
+    for(std::size_t i=0;i<count;++i) {
+        auto& next=successors[i];
+        std::sort(next.begin(),next.end());
+        next.erase(std::unique(next.begin(),next.end()),next.end());
+        for(const auto target:next) predecessors[target].push_back(i);
+    }
+
+    std::vector<std::vector<std::size_t>> definitionsAt(count);
+    for(std::size_t i=0;i<count;++i)
+        for(const auto& effect:analyses[i].operandEffects)
+            if(effect.trackable && effect.access==NsfGoolOperandAccess::Write) {
+                definitionsAt[i].push_back(result.definitions.size());
+                result.definitions.push_back({i,effect.reference});
+            }
+
+    using DefinitionSet=std::set<std::size_t>;
+    std::vector<DefinitionSet> incoming(count),outgoing(count);
+    auto transfer=[&](std::size_t instructionIndex,DefinitionSet state) {
+        const auto& analysis=analyses[instructionIndex];
+        if(!analysis.operandsKnown) { state.clear(); return state; }
+        for(const auto id:definitionsAt[instructionIndex]) {
+            const auto& location=result.definitions[id].location;
+            for(auto it=state.begin();it!=state.end();) {
+                if(result.definitions[*it].location==location) it=state.erase(it);
+                else ++it;
+            }
+            state.insert(id);
+        }
+        return state;
+    };
+    bool changed=true;
+    while(changed) {
+        changed=false;
+        for(std::size_t i=0;i<count;++i) {
+            DefinitionSet nextIn;
+            for(const auto predecessor:predecessors[i])
+                nextIn.insert(outgoing[predecessor].begin(),outgoing[predecessor].end());
+            auto nextOut=transfer(i,nextIn);
+            if(nextIn!=incoming[i] || nextOut!=outgoing[i]) {
+                incoming[i]=std::move(nextIn);
+                outgoing[i]=std::move(nextOut);
+                changed=true;
+            }
+        }
+    }
+    for(std::size_t i=0;i<count;++i)
+        for(const auto& effect:analyses[i].operandEffects) {
+            if(!effect.trackable || effect.access!=NsfGoolOperandAccess::Read) continue;
+            NsfGoolDataFlowUse use;
+            use.instructionIndex=i;
+            use.location=effect.reference;
+            for(const auto id:incoming[i])
+                if(result.definitions[id].location==effect.reference) use.reachingDefinitions.push_back(id);
+            result.uses.push_back(std::move(use));
+        }
+    return result;
 }
 
 }
