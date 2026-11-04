@@ -4,6 +4,8 @@
 
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
+#include "crash/formats/gool/gool_control_flow.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <iostream>
