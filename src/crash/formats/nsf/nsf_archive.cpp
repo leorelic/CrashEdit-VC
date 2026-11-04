@@ -412,6 +412,51 @@ bool NsfArchive::setGoolDataPoolWord(std::size_t chunkIndex,std::size_t entryInd
  entry.gool.dataPool[wordIndex]=static_cast<std::int32_t>(value);
  return true;
 }
+
+bool NsfArchive::setGoolFrameGroupEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint32_t eid){
+ if(!isValidEid(eid)||chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
+ const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
+ if(group.byteOffset>item.size||group.byteSize<8U||8U>item.size-group.byteOffset)return false;
+ const std::size_t offset=item.offset+group.byteOffset+4U;
+ if(!has(chunk.bytes,offset,4U))return false;
+ for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(eid>>(8U*i));
+ entry.gool.frameGroups[groupIndex].eid=eid;
+ return true;
+}
+bool NsfArchive::setGoolFrameGroupFrameCount(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint16_t frameCount){
+ if(frameCount>255U||chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
+ const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
+ if(group.type!=1U||group.byteOffset>item.size||group.byteSize<12U||12U>item.size-group.byteOffset)return false;
+ const std::size_t offset=item.offset+group.byteOffset+2U;
+ if(!has(chunk.bytes,offset,2U))return false;
+ chunk.bytes[offset]=static_cast<std::uint8_t>(frameCount);
+ chunk.bytes[offset+1U]=static_cast<std::uint8_t>(frameCount>>8U);
+ entry.gool.frameGroups[groupIndex].frameCount=static_cast<std::int16_t>(frameCount);
+ return true;
+}
+bool NsfArchive::setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,bool interpolated){
+ if(chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
+ const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
+ if(group.type!=1U||group.byteOffset>item.size||group.byteSize<12U||12U>item.size-group.byteOffset)return false;
+ const std::size_t offset=item.offset+group.byteOffset+8U;
+ if(!has(chunk.bytes,offset,4U))return false;
+ const std::uint32_t value=interpolated?1U:0U;
+ for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(value>>(8U*i));
+ entry.gool.frameGroups[groupIndex].interpolated=interpolated;
+ return true;
+}
 std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
  std::vector<NsfEntryLocation> matches;
  for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){
