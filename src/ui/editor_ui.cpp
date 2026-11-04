@@ -1479,19 +1479,60 @@ void EditorUI::drawGoolDataWindows(){
    const auto*selectedReference=static_cast<std::size_t>(selectedExternalDescriptor)<gool->stateReferences.size()?&gool->stateReferences[static_cast<std::size_t>(selectedExternalDescriptor)]:nullptr;
    const bool validPoolIndex=selectedDescriptor.goolIndex>=0&&static_cast<std::size_t>(selectedDescriptor.goolIndex)<gool->dataPool.size();
    if(validPoolIndex){
-    static int cachedExternalDescriptor=-1;static std::uint32_t externalEidValue=0;
-    if(cachedExternalDescriptor!=selectedExternalDescriptor){cachedExternalDescriptor=selectedExternalDescriptor;externalEidValue=static_cast<std::uint32_t>(gool->dataPool[static_cast<std::size_t>(selectedDescriptor.goolIndex)]);}
+    const std::size_t poolIndex=static_cast<std::size_t>(selectedDescriptor.goolIndex);
+    std::uint32_t targetEid=static_cast<std::uint32_t>(gool->dataPool[poolIndex]);
     ImGui::Separator();ImGui::Text("External GOOL");
-    const bool isExternal=selectedReference&&(selectedReference->status==Crash::NsfGoolStateReferenceStatus::External||selectedReference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous);
-    bool externalEnabled=isExternal;
-    ImGui::InputScalar("External GOOL EID",ImGuiDataType_U32,&externalEidValue,nullptr,nullptr,"%08X");
-    if(ImGui::Checkbox("Enabled",&externalEnabled)){
-     const auto index=static_cast<std::size_t>(selectedDescriptor.goolIndex);
-     const auto value=externalEnabled?externalEidValue:goolEid;
-     if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),index,value))goolReferencesNeedRefresh=true;
+    ImGui::TextDisabled("Choose a loaded GOOL, or enter an EID manually. Selecting this GOOL makes the reference local.");
+    std::map<std::uint32_t,std::size_t> targetCounts;
+    std::map<std::uint32_t,std::pair<std::size_t,std::size_t>> targetLocations;
+    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+     const auto&targetChunk=nsf_.chunks()[ci];
+     if(targetChunk.type!=0||!targetChunk.entryTableValid)continue;
+     for(std::size_t ei=0;ei<targetChunk.entries.size();++ei){
+      const auto&targetEntry=targetChunk.entries[ei];
+      if(!targetEntry.valid||targetEntry.type!=11||!targetEntry.gool.decoded)continue;
+      ++targetCounts[targetEntry.eid];
+      targetLocations.try_emplace(targetEntry.eid,ci,ei);
+     }
     }
+    std::vector<std::uint32_t> targetEids{goolEid};
+    std::vector<std::string> targetLabels;
+    targetLabels.push_back("Local — "+Crash::eidToEName(goolEid)+" (this entry)");
+    int selectedTarget=0;
+    for(const auto&[eid,count]:targetCounts){
+     if(eid==goolEid||count!=1)continue;
+     const auto location=targetLocations.at(eid);
+     targetEids.push_back(eid);
+     targetLabels.push_back(Crash::eidToEName(eid)+" — "+Crash::eidToEName(eid)+" (Chunk "+std::to_string(location.first)+", Entry "+std::to_string(location.second)+")");
+     if(eid==targetEid)selectedTarget=static_cast<int>(targetEids.size()-1);
+    }
+    if(targetEid!=goolEid&&std::find(targetEids.begin()+1,targetEids.end(),targetEid)==targetEids.end()){
+     const bool ambiguous=targetCounts.contains(targetEid)&&targetCounts[targetEid]>1;
+     targetEids.push_back(targetEid);
+     char unresolvedLabel[96];
+     std::snprintf(unresolvedLabel,sizeof(unresolvedLabel),ambiguous?"Ambiguous target — 0x%08X":"Custom / unresolved — 0x%08X",targetEid);
+     targetLabels.emplace_back(unresolvedLabel);
+     selectedTarget=static_cast<int>(targetEids.size()-1);
+    }
+    std::vector<const char*> targetLabelPointers;
+    targetLabelPointers.reserve(targetLabels.size());
+    for(const auto&label:targetLabels)targetLabelPointers.push_back(label.c_str());
+    ImGui::SetNextItemWidth(360.0f);
+    if(ImGui::Combo("External GOOL target",&selectedTarget,targetLabelPointers.data(),static_cast<int>(targetLabelPointers.size()))){
+     targetEid=targetEids[static_cast<std::size_t>(selectedTarget)];
+     if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),poolIndex,targetEid))goolReferencesNeedRefresh=true;
+    }
+    ImGui::SetNextItemWidth(220.0f);
+    if(ImGui::InputScalar("Custom EID / override",ImGuiDataType_U32,&targetEid,nullptr,nullptr,"%08X")){
+     if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),poolIndex,targetEid))goolReferencesNeedRefresh=true;
+    }
+    ImGui::TextDisabled("Data Pool word %zu is shared by every descriptor using index %d.",poolIndex,static_cast<int>(selectedDescriptor.goolIndex));
     int externalIndex=selectedDescriptor.goolIndex;
-    if(ImGui::InputInt("External GOOL Index",&externalIndex)&&externalIndex>=0&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(std::clamp(externalIndex,0,32767));if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited)){goolReferencesNeedRefresh=true;cachedExternalDescriptor=-1;}}
+    ImGui::SetNextItemWidth(180.0f);
+    if(ImGui::InputInt("Data Pool index",&externalIndex)&&externalIndex>=0&&externalIndex<=32767&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){
+     auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(externalIndex);
+     if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited))goolReferencesNeedRefresh=true;
+    }
    }
   }else ImGui::TextDisabled("No state descriptors in this GOOL entry.");
   if(goolReferencesNeedRefresh)nsf_.decodeGools(nsfGoolVersion(gameVersion_));
