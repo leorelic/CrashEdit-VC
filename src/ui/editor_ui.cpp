@@ -207,7 +207,7 @@ void EditorUI::draw(){
  auto id=ImGui::GetID("CrashEditDockSpace");
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
+ drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
@@ -1419,6 +1419,177 @@ void EditorUI::drawGoolInspector(){
  }
  ImGui::End();
 }
+
+void EditorUI::drawGoolGraph(){
+ const Crash::NsfEntry* selectedEntry=nullptr;
+ const Crash::NsfGool* gool=nullptr;
+ if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
+  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
+  if(chunk.type==0&&static_cast<std::size_t>(selectedEntry_)<chunk.entries.size()){
+   const auto&entry=chunk.entries[static_cast<std::size_t>(selectedEntry_)];
+   if(entry.valid&&entry.type==11){selectedEntry=&entry;gool=&entry.gool;}
+  }
+ }
+ if(ImGuiWindow* viewport=ImGui::FindWindowByName("3D Zone Editor"))
+  if(viewport->DockNode)ImGui::SetNextWindowDockID(viewport->DockNode->ID,ImGuiCond_FirstUseEver);
+ ImGui::Begin("GOOL Graph");
+ if(!selectedEntry||!gool){
+  ImGui::Spacing();
+  ImGui::TextDisabled("Select a GOOL entry in the Resource Hierarchy to explore its relationships.");
+  ImGui::End();return;
+ }
+ if(!gool->decoded){
+  ImGui::Text("%s | 0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
+  ImGui::TextDisabled("This GOOL entry could not be decoded, so its dependency graph is unavailable.");
+  if(!gool->error.empty())ImGui::TextWrapped("%s",gool->error.c_str());
+  ImGui::End();return;
+ }
+ const auto statusColor=[](Crash::NsfGoolStateReferenceStatus status){
+  switch(status){case Crash::NsfGoolStateReferenceStatus::Local:return ImVec4(.35f,.78f,.52f,1);case Crash::NsfGoolStateReferenceStatus::External:return ImVec4(.35f,.68f,.98f,1);case Crash::NsfGoolStateReferenceStatus::Ambiguous:return ImVec4(1,.68f,.25f,1);default:return ImVec4(.95f,.38f,.36f,1);}
+ };
+ const auto hookStatusName=[](Crash::NsfGoolStateHookStatus status)->const char*{
+  switch(status){
+   case Crash::NsfGoolStateHookStatus::Absent:return "Absent";
+   case Crash::NsfGoolStateHookStatus::InvalidDataIndex:return "Invalid data index";
+   case Crash::NsfGoolStateHookStatus::MissingTarget:return "Missing target";
+   case Crash::NsfGoolStateHookStatus::AmbiguousTarget:return "Ambiguous target";
+   case Crash::NsfGoolStateHookStatus::TargetUndecoded:return "Target not decoded";
+   case Crash::NsfGoolStateHookStatus::OffsetOutOfRange:return "Offset out of range";
+   case Crash::NsfGoolStateHookStatus::Local:return "Local destination";
+   case Crash::NsfGoolStateHookStatus::External:return "External destination";
+  }return "Unknown";
+ };
+ const auto hookKindName=[](Crash::NsfGoolStateHookKind kind)->const char*{
+  switch(kind){case Crash::NsfGoolStateHookKind::Event:return "Event";case Crash::NsfGoolStateHookKind::Transition:return "Transition";case Crash::NsfGoolStateHookKind::Code:return "Code";}return "Hook";
+ };
+ std::vector<std::pair<std::size_t,std::size_t>> dependencies;
+ std::size_t unresolved=0,externalCount=0,localCount=0;
+ for(const auto&reference:gool->stateReferences){
+  if(reference.status==Crash::NsfGoolStateReferenceStatus::InvalidDataIndex||!reference.targetFound){++unresolved;continue;}
+  if(reference.status==Crash::NsfGoolStateReferenceStatus::External||reference.status==Crash::NsfGoolStateReferenceStatus::Ambiguous){
+   ++externalCount;
+   if(reference.status==Crash::NsfGoolStateReferenceStatus::External){
+    const auto location=std::make_pair(reference.targetChunkIndex,reference.targetEntryIndex);
+    if(std::find(dependencies.begin(),dependencies.end(),location)==dependencies.end())dependencies.push_back(location);
+   }
+  }else ++localCount;
+ }
+ std::size_t validHooks=0,problemHooks=0,absentHooks=0;
+ for(const auto&hook:gool->stateHookReferences){
+  if(hook.status==Crash::NsfGoolStateHookStatus::Absent)++absentHooks;
+  else if(hook.status==Crash::NsfGoolStateHookStatus::Local||hook.status==Crash::NsfGoolStateHookStatus::External)++validHooks;
+  else ++problemHooks;
+ }
+ ImGui::TextDisabled("A top-to-bottom view of the selected entry's decoded relationships.");
+ ImGui::SameLine();
+ ImGui::Text("%s  |  0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
+ ImGui::Separator();
+ if(ImGui::BeginChild("GOOLGraphCanvas",ImVec2(0,0),false,ImGuiWindowFlags_AlwaysVerticalScrollbar)){
+  const float available=ImGui::GetContentRegionAvail().x;
+  const float cardWidth=std::max(available*.76f,300.0f);
+  const float sideWidth=std::max((available-24.0f)*.5f,180.0f);
+  auto centerCard=[&](const char*id,const char*title,const char*subtitle,ImVec4 tint){
+   ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
+   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(tint.x*.20f,tint.y*.20f,tint.z*.20f,.95f));
+   ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(tint.x,tint.y,tint.z,.75f));
+   ImGui::BeginChild(id,ImVec2(cardWidth,66.0f),true,ImGuiWindowFlags_NoScrollbar);
+   ImGui::TextColored(tint,"%s",title);ImGui::TextDisabled("%s",subtitle);
+   ImGui::EndChild();ImGui::PopStyleColor(2);
+  };
+  auto connector=[&](){
+   const float x=ImGui::GetCursorScreenPos().x+available*.5f;
+   const float y=ImGui::GetCursorScreenPos().y;
+   ImGui::GetWindowDrawList()->AddLine(ImVec2(x,y),ImVec2(x,y+22.0f),IM_COL32(105,130,157,190),2.0f);
+   ImGui::Dummy(ImVec2(1,22));
+  };
+  centerCard("GOOLGraphRoot","GOOL ENTRY",Crash::eidToEName(selectedEntry->eid).c_str(),ImVec4(.42f,.72f,1,1));
+  connector();
+  ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
+  ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.17f,.23f,.96f));
+  ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.48f,.68f,.8f));
+  const float descriptorHeight=std::min(120.0f+static_cast<float>(gool->stateDescriptors.size())*48.0f,360.0f);
+  if(ImGui::BeginChild("GOOLGraphStates",ImVec2(cardWidth,descriptorHeight),true)){
+   ImGui::TextColored(ImVec4(.48f,.72f,1,1),"STATE DESCRIPTORS");
+   ImGui::TextDisabled("%zu descriptors",gool->stateDescriptors.size());
+   ImGui::Separator();
+   if(gool->stateDescriptors.empty())ImGui::TextDisabled("No state descriptors.");
+   for(std::size_t i=0;i<gool->stateDescriptors.size();++i){
+    const auto*reference=i<gool->stateReferences.size()?&gool->stateReferences[i]:nullptr;
+    ImGui::PushID(static_cast<int>(i));
+    ImGui::Text("State %02zu",i);ImGui::SameLine();
+    if(reference){
+     const char*label=reference->status==Crash::NsfGoolStateReferenceStatus::Local?"Local":reference->status==Crash::NsfGoolStateReferenceStatus::External?"External":reference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous?"Ambiguous":"Invalid data index";
+     ImGui::TextColored(statusColor(reference->status),"%s",label);
+     ImGui::SameLine();
+     if(reference->status!=Crash::NsfGoolStateReferenceStatus::InvalidDataIndex)ImGui::TextDisabled("→ %s",Crash::eidToEName(reference->eid).c_str());
+    }else ImGui::TextDisabled("Reference unavailable");
+    ImGui::PopID();
+   }
+  }
+  ImGui::EndChild();ImGui::PopStyleColor(2);
+  connector();
+  if(ImGui::BeginTable("GOOLGraphMiddleCards",2,ImGuiTableFlags_SizingStretchSame)){
+   ImGui::TableNextRow();
+   ImGui::TableSetColumnIndex(0);
+   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.18f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.55f,.82f,.8f));
+   if(ImGui::BeginChild("GOOLGraphPoolCard",ImVec2(sideWidth,150),true)){
+    ImGui::TextColored(ImVec4(.48f,.72f,1,1),"DATA POOL");
+    ImGui::Text("%zu words",gool->dataPool.size());
+    ImGui::Separator();
+    ImGui::TextDisabled("%zu descriptor references",gool->stateReferences.size());
+    ImGui::TextDisabled("%zu unique external targets",dependencies.size());
+    if(ImGui::SmallButton("Open Data Pool"))showGoolDataPool_=true;
+   }ImGui::EndChild();ImGui::PopStyleColor(2);
+   ImGui::TableSetColumnIndex(1);
+   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.19f,.15f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.62f,.43f,.83f,.8f));
+   if(ImGui::BeginChild("GOOLGraphHooksCard",ImVec2(sideWidth,150),true)){
+    ImGui::TextColored(ImVec4(.76f,.59f,1,1),"HOOKS");
+    ImGui::Text("%zu destinations",gool->stateHookReferences.size());
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(.38f,.82f,.58f,1),"%zu resolved",validHooks);
+    ImGui::TextColored(ImVec4(1,.68f,.30f,1),"%zu unresolved",problemHooks);
+    ImGui::TextDisabled("%zu absent",absentHooks);
+    if(ImGui::SmallButton("Open State Descriptions"))showGoolStateDescriptions_=true;
+   }ImGui::EndChild();ImGui::PopStyleColor(2);
+   ImGui::EndTable();
+  }
+  connector();
+  ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
+  ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.13f,.21f,.17f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.32f,.70f,.48f,.8f));
+  const float dependencyHeight=std::max(100.0f,70.0f+static_cast<float>(dependencies.size())*48.0f);
+  if(ImGui::BeginChild("GOOLGraphDependencies",ImVec2(cardWidth,dependencyHeight),true)){
+   ImGui::TextColored(ImVec4(.42f,.82f,.57f,1),"GOOL DEPENDENCIES");
+   ImGui::TextDisabled("%zu unique loaded external GOOL entries",dependencies.size());
+   ImGui::Separator();
+   if(dependencies.empty())ImGui::TextDisabled("No resolved external GOOL dependencies were found.");
+   for(const auto&location:dependencies){
+    if(location.first>=nsf_.chunks().size()||location.second>=nsf_.chunks()[location.first].entries.size())continue;
+    const auto&target=nsf_.chunks()[location.first].entries[location.second];
+    ImGui::PushID(static_cast<int>(location.first*65536U+location.second));
+    const std::string label=Crash::eidToEName(target.eid)+"  ·  "+std::to_string(target.eid);
+    if(ImGui::Button((label+"##open_dependency").c_str(),ImVec2(-1,0))){
+     selectedChunk_=static_cast<int>(location.first);selectedEntry_=static_cast<int>(location.second);
+     selectedEntity_=-1;selectedItem_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;
+    }
+    ImGui::TextDisabled("Chunk %zu · Entry %zu%s",location.first,location.second,target.gool.decoded?"":" · not decoded");
+    ImGui::PopID();
+   }
+   if(unresolved>0)ImGui::TextColored(ImVec4(1,.65f,.30f,1),"%zu unresolved or invalid state references",unresolved);
+   if(externalCount>dependencies.size())ImGui::TextDisabled("%zu external/ambiguous descriptor references in total",externalCount);
+   if(localCount>0)ImGui::TextDisabled("%zu local descriptor references remain within this GOOL",localCount);
+  }
+  ImGui::EndChild();ImGui::PopStyleColor(2);
+  ImGui::Spacing();
+  ImGui::TextDisabled("Hook details:");
+  for(const auto&hook:gool->stateHookReferences){
+   if(hook.status==Crash::NsfGoolStateHookStatus::Absent)continue;
+   ImGui::BulletText("State %02zu · %s · instruction %04X · %s",hook.descriptorIndex,hookKindName(hook.kind),hook.instructionOffset,hookStatusName(hook.status));
+  }
+ }
+ ImGui::EndChild();
+ ImGui::End();
+}
+
 void EditorUI::drawGoolDataWindows(){
  const Crash::NsfGool* gool=nullptr; std::uint32_t goolEid=0;
  if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
