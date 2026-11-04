@@ -425,5 +425,30 @@ int main(){
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransition&&!e.targetValid;}));
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransitionTrue&&!e.targetValid;}));
  assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Fallthrough&&e.targetValid&&e.targetInstruction==2;}));
+ // Operand access analysis is intentionally based on encoded reference roles.
+ NsfGool effectGool;effectGool.version=NsfGoolVersion::Version2;
+ NsfGoolInstruction arithmetic;arithmetic.opcode=0;arithmetic.operandBits=0x345678U;effectGool.instructions.push_back(arithmetic);
+ const auto arithmeticEffects=analyzeGoolInstruction(effectGool,0);
+ assert(arithmeticEffects.operandsKnown&&arithmeticEffects.operandEffects.size()==2);
+ assert(arithmeticEffects.operandEffects[0].access==NsfGoolOperandAccess::Read);
+ assert(arithmeticEffects.operandEffects[1].access==NsfGoolOperandAccess::Read);
+ NsfGoolInstruction writeInstruction;writeInstruction.opcode=17;writeInstruction.operandBits=0xABC123U;effectGool.instructions.push_back(writeInstruction);
+ const auto writeEffects=analyzeGoolInstruction(effectGool,1);
+ assert(writeEffects.operandsKnown&&writeEffects.operandEffects.size()==2);
+ assert(writeEffects.operandEffects[0].access==NsfGoolOperandAccess::Write);
+ assert(writeEffects.operandEffects[1].access==NsfGoolOperandAccess::Read);
+ NsfGoolInstruction conditional;conditional.opcode=51;conditional.operandBits=0x3FFU;effectGool.instructions.push_back(conditional);
+ const auto conditionalEffects=analyzeGoolInstruction(effectGool,2);
+ assert(conditionalEffects.operandsKnown&&conditionalEffects.operandEffects.size()==1);
+ assert(conditionalEffects.operandEffects[0].access==NsfGoolOperandAccess::Read);
+ assert(conditionalEffects.executionEffect.find("target instruction")!=std::string::npos);
+ NsfGoolInstruction native;native.isMips=true;native.mnemonic="addu";effectGool.instructions.push_back(native);
+ const auto nativeEffects=analyzeGoolInstruction(effectGool,3);
+ assert(!nativeEffects.operandsKnown&&nativeEffects.operandEffects.empty());
+ assert(nativeEffects.executionEffect.find("not yet analyzed")!=std::string::npos);
+ NsfGoolInstruction unknownOpcode;unknownOpcode.opcode=250;effectGool.instructions.push_back(unknownOpcode);
+ const auto unknownEffects=analyzeGoolInstruction(effectGool,4);
+ assert(!unknownEffects.operandsKnown&&unknownEffects.operandEffects.empty());
+ assert(unknownEffects.executionEffect.find("not inferred")!=std::string::npos);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
