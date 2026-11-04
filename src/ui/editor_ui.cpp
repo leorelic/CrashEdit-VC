@@ -1770,7 +1770,8 @@ void EditorUI::drawGoolBlueprintGraph(){
  float contentHeight=40.0f;
  for(float height:rowHeights)contentHeight+=height+rowGap;
  const float canvasHeight=std::max(ImGui::GetContentRegionAvail().y,contentHeight);
- if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
+ const float canvasViewportHeight=std::max(160.0f,ImGui::GetContentRegionAvail().y-285.0f);
+ if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,canvasViewportHeight),true,ImGuiWindowFlags_HorizontalScrollbar)){
   const ImVec2 origin=ImGui::GetCursorScreenPos();
   const ImVec2 extent(canvasWidth,canvasHeight);
   ImGui::Dummy(extent);
@@ -1867,7 +1868,7 @@ void EditorUI::drawGoolBlueprintGraph(){
  if(chosen.startInstruction<gool->instructions.size()){
   ImGui::TextDisabled("Effects use encoded operand roles. Data-flow links only track stable stack, argument, and object references; unknown instructions break the chain.");
   const auto dataFlow=Crash::analyzeGoolDataFlow(*gool);
-  if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,250))){
+  if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,220))){
    ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,42.0f);
    ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,150.0f);
    ImGui::TableSetupColumn("Reads",ImGuiTableColumnFlags_WidthStretch);
