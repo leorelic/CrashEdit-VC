@@ -1474,13 +1474,19 @@ void EditorUI::drawGoolDataWindows(){
     ImGui::TableSetColumnIndex(8);if(reference&&reference->targetFound&&reference->status==Crash::NsfGoolStateReferenceStatus::Local)ImGui::TextUnformatted("This entry");else if(reference&&reference->targetFound)ImGui::Text("Chunk %03zu / Entry %03zu",reference->targetChunkIndex,reference->targetEntryIndex);else if(reference&&reference->status==Crash::NsfGoolStateReferenceStatus::External)ImGui::TextDisabled("Not in this NSF");else ImGui::TextDisabled("-");
     ImGui::PopID();
    }ImGui::EndTable();
-   ImGui::TextDisabled("Edit numeric cells directly. GOOL index selects a shared Data Pool word.");
+   ImGui::TextDisabled("Select a descriptor row to edit its GOOL target. The index points to a shared Data Pool word.");
    const auto&selectedDescriptor=gool->stateDescriptors[static_cast<std::size_t>(selectedExternalDescriptor)];
    const bool validPoolIndex=selectedDescriptor.goolIndex>=0&&static_cast<std::size_t>(selectedDescriptor.goolIndex)<gool->dataPool.size();
+   ImGui::Separator();ImGui::Text("External GOOL");
+   int externalIndex=selectedDescriptor.goolIndex;
+   ImGui::SetNextItemWidth(180.0f);
+   if(ImGui::InputInt("Data Pool index",&externalIndex)&&externalIndex>=0&&externalIndex<=32767&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){
+    auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(externalIndex);
+    if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited))goolReferencesNeedRefresh=true;
+   }
    if(validPoolIndex){
     const std::size_t poolIndex=static_cast<std::size_t>(selectedDescriptor.goolIndex);
     std::uint32_t targetEid=static_cast<std::uint32_t>(gool->dataPool[poolIndex]);
-    ImGui::Separator();ImGui::Text("External GOOL");
     ImGui::TextDisabled("Choose a loaded GOOL, or enter an EID manually. Selecting this GOOL makes the reference local.");
     std::map<std::uint32_t,std::size_t> targetCounts;
     std::map<std::uint32_t,std::pair<std::size_t,std::size_t>> targetLocations;
@@ -1496,13 +1502,18 @@ void EditorUI::drawGoolDataWindows(){
     }
     std::vector<std::uint32_t> targetEids{goolEid};
     std::vector<std::string> targetLabels;
-    {char localEid[9];std::snprintf(localEid,sizeof(localEid),"%08X",goolEid);targetLabels.push_back("Local — "+Crash::eidToEName(goolEid)+" (0x"+std::string(localEid)+", this entry)");}
+    char localEid[9];std::snprintf(localEid,sizeof(localEid),"%08X",goolEid);
+    targetLabels.push_back("Local — "+Crash::eidToEName(goolEid)+" (0x"+std::string(localEid)+", this entry)");
     int selectedTarget=0;
     for(const auto&[eid,count]:targetCounts){
      if(eid==goolEid||count!=1)continue;
      const auto location=targetLocations.at(eid);
-     targetEids.push_back(eid);
-     targetLabels.push_back(Crash::eidToEName(eid)+" (0x"+[&](){char hex[9];std::snprintf(hex,sizeof(hex),"%08X",eid);return std::string(hex);}()+") — Chunk "+std::to_string(location.first)+", Entry "+std::to_string(location.second)+(nsf_.chunks()[location.first].entries[location.second].gool.decoded?"":" (not decoded)"));
+     char targetHex[9];std::snprintf(targetHex,sizeof(targetHex),"%08X",eid);
+     char targetLabel[256];
+     std::snprintf(targetLabel,sizeof(targetLabel),"%s (0x%s) — Chunk %zu, Entry %zu%s",
+      Crash::eidToEName(eid).c_str(),targetHex,location.first,location.second,
+      nsf_.chunks()[location.first].entries[location.second].gool.decoded?"":" (not decoded)");
+     targetEids.push_back(eid);targetLabels.emplace_back(targetLabel);
      if(eid==targetEid)selectedTarget=static_cast<int>(targetEids.size()-1);
     }
     if(targetEid!=goolEid&&std::find(targetEids.begin()+1,targetEids.end(),targetEid)==targetEids.end()){
@@ -1526,13 +1537,7 @@ void EditorUI::drawGoolDataWindows(){
      if(nsf_.setGoolDataPoolWord(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),poolIndex,targetEid))goolReferencesNeedRefresh=true;
     }
     ImGui::TextDisabled("Data Pool word %zu is shared by every descriptor using index %d.",poolIndex,static_cast<int>(selectedDescriptor.goolIndex));
-    int externalIndex=selectedDescriptor.goolIndex;
-    ImGui::SetNextItemWidth(180.0f);
-    if(ImGui::InputInt("Data Pool index",&externalIndex)&&externalIndex>=0&&externalIndex<=32767&&static_cast<std::size_t>(externalIndex)<gool->dataPool.size()){
-     auto edited=selectedDescriptor;edited.goolIndex=static_cast<std::int16_t>(externalIndex);
-     if(nsf_.setGoolStateDescriptor(static_cast<std::size_t>(activeGoolChunk_),static_cast<std::size_t>(activeGoolEntry_),static_cast<std::size_t>(selectedExternalDescriptor),edited))goolReferencesNeedRefresh=true;
-    }
-   }
+   }else ImGui::TextDisabled("This descriptor has an invalid Data Pool index. Select a valid index above to assign a GOOL target.");
   }else ImGui::TextDisabled("No state descriptors in this GOOL entry.");
   if(goolReferencesNeedRefresh)nsf_.decodeGools(nsfGoolVersion(gameVersion_));
  }ImGui::End();focusGoolDataPool_=false;
