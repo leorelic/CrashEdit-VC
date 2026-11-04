@@ -47,7 +47,7 @@ int main() {
     source.instructions.push_back(unknown);
 
     source.stateDescriptors.push_back({1, 2, 3, 4, 5, 6});
-    source.stateReferences.push_back({0, 1, 0x0200007B, true, 2, 3});
+    source.stateReferences.push_back({0, 2, 3, 1, 0x0200007B, true, NsfGoolStateReferenceStatus::External});
     source.stateHookReferences.push_back({0, 1, 2, NsfGoolStateHookKind::Event,
         0x1234, 7, true, true, NsfGoolStateHookStatus::External});
     source.frameGroupBytes = 12;
