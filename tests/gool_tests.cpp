@@ -401,5 +401,14 @@ int main(){
  NsfGool externalFlow;externalFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction externalCall;externalCall.opcode=59;externalCall.operandBits=0x004000U;externalFlow.instructions.push_back(externalCall);
  const auto externalGraph=analyzeGoolControlFlow(externalFlow);
  assert(externalGraph.edges.size()==1&&externalGraph.edges[0].kind==NsfGoolFlowEdgeKind::ExternalCall&&!externalGraph.edges[0].targetValid);
+
+ NsfGool stateFlow;stateFlow.version=NsfGoolVersion::Version2;
+ NsfGoolInstruction goState;goState.opcode=53;stateFlow.instructions.push_back(goState);
+ NsfGoolInstruction conditionalState;conditionalState.opcode=54;stateFlow.instructions.push_back(conditionalState);
+ stateFlow.instructions.push_back(NsfGoolInstruction{});
+ const auto stateGraph=analyzeGoolControlFlow(stateFlow);
+ assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransition&&!e.targetValid;}));
+ assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::StateTransitionTrue&&!e.targetValid;}));
+ assert(std::any_of(stateGraph.edges.begin(),stateGraph.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Fallthrough&&e.targetValid&&e.targetInstruction==2;}));
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
