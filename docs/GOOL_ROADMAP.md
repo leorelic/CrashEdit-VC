@@ -46,7 +46,7 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 
 ## 4. Readable decompilation
 
-- [ ] Define a structured intermediate representation that preserves instruction semantics, control flow, data references, and state relationships.
+- [x] Introduce an initial loss-preserving GOOL IR snapshot for decoded instructions, operands, data pools, state metadata/references/hooks, frame groups, and original instruction locations; preserve unknown opcodes and native MIPS words.\n- [ ] Evolve the initial snapshot into a fully game-independent semantic IR with explicit control-flow, call/return, state-transition, event, and native-instruction models; keep Crash 2 binary decoding/encoding in a separate backend.
 - [ ] Develop a readable, source-like GOOL representation rather than exposing raw instruction words as the primary editing surface.
 - [ ] Represent branches, loops, calls, returns, and state transitions in a way that can be traced back to their original instruction locations.
 - [ ] Preserve unknown or not-yet-understood instructions without silently changing their meaning.
@@ -85,7 +85,7 @@ Do not implement the full visual authoring system or finalize GOOL Script syntax
 The product direction above is served by four major technical goals. These are the priority for current development; new authoring UI, language syntax, and other polish must not displace them:
 
 1. **Correct GOOL execution semantics.** Establish opcode meanings, operand effects, MIPS interactions, calls/returns, state transitions, event dispatch, and relevant side effects using evidence from source, binaries, and tests. Unknown semantics must remain explicitly unknown rather than guessed.
-2. **A reusable intermediate representation (IR).** Separate Crash 2 binary decoding/encoding from shared GOOL semantics. The IR must preserve instruction identity and locations, operands, control flow, states, references, native code, and unknown instructions so analysis and editing can build on one faithful model.
+2. **A reusable intermediate representation (IR).** Separate Crash 2 binary decoding/encoding from shared GOOL semantics. The first loss-preserving IR snapshot is now in place; it carries original instruction words/locations, decoded operands, pools, states, references, hooks, frame groups, and unknown/native instructions. It is a foundation, not a completed architecture: explicit semantic control-flow/call/state/event models and a clean game-specific backend boundary remain to be built.
 3. **Readable decompilation.** Produce genuinely understandable source-like output from real Crash 2 GOOL routines. Start with a small, representative routine and expand coverage incrementally; do not wait for every opcode to be understood. Unsupported instructions must remain visible and faithfully preserved.
 4. **Recompilation and validation.** Rebuild valid GOOL data from the representation/source, preserve unsupported content where possible, and prove correctness through round-trip tests, real NSF samples, reopen tests, and eventual in-game validation before routine save workflows are enabled.
 
