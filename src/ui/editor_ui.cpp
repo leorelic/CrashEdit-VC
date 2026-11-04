@@ -1523,6 +1523,63 @@ void EditorUI::drawGoolGraph(){
   }
   ImGui::EndChild();ImGui::PopStyleColor(2);
   connector();
+  const float descriptorGraphHeight=std::max(150.0f,112.0f+static_cast<float>(gool->stateDescriptors.size())*66.0f);
+  ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
+  ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.14f,.17f,.23f,.96f));
+  ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.38f,.48f,.66f,.82f));
+  if(ImGui::BeginChild("GOOLGraphDescriptorRoutes",ImVec2(cardWidth,descriptorGraphHeight),true)){
+   centeredText("STATE DESCRIPTOR ROUTES",ImVec4(.58f,.75f,1,1));
+   centeredText("Each descriptor can expose three distinct execution hooks. Destinations below are decoded offsets, not guessed script meanings.",ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
+   ImGui::Separator();
+   if(gool->stateDescriptors.empty())centeredText("No state descriptors were decoded.",ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),true);
+   else if(ImGui::BeginTable("GOOLGraphDescriptorRouteTable",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchSame)){
+    ImGui::TableSetupColumn("STATE DESCRIPTOR");
+    ImGui::TableSetupColumn("EVENT");
+    ImGui::TableSetupColumn("TRANSITION");
+    ImGui::TableSetupColumn("CODE");
+    ImGui::TableHeadersRow();
+    for(std::size_t descriptorIndex=0;descriptorIndex<gool->stateDescriptors.size();++descriptorIndex){
+     const auto&descriptor=gool->stateDescriptors[descriptorIndex];
+     const Crash::NsfGoolStateReference*reference=descriptorIndex<gool->stateReferences.size()?&gool->stateReferences[descriptorIndex]:nullptr;
+     ImGui::TableNextRow();
+     ImGui::TableSetColumnIndex(0);
+     ImGui::Text("State %zu",descriptorIndex);
+     ImGui::TextDisabled("GOOL index: %d",descriptor.goolIndex);
+     if(reference){
+      if(reference->status==Crash::NsfGoolStateReferenceStatus::InvalidDataIndex)
+       ImGui::TextColored(ImVec4(1,.48f,.40f,1),"Invalid pool index");
+      else if(Crash::isValidEid(reference->eid))
+       ImGui::TextColored(statusColor(reference->status),"EID %s",Crash::eidToEName(reference->eid).c_str());
+      else ImGui::TextDisabled("Pool word: 0x%08X",static_cast<unsigned>(reference->eid));
+     }else ImGui::TextDisabled("No resolved GOOL reference");
+     for(int hookColumn=0;hookColumn<3;++hookColumn){
+      ImGui::TableSetColumnIndex(hookColumn+1);
+      const auto kind=static_cast<Crash::NsfGoolStateHookKind>(hookColumn);
+      const auto hookIt=std::find_if(gool->stateHookReferences.begin(),gool->stateHookReferences.end(),[&](const Crash::NsfGoolStateHookReference&candidate){return candidate.descriptorIndex==descriptorIndex&&candidate.kind==kind;});
+      if(hookIt==gool->stateHookReferences.end()){
+       ImGui::TextDisabled("Not decoded");
+       continue;
+      }
+      const auto&hook=*hookIt;
+      const ImVec4 hookColor=hook.status==Crash::NsfGoolStateHookStatus::Local?ImVec4(.38f,.82f,.56f,1):
+       hook.status==Crash::NsfGoolStateHookStatus::External?ImVec4(.40f,.70f,1,1):
+       hook.status==Crash::NsfGoolStateHookStatus::Absent?ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled):ImVec4(1,.64f,.32f,1);
+      ImGui::TextColored(hookColor,"%s",hookStatusName(hook.status));
+      if(hook.status==Crash::NsfGoolStateHookStatus::Local||hook.status==Crash::NsfGoolStateHookStatus::External){
+       ImGui::Text("Instruction %u",static_cast<unsigned>(hook.instructionOffset));
+       if(hook.status==Crash::NsfGoolStateHookStatus::External&&hook.targetFound&&hook.targetChunkIndex<nsf_.chunks().size()&&hook.targetEntryIndex<nsf_.chunks()[hook.targetChunkIndex].entries.size()){
+        const auto&target=nsf_.chunks()[hook.targetChunkIndex].entries[hook.targetEntryIndex];
+        ImGui::TextColored(hookColor,"%s",Crash::eidToEName(target.eid).c_str());
+       }else if(hook.status==Crash::NsfGoolStateHookStatus::Local)ImGui::TextDisabled("Current GOOL");
+      }
+      if(ImGui::IsItemHovered())ImGui::SetTooltip("Raw hook value: 0x%04X",static_cast<unsigned>(hook.rawValue));
+     }
+    }
+    ImGui::EndTable();
+   }
+  }
+  ImGui::EndChild();ImGui::PopStyleColor(2);
+  connector();
   if(ImGui::BeginTable("GOOLGraphMiddleCards",2,ImGuiTableFlags_SizingStretchSame)){
    ImGui::TableNextRow();
    ImGui::TableSetColumnIndex(0);
