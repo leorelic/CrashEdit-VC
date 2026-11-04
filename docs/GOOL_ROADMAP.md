@@ -10,7 +10,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Build basic-block control-flow analysis with branch destinations and diagnostics.
 - [x] Add a visual Blueprint view of basic blocks and execution relationships.
 - [ ] Continue auditing instruction execution semantics against the original CrashEdit source and real Crash 2 samples, including opcode-specific side effects and stack behavior.
-- [x] Add initial per-instruction operand access analysis from encoded reference roles, with explicit unknown handling for unsupported GOOL and native MIPS instructions.
+- [x] Add initial per-instruction operand access analysis from encoded reference roles, with explicit unknown handling for unsupported GOOL, native MIPS, and unaudited process-field roles.
 - [ ] Extend the initial access facts into inter-instruction data-flow analysis (definitions, uses, and value propagation) without guessing at undocumented opcode behavior.
 - [ ] Improve explanations of calls, state transitions, event dispatch, and relationships between GOOL data structures.
 - [ ] Expand regression coverage across more real GOOL entries and unusual control-flow patterns.
