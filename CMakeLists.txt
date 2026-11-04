@@ -144,6 +144,7 @@ if(CRASHEDIT_BUILD_TESTS)
         tests/gool_ir_tests.cpp
         src/crash/formats/gool/gool_ir.cpp
         src/crash/formats/gool/gool_opcodes.cpp
+        src/crash/formats/gool/gool_control_flow.cpp
     )
     target_include_directories(crashedit_gool_ir_tests PRIVATE src)
     if(MSVC)
