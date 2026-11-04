@@ -470,6 +470,17 @@ int main(){
  assert(dataFlow.definitions[1].instructionIndex==2&&dataFlow.definitions[1].location=="stack[1]");
  assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==1&&use.location=="stack[0]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==0;}));
  assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==3&&use.location=="stack[1]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==1;}));
+ // At a conditional join, both path-specific reaching definitions remain visible.
+ NsfGool joinGool;joinGool.version=NsfGoolVersion::Version2;
+ joinGool.instructions.push_back(producer);
+ NsfGoolInstruction branch;branch.opcode=51;branch.operandBits=1U;
+ joinGool.instructions.push_back(branch);
+ joinGool.instructions.push_back(producer);
+ joinGool.instructions.push_back(consumer);
+ const auto joinFlow=analyzeGoolDataFlow(joinGool);
+ assert(std::any_of(joinFlow.uses.begin(),joinFlow.uses.end(),[](const auto& use){
+  return use.instructionIndex==3&&use.location=="stack[0]"&&use.reachingDefinitions.size()==2;
+ }));
  NsfGool barrierGool;barrierGool.version=NsfGoolVersion::Version2;
  barrierGool.instructions.push_back(producer);
  NsfGoolInstruction nativeBarrier;nativeBarrier.isMips=true;nativeBarrier.mnemonic="addu";
