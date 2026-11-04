@@ -24,13 +24,18 @@ struct NsfGoolOperandEffect {
     char operandName='?';
     NsfGoolOperandAccess access=NsfGoolOperandAccess::Read;
     std::string reference;
+    bool trackable = false;
 };
+struct NsfGoolDataFlowDefinition { std::size_t instructionIndex=0; std::string location; };
+struct NsfGoolDataFlowUse { std::size_t instructionIndex=0; std::string location; std::vector<std::size_t> reachingDefinitions; };
+struct NsfGoolDataFlowResult { std::vector<NsfGoolDataFlowDefinition> definitions; std::vector<NsfGoolDataFlowUse> uses; };
 struct NsfGoolInstructionAnalysis {
     bool operandsKnown=false;
     std::vector<NsfGoolOperandEffect> operandEffects;
     std::string executionEffect;
 };
 NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size_t instructionIndex);
+NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool);
 struct NsfGoolControlFlowGraph {
     std::vector<NsfGoolBasicBlock> blocks;
     std::vector<NsfGoolFlowEdge> edges;
