@@ -238,7 +238,7 @@ void EditorUI::draw(){
  auto id=ImGui::GetID("CrashEditDockSpace");
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
+ drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
@@ -1704,6 +1704,148 @@ void EditorUI::drawGoolGraph(){
 
  }
  ImGui::EndChild();
+ ImGui::End();
+}
+
+
+void EditorUI::drawGoolBlueprintGraph(){
+ const Crash::NsfEntry* selectedEntry=nullptr;
+ const Crash::NsfGool* gool=nullptr;
+ if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
+  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
+  if(chunk.type==0&&static_cast<std::size_t>(selectedEntry_)<chunk.entries.size()){
+   const auto&entry=chunk.entries[static_cast<std::size_t>(selectedEntry_)];
+   if(entry.valid&&entry.type==11){selectedEntry=&entry;gool=&entry.gool;}
+  }
+ }
+ if(!selectedEntry||!gool)return;
+ static bool dockInitialized=false;
+ if(!dockInitialized){
+  if(ImGuiWindow* graph=ImGui::FindWindowByName("GOOL Graph"))
+   if(graph->DockNode){ImGui::SetNextWindowDockID(graph->DockNode->ID,ImGuiCond_FirstUseEver);dockInitialized=true;}
+ }
+ ImGui::Begin("GOOL Blueprint");
+ ImGui::Text("%s  ·  %zu instructions",Crash::eidToEName(selectedEntry->eid).c_str(),gool->instructions.size());
+ if(!gool->decoded||gool->instructions.empty()){
+  ImGui::TextDisabled("No decoded instruction flow is available for this GOOL entry.");
+  ImGui::End();return;
+ }
+ const auto graph=Crash::analyzeGoolControlFlow(*gool);
+ if(graph.blocks.empty()){
+  ImGui::TextDisabled("No basic blocks were produced by control-flow analysis.");
+  ImGui::End();return;
+ }
+ static std::uint32_t previousEid=0;
+ static std::size_t selectedBlock=0;
+ if(previousEid!=selectedEntry->eid){previousEid=selectedEntry->eid;selectedBlock=0;}
+ ImGui::TextDisabled("Read-only execution graph · click a block to inspect its instructions. Unknown and dynamic destinations are kept explicit.");
+ ImGui::SameLine();
+ ImGui::TextDisabled("%zu blocks  |  %zu connections",graph.blocks.size(),graph.edges.size());
+ ImGui::Separator();
+ const float nodeWidth=250.0f,nodeHeight=122.0f,columnGap=150.0f,rowGap=76.0f;
+ const std::size_t columns=3;
+ const std::size_t rows=(graph.blocks.size()+columns-1U)/columns;
+ const float canvasWidth=std::max(ImGui::GetContentRegionAvail().x,40.0f+static_cast<float>(columns)*(nodeWidth+columnGap));
+ const float canvasHeight=std::max(ImGui::GetContentRegionAvail().y,40.0f+static_cast<float>(rows)*(nodeHeight+rowGap));
+ if(ImGui::BeginChild("GOOLBlueprintCanvas",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
+  const ImVec2 origin=ImGui::GetCursorScreenPos();
+  const ImVec2 extent(canvasWidth,canvasHeight);
+  ImGui::Dummy(extent);
+  ImDrawList* draw=ImGui::GetWindowDrawList();
+  const ImVec2 clipMin=ImGui::GetWindowPos();
+  const ImVec2 clipMax(clipMin.x+ImGui::GetWindowSize().x,clipMin.y+ImGui::GetWindowSize().y);
+  draw->PushClipRect(clipMin,clipMax,true);
+  auto nodePosition=[&](std::size_t block){
+   const std::size_t col=block%columns,row=block/columns;
+   return ImVec2(origin.x+20.0f+static_cast<float>(col)*(nodeWidth+columnGap),origin.y+20.0f+static_cast<float>(row)*(nodeHeight+rowGap));
+  };
+  std::vector<std::size_t> instructionToBlock(gool->instructions.size(),0U);
+  for(std::size_t b=0;b<graph.blocks.size();++b)
+   for(std::size_t i=graph.blocks[b].startInstruction;i<graph.blocks[b].endInstruction&&i<instructionToBlock.size();++i)instructionToBlock[i]=b;
+  auto edgeColor=[](Crash::NsfGoolFlowEdgeKind kind)->ImU32{
+   switch(kind){
+    case Crash::NsfGoolFlowEdgeKind::BranchTrue:return IM_COL32(80,205,125,235);
+    case Crash::NsfGoolFlowEdgeKind::BranchFalse:return IM_COL32(235,170,65,235);
+    case Crash::NsfGoolFlowEdgeKind::Branch:return IM_COL32(105,170,245,235);
+    case Crash::NsfGoolFlowEdgeKind::Call:return IM_COL32(190,130,245,235);
+    case Crash::NsfGoolFlowEdgeKind::StateTransition:
+    case Crash::NsfGoolFlowEdgeKind::StateTransitionTrue:
+    case Crash::NsfGoolFlowEdgeKind::StateTransitionFalse:return IM_COL32(225,115,205,235);
+    case Crash::NsfGoolFlowEdgeKind::ExternalCall:return IM_COL32(145,155,170,220);
+    case Crash::NsfGoolFlowEdgeKind::Return:return IM_COL32(220,105,95,220);
+    default:return IM_COL32(115,155,190,220);
+   }
+  };
+  auto edgeLabel=[](Crash::NsfGoolFlowEdgeKind kind)->const char*{
+   switch(kind){
+    case Crash::NsfGoolFlowEdgeKind::Fallthrough:return "Next";
+    case Crash::NsfGoolFlowEdgeKind::Branch:return "Branch";
+    case Crash::NsfGoolFlowEdgeKind::BranchTrue:return "True";
+    case Crash::NsfGoolFlowEdgeKind::BranchFalse:return "False";
+    case Crash::NsfGoolFlowEdgeKind::Call:return "Call";
+    case Crash::NsfGoolFlowEdgeKind::ExternalCall:return "External call";
+    case Crash::NsfGoolFlowEdgeKind::StateTransition:return "State change";
+    case Crash::NsfGoolFlowEdgeKind::StateTransitionTrue:return "State if true";
+    case Crash::NsfGoolFlowEdgeKind::StateTransitionFalse:return "State if false";
+    case Crash::NsfGoolFlowEdgeKind::Return:return "Return";
+   }return "Flow";
+  };
+  std::vector<std::size_t> sourcePorts(graph.blocks.size(),0U);
+  for(const auto&edge:graph.edges){
+   if(edge.sourceBlock>=graph.blocks.size()||!edge.targetValid||edge.targetInstruction>=instructionToBlock.size())continue;
+   const std::size_t targetBlock=instructionToBlock[edge.targetInstruction];
+   const ImVec2 source=nodePosition(edge.sourceBlock),target=nodePosition(targetBlock);
+   const float sourceY=source.y+nodeHeight*.5f+(static_cast<float>(sourcePorts[edge.sourceBlock]++)-0.5f)*13.0f;
+   const float targetY=target.y+nodeHeight*.5f;
+   const ImVec2 p0(source.x+nodeWidth,sourceY),p3(target.x,targetY);
+   const float bend=std::max(55.0f,std::abs(p3.x-p0.x)*.42f);
+   draw->AddBezierCubic(p0,ImVec2(p0.x+bend,p0.y),ImVec2(p3.x-bend,p3.y),p3,edgeColor(edge.kind),2.5f);
+   draw->AddCircleFilled(p0,4.5f,edgeColor(edge.kind));
+   draw->AddCircleFilled(p3,4.5f,edgeColor(edge.kind));
+   const ImVec2 mid((p0.x+p3.x)*.5f,(p0.y+p3.y)*.5f);
+   draw->AddText(ImVec2(mid.x-15.0f,mid.y-17.0f),edgeColor(edge.kind),edgeLabel(edge.kind));
+  }
+  for(std::size_t b=0;b<graph.blocks.size();++b){
+   const auto&block=graph.blocks[b];const ImVec2 pos=nodePosition(b);
+   ImGui::SetCursorScreenPos(pos);
+   ImGui::PushID(static_cast<int>(b));
+   const bool clicked=ImGui::InvisibleButton("##BlueprintBlock",ImVec2(nodeWidth,nodeHeight));
+   const bool hovered=ImGui::IsItemHovered();
+   if(clicked)selectedBlock=b;
+   const ImVec2 min=pos,max(pos.x+nodeWidth,pos.y+nodeHeight);
+   const ImU32 border=b==selectedBlock?IM_COL32(105,190,255,255):hovered?IM_COL32(150,175,205,255):IM_COL32(75,95,120,255);
+   draw->AddRectFilled(min,max,b==selectedBlock?IM_COL32(38,63,86,250):IM_COL32(34,42,53,248),8.0f);
+   draw->AddRect(min,max,border,8.0f,0, b==selectedBlock?2.5f:1.5f);
+   draw->AddRectFilled(min,ImVec2(max.x,min.y+27.0f),IM_COL32(49,78,105,255),8.0f,ImDrawFlags_RoundCornersTop);
+   char title[64];std::snprintf(title,sizeof(title),"EXECUTION  ·  BB%zu",b);
+   draw->AddText(ImVec2(min.x+10,min.y+7),IM_COL32(225,237,249,255),title);
+   char range[96];std::snprintf(range,sizeof(range),"Instructions %zu–%zu",block.startInstruction,block.endInstruction-1U);
+   draw->AddText(ImVec2(min.x+10,min.y+37),IM_COL32(170,190,210,255),range);
+   const std::size_t first=block.startInstruction,last=block.endInstruction>block.startInstruction?block.endInstruction-1U:block.startInstruction;
+   if(first<gool->instructions.size()){
+    const auto&ins=gool->instructions[first];
+    const std::string line=ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
+    draw->AddText(ImVec2(min.x+10,min.y+59),IM_COL32(225,225,215,255),line.c_str(),nullptr,nodeWidth-20.0f);
+   }
+   if(last<gool->instructions.size()&&last!=first){
+    const auto&ins=gool->instructions[last];
+    const std::string line="End: "+ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
+    draw->AddText(ImVec2(min.x+10,min.y+80),IM_COL32(190,205,220,255),line.c_str(),nullptr,nodeWidth-20.0f);
+   }
+   draw->AddCircleFilled(ImVec2(min.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
+   draw->AddCircleFilled(ImVec2(max.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
+   ImGui::PopID();
+  }
+  draw->PopClipRect();
+ }
+ ImGui::EndChild();
+ const auto&chosen=graph.blocks[std::min(selectedBlock,graph.blocks.size()-1U)];
+ ImGui::Separator();
+ ImGui::Text("Selected block BB%zu  ·  instructions %zu–%zu",std::min(selectedBlock,graph.blocks.size()-1U),chosen.startInstruction,chosen.endInstruction-1U);
+ if(chosen.startInstruction<gool->instructions.size()){
+  const auto&ins=gool->instructions[chosen.startInstruction];
+  ImGui::Text("%s  %s",ins.mnemonic.c_str(),ins.arguments.c_str());
+ }
  ImGui::End();
 }
 
