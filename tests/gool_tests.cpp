@@ -458,11 +458,11 @@ int main(){
  NsfGool dataFlowGool;dataFlowGool.version=NsfGoolVersion::Version2;
  NsfGoolInstruction producer;producer.opcode=17;producer.operandBits=0x001800U;
  dataFlowGool.instructions.push_back(producer);
- NsfGoolInstruction consumer;consumer.opcode=0;consumer.operandBits=0x800800U;
+ NsfGoolInstruction consumer;consumer.opcode=0;consumer.operandBits=0xB00B00U;
  dataFlowGool.instructions.push_back(consumer);
  NsfGoolInstruction secondProducer;secondProducer.opcode=17;secondProducer.operandBits=0x800801U;
  dataFlowGool.instructions.push_back(secondProducer);
- NsfGoolInstruction secondConsumer;secondConsumer.opcode=0;secondConsumer.operandBits=0x800801U;
+ NsfGoolInstruction secondConsumer;secondConsumer.opcode=0;secondConsumer.operandBits=0xB01B01U;
  dataFlowGool.instructions.push_back(secondConsumer);
  const auto dataFlow=analyzeGoolDataFlow(dataFlowGool);
  assert(dataFlow.definitions.size()==2);
