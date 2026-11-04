@@ -273,6 +273,17 @@ int main(){
  assert(g.frameGroups[2].type==3&&g.frameGroups[2].byteSize==28);
  assert(g.frameGroups[3].type==4&&g.frameGroups[3].font==0x02001111&&g.frameGroups[3].byteSize==16);
  assert(g.frameGroups[4].type==5&&g.frameGroups[4].partCount==1&&g.frameGroups[4].byteSize==36);
+ // Frame Group edits patch the original item in place and update decoded values.
+ assert(archive.setGoolFrameGroupEid(0,0,1,0x0200ABCDU));
+ assert(archive.chunks()[0].entries[0].gool.frameGroups[1].eid==0x0200ABCDU);
+ assert(archive.chunks()[0].bytes[entry.items[5].offset+16U]==0xCDU);
+ assert(archive.setGoolFrameGroupFrameCount(0,0,0,7U));
+ assert(archive.chunks()[0].entries[0].gool.frameGroups[0].frameCount==7);
+ assert(archive.setGoolFrameGroupInterpolated(0,0,0,false));
+ assert(!archive.chunks()[0].entries[0].gool.frameGroups[0].interpolated);
+ assert(!archive.setGoolFrameGroupFrameCount(0,0,1,3U));
+ assert(!archive.setGoolFrameGroupInterpolated(0,0,1,true));
+ assert(!archive.setGoolFrameGroupEid(0,0,1,0x0200ABCCU));
 
  // The original parser also treats 0x03E0A809 as a return sentinel,
  // even though the instruction itself disassembles as jalr $s5,$ra.
