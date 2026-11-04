@@ -1865,8 +1865,32 @@ void EditorUI::drawGoolBlueprintGraph(){
  ImGui::Separator();
  ImGui::Text("Selected block BB%zu  ·  instructions %zu–%zu",std::min(selectedBlock,graph.blocks.size()-1U),chosen.startInstruction,chosen.endInstruction-1U);
  if(chosen.startInstruction<gool->instructions.size()){
-  const auto&ins=gool->instructions[chosen.startInstruction];
-  ImGui::Text("%s  %s",ins.mnemonic.c_str(),ins.arguments.c_str());
+  ImGui::TextDisabled("Instruction effects are derived from the encoded operand roles. Unknown/native instructions stay explicitly unanalyzed.");
+  if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",5,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,210))){
+   ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,42.0f);
+   ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,150.0f);
+   ImGui::TableSetupColumn("Reads",ImGuiTableColumnFlags_WidthStretch);
+   ImGui::TableSetupColumn("Writes",ImGuiTableColumnFlags_WidthStretch);
+   ImGui::TableSetupColumn("Execution",ImGuiTableColumnFlags_WidthStretch);
+   ImGui::TableHeadersRow();
+   for(std::size_t instructionIndex=chosen.startInstruction;instructionIndex<chosen.endInstruction&&instructionIndex<gool->instructions.size();++instructionIndex){
+    const auto&instruction=gool->instructions[instructionIndex];
+    const auto analysis=Crash::analyzeGoolInstruction(*gool,instructionIndex);
+    std::string reads,writes;
+    for(const auto&effect:analysis.operandEffects){
+     std::string&target=effect.access==Crash::NsfGoolOperandAccess::Read?reads:writes;
+     if(!target.empty())target+=", ";
+     target+=effect.reference;
+    }
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",instructionIndex);
+    ImGui::TableSetColumnIndex(1);ImGui::Text("%s",instruction.mnemonic.c_str());
+    ImGui::TableSetColumnIndex(2);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(reads.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",reads.c_str());
+    ImGui::TableSetColumnIndex(3);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(writes.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",writes.c_str());
+    ImGui::TableSetColumnIndex(4);if(analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",analysis.executionEffect.c_str());
+   }
+   ImGui::EndTable();
+  }
  }
  ImGui::End();
 }
