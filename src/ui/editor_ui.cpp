@@ -1430,14 +1430,10 @@ void EditorUI::drawGoolGraph(){
    if(entry.valid&&entry.type==11){selectedEntry=&entry;gool=&entry.gool;}
   }
  }
+ if(!selectedEntry||!gool)return;
  if(ImGuiWindow* viewport=ImGui::FindWindowByName("3D Zone Editor"))
   if(viewport->DockNode)ImGui::SetNextWindowDockID(viewport->DockNode->ID,ImGuiCond_FirstUseEver);
  ImGui::Begin("GOOL Graph");
- if(!selectedEntry||!gool){
-  ImGui::Spacing();
-  ImGui::TextDisabled("Select a GOOL entry in the Resource Hierarchy to explore its relationships.");
-  ImGui::End();return;
- }
  if(!gool->decoded){
   ImGui::Text("%s | 0x%08X",Crash::eidToEName(selectedEntry->eid).c_str(),selectedEntry->eid);
   ImGui::TextDisabled("This GOOL entry could not be decoded, so its dependency graph is unavailable.");
@@ -1507,24 +1503,11 @@ void EditorUI::drawGoolGraph(){
   ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.17f,.23f,.96f));
   ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.48f,.68f,.8f));
-  const float descriptorHeight=std::min(120.0f+static_cast<float>(gool->stateDescriptors.size())*48.0f,360.0f);
-  if(ImGui::BeginChild("GOOLGraphStates",ImVec2(cardWidth,descriptorHeight),true)){
-   ImGui::TextColored(ImVec4(.48f,.72f,1,1),"STATE DESCRIPTORS");
-   ImGui::TextDisabled("%zu descriptors",gool->stateDescriptors.size());
+  if(ImGui::BeginChild("GOOLGraphStates",ImVec2(cardWidth,116),true)){
+   ImGui::TextColored(ImVec4(.48f,.72f,1,1),"STATE LOGIC");
+   ImGui::TextWrapped("This entry is organized into state descriptors. Each descriptor selects the GOOL code responsible for a part of the object's behaviour.");
    ImGui::Separator();
-   if(gool->stateDescriptors.empty())ImGui::TextDisabled("No state descriptors.");
-   for(std::size_t i=0;i<gool->stateDescriptors.size();++i){
-    const auto*reference=i<gool->stateReferences.size()?&gool->stateReferences[i]:nullptr;
-    ImGui::PushID(static_cast<int>(i));
-    ImGui::Text("State %02zu",i);ImGui::SameLine();
-    if(reference){
-     const char*label=reference->status==Crash::NsfGoolStateReferenceStatus::Local?"Local":reference->status==Crash::NsfGoolStateReferenceStatus::External?"External":reference->status==Crash::NsfGoolStateReferenceStatus::Ambiguous?"Ambiguous":"Invalid data index";
-     ImGui::TextColored(statusColor(reference->status),"%s",label);
-     ImGui::SameLine();
-     if(reference->status!=Crash::NsfGoolStateReferenceStatus::InvalidDataIndex)ImGui::TextDisabled("→ %s",Crash::eidToEName(reference->eid).c_str());
-    }else ImGui::TextDisabled("Reference unavailable");
-    ImGui::PopID();
-   }
+   ImGui::Text("%zu states · %zu resolved references",gool->stateDescriptors.size(),gool->stateReferences.size()-std::min(gool->stateReferences.size(),unresolved));
   }
   ImGui::EndChild();ImGui::PopStyleColor(2);
   connector();
