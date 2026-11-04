@@ -96,7 +96,7 @@ static std::string browseNsfPath(){
  char buffer[4096]{};std::string result;
  while(std::fgets(buffer,sizeof(buffer),pipe))result+=buffer;
  ::pclose(pipe);
- while(!result.empty()&&(result.back()=='\\n'||result.back()=='\\r'))result.pop_back();
+ while(!result.empty()&&(result.back()=='\n'||result.back()=='\r'))result.pop_back();
  return result;
 }
 #endif
