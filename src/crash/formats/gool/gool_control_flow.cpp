@@ -127,11 +127,17 @@ NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size
         NsfGoolOperandAccess access;
         switch(operand.kind) {
         case NsfGoolOperandKind::Reference:
-        case NsfGoolOperandKind::ProcessField:
             access=NsfGoolOperandAccess::Read;
             break;
         case NsfGoolOperandKind::DestinationReference:
             access=NsfGoolOperandAccess::Write;
+            break;
+        case NsfGoolOperandKind::ProcessField:
+            // Conditional branch/state opcodes test this field. Other process-field
+            // encodings need opcode-specific research before their access is assigned.
+            access=(instruction.opcode==51U||instruction.opcode==52U||
+                    instruction.opcode==54U||instruction.opcode==55U)
+                ?NsfGoolOperandAccess::Read:NsfGoolOperandAccess::Unknown;
             break;
         default:
             continue; // Literal values and signed offsets are not storage accesses.
