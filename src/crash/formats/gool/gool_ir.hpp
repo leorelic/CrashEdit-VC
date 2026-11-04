@@ -78,6 +78,24 @@ struct GoolIRFrameGroup {
     bool interpolated = false;
 };
 
+enum class GoolIRFlowEdgeKind : std::uint8_t {
+    Fallthrough, Branch, BranchTrue, BranchFalse, Call, ExternalCall,
+    StateTransition, StateTransitionTrue, StateTransitionFalse, Return
+};
+
+struct GoolIRBasicBlock {
+    std::size_t startInstruction = 0;
+    std::size_t endInstruction = 0; // exclusive
+};
+
+struct GoolIRFlowEdge {
+    std::size_t sourceBlock = 0;
+    std::size_t targetInstruction = 0;
+    GoolIRFlowEdgeKind kind = GoolIRFlowEdgeKind::Fallthrough;
+    bool targetValid = false;
+    std::string diagnostic;
+};
+
 struct GoolIRProgram {
     std::uint8_t targetVersion = 0;
     std::int32_t id = 0;
@@ -86,7 +104,7 @@ struct GoolIRProgram {
     std::int32_t heapBase = 0;
     std::int32_t eventCount = 0;
     std::int32_t entryCount = 0;
-    std::vector<GoolIRInstruction> instructions;
+    std::vector<GoolIRInstruction> instructions;\n    std::vector<std::size_t> instructionToBlock;\n    std::vector<GoolIRBasicBlock> basicBlocks;\n    std::vector<GoolIRFlowEdge> flowEdges;\n    std::vector<std::string> controlFlowDiagnostics;
     std::vector<std::int32_t> dataPool;
     std::vector<std::int16_t> stateMap;
     std::vector<GoolIRStateDescriptor> stateDescriptors;
