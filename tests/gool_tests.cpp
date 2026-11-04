@@ -322,7 +322,7 @@ int main(){
   assert(absentHooks[2].status==NsfGoolStateHookStatus::OffsetOutOfRange);
 
  NsfArchive localArchive;
- assert(localArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU),error));
+ assert(localArchive.loadBytes(makeGoolChunk(true,false,0x0200007BU,0,0x0200007BU,1,2,4),error));
  localArchive.decodeGools(NsfGoolVersion::Version2);
  assert(localArchive.chunks()[0].entries[0].gool.stateReferences[0].status==NsfGoolStateReferenceStatus::Local);
   const auto&localHooks=localArchive.chunks()[0].entries[0].gool.stateHookReferences;
