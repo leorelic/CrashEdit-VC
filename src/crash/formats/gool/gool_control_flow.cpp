@@ -35,7 +35,7 @@ NsfGoolControlFlowGraph analyzeGoolControlFlow(const NsfGool& gool) {
             const auto kind=opcode==50U?NsfGoolFlowEdgeKind::Branch:
                 opcode==51U?NsfGoolFlowEdgeKind::BranchTrue:NsfGoolFlowEdgeKind::BranchFalse;
             addTarget(i,target,kind);
-            if(opcode!=50U&&i+1U<count) leaders.insert(i+1U);
+            if(i+1U<count) leaders.insert(i+1U);
         } else if(opcode>=53U&&opcode<=55U) {
             const auto kind=opcode==53U?NsfGoolFlowEdgeKind::StateTransition:
                 opcode==54U?NsfGoolFlowEdgeKind::StateTransitionTrue:NsfGoolFlowEdgeKind::StateTransitionFalse;
