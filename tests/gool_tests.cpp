@@ -376,5 +376,30 @@ int main(){
  assert(roundTripDescriptor.stateFlags==0x11223344&&roundTripDescriptor.blockFlags==0x55667788);
  assert(roundTripDescriptor.goolIndex==1&&roundTripDescriptor.eventHook==21&&roundTripDescriptor.transHook==22&&roundTripDescriptor.codeHook==23);
  assert(static_cast<std::uint32_t>(reloadedEditableArchive.chunks()[0].entries[0].gool.dataPool[1])==0x0200ABCDU);
+
+ // Basic-block analysis is separate from the higher-level state/dependency graph.
+ NsfGool flowGool;flowGool.version=NsfGoolVersion::Version2;
+ auto addFlowInstruction=[&](std::uint8_t opcode,std::uint32_t operands=0U){NsfGoolInstruction i;i.opcode=opcode;i.operandBits=operands;i.mnemonic=std::string(goolOpcodeInfo(flowGool.version,opcode).mnemonic);flowGool.instructions.push_back(i);};
+ addFlowInstruction(0);
+ addFlowInstruction(51,0x000001U);
+ addFlowInstruction(0);
+ addFlowInstruction(59,0x000000U);
+ addFlowInstruction(49);
+ const auto flow=analyzeGoolControlFlow(flowGool);
+ assert(flow.blocks.size()==4);
+ assert(flow.blocks[0].startInstruction==0&&flow.blocks[0].endInstruction==2);
+ assert(flow.blocks[1].startInstruction==2&&flow.blocks[1].endInstruction==3);
+ assert(flow.blocks[2].startInstruction==3&&flow.blocks[2].endInstruction==4);
+ assert(flow.blocks[3].startInstruction==4&&flow.blocks[3].endInstruction==5);
+ assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::BranchTrue&&e.targetValid&&e.targetInstruction==3;}));
+ assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Fallthrough&&e.targetValid&&e.targetInstruction==2;}));
+ assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Call&&e.targetValid&&e.targetInstruction==0;}));
+ assert(std::any_of(flow.edges.begin(),flow.edges.end(),[](const auto& e){return e.kind==NsfGoolFlowEdgeKind::Return&&!e.targetValid;}));
+ NsfGool invalidFlow;invalidFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction invalidBranch;invalidBranch.opcode=50;invalidBranch.operandBits=0x3FFU;invalidFlow.instructions.push_back(invalidBranch);
+ const auto invalidGraph=analyzeGoolControlFlow(invalidFlow);
+ assert(invalidGraph.blocks.size()==1&&invalidGraph.edges.size()==1&&!invalidGraph.edges[0].targetValid&&!invalidGraph.diagnostics.empty());
+ NsfGool externalFlow;externalFlow.version=NsfGoolVersion::Version2;NsfGoolInstruction externalCall;externalCall.opcode=59;externalCall.operandBits=0x004000U;externalFlow.instructions.push_back(externalCall);
+ const auto externalGraph=analyzeGoolControlFlow(externalFlow);
+ assert(externalGraph.edges.size()==1&&externalGraph.edges[0].kind==NsfGoolFlowEdgeKind::ExternalCall&&!externalGraph.edges[0].targetValid);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
