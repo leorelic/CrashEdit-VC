@@ -6,7 +6,7 @@
 
 namespace CrashEdit::Crash {
 enum class NsfGoolFlowEdgeKind : std::uint8_t {
-    Fallthrough, Branch, BranchTrue, BranchFalse, Call, ExternalCall, Return
+    Fallthrough, Branch, BranchTrue, BranchFalse, Call, ExternalCall, StateTransition, StateTransitionTrue, StateTransitionFalse, Return
 };
 struct NsfGoolBasicBlock {
     std::size_t startInstruction=0;
