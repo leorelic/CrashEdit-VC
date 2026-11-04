@@ -1474,8 +1474,9 @@ void EditorUI::drawGoolDataWindows(){
     ImGui::TableSetColumnIndex(7);if(!reference)ImGui::TextDisabled("Unavailable");else{const char*status=reference->status==Crash::NsfGoolStateReferenceStatus::InvalidDataIndex?"Invalid data index":reference->status==Crash::NsfGoolStateReferenceStatus::Local?"Local":reference->status==Crash::NsfGoolStateReferenceStatus::External?"External":"Ambiguous";ImGui::TextUnformatted(status);}
     ImGui::TableSetColumnIndex(8);if(reference&&reference->targetFound&&reference->status==Crash::NsfGoolStateReferenceStatus::Local)ImGui::TextUnformatted("This entry");else if(reference&&reference->targetFound)ImGui::Text("Chunk %03zu / Entry %03zu",reference->targetChunkIndex,reference->targetEntryIndex);else if(reference&&reference->status==Crash::NsfGoolStateReferenceStatus::External)ImGui::TextDisabled("Not in this NSF");else ImGui::TextDisabled("-");
     ImGui::PopID();
-   }ImGui::TableSetColumnIndex(9);if(ImGui::Button(("Edit##descriptor_edit_"+std::to_string(i)).c_str()))selectedExternalDescriptor=static_cast<int>(i);
-     ImGui::EndTable();
+     ImGui::TableSetColumnIndex(9);if(ImGui::Button(("Edit##descriptor_edit_"+std::to_string(i)).c_str()))selectedExternalDescriptor=static_cast<int>(i);
+     ImGui::PopID();
+    }ImGui::EndTable();
    ImGui::Separator();
    ImGui::Text("External GOOL target — descriptor %d",selectedExternalDescriptor);
    ImGui::TextDisabled("Use the Edit button in the table to choose which descriptor to modify.");
