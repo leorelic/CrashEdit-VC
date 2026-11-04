@@ -1735,7 +1735,7 @@ void EditorUI::drawGoolBlueprintGraph(){
   ImGui::TextDisabled("No basic blocks were produced by control-flow analysis.");
   ImGui::End();return;
  }
- if(blueprintSelectedEid_!=selectedEntry->eid){blueprintSelectedEid_=selectedEntry->eid;selectedGoolBlueprintBlock_=0;}
+ if(blueprintSelectedEid_!=selectedEntry->eid){blueprintSelectedEid_=selectedEntry->eid;selectedGoolBlueprintBlock_=0;showGoolBlueprintInstructions_=true;}
  ImGui::TextDisabled("Read-only execution graph · click a block to inspect its instructions. Unknown and dynamic destinations are kept explicit.");
  ImGui::SameLine();
  ImGui::TextDisabled("%zu blocks  |  %zu connections",graph.blocks.size(),graph.edges.size());
@@ -1873,7 +1873,7 @@ void EditorUI::drawGoolBlueprintGraph(){
     if(entry.valid&&entry.type==11){selectedEntry=&entry;gool=&entry.gool;}
    }
   }
-  if(!selectedEntry||!gool){showGoolBlueprintInstructions_=false;return;}
+  if(!selectedEntry||!gool){showGoolBlueprintInstructions_=false;blueprintSelectedEid_=0;return;}
   const auto graph=Crash::analyzeGoolControlFlow(*gool);
   if(graph.blocks.empty()){showGoolBlueprintInstructions_=false;return;}
   selectedGoolBlueprintBlock_=std::min(selectedGoolBlueprintBlock_,graph.blocks.size()-1U);
