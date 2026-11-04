@@ -202,7 +202,13 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
     std::vector<DefinitionSet> incoming(count),outgoing(count);
     auto transfer=[&](std::size_t instructionIndex,DefinitionSet state) {
         const auto& analysis=analyses[instructionIndex];
-        if(!analysis.operandsKnown) { state.clear(); return state; }
+        const auto& instruction=gool.instructions[instructionIndex];
+        const bool mayInvokeExternalBehavior=!instruction.isMips &&
+            instruction.opcode>=59U && instruction.opcode<=71U;
+        if(!analysis.operandsKnown || mayInvokeExternalBehavior) {
+            state.clear();
+            return state;
+        }
         for(const auto id:definitionsAt[instructionIndex]) {
             const auto& location=result.definitions[id].location;
             for(auto it=state.begin();it!=state.end();) {
