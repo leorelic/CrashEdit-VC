@@ -1476,7 +1476,6 @@ void EditorUI::drawGoolDataWindows(){
    }ImGui::EndTable();
    ImGui::TextDisabled("Edit numeric cells directly. GOOL index selects a shared Data Pool word.");
    const auto&selectedDescriptor=gool->stateDescriptors[static_cast<std::size_t>(selectedExternalDescriptor)];
-   const auto*selectedReference=static_cast<std::size_t>(selectedExternalDescriptor)<gool->stateReferences.size()?&gool->stateReferences[static_cast<std::size_t>(selectedExternalDescriptor)]:nullptr;
    const bool validPoolIndex=selectedDescriptor.goolIndex>=0&&static_cast<std::size_t>(selectedDescriptor.goolIndex)<gool->dataPool.size();
    if(validPoolIndex){
     const std::size_t poolIndex=static_cast<std::size_t>(selectedDescriptor.goolIndex);
@@ -1490,20 +1489,20 @@ void EditorUI::drawGoolDataWindows(){
      if(targetChunk.type!=0||!targetChunk.entryTableValid)continue;
      for(std::size_t ei=0;ei<targetChunk.entries.size();++ei){
       const auto&targetEntry=targetChunk.entries[ei];
-      if(!targetEntry.valid||targetEntry.type!=11||!targetEntry.gool.decoded)continue;
+      if(!targetEntry.valid||targetEntry.type!=11)continue;
       ++targetCounts[targetEntry.eid];
       targetLocations.try_emplace(targetEntry.eid,ci,ei);
      }
     }
     std::vector<std::uint32_t> targetEids{goolEid};
     std::vector<std::string> targetLabels;
-    targetLabels.push_back("Local — "+Crash::eidToEName(goolEid)+" (this entry)");
+    {char localEid[9];std::snprintf(localEid,sizeof(localEid),"%08X",goolEid);targetLabels.push_back("Local — "+Crash::eidToEName(goolEid)+" (0x"+std::string(localEid)+", this entry)");}
     int selectedTarget=0;
     for(const auto&[eid,count]:targetCounts){
      if(eid==goolEid||count!=1)continue;
      const auto location=targetLocations.at(eid);
      targetEids.push_back(eid);
-     targetLabels.push_back(Crash::eidToEName(eid)+" — "+Crash::eidToEName(eid)+" (Chunk "+std::to_string(location.first)+", Entry "+std::to_string(location.second)+")");
+     targetLabels.push_back(Crash::eidToEName(eid)+" (0x"+[&](){char hex[9];std::snprintf(hex,sizeof(hex),"%08X",eid);return std::string(hex);}()+") — Chunk "+std::to_string(location.first)+", Entry "+std::to_string(location.second)+(nsf_.chunks()[location.first].entries[location.second].gool.decoded?"":" (not decoded)"));
      if(eid==targetEid)selectedTarget=static_cast<int>(targetEids.size()-1);
     }
     if(targetEid!=goolEid&&std::find(targetEids.begin()+1,targetEids.end(),targetEid)==targetEids.end()){
