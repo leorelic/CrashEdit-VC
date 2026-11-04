@@ -19,7 +19,7 @@ struct NsfGoolFlowEdge {
     bool targetValid=false;
     std::string diagnostic;
 };
-enum class NsfGoolOperandAccess : std::uint8_t { Read, Write };
+enum class NsfGoolOperandAccess : std::uint8_t { Read, Write, Unknown };
 struct NsfGoolOperandEffect {
     char operandName='?';
     NsfGoolOperandAccess access=NsfGoolOperandAccess::Read;
