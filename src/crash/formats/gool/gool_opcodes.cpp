@@ -60,6 +60,7 @@ void decodeGteCommand(std::uint32_t word,std::string& mnemonic,std::string& argu
  known=true;
 }
 std::int32_t signExtend(std::uint32_t v,unsigned bits){if(bits==0||bits>=32)return static_cast<std::int32_t>(v);const std::uint32_t mask=1U<<(bits-1U);return static_cast<std::int32_t>((v^mask)-mask);}
+}
 std::string goolObjectFieldName(std::uint32_t field) {
  static constexpr std::array<std::string_view,64> names = {
   "self","parent","brother","child","creator","player","collider","interrupter",
@@ -76,7 +77,6 @@ std::string goolObjectFieldName(std::uint32_t field) {
  return "field #"+std::to_string(field);
 }
 
-}
 const NsfGoolOpcodeInfo& goolOpcodeInfo(NsfGoolVersion version,std::uint8_t opcode) noexcept {
  static const auto table=[] {std::array<NsfGoolOpcodeInfo,256> t{};for(std::size_t i=0;i<t.size();++i)t[i]=unknown(static_cast<std::uint8_t>(i));for(std::size_t i=0;i<t.size();++i)if(!names[i].empty())t[i]={static_cast<std::uint8_t>(i),names[i],i!=46};return t;}();
  static const NsfGoolOpcodeInfo unsupported{0,"UNSUPPORTED",false};
