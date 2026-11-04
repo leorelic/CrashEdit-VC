@@ -481,6 +481,16 @@ int main(){
  assert(std::any_of(joinFlow.uses.begin(),joinFlow.uses.end(),[](const auto& use){
   return use.instructionIndex==3&&use.location=="stack[0]"&&use.reachingDefinitions.size()==2;
  }));
+ // Engine-call/event instructions can invoke code with unmodeled side effects.
+ NsfGool callBarrierGool;callBarrierGool.version=NsfGoolVersion::Version2;
+ callBarrierGool.instructions.push_back(producer);
+ NsfGoolInstruction callInstruction;callInstruction.opcode=59;
+ callBarrierGool.instructions.push_back(callInstruction);
+ callBarrierGool.instructions.push_back(consumer);
+ const auto callBarrierFlow=analyzeGoolDataFlow(callBarrierGool);
+ assert(std::any_of(callBarrierFlow.uses.begin(),callBarrierFlow.uses.end(),[](const auto& use){
+  return use.instructionIndex==2&&use.location=="stack[0]"&&use.reachingDefinitions.empty();
+ }));
  NsfGool barrierGool;barrierGool.version=NsfGoolVersion::Version2;
  barrierGool.instructions.push_back(producer);
  NsfGoolInstruction nativeBarrier;nativeBarrier.isMips=true;nativeBarrier.mnemonic="addu";
