@@ -135,8 +135,11 @@ NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size
         default:
             continue; // Literal values and signed offsets are not storage accesses.
         }
-        analysis.operandEffects.push_back({operand.name,access,
-            operand.resolvedText.empty()?std::string(1,operand.name):operand.resolvedText});
+        std::string reference=operand.resolvedText;
+        if(reference.empty()&&operand.kind==NsfGoolOperandKind::ProcessField)
+            reference=goolObjectFieldName(operand.rawValue);
+        if(reference.empty()) reference=std::string(1,operand.name);
+        analysis.operandEffects.push_back({operand.name,access,std::move(reference)});
     }
 
     const auto opcode=instruction.opcode;
