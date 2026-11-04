@@ -460,9 +460,9 @@ int main(){
  dataFlowGool.instructions.push_back(producer);
  NsfGoolInstruction consumer;consumer.opcode=0;consumer.operandBits=0x800800U;
  dataFlowGool.instructions.push_back(consumer);
- NsfGoolInstruction secondProducer;secondProducer.opcode=17;secondProducer.operandBits=0x801800U;
+ NsfGoolInstruction secondProducer;secondProducer.opcode=17;secondProducer.operandBits=0x800801U;
  dataFlowGool.instructions.push_back(secondProducer);
- NsfGoolInstruction secondConsumer;secondConsumer.opcode=0;secondConsumer.operandBits=0x801801U;
+ NsfGoolInstruction secondConsumer;secondConsumer.opcode=0;secondConsumer.operandBits=0x800801U;
  dataFlowGool.instructions.push_back(secondConsumer);
  const auto dataFlow=analyzeGoolDataFlow(dataFlowGool);
  assert(dataFlow.definitions.size()==2);
