@@ -1850,7 +1850,7 @@ void EditorUI::drawGoolDataWindows(){
      ImGui::TableSetupColumn("Index",ImGuiTableColumnFlags_WidthFixed,70.0f);
      ImGui::TableSetupColumn("Index (Alt)",ImGuiTableColumnFlags_WidthFixed,100.0f);
      ImGui::TableSetupColumn("EID",ImGuiTableColumnFlags_WidthFixed,115.0f);
-     ImGui::TableSetupColumn("Frames",ImGuiTableColumnFlags_WidthFixed,75.0f);
+     ImGui::TableSetupColumn("Frames",ImGuiTableColumnFlags_WidthFixed,115.0f);
      ImGui::TableSetupColumn("Interpolated",ImGuiTableColumnFlags_WidthFixed,105.0f);
      ImGui::TableHeadersRow();
      for(std::size_t i=0;i<gool->frameGroups.size();++i){
