@@ -238,7 +238,7 @@ void EditorUI::draw(){
  auto id=ImGui::GetID("CrashEditDockSpace");
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
+ drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();drawGoolBlueprintInstructions();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
@@ -1735,9 +1735,7 @@ void EditorUI::drawGoolBlueprintGraph(){
   ImGui::TextDisabled("No basic blocks were produced by control-flow analysis.");
   ImGui::End();return;
  }
- static std::uint32_t previousEid=0;
- static std::size_t selectedBlock=0;
- if(previousEid!=selectedEntry->eid){previousEid=selectedEntry->eid;selectedBlock=0;}
+ if(blueprintSelectedEid_!=selectedEntry->eid){blueprintSelectedEid_=selectedEntry->eid;selectedGoolBlueprintBlock_=0;}
  ImGui::TextDisabled("Read-only execution graph · click a block to inspect its instructions. Unknown and dynamic destinations are kept explicit.");
  ImGui::SameLine();
  ImGui::TextDisabled("%zu blocks  |  %zu connections",graph.blocks.size(),graph.edges.size());
@@ -1838,11 +1836,11 @@ void EditorUI::drawGoolBlueprintGraph(){
    const float nodeHeight=nodeHeights[b];
    const bool clicked=ImGui::InvisibleButton("##BlueprintBlock",ImVec2(nodeWidth,nodeHeight));
    const bool hovered=ImGui::IsItemHovered();
-   if(clicked)selectedBlock=b;
+   if(clicked)selectedGoolBlueprintBlock_=b;
    const ImVec2 min=pos,max(pos.x+nodeWidth,pos.y+nodeHeight);
-   const ImU32 border=b==selectedBlock?IM_COL32(105,190,255,255):hovered?IM_COL32(150,175,205,255):IM_COL32(75,95,120,255);
-   draw->AddRectFilled(min,max,b==selectedBlock?IM_COL32(38,63,86,250):IM_COL32(34,42,53,248),8.0f);
-   draw->AddRect(min,max,border,8.0f,0, b==selectedBlock?2.5f:1.5f);
+   const ImU32 border=b==selectedGoolBlueprintBlock_?IM_COL32(105,190,255,255):hovered?IM_COL32(150,175,205,255):IM_COL32(75,95,120,255);
+   draw->AddRectFilled(min,max,b==selectedGoolBlueprintBlock_?IM_COL32(38,63,86,250):IM_COL32(34,42,53,248),8.0f);
+   draw->AddRect(min,max,border,8.0f,0, b==selectedGoolBlueprintBlock_?2.5f:1.5f);
    draw->AddRectFilled(min,ImVec2(max.x,min.y+27.0f),IM_COL32(49,78,105,255),8.0f,ImDrawFlags_RoundCornersTop);
    char title[64];std::snprintf(title,sizeof(title),"EXECUTION  ·  BB%zu",b);
    draw->AddText(ImVec2(min.x+10,min.y+7),IM_COL32(225,237,249,255),title);
@@ -1862,65 +1860,65 @@ void EditorUI::drawGoolBlueprintGraph(){
   draw->PopClipRect();
  }
  ImGui::EndChild();
- const auto&chosen=graph.blocks[std::min(selectedBlock,graph.blocks.size()-1U)];
- ImGui::Separator();
- ImGui::Text("Selected block BB%zu  ·  instructions %zu–%zu",std::min(selectedBlock,graph.blocks.size()-1U),chosen.startInstruction,chosen.endInstruction-1U);
- if(chosen.startInstruction<gool->instructions.size()){
-  ImGui::TextDisabled("Effects use encoded operand roles. Data-flow links only track stable stack, argument, and object references; unknown instructions break the chain.");
-  const auto dataFlow=Crash::analyzeGoolDataFlow(*gool);
-  if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,220))){
-   ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,42.0f);
-   ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,150.0f);
-   ImGui::TableSetupColumn("Reads",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableSetupColumn("Writes",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableSetupColumn("Uncertain",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableSetupColumn("From",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableSetupColumn("Used by",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableSetupColumn("Execution",ImGuiTableColumnFlags_WidthStretch);
-   ImGui::TableHeadersRow();
-   for(std::size_t instructionIndex=chosen.startInstruction;instructionIndex<chosen.endInstruction&&instructionIndex<gool->instructions.size();++instructionIndex){
-    const auto&instruction=gool->instructions[instructionIndex];
-    const auto analysis=Crash::analyzeGoolInstruction(*gool,instructionIndex);
-    std::string reads,writes,uncertain;
-    for(const auto&effect:analysis.operandEffects){
-     std::string&target=effect.access==Crash::NsfGoolOperandAccess::Read?reads:
-      effect.access==Crash::NsfGoolOperandAccess::Write?writes:uncertain;
-     if(!target.empty())target+=", ";
-     target+=effect.reference;
-    }
-    std::vector<std::string> fromEntries,usedByEntries;
-    for(const auto&use:dataFlow.uses) if(use.instructionIndex==instructionIndex&&!use.reachingDefinitions.empty()){
-     std::string relation=use.location+" <- ";
-     for(std::size_t n=0;n<use.reachingDefinitions.size();++n){if(n)relation+="/";relation+="#"+std::to_string(dataFlow.definitions[use.reachingDefinitions[n]].instructionIndex);}
-     if(std::find(fromEntries.begin(),fromEntries.end(),relation)==fromEntries.end())fromEntries.push_back(std::move(relation));
-    }
-    for(std::size_t definitionId=0;definitionId<dataFlow.definitions.size();++definitionId){
-     if(dataFlow.definitions[definitionId].instructionIndex!=instructionIndex)continue;
-     for(const auto&use:dataFlow.uses) if(std::find(use.reachingDefinitions.begin(),use.reachingDefinitions.end(),definitionId)!=use.reachingDefinitions.end()){
-      const std::string relation=use.location+" -> #"+std::to_string(use.instructionIndex);
-      if(std::find(usedByEntries.begin(),usedByEntries.end(),relation)==usedByEntries.end())usedByEntries.push_back(relation);
-     }
-    }
-    std::string from,usedBy;
-    for(const auto&entry:fromEntries){if(!from.empty())from+=", ";from+=entry;}
-    for(const auto&entry:usedByEntries){if(!usedBy.empty())usedBy+=", ";usedBy+=entry;}
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",instructionIndex);
-    ImGui::TableSetColumnIndex(1);ImGui::Text("%s",instruction.mnemonic.c_str());
-    ImGui::TableSetColumnIndex(2);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(reads.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",reads.c_str());
-    ImGui::TableSetColumnIndex(3);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(writes.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",writes.c_str());
-    ImGui::TableSetColumnIndex(4);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(uncertain.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",uncertain.c_str());
-    ImGui::TableSetColumnIndex(5);if(from.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",from.c_str());
-    ImGui::TableSetColumnIndex(6);if(usedBy.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",usedBy.c_str());
-    ImGui::TableSetColumnIndex(7);if(analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",analysis.executionEffect.c_str());
-   }
-   ImGui::EndTable();
-  }
- }
  ImGui::End();
-}
+ }
 
-void EditorUI::drawGoolDataWindows(){
+ void EditorUI::drawGoolBlueprintInstructions(){
+  const Crash::NsfEntry* selectedEntry=nullptr;
+  const Crash::NsfGool* gool=nullptr;
+  if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
+   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
+   if(chunk.type==0&&static_cast<std::size_t>(selectedEntry_)<chunk.entries.size()){
+    const auto&entry=chunk.entries[static_cast<std::size_t>(selectedEntry_)];
+    if(entry.valid&&entry.type==11){selectedEntry=&entry;gool=&entry.gool;}
+   }
+  }
+  if(!selectedEntry||!gool){showGoolBlueprintInstructions_=false;return;}
+  const auto graph=Crash::analyzeGoolControlFlow(*gool);
+  if(graph.blocks.empty()){showGoolBlueprintInstructions_=false;return;}
+  selectedGoolBlueprintBlock_=std::min(selectedGoolBlueprintBlock_,graph.blocks.size()-1U);
+  const auto&chosen=graph.blocks[selectedGoolBlueprintBlock_];
+  ImGuiID bottomDockId=0;
+  if(ImGuiWindow* frameGroups=ImGui::FindWindowByName("GOOL Frame Groups"))if(frameGroups->DockNode)bottomDockId=frameGroups->DockNode->ID;
+  if(bottomDockId==0)if(ImGuiWindow* console=ImGui::FindWindowByName("Console / Diagnostics"))if(console->DockNode)bottomDockId=console->DockNode->ID;
+  if(bottomDockId!=0)ImGui::SetNextWindowDockID(bottomDockId,ImGuiCond_FirstUseEver);
+  if(ImGui::Begin("GOOL Blueprint Instructions",&showGoolBlueprintInstructions_,ImGuiWindowFlags_HorizontalScrollbar)){
+   ImGui::Text("%s  |  BB%zu  |  instructions %zu–%zu",Crash::eidToEName(selectedEntry->eid).c_str(),selectedGoolBlueprintBlock_,chosen.startInstruction,chosen.endInstruction-1U);
+   ImGui::TextDisabled("Data-flow links track stable stack, argument, and object references. Unknown instructions and engine calls break propagation.");
+   const auto dataFlow=Crash::analyzeGoolDataFlow(*gool);
+   if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingStretchProp,ImVec2(0,0))){
+    ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48.0f);
+    ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,105.0f);
+    ImGui::TableSetupColumn("Reads",ImGuiTableColumnFlags_WidthStretch,1.15f);
+    ImGui::TableSetupColumn("Writes",ImGuiTableColumnFlags_WidthStretch,1.15f);
+    ImGui::TableSetupColumn("Uncertain",ImGuiTableColumnFlags_WidthStretch,1.0f);
+    ImGui::TableSetupColumn("From",ImGuiTableColumnFlags_WidthStretch,1.35f);
+    ImGui::TableSetupColumn("Used by",ImGuiTableColumnFlags_WidthStretch,1.35f);
+    ImGui::TableSetupColumn("Execution",ImGuiTableColumnFlags_WidthStretch,1.4f);
+    ImGui::TableHeadersRow();
+    for(std::size_t instructionIndex=chosen.startInstruction;instructionIndex<chosen.endInstruction&&instructionIndex<gool->instructions.size();++instructionIndex){
+     const auto&instruction=gool->instructions[instructionIndex];const auto analysis=Crash::analyzeGoolInstruction(*gool,instructionIndex);
+     std::string reads,writes,uncertain;
+     for(const auto&effect:analysis.operandEffects){std::string&target=effect.access==Crash::NsfGoolOperandAccess::Read?reads:effect.access==Crash::NsfGoolOperandAccess::Write?writes:uncertain;if(!target.empty())target+=", ";target+=effect.reference;}
+     std::vector<std::string> fromEntries,usedByEntries;
+     for(const auto&use:dataFlow.uses)if(use.instructionIndex==instructionIndex&&!use.reachingDefinitions.empty()){std::string relation=use.location+" <- ";for(std::size_t n=0;n<use.reachingDefinitions.size();++n){if(n)relation+="/";relation+="#"+std::to_string(dataFlow.definitions[use.reachingDefinitions[n]].instructionIndex);}if(std::find(fromEntries.begin(),fromEntries.end(),relation)==fromEntries.end())fromEntries.push_back(std::move(relation));}
+     for(std::size_t definitionId=0;definitionId<dataFlow.definitions.size();++definitionId)if(dataFlow.definitions[definitionId].instructionIndex==instructionIndex)for(const auto&use:dataFlow.uses)if(std::find(use.reachingDefinitions.begin(),use.reachingDefinitions.end(),definitionId)!=use.reachingDefinitions.end()){const std::string relation=use.location+" -> #"+std::to_string(use.instructionIndex);if(std::find(usedByEntries.begin(),usedByEntries.end(),relation)==usedByEntries.end())usedByEntries.push_back(relation);}
+     std::string from,usedBy;for(const auto&entry:fromEntries){if(!from.empty())from+=", ";from+=entry;}for(const auto&entry:usedByEntries){if(!usedBy.empty())usedBy+=", ";usedBy+=entry;}
+     ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",instructionIndex);ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted(instruction.mnemonic.c_str());
+     ImGui::TableSetColumnIndex(2);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(reads.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",reads.c_str());
+     ImGui::TableSetColumnIndex(3);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(writes.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",writes.c_str());
+     ImGui::TableSetColumnIndex(4);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(uncertain.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",uncertain.c_str());
+     ImGui::TableSetColumnIndex(5);if(from.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",from.c_str());
+     ImGui::TableSetColumnIndex(6);if(usedBy.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",usedBy.c_str());
+     ImGui::TableSetColumnIndex(7);if(analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",analysis.executionEffect.c_str());
+    }
+    ImGui::EndTable();
+   }
+  }
+  ImGui::End();
+ }
+
+ void EditorUI::drawGoolDataWindows(){
  const Crash::NsfGool* gool=nullptr; std::uint32_t goolEid=0;
  if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
