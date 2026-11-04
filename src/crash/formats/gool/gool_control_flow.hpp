@@ -19,6 +19,18 @@ struct NsfGoolFlowEdge {
     bool targetValid=false;
     std::string diagnostic;
 };
+enum class NsfGoolOperandAccess : std::uint8_t { Read, Write };
+struct NsfGoolOperandEffect {
+    char operandName='?';
+    NsfGoolOperandAccess access=NsfGoolOperandAccess::Read;
+    std::string reference;
+};
+struct NsfGoolInstructionAnalysis {
+    bool operandsKnown=false;
+    std::vector<NsfGoolOperandEffect> operandEffects;
+    std::string executionEffect;
+};
+NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size_t instructionIndex);
 struct NsfGoolControlFlowGraph {
     std::vector<NsfGoolBasicBlock> blocks;
     std::vector<NsfGoolFlowEdge> edges;
