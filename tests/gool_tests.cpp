@@ -473,8 +473,8 @@ int main(){
  // At a conditional join, both path-specific reaching definitions remain visible.
  NsfGool joinGool;joinGool.version=NsfGoolVersion::Version2;
  joinGool.instructions.push_back(producer);
- NsfGoolInstruction branch;branch.opcode=51;branch.operandBits=1U;
- joinGool.instructions.push_back(branch);
+ NsfGoolInstruction branchInstruction;branchInstruction.opcode=51;branchInstruction.operandBits=1U;
+ joinGool.instructions.push_back(branchInstruction);
  joinGool.instructions.push_back(producer);
  joinGool.instructions.push_back(consumer);
  const auto joinFlow=analyzeGoolDataFlow(joinGool);
