@@ -2,7 +2,9 @@
 #include "core/workspace.hpp"
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/nsd/nsd_file.hpp"
+#include <array>
 #include <string>
+#include <vector>
 namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {
@@ -16,6 +18,7 @@ private:
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool showGoolDataPool_=false,showGoolStateMap_=false,showGoolStateDescriptions_=false,showGoolFrameGroups_=false,focusGoolDataPool_=false;
  int activeGoolChunk_=-1,activeGoolEntry_=-1;
+ std::vector<std::array<char,6>> frameGroupEidBuffers_;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  bool sceneCameraInitialized_=false;
