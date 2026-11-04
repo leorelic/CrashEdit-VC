@@ -1,5 +1,5 @@
 #include "crash/formats/gool/gool_ir.hpp"
-#include "crash/formats/gool/gool_control_flow.hpp"
+#include "crash/formats/gool/gool_control_flow.hpp"\n#include <utility>
 #include "crash/formats/gool/gool_opcodes.hpp"
 
 namespace CrashEdit::Crash {
@@ -54,6 +54,26 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             }
         }
         result.instructions.push_back(std::move(ir));
+    }
+
+    const auto controlFlow = analyzeGoolControlFlow(source);
+    result.basicBlocks.reserve(controlFlow.blocks.size());
+    for (const auto& block : controlFlow.blocks)
+        result.basicBlocks.push_back({block.startInstruction, block.endInstruction});
+    result.flowEdges.reserve(controlFlow.edges.size());
+    for (const auto& edge : controlFlow.edges) {
+        result.flowEdges.push_back({edge.sourceBlock, edge.targetInstruction,
+            static_cast<GoolIRFlowEdgeKind>(edge.kind), edge.targetValid, edge.diagnostic});
+    }
+    result.controlFlowDiagnostics = controlFlow.diagnostics;
+    result.instructionToBlock.assign(source.instructions.size(), 0U);
+    for (std::size_t blockIndex = 0; blockIndex < controlFlow.blocks.size(); ++blockIndex) {
+        const auto& block = controlFlow.blocks[blockIndex];
+        for (std::size_t instructionIndex = block.startInstruction;
+             instructionIndex < block.endInstruction && instructionIndex < result.instructionToBlock.size();
+             ++instructionIndex) {
+            result.instructionToBlock[instructionIndex] = blockIndex;
+        }
     }
 
     result.stateDescriptors.reserve(source.stateDescriptors.size());
