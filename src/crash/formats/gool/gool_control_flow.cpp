@@ -101,4 +101,55 @@ NsfGoolControlFlowGraph analyzeGoolControlFlow(const NsfGool& gool) {
     }
     return graph;
 }
+
+NsfGoolInstructionAnalysis analyzeGoolInstruction(const NsfGool& gool, std::size_t instructionIndex) {
+    NsfGoolInstructionAnalysis analysis;
+    if(instructionIndex>=gool.instructions.size()) {
+        analysis.executionEffect="Instruction index is outside this GOOL program.";
+        return analysis;
+    }
+    const auto& instruction=gool.instructions[instructionIndex];
+    if(instruction.isMips) {
+        analysis.executionEffect="Native MIPS instruction; register and memory effects are not yet analyzed.";
+        return analysis;
+    }
+    const auto& opcodeInfo=goolOpcodeInfo(gool.version,instruction.opcode);
+    if(!opcodeInfo.known || goolOpcodeFormat(gool.version,instruction.opcode).empty()) {
+        analysis.executionEffect="Unknown or unsupported GOOL opcode; effects are not inferred.";
+        return analysis;
+    }
+
+    auto operands=decodeGoolOperands(gool.version,instruction.opcode,instruction.operandBits);
+    resolveGoolOperands(operands,gool);
+    analysis.operandsKnown=true;
+    for(const auto& operand:operands) {
+        NsfGoolOperandAccess access;
+        switch(operand.kind) {
+        case NsfGoolOperandKind::Reference:
+        case NsfGoolOperandKind::ProcessField:
+            access=NsfGoolOperandAccess::Read;
+            break;
+        case NsfGoolOperandKind::DestinationReference:
+            access=NsfGoolOperandAccess::Write;
+            break;
+        default:
+            continue; // Literal values and signed offsets are not storage accesses.
+        }
+        analysis.operandEffects.push_back({operand.name,access,
+            operand.resolvedText.empty()?std::string(1,operand.name):operand.resolvedText});
+    }
+
+    const auto opcode=instruction.opcode;
+    if(opcode==49U) analysis.executionEffect="Returns to the caller.";
+    else if(opcode>=50U&&opcode<=52U)
+        analysis.executionEffect=formatGoolControlFlow(opcode,operands,gool,instructionIndex);
+    else if(opcode>=53U&&opcode<=55U)
+        analysis.executionEffect=formatGoolControlFlow(opcode,operands,gool,instructionIndex);
+    else if(opcode==59U)
+        analysis.executionEffect=formatGoolControlFlow(opcode,operands,gool,instructionIndex);
+    else
+        analysis.executionEffect="Sequential control flow; no transfer is encoded by this instruction.";
+    return analysis;
+}
+
 }
