@@ -454,5 +454,28 @@ int main(){
  const auto unknownEffects=analyzeGoolInstruction(effectGool,5);
  assert(!unknownEffects.operandsKnown&&unknownEffects.operandEffects.empty());
  assert(unknownEffects.executionEffect.find("not inferred")!=std::string::npos);
+ // Conservative reaching-definitions analysis links writes to later reads.
+ NsfGool dataFlowGool;dataFlowGool.version=NsfGoolVersion::Version2;
+ NsfGoolInstruction producer;producer.opcode=17;producer.operandBits=0x001800U;
+ dataFlowGool.instructions.push_back(producer);
+ NsfGoolInstruction consumer;consumer.opcode=0;consumer.operandBits=0x800800U;
+ dataFlowGool.instructions.push_back(consumer);
+ NsfGoolInstruction secondProducer;secondProducer.opcode=17;secondProducer.operandBits=0x801800U;
+ dataFlowGool.instructions.push_back(secondProducer);
+ NsfGoolInstruction secondConsumer;secondConsumer.opcode=0;secondConsumer.operandBits=0x801801U;
+ dataFlowGool.instructions.push_back(secondConsumer);
+ const auto dataFlow=analyzeGoolDataFlow(dataFlowGool);
+ assert(dataFlow.definitions.size()==2);
+ assert(dataFlow.definitions[0].instructionIndex==0&&dataFlow.definitions[0].location=="stack[0]");
+ assert(dataFlow.definitions[1].instructionIndex==2&&dataFlow.definitions[1].location=="stack[1]");
+ assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==1&&use.location=="stack[0]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==0;}));
+ assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==3&&use.location=="stack[1]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==1;}));
+ NsfGool barrierGool;barrierGool.version=NsfGoolVersion::Version2;
+ barrierGool.instructions.push_back(producer);
+ NsfGoolInstruction nativeBarrier;nativeBarrier.isMips=true;nativeBarrier.mnemonic="addu";
+ barrierGool.instructions.push_back(nativeBarrier);
+ barrierGool.instructions.push_back(consumer);
+ const auto barrierFlow=analyzeGoolDataFlow(barrierGool);
+ assert(std::any_of(barrierFlow.uses.begin(),barrierFlow.uses.end(),[](const auto& use){return use.instructionIndex==2&&use.location=="stack[0]"&&use.reachingDefinitions.empty();}));
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
