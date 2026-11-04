@@ -1488,7 +1488,43 @@ void EditorUI::drawGoolInspector(){
     ImGui::TableSetupColumn("Destination",ImGuiTableColumnFlags_WidthFixed,115);
     ImGui::TableSetupColumn("Details");
     ImGui::TableHeadersRow();
-    for(const auto&edge:graph.edges){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("BB%zu",edge.sourceBlock);ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted(edgeKindName(edge.kind));ImGui::TableSetColumnIndex(2);if(edge.targetValid)ImGui::Text("Instruction %zu",edge.targetInstruction);else ImGui::TextDisabled("Dynamic / unresolved");ImGui::TableSetColumnIndex(3);if(!edge.diagnostic.empty())ImGui::TextWrapped("%s",edge.diagnostic.c_str());else ImGui::TextDisabled("—");}
+    auto transitionHookDetails=[&](const Crash::NsfGoolFlowEdge&edge)->std::string{
+     if(edge.kind!=Crash::NsfGoolFlowEdgeKind::StateTransition&&edge.kind!=Crash::NsfGoolFlowEdgeKind::StateTransitionTrue&&edge.kind!=Crash::NsfGoolFlowEdgeKind::StateTransitionFalse)return {};
+     if(edge.sourceBlock>=graph.blocks.size())return "Transition source block is unavailable.";
+     const auto&sourceBlock=graph.blocks[edge.sourceBlock];
+     if(sourceBlock.endInstruction==0||sourceBlock.endInstruction>g.instructions.size())return "Transition instruction is unavailable.";
+     const std::size_t instructionIndex=sourceBlock.endInstruction-1U;
+     const auto&instruction=g.instructions[instructionIndex];
+     const auto operands=Crash::decodeGoolOperands(g.version,instruction.opcode,instruction.operandBits);
+     const auto stateOperand=std::find_if(operands.begin(),operands.end(),[](const auto&operand){return operand.name=='S';});
+     if(stateOperand==operands.end())return "State descriptor operand is unavailable.";
+     const std::size_t descriptorIndex=stateOperand->rawValue;
+     if(descriptorIndex>=g.stateDescriptors.size())return "State descriptor "+std::to_string(descriptorIndex)+" is out of range.";
+     const auto hook=std::find_if(g.stateHookReferences.begin(),g.stateHookReferences.end(),[descriptorIndex](const auto&reference){return reference.descriptorIndex==descriptorIndex&&reference.kind==Crash::NsfGoolStateHookKind::Transition;});
+     if(hook==g.stateHookReferences.end())return "Descriptor "+std::to_string(descriptorIndex)+" has no resolved transition-hook record.";
+     const char*status="Unknown";
+     switch(hook->status){
+      case Crash::NsfGoolStateHookStatus::Absent:status="Absent";break;
+      case Crash::NsfGoolStateHookStatus::InvalidDataIndex:status="Invalid data index";break;
+      case Crash::NsfGoolStateHookStatus::MissingTarget:status="Missing target";break;
+      case Crash::NsfGoolStateHookStatus::AmbiguousTarget:status="Ambiguous target";break;
+      case Crash::NsfGoolStateHookStatus::TargetUndecoded:status="Target not decoded";break;
+      case Crash::NsfGoolStateHookStatus::OffsetOutOfRange:status="Offset out of range";break;
+      case Crash::NsfGoolStateHookStatus::Local:status="Local";break;
+      case Crash::NsfGoolStateHookStatus::External:status="External";break;
+     }
+     const std::string prefix="Descriptor "+std::to_string(descriptorIndex)+" → transition hook: ";
+     if(hook->status!=Crash::NsfGoolStateHookStatus::Local&&hook->status!=Crash::NsfGoolStateHookStatus::External)return prefix+status+".";
+     if(hook->targetChunkIndex>=nsf_.chunks().size())return prefix+"resolved target chunk is unavailable.";
+     const auto&targetChunk=nsf_.chunks()[hook->targetChunkIndex];
+     if(hook->targetEntryIndex>=targetChunk.entries.size())return prefix+"resolved target entry is unavailable.";
+     const auto&targetEntry=targetChunk.entries[hook->targetEntryIndex];
+     if(!targetEntry.valid||targetEntry.type!=11)return prefix+"resolved target is not a valid GOOL entry.";
+     char target[256];
+     std::snprintf(target,sizeof(target),"%s GOOL 0x%08X, instruction %u",Crash::eidToEName(targetEntry.eid).c_str(),targetEntry.eid,static_cast<unsigned>(hook->instructionOffset));
+     return prefix+status+" → "+target+".";
+    };
+    for(const auto&edge:graph.edges){ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("BB%zu",edge.sourceBlock);ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted(edgeKindName(edge.kind));ImGui::TableSetColumnIndex(2);if(edge.targetValid)ImGui::Text("Instruction %zu",edge.targetInstruction);else ImGui::TextDisabled("Dynamic / unresolved");ImGui::TableSetColumnIndex(3);const std::string hookDetails=transitionHookDetails(edge);if(!hookDetails.empty())ImGui::TextWrapped("%s",hookDetails.c_str());else if(!edge.diagnostic.empty())ImGui::TextWrapped("%s",edge.diagnostic.c_str());else ImGui::TextDisabled("—");}
     ImGui::EndTable();
    }
    if(!graph.diagnostics.empty()){ImGui::Separator();ImGui::Text("Analysis diagnostics");for(const auto&diagnostic:graph.diagnostics)ImGui::BulletText("%s",diagnostic.c_str());}
