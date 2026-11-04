@@ -1825,12 +1825,12 @@ void EditorUI::drawGoolBlueprintGraph(){
    if(first<gool->instructions.size()){
     const auto&ins=gool->instructions[first];
     const std::string line=ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
-    draw->AddText(ImVec2(min.x+10,min.y+59),IM_COL32(225,225,215,255),line.c_str(),nullptr,nodeWidth-20.0f);
+    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+59),IM_COL32(225,225,215,255),line.c_str(),nullptr,nodeWidth-20.0f);
    }
    if(last<gool->instructions.size()&&last!=first){
     const auto&ins=gool->instructions[last];
     const std::string line="End: "+ins.mnemonic+(ins.arguments.empty()?std::string{}:"  "+ins.arguments);
-    draw->AddText(ImVec2(min.x+10,min.y+80),IM_COL32(190,205,220,255),line.c_str(),nullptr,nodeWidth-20.0f);
+    draw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(min.x+10,min.y+80),IM_COL32(190,205,220,255),line.c_str(),nullptr,nodeWidth-20.0f);
    }
    draw->AddCircleFilled(ImVec2(min.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
    draw->AddCircleFilled(ImVec2(max.x,min.y+nodeHeight*.5f),5.0f,IM_COL32(145,165,185,255));
