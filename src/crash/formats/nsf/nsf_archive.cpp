@@ -1,4 +1,5 @@
 #include "crash/formats/nsf/nsf_archive.hpp"
+#include "crash/formats/eid.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <algorithm>
 #include <fstream>
