@@ -1289,6 +1289,10 @@ void EditorUI::drawSpawnPointsEditor(){
 
 void EditorUI::drawNsdGoolMap(){
  if(!nsdGoolMapWindow_||!nsdValid_)return;
+ const ImGuiViewport*viewport=ImGui::GetMainViewport();
+ const ImVec2 maxWindowSize(viewport->WorkSize.x*0.95f,viewport->WorkSize.y*0.90f);
+ ImGui::SetNextWindowSize(ImVec2(900.0f,560.0f),ImGuiCond_FirstUseEver);
+ ImGui::SetNextWindowSizeConstraints(ImVec2(480.0f,280.0f),maxWindowSize);
  if(!ImGui::Begin("NSD GOOL Map",&nsdGoolMapWindow_)){ImGui::End();return;}
  ImGui::Text("GOOL map entries: %zu",nsd_.goolMap.size());
  ImGui::Separator();
