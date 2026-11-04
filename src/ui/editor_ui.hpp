@@ -13,7 +13,7 @@ private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows();
  void drawNode(const ResourceNode&); void drawSearchWindow(); void drawGoolInspector(); void drawGoolGraph(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
- bool openDialog_=true,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
+ bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool showGoolDataPool_=false,showGoolStateMap_=false,showGoolStateDescriptions_=false,focusGoolDataPool_=false;
  int activeGoolChunk_=-1,activeGoolEntry_=-1;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
