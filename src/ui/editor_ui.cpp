@@ -1480,26 +1480,26 @@ void EditorUI::drawGoolGraph(){
  if(ImGui::BeginChild("GOOLGraphCanvas",ImVec2(0,0),false,ImGuiWindowFlags_AlwaysVerticalScrollbar)){
   const float available=ImGui::GetContentRegionAvail().x;
   auto centeredText=[&](const char*text,ImVec4 color,bool disabled=false,float scale=1.0f){
+   const float contentWidth=ImGui::GetContentRegionAvail().x;
    const float size=ImGui::GetFontSize()*scale;
-   const ImVec2 extent=ImGui::GetFont()->CalcTextSizeA(size,available,available,text);
-   const ImVec2 pos(ImGui::GetCursorScreenPos().x+std::max(0.0f,(available-extent.x)*.5f),ImGui::GetCursorScreenPos().y);
-   ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(),size,pos,disabled?ImGui::GetColorU32(ImGuiCol_TextDisabled):ImGui::GetColorU32(color),text,nullptr,available);
+   const ImVec2 extent=ImGui::GetFont()->CalcTextSizeA(size,contentWidth,contentWidth,text);
+   const ImVec2 pos(ImGui::GetCursorScreenPos().x+std::max(0.0f,(contentWidth-extent.x)*.5f),ImGui::GetCursorScreenPos().y);
+   ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(),size,pos,disabled?ImGui::GetColorU32(ImGuiCol_TextDisabled):ImGui::GetColorU32(color),text,nullptr,contentWidth);
    ImGui::Dummy(ImVec2(1.0f,extent.y+ImGui::GetStyle().ItemSpacing.y));
   };
-  const float cardWidth=std::max(available*.76f,300.0f);
-  const float sideWidth=std::max((available-24.0f)*.5f,180.0f);
+  const float cardWidth=std::min(available,std::max(available*.76f,300.0f));
   auto centerCard=[&](const char*id,const char*title,const char*subtitle,ImVec4 tint){
    ImGui::SetCursorPosX(std::max(0.0f,(available-cardWidth)*.5f));
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(tint.x*.20f,tint.y*.20f,tint.z*.20f,.95f));
    ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(tint.x,tint.y,tint.z,.75f));
-   if(ImGui::BeginChild(id,ImVec2(cardWidth,112.0f),true,ImGuiWindowFlags_NoScrollbar)){
+   if(ImGui::BeginChild(id,ImVec2(cardWidth,124.0f),true,ImGuiWindowFlags_NoScrollbar)){
     const float inner=ImGui::GetContentRegionAvail().x;
-    const ImVec2 titleSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.6f,inner,inner,title);
+    const ImVec2 titleSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.8f,inner,inner,title);
     ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(inner-titleSize.x)*.5f+ImGui::GetStyle().WindowPadding.x));
-    ImGui::SetWindowFontScale(1.6f);ImGui::TextColored(tint,"%s",title);ImGui::SetWindowFontScale(1.0f);
-    const ImVec2 nameSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.35f,inner,inner,subtitle);
+    ImGui::SetWindowFontScale(1.8f);ImGui::TextColored(tint,"%s",title);ImGui::SetWindowFontScale(1.0f);
+    const ImVec2 nameSize=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize()*1.5f,inner,inner,subtitle);
     ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,(inner-nameSize.x)*.5f+ImGui::GetStyle().WindowPadding.x));
-    ImGui::SetWindowFontScale(1.35f);ImGui::TextUnformatted(subtitle);ImGui::SetWindowFontScale(1.0f);
+    ImGui::SetWindowFontScale(1.5f);ImGui::TextUnformatted(subtitle);ImGui::SetWindowFontScale(1.0f);
    }
    ImGui::EndChild();ImGui::PopStyleColor(2);
   };
@@ -1527,7 +1527,7 @@ void EditorUI::drawGoolGraph(){
    ImGui::TableNextRow();
    ImGui::TableSetColumnIndex(0);
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.12f,.18f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.30f,.55f,.82f,.8f));
-   if(ImGui::BeginChild("GOOLGraphPoolCard",ImVec2(sideWidth,150),true)){
+   if(ImGui::BeginChild("GOOLGraphPoolCard",ImVec2(0,150),true)){
     centeredText("DATA POOL",ImVec4(.48f,.72f,1,1));
     centeredText("A descriptor's GOOL index selects a word here. That word supplies the EID used to resolve the target GOOL.",ImGui::GetStyleColorVec4(ImGuiCol_Text));
     ImGui::Separator();
@@ -1539,7 +1539,7 @@ void EditorUI::drawGoolGraph(){
    }ImGui::EndChild();ImGui::PopStyleColor(2);
    ImGui::TableSetColumnIndex(1);
    ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(.19f,.15f,.25f,.96f));ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(.62f,.43f,.83f,.8f));
-   if(ImGui::BeginChild("GOOLGraphHooksCard",ImVec2(sideWidth,150),true)){
+   if(ImGui::BeginChild("GOOLGraphHooksCard",ImVec2(0,150),true)){
     centeredText("HOOKS",ImVec4(.76f,.59f,1,1));
     centeredText("Event, Transition, and Code hooks route execution to instruction offsets, locally or in another GOOL.",ImGui::GetStyleColorVec4(ImGuiCol_Text));
     ImGui::Separator();
