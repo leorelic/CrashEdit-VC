@@ -88,5 +88,32 @@ int main() {
     assert(ir.frameGroupBytes == 12 && ir.frameGroupsDecoded && ir.frameGroups.size() == 1);
     assert(ir.frameGroups[0].sourceByteOffset == 0x60 && ir.frameGroups[0].interpolated);
 
-    std::cout << "GOOL IR preservation checks passed\\n";
+    NsfGool flowSource;
+    flowSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction branch;
+    branch.opcode = 50; // BRA with zero displacement targets the next instruction.
+    branch.operandBits = 0;
+    flowSource.instructions.push_back(branch);
+    NsfGoolInstruction sequential;
+    sequential.opcode = 0;
+    flowSource.instructions.push_back(sequential);
+    NsfGoolInstruction ret;
+    ret.opcode = 49;
+    flowSource.instructions.push_back(ret);
+
+    const auto flowIR = buildGoolIR(flowSource);
+    assert(flowIR.basicBlocks.size() == 2);
+    assert(flowIR.instructionToBlock.size() == 3);
+    assert(flowIR.instructionToBlock[0] == 0 && flowIR.instructionToBlock[1] == 1);
+    assert(flowIR.instructionToBlock[2] == 1);
+    assert(!flowIR.flowEdges.empty());
+    assert(flowIR.flowEdges[0].kind == GoolIRFlowEdgeKind::Branch);
+    assert(flowIR.flowEdges[0].targetValid && flowIR.flowEdges[0].targetInstruction == 1);
+    bool hasDynamicReturn = false;
+    for (const auto& edge : flowIR.flowEdges)
+        if (edge.kind == GoolIRFlowEdgeKind::Return && !edge.targetValid)
+            hasDynamicReturn = true;
+    assert(hasDynamicReturn);
+
+    std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
