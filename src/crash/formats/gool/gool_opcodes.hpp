@@ -20,6 +20,7 @@ struct NsfGoolOperand {
     NsfGoolOperandKind kind = NsfGoolOperandKind::Value;
     std::string resolvedText;
 };
+std::string goolObjectFieldName(std::uint32_t field);
 const NsfGoolOpcodeInfo& goolOpcodeInfo(NsfGoolVersion version, std::uint8_t opcode) noexcept;
 std::string_view goolOpcodeFormat(NsfGoolVersion version, std::uint8_t opcode) noexcept;
 std::vector<NsfGoolOperand> decodeGoolOperands(NsfGoolVersion version, std::uint8_t opcode, std::uint32_t operandBits);
