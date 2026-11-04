@@ -9,7 +9,8 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Resolve supported data-pool references and clearly label unresolved or special references.
 - [x] Build basic-block control-flow analysis with branch destinations and diagnostics.
 - [x] Add a visual Blueprint view of basic blocks and execution relationships.
-- [ ] Continue auditing instruction semantics against the original CrashEdit source and real Crash 2 samples.
+- [ ] Audit instruction execution semantics against the original CrashEdit source and real Crash 2 samples, beginning with operand reads/writes and control-flow side effects.
+- [ ] Build conservative data-flow facts (read, written, and unknown operands) without guessing at undocumented opcode behavior.
 - [ ] Improve explanations of calls, state transitions, event dispatch, and relationships between GOOL data structures.
 - [ ] Expand regression coverage across more real GOOL entries and unusual control-flow patterns.
 
@@ -25,9 +26,9 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 
 ### Near-term improvements
 
-- [ ] Make node text layout robust: wrap long instruction summaries, clip drawing to node bounds, and size node content using measured text dimensions.
-- [ ] Ensure node sizing and text layout remain correct at different UI scaling levels and window sizes.
-- [ ] Keep the graph focused on explaining execution and relationships rather than duplicating the detailed GOOL Inspector tables.
+- [x] Make node text layout robust: wrap long instruction summaries and size node content using measured text dimensions.
+- [ ] Verify node sizing and text layout at different UI scaling levels and window sizes; add clipping if testing exposes overflow.
+- [x] Keep the graph focused on explaining execution and relationships rather than duplicating the detailed GOOL Inspector tables.
 
 ### Longer-term canvas improvements
 
