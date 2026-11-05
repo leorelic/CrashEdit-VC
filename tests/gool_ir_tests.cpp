@@ -507,6 +507,37 @@ int main() {
     assert(!boundaryIR.routines[0].hasSharedInstructions);
     assert(!boundaryIR.routines[1].hasSharedInstructions);
 
+    // Two independent entries can converge on ordinary code that is not itself
+    // a known entry point. Preserve the exact shared instruction, not just a flag.
+    NsfGool sharedSource;
+    sharedSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction firstConditional;
+    firstConditional.opcode = 51U; // BNEZ: branch from 0 to 3, or fall through to 1.
+    firstConditional.operandBits = 2U | (29U << 14U);
+    sharedSource.instructions.push_back(firstConditional);
+    NsfGoolInstruction firstJump;
+    firstJump.opcode = 50U; // BRA from 1 to the shared instruction at 3.
+    firstJump.operandBits = 1U;
+    sharedSource.instructions.push_back(firstJump);
+    NsfGoolInstruction secondEntry;
+    secondEntry.opcode = 47U;
+    sharedSource.instructions.push_back(secondEntry);
+    NsfGoolInstruction sharedReturn;
+    sharedReturn.opcode = 49U;
+    sharedSource.instructions.push_back(sharedReturn);
+    sharedSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    sharedSource.stateHookReferences.push_back({1, 0, 0, NsfGoolStateHookKind::Code,
+        2, 2, false, true, NsfGoolStateHookStatus::Local});
+    const auto sharedIR = buildGoolIR(sharedSource);
+    assert(sharedIR.routines.size() == 2);
+    assert((sharedIR.routines[0].instructions == std::vector<std::size_t>{0, 1, 3}));
+    assert((sharedIR.routines[1].instructions == std::vector<std::size_t>{2, 3}));
+    assert(sharedIR.routines[0].hasSharedInstructions);
+    assert(sharedIR.routines[1].hasSharedInstructions);
+    assert((sharedIR.routines[0].sharedInstructions == std::vector<std::size_t>{3}));
+    assert((sharedIR.routines[1].sharedInstructions == std::vector<std::size_t>{3}));
+
     // Real Crash 2 sample: DispC's Code hook at instruction 0. These twenty
     // words are copied from the extracted entry; this is a focused IR/decompiler
     // regression, not a replacement for parsing the complete NSF entry.
