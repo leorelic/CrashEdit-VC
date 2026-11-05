@@ -134,6 +134,9 @@ GoolIRDecompilation decompileGoolIR(
     std::map<std::size_t, bool> suppressedBranches;
     std::map<std::size_t, bool> elseIfClauses;
     std::map<std::size_t, bool> suppressedConditionProducers;
+    std::map<std::size_t, bool> elseArms;
+    std::map<std::size_t, bool> suppressedElseLabels;
+    std::map<std::size_t, bool> closeElseAt;
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (instruction.nativeMips || !instruction.opcodeKnown ||
@@ -193,6 +196,38 @@ GoolIRDecompilation decompileGoolIR(
         }
     }
 
+    // A final conditional may skip to a plain fallback arm. Only structure
+    // it when that target is unique and both paths reach the same join.
+    for (const auto& [branchIndex, clause] : structuredIfs) {
+        const auto target = clause.branchTarget;
+        if (target >= clause.joinTarget || target >= boundedEnd)
+            continue;
+        bool startsAnotherClause = false;
+        if (target + 1 < boundedEnd) {
+            const auto& next = program.instructions[target + 1];
+            startsAnotherClause = !next.nativeMips && next.opcodeKnown &&
+                (next.opcode == 51U || next.opcode == 52U);
+        }
+        if (startsAnotherClause) continue;
+        std::size_t incomingEdges = 0;
+        for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+            const auto& candidate = program.instructions[source];
+            if (candidate.nativeMips || !candidate.opcodeKnown ||
+                candidate.opcode < 50U || candidate.opcode > 52U)
+                continue;
+            const auto* displacement = findOperand(candidate, 'I');
+            if (!displacement) continue;
+            const auto destination = static_cast<std::int64_t>(source) + 1 +
+                displacement->value;
+            if (destination == static_cast<std::int64_t>(target))
+                ++incomingEdges;
+        }
+        if (incomingEdges != 1) continue;
+        elseArms[branchIndex] = true;
+        suppressedElseLabels[target] = true;
+        closeElseAt[clause.joinTarget] = true;
+    }
+
     if (options.includeHeader) {
         result.text += "// Best-effort GOOL decompilation; unresolved semantics remain explicit.\n";
         result.text += "// Instruction range: [" + std::to_string(start) + ", " +
@@ -203,17 +238,27 @@ GoolIRDecompilation decompileGoolIR(
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (suppressedBranches.find(index) != suppressedBranches.end()) {
-            const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
-                [&](const auto& entry) {
-                    const auto clause = structuredIfs.find(entry.first);
-                    return clause != structuredIfs.end() && clause->second.bodyEnd == index;
-                });
-            if (!closesForElseIf) result.text += "    }\n";
+            const auto owningClause = std::find_if(structuredIfs.begin(), structuredIfs.end(),
+                [&](const auto& entry) { return entry.second.bodyEnd == index; });
+            if (owningClause != structuredIfs.end() &&
+                elseArms.find(owningClause->first) != elseArms.end()) {
+                result.text += "    } else {\\n";
+            } else {
+                const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
+                    [&](const auto& entry) {
+                        const auto clause = structuredIfs.find(entry.first);
+                        return clause != structuredIfs.end() && clause->second.bodyEnd == index;
+                    });
+                if (!closesForElseIf) result.text += "    }\\n";
+            }
             continue;
         }
+        if (closeElseAt.find(index) != closeElseAt.end())
+            result.text += "    }\\n";
         if (suppressedConditionProducers.find(index) == suppressedConditionProducers.end() &&
+            suppressedElseLabels.find(index) == suppressedElseLabels.end() &&
             labels.find(index) != labels.end())
-            result.text += labelName(index) + ":\n";
+            result.text += labelName(index) + ":\\n";
 
         if (structuredIfs.find(index) != structuredIfs.end()) {
             const auto comparison = comparisonCondition(program, index);

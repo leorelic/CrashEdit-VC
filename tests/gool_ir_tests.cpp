@@ -331,6 +331,39 @@ int main() {
     assert(chainOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
     assert(chainOutput.text.find("} else if (self->subtype == 10) {") != std::string::npos);
 
+    // A unique fallback target becomes a plain else arm.
+    GoolIRProgram elseProgram;
+    auto appendElseInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                     std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        elseProgram.instructions.push_back(std::move(item));
+    };
+    const GoolIROperand elseField{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->subtype"};
+    const GoolIROperand elseValue{'R', 12, 2, 2,
+        GoolIROperandKind::Value, "2"};
+    const auto elseDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    appendElseInstruction(4, 0x500, {elseField, elseValue});
+    appendElseInstruction(52, 0x504, {elseDisplacement(3)});
+    appendElseInstruction(47, 0x508);
+    appendElseInstruction(50, 0x50C, {elseDisplacement(2)});
+    appendElseInstruction(47, 0x510);
+    appendElseInstruction(47, 0x514);
+    const auto elseOutput = decompileGoolIR(elseProgram);
+    assert(elseOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
+    assert(elseOutput.text.find("} else {") != std::string::npos);
+    assert(elseOutput.text.find("L00004:") == std::string::npos);
+    assert(elseOutput.text.find("@0x0514") != std::string::npos);
+
     // A comparison immediately feeding BEQZ should become the source
     // expression, not expose the temporary stack result as "sp != 0".
     GoolIRProgram comparisonProgram;

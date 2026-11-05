@@ -54,7 +54,8 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [x] Reconstruct a conservative forward conditional pattern as a structured `if` block when the fallthrough arm ends in an unconditional branch to a later join; retain raw offsets/words on body instructions and leave ambiguous control flow unstructured.
 - [x] Reconstruct simple comparison expressions (`==`, `!=`, `<`, `<=`, `>`, `>=`) when a comparison instruction directly feeds a conditional branch; preserve the stack-test fallback when the producer cannot be proven.
 - [x] Reconstruct adjacent `else if` clauses when the preceding branch targets the next comparison and both clauses share a proven join point.
-- [ ] Extend structured control-flow reconstruction to nested conditionals, plain `else` arms, and loops, with explicit fallback when region boundaries or branch conditions cannot be proven.
+- [x] Reconstruct a plain `else` arm when a final conditional skips to a unique fallback body and both paths reach a proven join.
+- [ ] Extend structured control-flow reconstruction to nested conditionals and loops, with explicit fallback when region boundaries or branch conditions cannot be proven.
 - [ ] Apply the decompiler to real Crash 2 routines, beginning with the `BoxsC` Code hook at instruction 558; use the resulting output to identify missing semantics rather than inventing high-level behavior.
 - [ ] Evolve the initial snapshot into a fully game-independent semantic IR; keep Crash 2 binary decoding/encoding in a separate backend.
 - [ ] Develop a readable, source-like GOOL representation rather than exposing raw instruction words as the primary editing surface.
