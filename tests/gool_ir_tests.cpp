@@ -197,6 +197,8 @@ int main() {
     decompileSource.id = 0x0200007B;
     decompileSource.dataPool = {static_cast<std::int32_t>(0x0200007B)};
     decompileSource.stateDescriptors.push_back({0, 0, 0, 0, 0, 0});
+    decompileSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        4, 4, false, true, NsfGoolStateHookStatus::Local});
 
     NsfGoolInstruction conditionalBranch;
     conditionalBranch.byteOffset = 0x100;
@@ -241,6 +243,7 @@ int main() {
     assert(decompiled.text.find("transition state_descriptor[0]") != std::string::npos);
     assert(decompiled.text.find("GOOL 0x0200007B") != std::string::npos);
     assert(decompiled.text.find("return") != std::string::npos);
+    assert(decompiled.text.find("L00004:") != std::string::npos);
     assert(decompiled.text.find(".gool_word 0xFA123456") != std::string::npos);
     assert(decompiled.text.find(".mips_word 0xFFFFFFFF") != std::string::npos);
     assert(decompiled.text.find("@0x0100") != std::string::npos);
