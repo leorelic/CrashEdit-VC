@@ -259,5 +259,41 @@ int main() {
     assert(selectedDecompilation.text.find("return") != std::string::npos);
     assert(selectedDecompilation.text.find(".gool_word") == std::string::npos);
 
+    // A forward conditional branch whose fallthrough arm ends in BRA to a
+    // later join can be represented as a structured if block without changing
+    // the branch condition or dropping source mapping.
+    NsfGool structuredSource;
+    structuredSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction skipBody;
+    skipBody.opcode = 52; // BEQZ branches to instruction 3; fallthrough means field != 0.
+    skipBody.operandBits = 2U | (29U << 14U); // displacement 2, field subtype.
+    skipBody.byteOffset = 0x200;
+    structuredSource.instructions.push_back(skipBody);
+    NsfGoolInstruction bodyInstruction;
+    bodyInstruction.opcode = 0;
+    bodyInstruction.byteOffset = 0x204;
+    structuredSource.instructions.push_back(bodyInstruction);
+    NsfGoolInstruction joinBranch;
+    joinBranch.opcode = 50; // BRA from instruction 2 to instruction 4.
+    joinBranch.operandBits = 1U;
+    joinBranch.byteOffset = 0x208;
+    structuredSource.instructions.push_back(joinBranch);
+    NsfGoolInstruction alternateInstruction;
+    alternateInstruction.opcode = 47;
+    alternateInstruction.byteOffset = 0x20C;
+    structuredSource.instructions.push_back(alternateInstruction);
+    NsfGoolInstruction joinInstruction;
+    joinInstruction.opcode = 47;
+    joinInstruction.byteOffset = 0x210;
+    structuredSource.instructions.push_back(joinInstruction);
+
+    const auto structuredIR = buildGoolIR(structuredSource);
+    const auto structuredText = decompileGoolIR(structuredIR);
+    assert(structuredText.text.find("if (subtype != 0) {") != std::string::npos);
+    assert(structuredText.text.find("    }\\n") != std::string::npos);
+    assert(structuredText.text.find("goto L00004") == std::string::npos);
+    assert(structuredText.text.find("@0x0204") != std::string::npos);
+    assert(structuredText.text.find("@0x0208") == std::string::npos);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
