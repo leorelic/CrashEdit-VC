@@ -129,8 +129,11 @@ GoolIRDecompilation decompileGoolIR(
     // to the next clause, while the fallthrough body ends in an unconditional
     // branch to a later join point. This is common in GOOL's if/else-if chains.
     // We only structure the body when the complete pattern is visible.
-    std::map<std::size_t, std::size_t> structuredIfEnd;
+    struct StructuredIf { std::size_t bodyEnd; std::size_t branchTarget; std::size_t joinTarget; };
+    std::map<std::size_t, StructuredIf> structuredIfs;
     std::map<std::size_t, bool> suppressedBranches;
+    std::map<std::size_t, bool> elseIfClauses;
+    std::map<std::size_t, bool> suppressedConditionProducers;
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (instruction.nativeMips || !instruction.opcodeKnown ||
@@ -167,9 +170,26 @@ GoolIRDecompilation decompileGoolIR(
                 }
             }
             if (hasInteriorEntry) continue;
-            structuredIfEnd[index] = bodyEnd;
+            structuredIfs[index] = {bodyEnd, branchTarget, static_cast<std::size_t>(joinSigned)};
             suppressedBranches[bodyEnd] = true;
             break;
+        }
+    }
+
+    // Join adjacent clauses only when the preceding conditional skips to
+    // this clause's comparison producer and both clauses share the same join.
+    for (const auto& [branchIndex, clause] : structuredIfs) {
+        if (branchIndex == 0 || comparisonCondition(program, branchIndex).empty())
+            continue;
+        const auto producerIndex = branchIndex - 1;
+        for (const auto& [previousBranch, previousClause] : structuredIfs) {
+            if (previousBranch >= branchIndex) break;
+            if (previousClause.branchTarget == producerIndex &&
+                previousClause.joinTarget == clause.joinTarget) {
+                elseIfClauses[branchIndex] = true;
+                suppressedConditionProducers[producerIndex] = true;
+                break;
+            }
         }
     }
 
@@ -183,15 +203,23 @@ GoolIRDecompilation decompileGoolIR(
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (suppressedBranches.find(index) != suppressedBranches.end()) {
-            result.text += "    }\n";
+            const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
+                [&](const auto& entry) {
+                    const auto clause = structuredIfs.find(entry.first);
+                    return clause != structuredIfs.end() && clause->second.bodyEnd == index;
+                });
+            if (!closesForElseIf) result.text += "    }\n";
             continue;
         }
-        if (labels.find(index) != labels.end())
+        if (suppressedConditionProducers.find(index) == suppressedConditionProducers.end() &&
+            labels.find(index) != labels.end())
             result.text += labelName(index) + ":\n";
 
-        if (structuredIfEnd.find(index) != structuredIfEnd.end()) {
+        if (structuredIfs.find(index) != structuredIfs.end()) {
             const auto comparison = comparisonCondition(program, index);
-            if (!comparison.empty()) {
+            if (elseIfClauses.find(index) != elseIfClauses.end()) {
+                result.text += "    } else if (" + comparison + ") {\n";
+            } else if (!comparison.empty()) {
                 result.text += "    if (" + comparison + ") {\n";
             } else {
                 result.text += "    if (" + fieldText(instruction) +
@@ -199,6 +227,8 @@ GoolIRDecompilation decompileGoolIR(
             }
             continue;
         }
+        if (suppressedConditionProducers.find(index) != suppressedConditionProducers.end())
+            continue;
 
         std::ostringstream line;
         line << "    ";
