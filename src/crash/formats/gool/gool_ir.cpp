@@ -1,5 +1,6 @@
 #include "crash/formats/gool/gool_ir.hpp"
 #include "crash/formats/gool/gool_control_flow.hpp"
+#include <algorithm>
 #include <utility>
 #include "crash/formats/gool/gool_opcodes.hpp"
 
@@ -214,6 +215,105 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             convertHookResolution(hook.status), hook.targetFound,
             hook.targetChunkIndex, hook.targetEntryIndex});
     }
+    // Discover local routine candidates from independently encoded entry points.
+    // Reachability is conservative: calls are recorded as separate candidates,
+    // not traversed as ordinary execution, and another known entry point forms
+    // a boundary. Multiple routines may still reach shared code; that is retained.
+    struct RoutineCandidate {
+        std::size_t instruction = 0;
+        bool codeHook = false;
+        bool localCall = false;
+    };
+    std::vector<RoutineCandidate> candidates;
+    const auto addCandidate = [&candidates](std::size_t instruction, bool codeHook, bool localCall) {
+        auto found = std::find_if(candidates.begin(), candidates.end(),
+            [instruction](const auto& item) { return item.instruction == instruction; });
+        if (found == candidates.end()) candidates.push_back({instruction, codeHook, localCall});
+        else {
+            found->codeHook = found->codeHook || codeHook;
+            found->localCall = found->localCall || localCall;
+        }
+    };
+    for (const auto& hook : result.hookDispatches) {
+        if (hook.kind == GoolIRHookKind::Code &&
+            hook.resolution == GoolIRHookResolution::Local &&
+            hook.instructionOffset < result.instructions.size()) {
+            addCandidate(hook.instructionOffset, true, false);
+        }
+    }
+    for (const auto& operation : result.controlOperations) {
+        if (operation.kind == GoolIRControlOperationKind::Call &&
+            !operation.external && operation.targetInstructionValid) {
+            addCandidate(operation.targetInstruction, false, true);
+        }
+    }
+    std::sort(candidates.begin(), candidates.end(),
+        [](const auto& a, const auto& b) { return a.instruction < b.instruction; });
+    for (const auto& candidate : candidates)
+        result.routineEntries.push_back({candidate.instruction, candidate.codeHook, candidate.localCall});
+
+    const std::size_t instructionCount = result.instructions.size();
+    result.instructionRoutineMembership.assign(instructionCount, 0U);
+    std::vector<std::vector<std::size_t>> blockSuccessors(result.basicBlocks.size());
+    for (const auto& edge : result.flowEdges) {
+        if (!edge.targetValid || edge.sourceBlock >= blockSuccessors.size() ||
+            edge.targetInstruction >= instructionCount) continue;
+        if (edge.kind == GoolIRFlowEdgeKind::Call ||
+            edge.kind == GoolIRFlowEdgeKind::ExternalCall ||
+            edge.kind == GoolIRFlowEdgeKind::StateTransition ||
+            edge.kind == GoolIRFlowEdgeKind::StateTransitionTrue ||
+            edge.kind == GoolIRFlowEdgeKind::StateTransitionFalse ||
+            edge.kind == GoolIRFlowEdgeKind::Return) continue;
+        blockSuccessors[edge.sourceBlock].push_back(edge.targetInstruction);
+    }
+    for (auto& successors : blockSuccessors) {
+        std::sort(successors.begin(), successors.end());
+        successors.erase(std::unique(successors.begin(), successors.end()), successors.end());
+    }
+    for (const auto& candidate : candidates) {
+        GoolIRRoutine routine;
+        routine.entryInstruction = candidate.instruction;
+        routine.fromCodeHook = candidate.codeHook;
+        routine.fromLocalCall = candidate.localCall;
+        std::vector<bool> visited(instructionCount, false);
+        std::vector<std::size_t> pending{candidate.instruction};
+        while (!pending.empty()) {
+            const auto current = pending.back();
+            pending.pop_back();
+            if (current >= instructionCount || visited[current]) continue;
+            if (current != candidate.instruction &&
+                std::any_of(candidates.begin(), candidates.end(), [current](const auto& other) {
+                    return other.instruction == current;
+                })) continue;
+            visited[current] = true;
+            routine.instructions.push_back(current);
+            const auto blockIndex = current < result.instructionToBlock.size()
+                ? result.instructionToBlock[current] : result.basicBlocks.size();
+            if (blockIndex >= result.basicBlocks.size()) continue;
+            const auto& block = result.basicBlocks[blockIndex];
+            if (current + 1U < block.endInstruction) {
+                pending.push_back(current + 1U);
+            } else {
+                for (const auto target : blockSuccessors[blockIndex]) pending.push_back(target);
+            }
+        }
+        std::sort(routine.instructions.begin(), routine.instructions.end());
+        for (const auto instruction : routine.instructions) {
+            ++result.instructionRoutineMembership[instruction];
+            if (result.instructionRoutineMembership[instruction] > 1U)
+                routine.hasSharedInstructions = true;
+        }
+        result.routines.push_back(std::move(routine));
+    }
+    for (auto& routine : result.routines) {
+        routine.hasSharedInstructions = std::any_of(routine.instructions.begin(),
+            routine.instructions.end(), [&result](std::size_t instruction) {
+                return result.instructionRoutineMembership[instruction] > 1U;
+            });
+        if (routine.hasSharedInstructions)
+            routine.diagnostics.push_back("Some reachable instructions are shared with another discovered entry point.");
+    }
+
     result.frameGroups.reserve(source.frameGroups.size());
     for (const auto& group : source.frameGroups) {
         result.frameGroups.push_back({group.type, group.frameCount, group.eid,
