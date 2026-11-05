@@ -598,8 +598,13 @@ GoolIRDecompilation decompileGoolIRRoutine(
                 if (operation.kind == GoolIRControlOperationKind::Call &&
                     operation.targetInstructionValid) {
                     const auto target = compactIndex.find(operation.targetInstruction);
-                    if (target == compactIndex.end()) { canCompact = false; break; }
-                    operation.targetInstruction = target->second;
+                    if (target == compactIndex.end()) {
+                        // Calls into another discovered routine remain calls;
+                        // the routine relationship is emitted separately below.
+                        operation.targetInstructionValid = false;
+                    } else {
+                        operation.targetInstruction = target->second;
+                    }
                 }
                 compactProgram.controlOperations.push_back(std::move(operation));
             }
@@ -609,7 +614,13 @@ GoolIRDecompilation decompileGoolIRRoutine(
             for (auto hook : program.hookDispatches) {
                 if (hook.resolution == GoolIRHookResolution::Local) {
                     const auto target = compactIndex.find(hook.instructionOffset);
-                    if (target == compactIndex.end()) { canCompact = false; break; }
+                    // Other routines' hook entries are outside this routine's
+                    // compact view and must not create spurious local labels.
+                    if (target == compactIndex.end()) continue;
+                    if (target->second > std::numeric_limits<std::uint16_t>::max()) {
+                        canCompact = false;
+                        break;
+                    }
                     hook.instructionOffset = static_cast<std::uint16_t>(target->second);
                 }
                 compactProgram.hookDispatches.push_back(std::move(hook));
