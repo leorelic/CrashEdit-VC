@@ -284,7 +284,10 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             if (current != candidate.instruction &&
                 std::any_of(candidates.begin(), candidates.end(), [current](const auto& other) {
                     return other.instruction == current;
-                })) continue;
+                })) {
+                routine.entryPointBoundaries.push_back(current);
+                continue;
+            }
             visited[current] = true;
             routine.instructions.push_back(current);
             const auto blockIndex = current < result.instructionToBlock.size()
@@ -316,6 +319,8 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             });
         if (routine.hasSharedInstructions)
             routine.diagnostics.push_back("Some reachable instructions are shared with another discovered entry point.");
+        if (!routine.entryPointBoundaries.empty())
+            routine.diagnostics.push_back("Control flow reaches another discovered entry point; traversal stops there to preserve separate routine ownership.");
     }
 
     result.frameGroups.reserve(source.frameGroups.size());
