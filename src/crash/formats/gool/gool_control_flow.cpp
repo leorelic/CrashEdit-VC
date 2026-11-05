@@ -204,8 +204,10 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
     using DefinitionSet=std::set<std::size_t>;
     using UnknownLocationSet=std::set<std::string>;
     UnknownLocationSet allTrackableLocations;
-    for(const auto& definition:result.definitions)
-        allTrackableLocations.insert(definition.location);
+    for(const auto& analysis:analyses)
+        for(const auto& effect:analysis.operandEffects)
+            if(effect.trackable)
+                allTrackableLocations.insert(effect.reference);
     std::vector<DefinitionSet> incoming(count),outgoing(count);
     std::vector<UnknownLocationSet> unknownIncoming(count),unknownOutgoing(count);
     auto mayInvokeExternalBehavior=[&](std::size_t instructionIndex) {
