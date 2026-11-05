@@ -485,6 +485,28 @@ int main() {
     assert(!routineIR.routines[1].hasSharedInstructions);
     assert((routineIR.unassignedInstructions == std::vector<std::size_t>{5}));
 
+    // Reaching another known entry point is reported as a boundary rather than
+    // silently treating it as shared code or absorbing it into the first routine.
+    NsfGool boundarySource;
+    boundarySource.version = NsfGoolVersion::Version2;
+    for (std::size_t i = 0; i < 4; ++i) {
+        NsfGoolInstruction instruction;
+        instruction.opcode = 47U;
+        instruction.byteOffset = i * 4U;
+        boundarySource.instructions.push_back(instruction);
+    }
+    boundarySource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    boundarySource.stateHookReferences.push_back({1, 0, 0, NsfGoolStateHookKind::Code,
+        2, 2, false, true, NsfGoolStateHookStatus::Local});
+    const auto boundaryIR = buildGoolIR(boundarySource);
+    assert(boundaryIR.routines.size() == 2);
+    assert((boundaryIR.routines[0].instructions == std::vector<std::size_t>{0, 1}));
+    assert((boundaryIR.routines[0].entryPointBoundaries == std::vector<std::size_t>{2}));
+    assert((boundaryIR.routines[1].instructions == std::vector<std::size_t>{2, 3}));
+    assert(!boundaryIR.routines[0].hasSharedInstructions);
+    assert(!boundaryIR.routines[1].hasSharedInstructions);
+
     // Real Crash 2 sample: DispC's Code hook at instruction 0. These twenty
     // words are copied from the extracted entry; this is a focused IR/decompiler
     // regression, not a replacement for parsing the complete NSF entry.
