@@ -506,7 +506,10 @@ GoolIRDecompilation decompileGoolIRRoutine(
     routineBranchTargets.erase(std::unique(routineBranchTargets.begin(),
         routineBranchTargets.end()), routineBranchTargets.end());
 
-    bool contiguousRoutine = !routine.instructions.empty();
+    // A single-instruction routine has no region to structure. Keep it on
+    // the routine-aware listing path so outgoing branches retain their
+    // explicit cross-routine destination annotation.
+    bool contiguousRoutine = routine.instructions.size() > 1;
     for (std::size_t i = 0; i < routine.instructions.size(); ++i) {
         if (routine.instructions[i] >= program.instructions.size() ||
             (i != 0 && routine.instructions[i] != routine.instructions[i - 1] + 1U)) {
