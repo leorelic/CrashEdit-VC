@@ -86,6 +86,27 @@ struct GoolIRStateHook {
     std::size_t targetEntryIndex = 0;
 };
 
+// Typed hook dispatch extracted from a state descriptor. This records the
+// encoded destination and its resolution; it does not assume when the engine
+// invokes a hook or what the target instructions do.
+enum class GoolIRHookKind : std::uint8_t { Event, Transition, Code };
+enum class GoolIRHookResolution : std::uint8_t {
+    Absent, InvalidDataIndex, MissingTarget, AmbiguousTarget,
+    TargetUndecoded, OffsetOutOfRange, Local, External
+};
+
+struct GoolIRHookDispatch {
+    std::size_t descriptorIndex = 0;
+    GoolIRHookKind kind = GoolIRHookKind::Event;
+    std::uint16_t rawValue = 0;
+    std::uint16_t instructionOffset = 0;
+    bool external = false;
+    GoolIRHookResolution resolution = GoolIRHookResolution::Absent;
+    bool targetFound = false;
+    std::size_t targetChunkIndex = 0;
+    std::size_t targetEntryIndex = 0;
+};
+
 struct GoolIRFrameGroup {
     std::uint16_t type = 0;
     std::int16_t frameCount = 0;
@@ -154,7 +175,8 @@ struct GoolIRProgram {
     std::vector<std::int16_t> stateMap;
     std::vector<GoolIRStateDescriptor> stateDescriptors;
     std::vector<GoolIRStateReference> stateReferences;
-    std::vector<GoolIRStateHook> stateHooks;
+    std::vector<GoolIRStateHook> stateHooks; // Loss-preserving source snapshot.
+    std::vector<GoolIRHookDispatch> hookDispatches; // Typed descriptor-to-entrypoint relationships.
     std::size_t frameGroupBytes = 0;
     bool frameGroupsDecoded = false;
     std::vector<GoolIRFrameGroup> frameGroups;

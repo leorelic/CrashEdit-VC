@@ -49,7 +49,13 @@ int main() {
     source.stateDescriptors.push_back({1, 2, 3, 4, 5, 6});
     source.stateReferences.push_back({0, 2, 3, 1, 0x0200007B, true, NsfGoolStateReferenceStatus::External});
     source.stateHookReferences.push_back({0, 1, 2, NsfGoolStateHookKind::Event,
-        0x1234, 7, true, true, NsfGoolStateHookStatus::External});
+        0x5234, 0x1234, true, true, NsfGoolStateHookStatus::External});
+    source.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Transition,
+        0x0007, 7, false, true, NsfGoolStateHookStatus::Local});
+    source.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0x3FFF, 0x3FFF, false, false, NsfGoolStateHookStatus::Absent});
+    source.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Event,
+        0x4009, 9, true, true, NsfGoolStateHookStatus::OffsetOutOfRange});
     source.frameGroupBytes = 12;
     source.frameGroupsDecoded = true;
     source.frameGroups.push_back({3, 8, 0x0200007B, 0x60, 0x18, 2, 9, true});
@@ -83,8 +89,18 @@ int main() {
     assert(ir.stateDescriptors[0].transitionHook == 5 && ir.stateDescriptors[0].codeHook == 6);
     assert(ir.stateReferences.size() == 1 && ir.stateReferences[0].eid == 0x0200007B);
     assert(ir.stateReferences[0].targetFound && ir.stateReferences[0].targetChunkIndex == 2);
-    assert(ir.stateHooks.size() == 1 && ir.stateHooks[0].rawValue == 0x1234);
+    assert(ir.stateHooks.size() == 4 && ir.stateHooks[0].rawValue == 0x5234);
     assert(ir.stateHooks[0].external && ir.stateHooks[0].targetFound);
+    assert(ir.hookDispatches.size() == 4);
+    assert(ir.hookDispatches[0].kind == GoolIRHookKind::Event);
+    assert(ir.hookDispatches[0].resolution == GoolIRHookResolution::External);
+    assert(ir.hookDispatches[0].instructionOffset == 0x1234);
+    assert(ir.hookDispatches[0].targetChunkIndex == 1 && ir.hookDispatches[0].targetEntryIndex == 2);
+    assert(ir.hookDispatches[1].kind == GoolIRHookKind::Transition);
+    assert(ir.hookDispatches[1].resolution == GoolIRHookResolution::Local);
+    assert(ir.hookDispatches[2].kind == GoolIRHookKind::Code);
+    assert(ir.hookDispatches[2].resolution == GoolIRHookResolution::Absent);
+    assert(ir.hookDispatches[3].resolution == GoolIRHookResolution::OffsetOutOfRange);
     assert(ir.frameGroupBytes == 12 && ir.frameGroupsDecoded && ir.frameGroups.size() == 1);
     assert(ir.frameGroups[0].sourceByteOffset == 0x60 && ir.frameGroups[0].interpolated);
 

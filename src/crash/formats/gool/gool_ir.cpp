@@ -14,6 +14,27 @@ GoolIROperandKind convertOperandKind(NsfGoolOperandKind kind) {
     case NsfGoolOperandKind::Value: default: return GoolIROperandKind::Value;
     }
 }
+
+GoolIRHookKind convertHookKind(NsfGoolStateHookKind kind) {
+    switch (kind) {
+    case NsfGoolStateHookKind::Transition: return GoolIRHookKind::Transition;
+    case NsfGoolStateHookKind::Code: return GoolIRHookKind::Code;
+    case NsfGoolStateHookKind::Event: default: return GoolIRHookKind::Event;
+    }
+}
+
+GoolIRHookResolution convertHookResolution(NsfGoolStateHookStatus status) {
+    switch (status) {
+    case NsfGoolStateHookStatus::InvalidDataIndex: return GoolIRHookResolution::InvalidDataIndex;
+    case NsfGoolStateHookStatus::MissingTarget: return GoolIRHookResolution::MissingTarget;
+    case NsfGoolStateHookStatus::AmbiguousTarget: return GoolIRHookResolution::AmbiguousTarget;
+    case NsfGoolStateHookStatus::TargetUndecoded: return GoolIRHookResolution::TargetUndecoded;
+    case NsfGoolStateHookStatus::OffsetOutOfRange: return GoolIRHookResolution::OffsetOutOfRange;
+    case NsfGoolStateHookStatus::Local: return GoolIRHookResolution::Local;
+    case NsfGoolStateHookStatus::External: return GoolIRHookResolution::External;
+    case NsfGoolStateHookStatus::Absent: default: return GoolIRHookResolution::Absent;
+    }
+}
 }
 
 GoolIRProgram buildGoolIR(const NsfGool& source) {
@@ -183,10 +204,15 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             reference.targetChunkIndex, reference.targetEntryIndex});
     }
     result.stateHooks.reserve(source.stateHookReferences.size());
+    result.hookDispatches.reserve(source.stateHookReferences.size());
     for (const auto& hook : source.stateHookReferences) {
         result.stateHooks.push_back({hook.descriptorIndex, static_cast<std::uint8_t>(hook.kind),
             static_cast<std::uint8_t>(hook.status), hook.rawValue, hook.instructionOffset,
             hook.external, hook.targetFound, hook.targetChunkIndex, hook.targetEntryIndex});
+        result.hookDispatches.push_back({hook.descriptorIndex, convertHookKind(hook.kind),
+            hook.rawValue, hook.instructionOffset, hook.external,
+            convertHookResolution(hook.status), hook.targetFound,
+            hook.targetChunkIndex, hook.targetEntryIndex});
     }
     result.frameGroups.reserve(source.frameGroups.size());
     for (const auto& group : source.frameGroups) {
