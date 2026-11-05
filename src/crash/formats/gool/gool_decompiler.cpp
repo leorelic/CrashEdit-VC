@@ -537,9 +537,9 @@ GoolIRDecompilation decompileGoolIRRoutine(
                 result.text += "    // calls discovered routine " +
                     std::to_string(call->targetRoutineIndex) + "\n";
             else if (call->external)
-                result.text += "    // calls an external GOOL target\\n";
+                result.text += "    // calls an external GOOL target\n";
             else if (!call->targetInstructionValid)
-                result.text += "    // local call target is unresolved\\n";
+                result.text += "    // local call target is unresolved\n";
         }
         result.diagnostics.insert(result.diagnostics.end(),
             instruction.diagnostics.begin(), instruction.diagnostics.end());
