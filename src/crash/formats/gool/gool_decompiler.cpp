@@ -33,8 +33,11 @@ std::string labelName(std::size_t instruction) {
 
 std::string operandText(const GoolIROperand& operand) {
     if (!operand.resolvedText.empty()) return operand.resolvedText;
-    if (operand.kind == GoolIROperandKind::Signed)
+    if (operand.kind == GoolIROperandKind::Signed ||
+        operand.kind == GoolIROperandKind::Value)
         return std::to_string(operand.value);
+    if (operand.kind == GoolIROperandKind::ProcessField)
+        return goolObjectFieldName(operand.rawValue);
     return hexValue(operand.rawValue);
 }
 
