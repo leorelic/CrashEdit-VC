@@ -240,8 +240,9 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   const auto target=static_cast<std::int64_t>(instructionByteOffset)+4+
    static_cast<std::int64_t>(imm)*4;
   std::ostringstream text;
-  text<<" -> stream+0x"<<std::uppercase<<std::hex<<std::setfill('0')<<std::setw(4)
-      <<static_cast<std::uint64_t>(target);
+  text<<" -> stream"<<(target<0?"-":"+")<<"0x"<<std::uppercase<<std::hex
+      <<std::setfill('0')<<std::setw(4)
+      <<static_cast<std::uint64_t>(target<0?-target:target);
   if(target<0||static_cast<std::uint64_t>(target)>=instructionStreamSize)
    text<<" (outside instruction stream)";
   return text.str();

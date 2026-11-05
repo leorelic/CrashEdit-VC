@@ -75,6 +75,8 @@ int main(){
  assert(mipsKnown&&mipsName=="beq"&&mipsArgs=="$zr,$zr,-1 -> stream+0x0020");
  decodeMipsInstruction(0x10000002U,mipsName,mipsArgs,mipsKnown,0x20U,0x28U);
  assert(mipsKnown&&mipsArgs=="$zr,$zr,2 -> stream+0x002C (outside instruction stream)");
+ decodeMipsInstruction(0x1000FFFEU,mipsName,mipsArgs,mipsKnown,0x00U,0x100U);
+ assert(mipsKnown&&mipsArgs=="$zr,$zr,-2 -> stream-0x0004 (outside instruction stream)");
  decodeMipsInstruction(0x49000004U,mipsName,mipsArgs,mipsKnown,0x20U,0x100U);
  assert(mipsKnown&&mipsName=="bc2f"&&mipsArgs=="4 -> stream+0x0034");
  decodeMipsInstruction(0x08000004U,mipsName,mipsArgs,mipsKnown,0x20U,0x100U);
