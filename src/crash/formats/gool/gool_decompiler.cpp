@@ -137,6 +137,8 @@ GoolIRDecompilation decompileGoolIR(
                          << (instruction.opcode == 51U ? " != 0" : " == 0")
                          << ") goto " << labelName(static_cast<std::size_t>(target));
                 }
+                if (static_cast<std::size_t>(target) < start || static_cast<std::size_t>(target) >= boundedEnd)
+                    line << " // target is outside selected range";
                 const auto* popCount = findOperand(instruction, 'V');
                 if (popCount && popCount->value != 0)
                     line << " // pop " << popCount->value;
@@ -171,6 +173,8 @@ GoolIRDecompilation decompileGoolIR(
             }
             if (operation && operation->targetDescriptorValid) {
                 line << "transition state_descriptor[" << operation->targetDescriptorIndex << "]";
+                const auto* argumentCount = findOperand(instruction, 'V');
+                line << "(args=" << (argumentCount ? std::to_string(argumentCount->value) : "unknown") << ")";
                 if (operation->targetGoolEidValid)
                     line << " // GOOL " << hexValue(operation->targetGoolEid, 8);
                 else if (!operation->diagnostic.empty())
