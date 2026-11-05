@@ -549,7 +549,7 @@ int main() {
     labeledRoutineProgram.routines.push_back(labeledRoutine);
     const auto labeledRoutineText = decompileGoolIRRoutine(labeledRoutineProgram, 0);
     assert(labeledRoutineText.text.find("goto L00002") != std::string::npos);
-    assert(labeledRoutineText.text.find("L00002:\\n") != std::string::npos);
+    assert(labeledRoutineText.text.find("L00002:\n") != std::string::npos);
     assert(labeledRoutineText.text.find("@0x0704") == std::string::npos);
 
     // RET is an explicit routine exit, while a final ordinary instruction is
