@@ -314,16 +314,24 @@ GoolIRDecompilation decompileGoolIR(
         if (suppressedBranches.find(index) != suppressedBranches.end()) {
             const auto owningClause = std::find_if(structuredIfs.begin(), structuredIfs.end(),
                 [&](const auto& entry) { return entry.second.bodyEnd == index; });
+            std::string closingLine;
             if (owningClause != structuredIfs.end() &&
                 elseArms.find(owningClause->first) != elseArms.end()) {
-                result.text += "    } else {\n";
+                closingLine = "    } else {";
             } else {
                 const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
                     [&](const auto& entry) {
                         const auto clause = structuredIfs.find(entry.first);
                         return clause != structuredIfs.end() && clause->second.bodyEnd == index;
                     });
-                if (!closesForElseIf) result.text += "    }\n";
+                if (!closesForElseIf) closingLine = "    }";
+            }
+            if (!closingLine.empty()) {
+                // Structured braces replace the original branch instruction,
+                // but keep its byte address visible for source-level tracing.
+                closingLine += " // @" + hexValue(
+                    static_cast<std::uint32_t>(instruction.sourceByteOffset), 4) + "\n";
+                result.text += closingLine;
             }
             continue;
         }

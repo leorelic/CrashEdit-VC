@@ -555,6 +555,7 @@ int main() {
     structuredJoinBranch.opcode = 50U;
     structuredJoinBranch.opcodeKnown = true;
     structuredJoinBranch.mnemonic = "BRA";
+    structuredJoinBranch.sourceByteOffset = 0x000C;
     structuredJoinBranch.operands.push_back(structuredDisp(1));
     structuredRoutineProgram.instructions.push_back(structuredJoinBranch);
     GoolIRInstruction structuredElse;
