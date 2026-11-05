@@ -201,6 +201,15 @@ struct GoolIRFlowEdge {
     std::string diagnostic;
 };
 
+enum class GoolIRValueOriginKind : std::uint8_t { NoInStreamDefinition, SingleReachingDefinition, MultipleReachingDefinitions };
+struct GoolIRValueUse {
+    std::size_t instructionIndex = 0;
+    std::string location;
+    std::vector<std::size_t> reachingDefinitionInstructions;
+    GoolIRValueOriginKind kind = GoolIRValueOriginKind::NoInStreamDefinition;
+    bool mayHaveUnmodeledValue = false;
+};
+
 struct GoolIRProgram {
     std::uint8_t targetVersion = 0;
     std::int32_t id = 0;
@@ -209,7 +218,7 @@ struct GoolIRProgram {
     std::int32_t heapBase = 0;
     std::int32_t eventCount = 0;
     std::int32_t entryCount = 0;
-    std::vector<GoolIRInstruction> instructions;
+    std::vector<GoolIRInstruction> instructions;\n    std::vector<GoolIRValueUse> valueUses;
     std::vector<std::size_t> instructionToBlock;
     std::vector<GoolIRBasicBlock> basicBlocks;
     std::vector<GoolIRRoutineEntry> routineEntries;

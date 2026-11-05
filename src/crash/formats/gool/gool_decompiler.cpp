@@ -467,6 +467,22 @@ GoolIRDecompilation decompileGoolIR(
 
         line << "  // @" << hexValue(static_cast<std::uint32_t>(instruction.sourceByteOffset), 4)
              << " raw=" << hexValue(instruction.rawWord, 8) << "\n";
+        for (const auto& use : program.valueUses) {
+            if (use.instructionIndex != index) continue;
+            line << "    // value " << use.location << ": ";
+            if (use.reachingDefinitionInstructions.empty()) {
+                line << "no in-stream definition";
+            } else {
+                line << "defined at ";
+                for (std::size_t definition = 0; definition < use.reachingDefinitionInstructions.size(); ++definition) {
+                    if (definition != 0) line << ", ";
+                    line << "instruction " << use.reachingDefinitionInstructions[definition];
+                }
+            }
+            if (use.mayHaveUnmodeledValue)
+                line << "; an initial or unmodeled value may also reach here";
+            line << "\n";
+        }
         result.text += line.str();
     }
 
@@ -573,8 +589,21 @@ GoolIRDecompilation decompileGoolIRRoutine(
             compactProgram = program;
             compactProgram.instructions.clear();
             compactProgram.instructions.reserve(routine.instructions.size());
-            for (const auto original : routine.instructions)
+            compactProgram.valueUses.clear();
+            for (std::size_t compact = 0; compact < routine.instructions.size(); ++compact) {
+                const auto original = routine.instructions[compact];
                 compactProgram.instructions.push_back(program.instructions[original]);
+                for (const auto& use : program.valueUses) {
+                    if (use.instructionIndex != original) continue;
+                    auto compactUse = use;
+                    compactUse.instructionIndex = compact;
+                    for (auto& definition : compactUse.reachingDefinitionInstructions) {
+                        const auto mapped = compactIndex.find(definition);
+                        if (mapped != compactIndex.end()) definition = mapped->second;
+                    }
+                    compactProgram.valueUses.push_back(std::move(compactUse));
+                }
+            }
 
             for (std::size_t compactSource = 0;
                  compactSource < compactProgram.instructions.size(); ++compactSource) {

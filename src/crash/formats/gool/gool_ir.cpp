@@ -409,6 +409,24 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             routine.diagnostics.push_back("At least one execution path has an unresolved or incomplete routine boundary.");
     }
 
+    const auto dataFlow = analyzeGoolDataFlow(source);
+    result.valueUses.reserve(dataFlow.uses.size());
+    for (const auto& use : dataFlow.uses) {
+        GoolIRValueUse irUse;
+        irUse.instructionIndex = use.instructionIndex;
+        irUse.location = use.location;
+        irUse.kind = use.kind == NsfGoolDataFlowUseKind::SingleReachingDefinition
+            ? GoolIRValueOriginKind::SingleReachingDefinition
+            : use.kind == NsfGoolDataFlowUseKind::MultipleReachingDefinitions
+                ? GoolIRValueOriginKind::MultipleReachingDefinitions
+                : GoolIRValueOriginKind::NoInStreamDefinition;
+        irUse.mayHaveUnmodeledValue = use.mayHaveUnmodeledValue;
+        for (const auto definitionId : use.reachingDefinitions) {
+            if (definitionId < dataFlow.definitions.size())
+                irUse.reachingDefinitionInstructions.push_back(dataFlow.definitions[definitionId].instructionIndex);
+        }
+        result.valueUses.push_back(std::move(irUse));
+    }
     result.frameGroups.reserve(source.frameGroups.size());
     for (const auto& group : source.frameGroups) {
         result.frameGroups.push_back({group.type, group.frameCount, group.eid,

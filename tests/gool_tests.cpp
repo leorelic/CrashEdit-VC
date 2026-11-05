@@ -4,7 +4,7 @@
 
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
-#include "crash/formats/gool/gool_control_flow.hpp"
+#include "crash/formats/gool/gool_control_flow.hpp"\n#include "crash/formats/gool/gool_ir.hpp"\n#include "crash/formats/gool/gool_decompiler.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -516,5 +516,13 @@ int main(){
  assert(std::any_of(entryReadFlow.uses.begin(),entryReadFlow.uses.end(),[](const auto& use){
   return use.instructionIndex==0&&use.location=="stack[0]"&&use.reachingDefinitions.empty()&&use.kind==NsfGoolDataFlowUseKind::NoInStreamDefinition&&use.mayHaveUnmodeledValue;
  }));
+ GoolIRProgram provenanceProgram;provenanceProgram.id=0x1234;
+ GoolIRInstruction provenanceInstruction;provenanceInstruction.sourceByteOffset=0;
+ provenanceInstruction.rawWord=0x12345678;provenanceInstruction.mnemonic="read";
+ provenanceProgram.instructions.push_back(provenanceInstruction);
+ provenanceProgram.valueUses.push_back({0,"stack[0]",{3,7},GoolIRValueOriginKind::MultipleReachingDefinitions,true});
+ const auto provenanceListing=decompileGoolIR(provenanceProgram);
+ assert(provenanceListing.text.find("value stack[0]: defined at instruction 3, instruction 7")!=std::string::npos);
+ assert(provenanceListing.text.find("an initial or unmodeled value may also reach here")!=std::string::npos);
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
