@@ -242,23 +242,23 @@ GoolIRDecompilation decompileGoolIR(
                 [&](const auto& entry) { return entry.second.bodyEnd == index; });
             if (owningClause != structuredIfs.end() &&
                 elseArms.find(owningClause->first) != elseArms.end()) {
-                result.text += "    } else {\\n";
+                result.text += "    } else {\n";
             } else {
                 const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
                     [&](const auto& entry) {
                         const auto clause = structuredIfs.find(entry.first);
                         return clause != structuredIfs.end() && clause->second.bodyEnd == index;
                     });
-                if (!closesForElseIf) result.text += "    }\\n";
+                if (!closesForElseIf) result.text += "    }\n";
             }
             continue;
         }
         if (closeElseAt.find(index) != closeElseAt.end())
-            result.text += "    }\\n";
+            result.text += "    }\n";
         if (suppressedConditionProducers.find(index) == suppressedConditionProducers.end() &&
             suppressedElseLabels.find(index) == suppressedElseLabels.end() &&
             labels.find(index) != labels.end())
-            result.text += labelName(index) + ":\\n";
+            result.text += labelName(index) + ":\n";
 
         if (structuredIfs.find(index) != structuredIfs.end()) {
             const auto comparison = comparisonCondition(program, index);
