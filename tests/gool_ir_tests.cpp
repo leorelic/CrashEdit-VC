@@ -289,6 +289,34 @@ int main() {
     assert(immediateValidationIR.instructions[4].nativeEffects.known);
     assert(immediateValidationIR.instructions[4].nativeEffects.gprWriteMask == (std::uint32_t{1} << 6U));
 
+    // COP0 transfers distinguish general-purpose and coprocessor register
+    // effects. Reserved low fields and unsupported COP0 operations stay unknown.
+    NsfGool cop0Source;
+    cop0Source.version = NsfGoolVersion::Version2;
+    const auto addCop0Word = [&cop0Source](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        cop0Source.instructions.push_back(instruction);
+    };
+    addCop0Word((16U << 26U) | (2U << 16U) | (12U << 11U)); // mfc0 v0,status
+    addCop0Word((16U << 26U) | (4U << 21U) | (3U << 16U) | (13U << 11U)); // mtc0 cause,v1
+    addCop0Word((16U << 26U) | (2U << 16U) | (12U << 11U) | 1U); // invalid mfc0 reserved bit
+    addCop0Word((16U << 26U) | (8U << 21U)); // bc0: not modeled yet
+    const auto cop0IR = buildGoolIR(cop0Source);
+    assert(cop0IR.instructions.size() == 4);
+    const auto& mfc0Effects = cop0IR.instructions[0].nativeEffects;
+    assert(mfc0Effects.known && mfc0Effects.memory == GoolIRMipsMemoryEffect::None);
+    assert(mfc0Effects.gprWriteMask == (std::uint32_t{1} << 2U));
+    assert(mfc0Effects.coprocessor0ReadMask == (std::uint32_t{1} << 12U));
+    assert(mfc0Effects.coprocessor0WriteMask == 0U);
+    const auto& mtc0Effects = cop0IR.instructions[1].nativeEffects;
+    assert(mtc0Effects.known && mtc0Effects.gprReadMask == (std::uint32_t{1} << 3U));
+    assert(mtc0Effects.coprocessor0ReadMask == 0U);
+    assert(mtc0Effects.coprocessor0WriteMask == (std::uint32_t{1} << 13U));
+    assert(!cop0IR.instructions[2].nativeEffects.known);
+    assert(!cop0IR.instructions[3].nativeEffects.known);
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;

@@ -110,6 +110,19 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         case 15U: // lui
             if (fields.rs != 0U) return effects;
             write(fields.rt); break;
+        case 16U: // COP0 register transfers (MFC0/MTC0)
+            if (fields.rs == 0U) { // mfc0 rt, rd
+                if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
+                effects.coprocessor0ReadMask |= (std::uint32_t{1} << fields.rd);
+                write(fields.rt);
+            } else if (fields.rs == 4U) { // mtc0 rd, rt
+                if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
+                read(fields.rt);
+                effects.coprocessor0WriteMask |= (std::uint32_t{1} << fields.rd);
+            } else {
+                return effects;
+            }
+            break;
         case 32U: case 33U: case 34U: case 35U:
         case 36U: case 37U: case 38U: // byte/half/word loads and unaligned loads
             read(fields.rs);

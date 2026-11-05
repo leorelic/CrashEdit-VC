@@ -24,6 +24,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Record conservative R3000A GPR/HI/LO read-write effects plus memory-access and control-transfer categories for supported instruction forms; leave unsupported/reserved encodings explicitly unanalyzed.
 - [x] Validate reserved-field constraints for common R3000A SPECIAL-format instructions and recognize SYSCALL/BREAK without inventing register or memory effects.
 - [x] Validate reserved `rt` fields for BLEZ/BGTZ and the reserved `rs` field for LUI; keep malformed immediate-format words unanalyzed.
+- [x] Model validated COP0 MFC0/MTC0 transfers with separate coprocessor-register read/write effects; leave unsupported COP0 operations and malformed transfer encodings unanalyzed.
 - [ ] Complete the R3000A decoder audit, including remaining instruction encodings and control-flow edge cases.
 - [ ] Audit the PlayStation COP2/GTE instruction space: command words, command flags, register transfers, and load/store forms.
 - [ ] Decode supported GTE instructions while preserving raw words and clearly identifying unknown or reserved encodings.

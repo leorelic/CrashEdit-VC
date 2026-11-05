@@ -34,6 +34,9 @@ struct GoolIRMipsEffects {
     bool writesHi = false;
     bool readsLo = false;
     bool writesLo = false;
+    // Coprocessor 0 register effects are tracked separately from GPRs.
+    std::uint32_t coprocessor0ReadMask = 0;
+    std::uint32_t coprocessor0WriteMask = 0;
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
     bool controlTransfer = false;
 };
