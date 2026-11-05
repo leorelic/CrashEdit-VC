@@ -890,7 +890,7 @@ int main() {
     assignmentSource.version = NsfGoolVersion::Version2;
     NsfGoolInstruction setField;
     setField.opcode = 17U;
-    setField.operandBits = (0x408U << 12U) | 5U; // x = immediate 5
+    setField.operandBits = (0x408U << 12U) | 0x805U; // x = immediate 5
     setField.byteOffset = 0x24;
     setField.word = 0x11000000U | setField.operandBits;
     assignmentSource.instructions.push_back(setField);
@@ -898,7 +898,7 @@ int main() {
     const auto assignmentText = decompileGoolIR(assignmentIR);
     assert(assignmentText.text.find("x = 5") != std::string::npos);
     assert(assignmentText.text.find("@0x0024") != std::string::npos);
-    assert(assignmentText.text.find("raw=0x11408005") != std::string::npos);
+    assert(assignmentText.text.find("raw=0x11408805") != std::string::npos);
 
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }

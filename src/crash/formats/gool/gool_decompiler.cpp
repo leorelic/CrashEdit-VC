@@ -388,7 +388,11 @@ GoolIRDecompilation decompileGoolIR(
             const auto* destination = findOperand(instruction, 'D');
             const auto* value = findOperand(instruction, 'S');
             if (destination && value) {
-                line << operandText(*destination) << " = " << operandText(*value);
+                std::string sourceExpression = operandText(*value);
+                constexpr std::string_view immediatePrefix = "immediate ";
+                if (sourceExpression.compare(0, immediatePrefix.size(), immediatePrefix) == 0)
+                    sourceExpression.erase(0, immediatePrefix.size());
+                line << operandText(*destination) << " = " << sourceExpression;
             } else {
                 line << "SETF /* missing destination or source */";
                 addDiagnostic(result, index, "SETF operands could not be resolved.");
