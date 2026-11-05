@@ -115,5 +115,41 @@ int main() {
             hasDynamicReturn = true;
     assert(hasDynamicReturn);
 
+    // Calls, returns, and state transitions have explicit source-mapped IR records.
+    NsfGool semanticSource;
+    semanticSource.version = NsfGoolVersion::Version2;
+    semanticSource.dataPool = {static_cast<std::int32_t>(0x0200007BU)};
+    semanticSource.stateDescriptors.push_back({0, 0, 0, 0, 0, 0});
+    semanticSource.stateReferences.push_back({0, 0, 0, 0, 0x0200007B, true,
+        NsfGoolStateReferenceStatus::Local});
+    NsfGoolInstruction localCall;
+    localCall.opcode = 59;
+    localCall.byteOffset = 0x80;
+    localCall.operandBits = 2U; // I = instruction 2; E = local; V = 0
+    semanticSource.instructions.push_back(localCall);
+    NsfGoolInstruction go;
+    go.opcode = 53;
+    go.byteOffset = 0x84;
+    go.operandBits = 0U; // S = descriptor 0; V = 0
+    semanticSource.instructions.push_back(go);
+    NsfGoolInstruction retSemantic;
+    retSemantic.opcode = 49;
+    retSemantic.byteOffset = 0x88;
+    semanticSource.instructions.push_back(retSemantic);
+    const auto semanticIR = buildGoolIR(semanticSource);
+    assert(semanticIR.controlOperations.size() == 3);
+    assert(semanticIR.controlOperations[0].kind == GoolIRControlOperationKind::Call);
+    assert(semanticIR.controlOperations[0].sourceByteOffset == 0x80);
+    assert(semanticIR.controlOperations[0].targetInstructionValid);
+    assert(semanticIR.controlOperations[0].targetInstruction == 2);
+    assert(!semanticIR.controlOperations[0].external);
+    assert(semanticIR.controlOperations[1].kind == GoolIRControlOperationKind::StateTransition);
+    assert(semanticIR.controlOperations[1].targetDescriptorValid);
+    assert(semanticIR.controlOperations[1].targetGoolEidValid);
+    assert(semanticIR.controlOperations[1].targetGoolEid == 0x0200007B);
+    assert(semanticIR.controlOperations[1].hasTargetReferenceStatus);
+    assert(semanticIR.controlOperations[2].kind == GoolIRControlOperationKind::Return);
+    assert(!semanticIR.controlOperations[2].targetInstructionValid);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
