@@ -161,6 +161,8 @@ struct GoolIRRoutine {
     bool fromLocalCall = false;
     std::vector<std::size_t> instructions;
     bool hasSharedInstructions = false;
+    // Exact instruction indices reached by more than one discovered routine.
+    std::vector<std::size_t> sharedInstructions;
     // Other discovered entry points reached by this routine's control flow.
     // They are boundaries, not automatically evidence of shared ownership.
     std::vector<std::size_t> entryPointBoundaries;
