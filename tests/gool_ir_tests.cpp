@@ -507,6 +507,60 @@ int main() {
     assert(!boundaryIR.routines[0].hasSharedInstructions);
     assert(!boundaryIR.routines[1].hasSharedInstructions);
 
+    assert(boundaryIR.routines[0].exits.size() == 1);
+    assert(boundaryIR.routines[0].exits[0].kind == GoolIRRoutineExitKind::EntryPointBoundary);
+    assert(boundaryIR.routines[0].exits[0].sourceInstruction == 1);
+    assert(boundaryIR.routines[0].exits[0].targetInstruction == 2);
+
+    // RET is an explicit routine exit, while a final ordinary instruction is
+    // reported as an incomplete end-of-program path rather than an invented RET.
+    NsfGool exitSource;
+    exitSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction exitReturn;
+    exitReturn.opcode = 49U;
+    exitSource.instructions.push_back(exitReturn);
+    NsfGoolInstruction exitTail;
+    exitTail.opcode = 47U;
+    exitSource.instructions.push_back(exitTail);
+    exitSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    exitSource.stateHookReferences.push_back({1, 0, 0, NsfGoolStateHookKind::Code,
+        1, 1, false, true, NsfGoolStateHookStatus::Local});
+    const auto exitIR = buildGoolIR(exitSource);
+    assert(exitIR.routines.size() == 2);
+    assert(exitIR.routines[0].exits.size() == 1);
+    assert(exitIR.routines[0].exits[0].kind == GoolIRRoutineExitKind::Return);
+    assert(exitIR.routines[0].exits[0].sourceInstruction == 0);
+    assert(exitIR.routines[1].exits.size() == 1);
+    assert(exitIR.routines[1].exits[0].kind == GoolIRRoutineExitKind::EndOfProgram);
+    assert(!exitIR.routines[1].exits[0].targetValid);
+    assert(!exitIR.routines[1].diagnostics.empty());
+
+    // Local calls are represented as call relationships, not traversed as
+    // ordinary control flow. The destination remains its own discovered routine.
+    NsfGool callSource;
+    callSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction localCall;
+    localCall.opcode = 59U;
+    localCall.operandBits = 1U; // local instruction target 1
+    callSource.instructions.push_back(localCall);
+    NsfGoolInstruction callReturn;
+    callReturn.opcode = 49U;
+    callSource.instructions.push_back(callReturn);
+    callSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    const auto callIR = buildGoolIR(callSource);
+    assert(callIR.routines.size() == 2);
+    assert(callIR.routines[0].calls.size() == 1);
+    assert(callIR.routines[0].calls[0].sourceInstruction == 0);
+    assert(callIR.routines[0].calls[0].targetInstructionValid);
+    assert(callIR.routines[0].calls[0].targetInstruction == 1);
+    assert(callIR.routines[0].calls[0].targetRoutineFound);
+    assert(callIR.routines[0].calls[0].targetRoutineIndex == 1);
+    assert(callIR.routines[1].entryInstruction == 1);
+    assert(callIR.routines[1].exits.size() == 1);
+    assert(callIR.routines[1].exits[0].kind == GoolIRRoutineExitKind::Return);
+
     // Two independent entries can converge on ordinary code that is not itself
     // a known entry point. Preserve the exact shared instruction, not just a flag.
     NsfGool sharedSource;
@@ -604,6 +658,9 @@ int main() {
     assert(dispCIR.controlOperations[0].targetGoolEidValid);
     assert(dispCIR.controlOperations[0].targetGoolEid == 0x4E938CCD);
     assert(dispCIR.controlOperations[1].kind == GoolIRControlOperationKind::Return);
+    assert(dispCIR.routines[0].exits.size() == 1);
+    assert(dispCIR.routines[0].exits[0].kind == GoolIRRoutineExitKind::Return);
+    assert(dispCIR.routines[0].exits[0].sourceInstruction == 19);
     const auto goBlock = dispCIR.instructionToBlock[18];
     const auto returnBlock = dispCIR.instructionToBlock[19];
     assert(goBlock != returnBlock);

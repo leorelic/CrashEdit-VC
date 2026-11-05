@@ -215,10 +215,9 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             convertHookResolution(hook.status), hook.targetFound,
             hook.targetChunkIndex, hook.targetEntryIndex});
     }
-    // Discover local routine candidates from independently encoded entry points.
-    // Reachability is conservative: calls are recorded as separate candidates,
-    // not traversed as ordinary execution, and another known entry point forms
-    // a boundary. Multiple routines may still reach shared code; that is retained.
+    // Discover routines from semantic entry points, then record their exits and
+    // calls from the same generic control-flow graph. No object names or offsets
+    // participate in this analysis.
     struct RoutineCandidate {
         std::size_t instruction = 0;
         bool codeHook = false;
@@ -254,7 +253,11 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
 
     const std::size_t instructionCount = result.instructions.size();
     result.instructionRoutineMembership.assign(instructionCount, 0U);
-    std::vector<std::vector<std::size_t>> blockSuccessors(result.basicBlocks.size());
+    struct Successor {
+        std::size_t target = 0;
+        GoolIRFlowEdgeKind kind = GoolIRFlowEdgeKind::Fallthrough;
+    };
+    std::vector<std::vector<Successor>> blockSuccessors(result.basicBlocks.size());
     for (const auto& edge : result.flowEdges) {
         if (!edge.targetValid || edge.sourceBlock >= blockSuccessors.size() ||
             edge.targetInstruction >= instructionCount) continue;
@@ -264,28 +267,45 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             edge.kind == GoolIRFlowEdgeKind::StateTransitionTrue ||
             edge.kind == GoolIRFlowEdgeKind::StateTransitionFalse ||
             edge.kind == GoolIRFlowEdgeKind::Return) continue;
-        blockSuccessors[edge.sourceBlock].push_back(edge.targetInstruction);
+        blockSuccessors[edge.sourceBlock].push_back({edge.targetInstruction, edge.kind});
     }
     for (auto& successors : blockSuccessors) {
-        std::sort(successors.begin(), successors.end());
-        successors.erase(std::unique(successors.begin(), successors.end()), successors.end());
+        std::sort(successors.begin(), successors.end(), [](const auto& a, const auto& b) {
+            if (a.target != b.target) return a.target < b.target;
+            return a.kind < b.kind;
+        });
+        successors.erase(std::unique(successors.begin(), successors.end(),
+            [](const auto& a, const auto& b) { return a.target == b.target && a.kind == b.kind; }),
+            successors.end());
     }
+
     for (const auto& candidate : candidates) {
         GoolIRRoutine routine;
         routine.entryInstruction = candidate.instruction;
         routine.fromCodeHook = candidate.codeHook;
         routine.fromLocalCall = candidate.localCall;
+        struct PendingInstruction {
+            std::size_t instruction = 0;
+            std::size_t sourceInstruction = 0;
+            GoolIRFlowEdgeKind incomingKind = GoolIRFlowEdgeKind::Fallthrough;
+            bool hasSource = false;
+        };
         std::vector<bool> visited(instructionCount, false);
-        std::vector<std::size_t> pending{candidate.instruction};
+        std::vector<PendingInstruction> pending{{candidate.instruction, 0U,
+            GoolIRFlowEdgeKind::Fallthrough, false}};
         while (!pending.empty()) {
-            const auto current = pending.back();
+            const auto next = pending.back();
             pending.pop_back();
+            const auto current = next.instruction;
             if (current >= instructionCount || visited[current]) continue;
             if (current != candidate.instruction &&
                 std::any_of(candidates.begin(), candidates.end(), [current](const auto& other) {
                     return other.instruction == current;
                 })) {
                 routine.entryPointBoundaries.push_back(current);
+                routine.exits.push_back({GoolIRRoutineExitKind::EntryPointBoundary,
+                    next.sourceInstruction, current, true, next.incomingKind,
+                    "Control flow reaches another discovered routine entry point."});
                 continue;
             }
             visited[current] = true;
@@ -295,12 +315,73 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             if (blockIndex >= result.basicBlocks.size()) continue;
             const auto& block = result.basicBlocks[blockIndex];
             if (current + 1U < block.endInstruction) {
-                pending.push_back(current + 1U);
+                pending.push_back({current + 1U, current, GoolIRFlowEdgeKind::Fallthrough, true});
             } else {
-                for (const auto target : blockSuccessors[blockIndex]) pending.push_back(target);
+                for (const auto& successor : blockSuccessors[blockIndex])
+                    pending.push_back({successor.target, block.endInstruction - 1U,
+                        successor.kind, true});
             }
         }
         std::sort(routine.instructions.begin(), routine.instructions.end());
+        std::sort(routine.entryPointBoundaries.begin(), routine.entryPointBoundaries.end());
+        routine.entryPointBoundaries.erase(std::unique(routine.entryPointBoundaries.begin(),
+            routine.entryPointBoundaries.end()), routine.entryPointBoundaries.end());
+
+        // Record explicit return and invalid-branch exits only when their source
+        // instruction is reachable from this routine's entry.
+        for (const auto instruction : routine.instructions) {
+            const auto blockIndex = result.instructionToBlock[instruction];
+            for (const auto& edge : result.flowEdges) {
+                if (edge.sourceBlock != blockIndex) continue;
+                const auto sourceInstruction = result.basicBlocks[blockIndex].endInstruction - 1U;
+                if (sourceInstruction != instruction) continue;
+                if (edge.kind == GoolIRFlowEdgeKind::Return) {
+                    routine.exits.push_back({GoolIRRoutineExitKind::Return,
+                        sourceInstruction, 0U, false, edge.kind,
+                        "Routine returns to its caller; the return destination is dynamic."});
+                } else if (!edge.targetValid &&
+                    (edge.kind == GoolIRFlowEdgeKind::Branch ||
+                     edge.kind == GoolIRFlowEdgeKind::BranchTrue ||
+                     edge.kind == GoolIRFlowEdgeKind::BranchFalse)) {
+                    routine.exits.push_back({GoolIRRoutineExitKind::InvalidBranchTarget,
+                        sourceInstruction, 0U, false, edge.kind, edge.diagnostic});
+                }
+            }
+        }
+
+        // A sequential or conditional path that reaches the end of the decoded
+        // instruction stream is an incomplete boundary, not an implicit RET.
+        if (!routine.instructions.empty() &&
+            routine.instructions.back() + 1U == instructionCount) {
+            const auto last = routine.instructions.back();
+            const auto opcode = result.instructions[last].opcode;
+            if (opcode != 49U && opcode != 50U) {
+                routine.exits.push_back({GoolIRRoutineExitKind::EndOfProgram,
+                    last, 0U, false, GoolIRFlowEdgeKind::Fallthrough,
+                    "Execution can fall beyond the decoded GOOL instruction stream."});
+            }
+        }
+
+        for (const auto& operation : result.controlOperations) {
+            if (operation.kind != GoolIRControlOperationKind::Call ||
+                !std::binary_search(routine.instructions.begin(), routine.instructions.end(),
+                    operation.sourceInstruction)) continue;
+            GoolIRRoutineCall call;
+            call.sourceInstruction = operation.sourceInstruction;
+            call.targetInstruction = operation.targetInstruction;
+            call.targetInstructionValid = operation.targetInstructionValid;
+            call.external = operation.external;
+            if (!call.external && call.targetInstructionValid) {
+                const auto target = std::find_if(candidates.begin(), candidates.end(),
+                    [&call](const auto& entry) { return entry.instruction == call.targetInstruction; });
+                if (target != candidates.end()) {
+                    call.targetRoutineIndex = static_cast<std::size_t>(std::distance(candidates.begin(), target));
+                    call.targetRoutineFound = true;
+                }
+            }
+            routine.calls.push_back(call);
+        }
+
         for (const auto instruction : routine.instructions) {
             ++result.instructionRoutineMembership[instruction];
             if (result.instructionRoutineMembership[instruction] > 1U)
@@ -313,7 +394,6 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             result.unassignedInstructions.push_back(instruction);
     }
     for (auto& routine : result.routines) {
-        routine.sharedInstructions.clear();
         for (const auto instruction : routine.instructions) {
             if (result.instructionRoutineMembership[instruction] > 1U)
                 routine.sharedInstructions.push_back(instruction);
@@ -323,6 +403,11 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             routine.diagnostics.push_back("Some reachable instructions are shared with another discovered entry point.");
         if (!routine.entryPointBoundaries.empty())
             routine.diagnostics.push_back("Control flow reaches another discovered entry point; traversal stops there to preserve separate routine ownership.");
+        if (std::any_of(routine.exits.begin(), routine.exits.end(), [](const auto& exit) {
+                return exit.kind == GoolIRRoutineExitKind::InvalidBranchTarget ||
+                       exit.kind == GoolIRRoutineExitKind::EndOfProgram;
+            }))
+            routine.diagnostics.push_back("At least one execution path has an unresolved or incomplete routine boundary.");
     }
 
     result.frameGroups.reserve(source.frameGroups.size());

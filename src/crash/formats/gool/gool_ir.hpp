@@ -155,6 +155,28 @@ struct GoolIRRoutineEntry {
     bool fromCodeHook = false;
     bool fromLocalCall = false;
 };
+
+enum class GoolIRRoutineExitKind : std::uint8_t {
+    Return, EntryPointBoundary, InvalidBranchTarget, EndOfProgram
+};
+
+struct GoolIRRoutineExit {
+    GoolIRRoutineExitKind kind = GoolIRRoutineExitKind::Return;
+    std::size_t sourceInstruction = 0;
+    std::size_t targetInstruction = 0;
+    bool targetValid = false;
+    GoolIRFlowEdgeKind flowKind = GoolIRFlowEdgeKind::Return;
+    std::string diagnostic;
+};
+
+struct GoolIRRoutineCall {
+    std::size_t sourceInstruction = 0;
+    std::size_t targetInstruction = 0;
+    bool targetInstructionValid = false;
+    bool external = false;
+    std::size_t targetRoutineIndex = 0;
+    bool targetRoutineFound = false;
+};
 struct GoolIRRoutine {
     std::size_t entryInstruction = 0;
     bool fromCodeHook = false;
@@ -163,6 +185,8 @@ struct GoolIRRoutine {
     bool hasSharedInstructions = false;
     // Exact instruction indices reached by more than one discovered routine.
     std::vector<std::size_t> sharedInstructions;
+    std::vector<GoolIRRoutineExit> exits;
+    std::vector<GoolIRRoutineCall> calls;
     // Other discovered entry points reached by this routine's control flow.
     // They are boundaries, not automatically evidence of shared ownership.
     std::vector<std::size_t> entryPointBoundaries;
