@@ -78,6 +78,27 @@ struct GoolIRFrameGroup {
     bool interpolated = false;
 };
 
+enum class GoolIRControlOperationKind : std::uint8_t { Call, Return, StateTransition };
+
+struct GoolIRControlOperation {
+    GoolIRControlOperationKind kind = GoolIRControlOperationKind::Call;
+    std::size_t sourceInstruction = 0;
+    std::size_t sourceByteOffset = 0;
+    bool conditional = false;
+    std::string conditionField;
+    std::uint32_t argumentCount = 0;
+    std::size_t targetInstruction = 0;
+    bool targetInstructionValid = false;
+    bool external = false;
+    std::size_t targetDescriptorIndex = 0;
+    bool targetDescriptorValid = false;
+    std::uint32_t targetGoolEid = 0;
+    bool targetGoolEidValid = false;
+    bool hasTargetReferenceStatus = false;
+    std::uint8_t targetReferenceStatus = 0;
+    std::string diagnostic;
+};
+
 enum class GoolIRFlowEdgeKind : std::uint8_t {
     Fallthrough, Branch, BranchTrue, BranchFalse, Call, ExternalCall,
     StateTransition, StateTransitionTrue, StateTransitionFalse, Return
@@ -108,6 +129,7 @@ struct GoolIRProgram {
     std::vector<std::size_t> instructionToBlock;
     std::vector<GoolIRBasicBlock> basicBlocks;
     std::vector<GoolIRFlowEdge> flowEdges;
+    std::vector<GoolIRControlOperation> controlOperations;
     std::vector<std::string> controlFlowDiagnostics;
     std::vector<std::int32_t> dataPool;
     std::vector<std::int16_t> stateMap;
