@@ -24,4 +24,10 @@ GoolIRDecompilation decompileGoolIR(
     const GoolIRProgram& program,
     const GoolIRDecompileOptions& options = {});
 
+// Decompile only the instructions assigned to one discovered routine. This
+// initial view preserves instruction order and reports known exits; it does
+// not yet claim structured control flow across non-contiguous blocks.
+GoolIRDecompilation decompileGoolIRRoutine(
+    const GoolIRProgram& program, std::size_t routineIndex);
+
 }
