@@ -302,7 +302,7 @@ int main() {
     addCop0Word((16U << 26U) | (2U << 16U) | (12U << 11U)); // mfc0 v0,status
     addCop0Word((16U << 26U) | (4U << 21U) | (3U << 16U) | (13U << 11U)); // mtc0 cause,v1
     addCop0Word((16U << 26U) | (2U << 16U) | (12U << 11U) | 1U); // invalid mfc0 reserved bit
-    addCop0Word((16U << 26U) | (8U << 21U)); // bc0: not modeled yet
+    addCop0Word((16U << 26U) | (8U << 21U)); // bc0f: branch on false COP0 condition
     const auto cop0IR = buildGoolIR(cop0Source);
     assert(cop0IR.instructions.size() == 4);
     const auto& mfc0Effects = cop0IR.instructions[0].nativeEffects;
@@ -315,7 +315,10 @@ int main() {
     assert(mtc0Effects.coprocessor0ReadMask == 0U);
     assert(mtc0Effects.coprocessor0WriteMask == (std::uint32_t{1} << 13U));
     assert(!cop0IR.instructions[2].nativeEffects.known);
-    assert(!cop0IR.instructions[3].nativeEffects.known);
+    const auto& bc0fEffects = cop0IR.instructions[3].nativeEffects;
+    assert(bc0fEffects.known && bc0fEffects.controlTransfer);
+    assert(bc0fEffects.readsCoprocessor0Condition);
+    assert(bc0fEffects.gprReadMask == 0U && bc0fEffects.gprWriteMask == 0U);
 
     addCop0Word((16U << 26U) | (8U << 21U) | (1U << 16U) | 4U); // bc0t
     addCop0Word((16U << 26U) | (16U << 21U) | 16U); // rfe
