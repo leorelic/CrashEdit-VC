@@ -112,7 +112,8 @@ GoolIRDecompilation decompileGoolIR(
             (instruction.opcode != 51U && instruction.opcode != 52U))
             continue;
         const auto* displacement = findOperand(instruction, 'I');
-        if (!displacement) continue;
+        const auto* popCount = findOperand(instruction, 'V');
+        if (!displacement || (popCount && popCount->value != 0)) continue;
         const auto branchTargetSigned = static_cast<std::int64_t>(index) + 1 + displacement->value;
         if (branchTargetSigned <= static_cast<std::int64_t>(index + 1) ||
             branchTargetSigned >= static_cast<std::int64_t>(boundedEnd))
@@ -135,7 +136,7 @@ GoolIRDecompilation decompileGoolIR(
             bool hasInteriorEntry = false;
             for (const auto& [target, unused] : labels) {
                 (void)unused;
-                if (target > index + 1 && target <= bodyEnd) {
+                if (target >= index + 1 && target <= bodyEnd) {
                     hasInteriorEntry = true;
                     break;
                 }
