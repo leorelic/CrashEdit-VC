@@ -578,6 +578,33 @@ int main() {
     assert(structuredRoutineText.text.find("} else {") != std::string::npos);
     assert(structuredRoutineText.text.find("goto L") == std::string::npos);
 
+    // A non-contiguous routine still gets routine-wide structuring inside
+    // each maximal adjacent region, without absorbing instructions owned by
+    // another routine or left unassigned.
+    GoolIRProgram discontiguousStructuredProgram = structuredRoutineProgram;
+    GoolIRInstruction unrelatedInstruction;
+    unrelatedInstruction.opcode = 47U;
+    unrelatedInstruction.opcodeKnown = true;
+    unrelatedInstruction.mnemonic = "NOP";
+    unrelatedInstruction.sourceByteOffset = 0x7F0;
+    discontiguousStructuredProgram.instructions.push_back(unrelatedInstruction);
+    GoolIRInstruction laterRoutineInstruction;
+    laterRoutineInstruction.opcode = 49U;
+    laterRoutineInstruction.opcodeKnown = true;
+    laterRoutineInstruction.mnemonic = "RET";
+    laterRoutineInstruction.sourceByteOffset = 0x7F4;
+    discontiguousStructuredProgram.instructions.push_back(laterRoutineInstruction);
+    discontiguousStructuredProgram.routines[0].instructions.push_back(7);
+    const auto discontiguousStructuredText = decompileGoolIRRoutine(
+        discontiguousStructuredProgram, 0);
+    assert(discontiguousStructuredText.text.find("if (self->subtype == 2) {") !=
+        std::string::npos);
+    assert(discontiguousStructuredText.text.find("} else {") != std::string::npos);
+    assert(discontiguousStructuredText.text.find("Discontiguous routine region [7, 8)") !=
+        std::string::npos);
+    assert(discontiguousStructuredText.text.find("@0x07F0") == std::string::npos);
+    assert(discontiguousStructuredText.text.find("@0x07F4") != std::string::npos);
+
     // A routine listing must define labels for branch destinations even
     // when the routine's reachable instructions are non-contiguous in the
     // containing GOOL instruction stream.
