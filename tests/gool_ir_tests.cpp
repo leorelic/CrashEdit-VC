@@ -163,15 +163,15 @@ int main() {
     mipsSource.instructions.push_back(jalr);
     const auto mipsIR = buildGoolIR(mipsSource);
     assert(mipsIR.instructions.size() == 1);
-    const auto& nativeIR = mipsIR.instructions[0];
-    assert(nativeIR.nativeMips && nativeIR.nativeFieldsDecoded);
-    assert(nativeIR.nativeFields.format == GoolIRMipsFormat::Register);
-    assert(nativeIR.nativeFields.primaryOpcode == 0);
-    assert(nativeIR.nativeFields.rs == 21);
-    assert(nativeIR.nativeFields.rd == 31);
-    assert(nativeIR.nativeFields.function == 9);
-    assert(nativeIR.rawWord == 0x02A0F809U);
-    assert(nativeIR.sourceByteOffset == 0x44);
+    const auto& jalrIR = mipsIR.instructions[0];
+    assert(jalrIR.nativeMips && jalrIR.nativeFieldsDecoded);
+    assert(jalrIR.nativeFields.format == GoolIRMipsFormat::Register);
+    assert(jalrIR.nativeFields.primaryOpcode == 0);
+    assert(jalrIR.nativeFields.rs == 21);
+    assert(jalrIR.nativeFields.rd == 31);
+    assert(jalrIR.nativeFields.function == 9);
+    assert(jalrIR.rawWord == 0x02A0F809U);
+    assert(jalrIR.sourceByteOffset == 0x44);
 
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
