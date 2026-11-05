@@ -110,7 +110,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         case 15U: // lui
             if (fields.rs != 0U) return effects;
             write(fields.rt); break;
-        case 16U: // COP0 register transfers (MFC0/MTC0)
+        case 16U: // COP0 transfers, branches, and R3000A RFE
             if (fields.rs == 0U) { // mfc0 rt, rd
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 effects.coprocessor0ReadMask |= (std::uint32_t{1} << fields.rd);
@@ -119,6 +119,15 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 read(fields.rt);
                 effects.coprocessor0WriteMask |= (std::uint32_t{1} << fields.rd);
+            } else if (fields.rs == 8U) { // bc0f / bc0t
+                if (fields.rt > 1U) return effects;
+                effects.readsCoprocessor0Condition = true;
+                effects.controlTransfer = true;
+            } else if (fields.rs == 16U && fields.rt == 0U &&
+                       fields.rd == 0U && fields.shiftAmount == 0U &&
+                       fields.function == 16U) { // rfe: restore previous status mode
+                effects.coprocessor0ReadMask |= (std::uint32_t{1} << 12U); // Status
+                effects.coprocessor0WriteMask |= (std::uint32_t{1} << 12U);
             } else {
                 return effects;
             }

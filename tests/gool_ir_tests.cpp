@@ -317,6 +317,21 @@ int main() {
     assert(!cop0IR.instructions[2].nativeEffects.known);
     assert(!cop0IR.instructions[3].nativeEffects.known);
 
+    addCop0Word((16U << 26U) | (8U << 21U) | (1U << 16U) | 4U); // bc0t
+    addCop0Word((16U << 26U) | (16U << 21U) | 16U); // rfe
+    addCop0Word((16U << 26U) | (8U << 21U) | (2U << 16U) | 4U); // invalid bc0 rt
+    const auto cop0ControlIR = buildGoolIR(cop0Source);
+    assert(cop0ControlIR.instructions.size() == 7);
+    const auto& bc0Effects = cop0ControlIR.instructions[4].nativeEffects;
+    assert(bc0Effects.known && bc0Effects.controlTransfer);
+    assert(bc0Effects.readsCoprocessor0Condition);
+    assert(bc0Effects.gprReadMask == 0U && bc0Effects.gprWriteMask == 0U);
+    const auto& rfeEffects = cop0ControlIR.instructions[5].nativeEffects;
+    assert(rfeEffects.known && !rfeEffects.controlTransfer);
+    assert(rfeEffects.coprocessor0ReadMask == (std::uint32_t{1} << 12U));
+    assert(rfeEffects.coprocessor0WriteMask == (std::uint32_t{1} << 12U));
+    assert(!cop0ControlIR.instructions[6].nativeEffects.known);
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;
