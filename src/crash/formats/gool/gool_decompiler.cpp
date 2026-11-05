@@ -1,4 +1,5 @@
 #include "crash/formats/gool/gool_decompiler.hpp"
+#include "crash/formats/gool/gool_opcodes.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -41,7 +42,7 @@ std::string fieldText(const GoolIRInstruction& instruction) {
     const auto* field = findOperand(instruction, 'R');
     if (!field) return "unknown_field";
     if (!field->resolvedText.empty()) return field->resolvedText;
-    return "field_" + std::to_string(field->rawValue);
+    return goolObjectFieldName(field->rawValue);
 }
 
 const GoolIRControlOperation* findControlOperation(
@@ -149,9 +150,9 @@ GoolIRDecompilation decompileGoolIR(
                 const auto* target = findOperand(instruction, 'I');
                 line << "call_external(" << (target ? operandText(*target) : "unknown_target");
             } else if (operation && operation->targetInstructionValid) {
-                line << "call " << labelName(operation->targetInstruction);
+                line << "call " << labelName(operation->targetInstruction) << "(";
             } else {
-                line << "call /* unresolved local target */";
+                line << "call(/* unresolved local target */";
                 addDiagnostic(result, index, operation && !operation->diagnostic.empty()
                     ? operation->diagnostic : "local call target could not be resolved.");
             }
