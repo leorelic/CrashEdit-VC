@@ -545,72 +545,101 @@ GoolIRDecompilation decompileGoolIRRoutine(
                     std::to_string(call.sourceInstruction) + " has unresolved local target\n";
         }
     } else {
-    for (const auto instructionIndex : routine.instructions) {
-        if (instructionIndex >= program.instructions.size()) {
-            result.diagnostics.push_back(
-                "routine contains an out-of-range instruction index " +
-                std::to_string(instructionIndex) + ".");
-            continue;
-        }
-        if (std::binary_search(routineBranchTargets.begin(), routineBranchTargets.end(),
-                instructionIndex))
-            result.text += labelName(instructionIndex) + ":\n";
+        // Non-contiguous routines are split into maximal adjacent instruction
+        // regions. Each region is decompiled as a unit, so local control-flow
+        // patterns can still be recognized without pulling unrelated
+        // instructions from the containing GOOL object into the routine.
+        std::size_t regionBegin = 0;
+        while (regionBegin < routine.instructions.size()) {
+            const std::size_t first = routine.instructions[regionBegin];
+            if (first >= program.instructions.size()) {
+                result.diagnostics.push_back(
+                    "routine contains an out-of-range instruction index " +
+                    std::to_string(first) + ".");
+                ++regionBegin;
+                continue;
+            }
 
-        GoolIRDecompileOptions options;
-        options.startInstruction = instructionIndex;
-        options.endInstruction = instructionIndex + 1;
-        options.includeHeader = false;
-        auto instruction = decompileGoolIR(program, options);
-        constexpr std::string_view misleadingRangeNote =
-            " // target is outside selected range";
-        std::size_t note = 0;
-        while ((note = instruction.text.find(misleadingRangeNote, note)) != std::string::npos)
-            instruction.text.erase(note, misleadingRangeNote.size());
+            std::size_t regionEnd = regionBegin + 1;
+            while (regionEnd < routine.instructions.size() &&
+                routine.instructions[regionEnd] < program.instructions.size() &&
+                routine.instructions[regionEnd] == routine.instructions[regionEnd - 1] + 1U) {
+                ++regionEnd;
+            }
+            const std::size_t last = routine.instructions[regionEnd - 1];
+            if (regionBegin != 0)
+                result.text += "    // Discontiguous routine region [" +
+                    std::to_string(first) + ", " + std::to_string(last + 1U) + ")\n";
 
-        // A branch can leave this routine while still targeting a valid
-        // instruction in the containing GOOL object. Do not emit a dangling
-        // routine-local label for that edge: name the absolute instruction
-        // destination and make the routine boundary explicit instead.
-        const auto& sourceInstruction = program.instructions[instructionIndex];
-        if (!sourceInstruction.nativeMips && sourceInstruction.opcodeKnown &&
-            sourceInstruction.opcode >= 50U && sourceInstruction.opcode <= 52U) {
-            const auto* displacement = findOperand(sourceInstruction, 'I');
-            if (displacement) {
+            for (std::size_t i = regionBegin; i < regionEnd; ++i) {
+                const auto instructionIndex = routine.instructions[i];
+                if (std::binary_search(routineBranchTargets.begin(), routineBranchTargets.end(),
+                        instructionIndex))
+                    result.text += labelName(instructionIndex) + ":\n";
+            }
+
+            GoolIRDecompileOptions options;
+            options.startInstruction = first;
+            options.endInstruction = last + 1U;
+            options.includeHeader = false;
+            auto region = decompileGoolIR(program, options);
+
+            // Branches into another region of this same routine retain a
+            // label that will be defined at that region's start. Branches
+            // leaving the routine name the absolute instruction instead.
+            for (const auto instructionIndex : routine.instructions) {
+                if (instructionIndex < first || instructionIndex > last) continue;
+                const auto& sourceInstruction = program.instructions[instructionIndex];
+                if (sourceInstruction.nativeMips || !sourceInstruction.opcodeKnown ||
+                    sourceInstruction.opcode < 50U || sourceInstruction.opcode > 52U)
+                    continue;
+                const auto* displacement = findOperand(sourceInstruction, 'I');
+                if (!displacement) continue;
                 const auto target = static_cast<std::int64_t>(instructionIndex) + 1 +
                     displacement->value;
-                if (target >= 0 &&
-                    static_cast<std::uint64_t>(target) < program.instructions.size() &&
-                    !belongsToRoutine(static_cast<std::size_t>(target))) {
-                    const auto targetIndex = static_cast<std::size_t>(target);
-                    const auto label = labelName(targetIndex);
-                    const auto absoluteTarget = "instruction " + std::to_string(targetIndex);
-                    std::size_t labelPosition = 0;
-                    while ((labelPosition = instruction.text.find(label, labelPosition)) !=
-                        std::string::npos) {
-                        instruction.text.replace(labelPosition, label.size(), absoluteTarget);
-                        labelPosition += absoluteTarget.size();
-                    }
-                    instruction.text += "    // branch leaves this routine\n";
+                if (target < 0 ||
+                    static_cast<std::uint64_t>(target) >= program.instructions.size() ||
+                    belongsToRoutine(static_cast<std::size_t>(target)))
+                    continue;
+
+                const auto targetIndex = static_cast<std::size_t>(target);
+                const auto label = labelName(targetIndex);
+                const auto absoluteTarget = "instruction " + std::to_string(targetIndex);
+                std::size_t labelPosition = 0;
+                while ((labelPosition = region.text.find(label, labelPosition)) !=
+                    std::string::npos) {
+                    region.text.replace(labelPosition, label.size(), absoluteTarget);
+                    labelPosition += absoluteTarget.size();
                 }
+
+                std::ostringstream offset;
+                offset << "@0x" << std::uppercase << std::hex << std::setfill('0')
+                       << std::setw(4)
+                       << static_cast<std::uint32_t>(sourceInstruction.sourceByteOffset);
+                const auto lineEnd = region.text.find('\n',
+                    region.text.find(offset.str()));
+                if (lineEnd != std::string::npos)
+                    region.text.insert(lineEnd + 1U, "    // branch leaves this routine\n");
             }
+
+            result.text += region.text;
+            result.diagnostics.insert(result.diagnostics.end(),
+                region.diagnostics.begin(), region.diagnostics.end());
+            regionBegin = regionEnd;
         }
-        result.text += instruction.text;
-        const auto call = std::find_if(routine.calls.begin(), routine.calls.end(),
-            [instructionIndex](const GoolIRRoutineCall& candidate) {
-                return candidate.sourceInstruction == instructionIndex;
-            });
-        if (call != routine.calls.end()) {
-            if (call->targetRoutineFound)
-                result.text += "    // calls discovered routine " +
-                    std::to_string(call->targetRoutineIndex) + "\n";
-            else if (call->external)
-                result.text += "    // calls an external GOOL target\n";
-            else if (!call->targetInstructionValid)
-                result.text += "    // local call target is unresolved\n";
+
+        for (const auto& call : routine.calls) {
+            if (!call.targetRoutineFound && !call.external && call.targetInstructionValid)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " reaches local instruction " +
+                    std::to_string(call.targetInstruction) + "\n";
+            else if (call.external)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " targets external GOOL\n";
+            else if (!call.targetInstructionValid)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " has unresolved local target\n";
         }
-        result.diagnostics.insert(result.diagnostics.end(),
-            instruction.diagnostics.begin(), instruction.diagnostics.end());
-    }
     }
 
     const auto exitName = [](GoolIRRoutineExitKind kind) -> const char* {
