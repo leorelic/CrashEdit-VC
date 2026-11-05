@@ -41,6 +41,77 @@ struct EditorPreferences {
  std::string lastNsfPath;
 };
 static EditorPreferences editorPreferences;
+
+struct BlueprintInstructionCacheRow {
+ Crash::NsfGoolInstructionAnalysis analysis;
+ std::string reads,writes,uncertain,from,usedBy;
+ std::vector<std::string> usedByLinks;
+};
+struct BlueprintAnalysisCache {
+ const Crash::NsfGool* source=nullptr;
+ std::size_t instructionCount=0;
+ Crash::NsfGoolControlFlowGraph graph;
+ Crash::NsfGoolDataFlowResult dataFlow;
+ std::vector<BlueprintInstructionCacheRow> rows;
+ bool dataFlowReady=false;
+};
+static BlueprintAnalysisCache blueprintAnalysisCache;
+static BlueprintAnalysisCache& blueprintCacheFor(const Crash::NsfGool& gool) {
+ auto& cache=blueprintAnalysisCache;
+ if(cache.source!=&gool||cache.instructionCount!=gool.instructions.size()) {
+  cache=BlueprintAnalysisCache{};
+  cache.source=&gool;
+  cache.instructionCount=gool.instructions.size();
+  cache.graph=Crash::analyzeGoolControlFlow(gool);
+ }
+ return cache;
+}
+static void prepareBlueprintDataFlow(BlueprintAnalysisCache& cache,const Crash::NsfGool& gool) {
+ if(cache.dataFlowReady)return;
+ cache.dataFlow=Crash::analyzeGoolDataFlow(gool);
+ cache.rows.resize(gool.instructions.size());
+ for(std::size_t i=0;i<gool.instructions.size();++i) {
+  auto& row=cache.rows[i];
+  row.analysis=Crash::analyzeGoolInstruction(gool,i);
+  for(const auto& effect:row.analysis.operandEffects) {
+   std::string& target=effect.access==Crash::NsfGoolOperandAccess::Read?row.reads:
+    effect.access==Crash::NsfGoolOperandAccess::Write?row.writes:row.uncertain;
+   if(!target.empty())target+=", ";
+   target+=effect.reference;
+  }
+ }
+ for(const auto& use:cache.dataFlow.uses) {
+  if(use.instructionIndex>=cache.rows.size()||use.reachingDefinitions.empty())continue;
+  std::string relation=use.location+" <- ";
+  for(std::size_t n=0;n<use.reachingDefinitions.size();++n) {
+   if(n)relation+="/";
+   const auto definitionId=use.reachingDefinitions[n];
+   if(definitionId<cache.dataFlow.definitions.size())
+    relation+="#"+std::to_string(cache.dataFlow.definitions[definitionId].instructionIndex);
+  }
+  auto& from=cache.rows[use.instructionIndex].from;
+  if(!from.empty())from+=", ";
+  from+=relation;
+  const std::string reverseRelation=use.location+" -> #"+std::to_string(use.instructionIndex);
+  for(const auto definitionId:use.reachingDefinitions) {
+   if(definitionId>=cache.dataFlow.definitions.size())continue;
+   const auto definitionInstruction=cache.dataFlow.definitions[definitionId].instructionIndex;
+   if(definitionInstruction>=cache.rows.size())continue;
+   auto& links=cache.rows[definitionInstruction].usedByLinks;
+   if(std::find(links.begin(),links.end(),reverseRelation)==links.end())
+    links.push_back(reverseRelation);
+  }
+ }
+ for(auto& row:cache.rows)
+  for(const auto& link:row.usedByLinks) {
+   if(!row.usedBy.empty())row.usedBy+=", ";
+   row.usedBy+=link;
+  }
+ cache.dataFlowReady=true;
+}
+static void invalidateBlueprintAnalysisCache() {
+ blueprintAnalysisCache=BlueprintAnalysisCache{};
+}
 static void* readEditorSettingsOpen(ImGuiContext*,ImGuiSettingsHandler* handler,const char*){return handler->UserData;}
 static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,const char* line){
  int value=0;
@@ -196,7 +267,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
- nsf_=std::move(archive);sceneCameraInitialized_=false;sceneCameraChunk_=-1;sceneCameraEntry_=-1;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
+ invalidateBlueprintAnalysisCache();nsf_=std::move(archive);sceneCameraInitialized_=false;sceneCameraChunk_=-1;sceneCameraEntry_=-1;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
  nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd){status_+=" Matching NSD unavailable: "+nsdError;Diagnostics::log(DiagnosticLevel::Warning,"Matching NSD unavailable: "+nsdError);}
@@ -1797,7 +1868,7 @@ void EditorUI::drawGoolBlueprintGraph(){
   ImGui::TextDisabled("No decoded instruction flow is available for this GOOL entry.");
   ImGui::End();return;
  }
- const auto graph=Crash::analyzeGoolControlFlow(*gool);
+ const auto& graph=blueprintCacheFor(*gool).graph;
  if(graph.blocks.empty()){
   ImGui::TextDisabled("No basic blocks were produced by control-flow analysis.");
   ImGui::End();return;
@@ -1940,7 +2011,7 @@ void EditorUI::drawGoolBlueprintGraph(){
    }
   }
   if(!selectedEntry||!gool){showGoolBlueprintInstructions_=false;blueprintSelectedEid_=0;return;}
-  const auto graph=Crash::analyzeGoolControlFlow(*gool);
+  const auto& graph=blueprintCacheFor(*gool).graph;
   if(graph.blocks.empty()){showGoolBlueprintInstructions_=false;return;}
   selectedGoolBlueprintBlock_=std::min(selectedGoolBlueprintBlock_,graph.blocks.size()-1U);
   const auto&chosen=graph.blocks[selectedGoolBlueprintBlock_];
@@ -1951,7 +2022,8 @@ void EditorUI::drawGoolBlueprintGraph(){
   if(ImGui::Begin("GOOL Blueprint Instructions",&showGoolBlueprintInstructions_,ImGuiWindowFlags_HorizontalScrollbar)){
    ImGui::Text("%s  |  BB%zu  |  instructions %zu–%zu",Crash::eidToEName(selectedEntry->eid).c_str(),selectedGoolBlueprintBlock_,chosen.startInstruction,chosen.endInstruction-1U);
    ImGui::TextDisabled("Data-flow links track stable stack, argument, and object references. Unknown instructions and engine calls break propagation.");
-   const auto dataFlow=Crash::analyzeGoolDataFlow(*gool);
+   auto& analysisCache=blueprintCacheFor(*gool);
+   prepareBlueprintDataFlow(analysisCache,*gool);
    if(ImGui::BeginTable("GOOLBlueprintInstructionEffects",8,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_Resizable|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingStretchProp,ImVec2(0,0))){
     ImGui::TableSetupColumn("#",ImGuiTableColumnFlags_WidthFixed,48.0f);
     ImGui::TableSetupColumn("Instruction",ImGuiTableColumnFlags_WidthFixed,105.0f);
@@ -1963,22 +2035,16 @@ void EditorUI::drawGoolBlueprintGraph(){
     ImGui::TableSetupColumn("Execution",ImGuiTableColumnFlags_WidthStretch,1.4f);
     ImGui::TableHeadersRow();
     for(std::size_t instructionIndex=chosen.startInstruction;instructionIndex<chosen.endInstruction&&instructionIndex<gool->instructions.size();++instructionIndex){
-     const auto&instruction=gool->instructions[instructionIndex];const auto analysis=Crash::analyzeGoolInstruction(*gool,instructionIndex);
-     std::string reads,writes,uncertain;
-     for(const auto&effect:analysis.operandEffects){std::string&target=effect.access==Crash::NsfGoolOperandAccess::Read?reads:effect.access==Crash::NsfGoolOperandAccess::Write?writes:uncertain;if(!target.empty())target+=", ";target+=effect.reference;}
-     std::vector<std::string> fromEntries,usedByEntries;
-     for(const auto&use:dataFlow.uses)if(use.instructionIndex==instructionIndex&&!use.reachingDefinitions.empty()){std::string relation=use.location+" <- ";for(std::size_t n=0;n<use.reachingDefinitions.size();++n){if(n)relation+="/";relation+="#"+std::to_string(dataFlow.definitions[use.reachingDefinitions[n]].instructionIndex);}if(std::find(fromEntries.begin(),fromEntries.end(),relation)==fromEntries.end())fromEntries.push_back(std::move(relation));}
-     for(std::size_t definitionId=0;definitionId<dataFlow.definitions.size();++definitionId)if(dataFlow.definitions[definitionId].instructionIndex==instructionIndex)for(const auto&use:dataFlow.uses)if(std::find(use.reachingDefinitions.begin(),use.reachingDefinitions.end(),definitionId)!=use.reachingDefinitions.end()){const std::string relation=use.location+" -> #"+std::to_string(use.instructionIndex);if(std::find(usedByEntries.begin(),usedByEntries.end(),relation)==usedByEntries.end())usedByEntries.push_back(relation);}
-     std::string from,usedBy;for(const auto&entry:fromEntries){if(!from.empty())from+=", ";from+=entry;}for(const auto&entry:usedByEntries){if(!usedBy.empty())usedBy+=", ";usedBy+=entry;}
+     const auto&instruction=gool->instructions[instructionIndex];
+     const auto&row=analysisCache.rows[instructionIndex];
      ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",instructionIndex);ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted(instruction.mnemonic.c_str());
-     ImGui::TableSetColumnIndex(2);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(reads.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",reads.c_str());
-     ImGui::TableSetColumnIndex(3);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(writes.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",writes.c_str());
-     ImGui::TableSetColumnIndex(4);if(!analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(uncertain.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",uncertain.c_str());
-     ImGui::TableSetColumnIndex(5);if(from.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",from.c_str());
-     ImGui::TableSetColumnIndex(6);if(usedBy.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",usedBy.c_str());
-     ImGui::TableSetColumnIndex(7);if(analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",analysis.executionEffect.c_str());
-    }
-    ImGui::EndTable();
+     ImGui::TableSetColumnIndex(2);if(!row.analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(row.reads.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.reads.c_str());
+     ImGui::TableSetColumnIndex(3);if(!row.analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(row.writes.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.writes.c_str());
+     ImGui::TableSetColumnIndex(4);if(!row.analysis.operandsKnown)ImGui::TextDisabled("Unknown");else if(row.uncertain.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.uncertain.c_str());
+     ImGui::TableSetColumnIndex(5);if(row.from.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.from.c_str());
+     ImGui::TableSetColumnIndex(6);if(row.usedBy.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.usedBy.c_str());
+     ImGui::TableSetColumnIndex(7);if(row.analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.analysis.executionEffect.c_str());
+    }    ImGui::EndTable();
    }
   }
   ImGui::End();
