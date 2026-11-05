@@ -23,6 +23,23 @@ struct GoolIROperand {
     std::string resolvedText;
 };
 
+enum class GoolIRMipsFormat : std::uint8_t { Unknown, Register, Immediate, Jump };
+
+// Structural R3000A word fields. These are encoding facts, not a claim that
+// the instruction's runtime side effects have been fully audited.
+struct GoolIRMipsFields {
+    GoolIRMipsFormat format = GoolIRMipsFormat::Unknown;
+    std::uint8_t primaryOpcode = 0;
+    std::uint8_t rs = 0;
+    std::uint8_t rt = 0;
+    std::uint8_t rd = 0;
+    std::uint8_t shiftAmount = 0;
+    std::uint8_t function = 0;
+    std::uint16_t immediate = 0;
+    std::int16_t signedImmediate = 0;
+    std::uint32_t jumpTarget = 0;
+};
+
 struct GoolIRInstruction {
     std::size_t sourceByteOffset = 0;
     std::uint32_t rawWord = 0;
@@ -33,6 +50,8 @@ struct GoolIRInstruction {
     bool nativeInstructionDecoded = false;
     std::string mnemonic;
     std::string nativeArguments;
+    bool nativeFieldsDecoded = false;
+    GoolIRMipsFields nativeFields;
     std::vector<GoolIROperand> operands;
 };
 
