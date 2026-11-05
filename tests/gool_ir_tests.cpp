@@ -452,5 +452,65 @@ int main() {
     assert(comparisonOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
     assert(comparisonOutput.text.find("if (sp != 0)") == std::string::npos);
 
+
+    // Real Crash 2 sample: DispC's Code hook at instruction 0. These twenty
+    // words are copied from the extracted entry; this is a focused IR/decompiler
+    // regression, not a replacement for parsing the complete NSF entry.
+    NsfGool dispC;
+    dispC.version = NsfGoolVersion::Version2;
+    dispC.id = static_cast<std::int32_t>(0x4E938CCDU);
+    dispC.format = 1;
+    dispC.entryCount = 2;
+    dispC.dataPool.resize(21, 0);
+    dispC.dataPool[0] = static_cast<std::int32_t>(0x4E938CCDU);
+    dispC.dataPool[2] = -256;
+    dispC.dataPool[3] = 6;
+    dispC.dataPool[4] = 0x333;
+    dispC.dataPool[20] = 0x40000;
+    dispC.stateDescriptors.resize(4);
+    dispC.stateDescriptors[3].goolIndex = 0;
+    dispC.stateReferences.push_back({3, 0, 0, 0, 0x4E938CCD, true,
+        NsfGoolStateReferenceStatus::Local});
+    const std::uint32_t dispCWords[] = {
+        0x2086480DU, 0x11014E1BU, 0x07002C38U, 0x08003E1FU,
+        0x11E1FC38U, 0x11004E0EU, 0x11802E0FU, 0x11802E10U,
+        0x11882E08U, 0x118BEE18U, 0x11800E0AU, 0x11800E4AU,
+        0x11841E4BU, 0x11800E4CU, 0x11800E19U, 0x38C41D00U,
+        0x1C305E4BU, 0x1C400E4BU, 0x35494003U, 0x31894000U
+    };
+    const char* dispCMnemonics[] = {
+        "GVAW", "SETF", "ANDL", "ORL", "SETF", "SETF", "SETF",
+        "SETF", "SETF", "SETF", "SETF", "SETF", "SETF", "SETF",
+        "SETF", "ANIM", "MISC", "MISC", "GO", "RET"
+    };
+    for (std::size_t i = 0; i < 20; ++i) {
+        NsfGoolInstruction instruction;
+        instruction.byteOffset = i * 4U;
+        instruction.word = dispCWords[i];
+        instruction.opcode = static_cast<std::uint8_t>(dispCWords[i] >> 24U);
+        instruction.operandBits = dispCWords[i] & 0x00FFFFFFU;
+        instruction.mnemonic = dispCMnemonics[i];
+        dispC.instructions.push_back(std::move(instruction));
+    }
+    const auto dispCIR = buildGoolIR(dispC);
+    assert(dispCIR.instructions.size() == 20);
+    assert(dispCIR.instructions.front().rawWord == 0x2086480DU);
+    assert(dispCIR.instructions[18].rawWord == 0x35494003U);
+    assert(dispCIR.instructions[19].rawWord == 0x31894000U);
+    assert(dispCIR.controlOperations.size() == 2);
+    assert(dispCIR.controlOperations[0].kind == GoolIRControlOperationKind::StateTransition);
+    assert(dispCIR.controlOperations[0].sourceInstruction == 18);
+    assert(dispCIR.controlOperations[0].targetDescriptorValid);
+    assert(dispCIR.controlOperations[0].targetDescriptorIndex == 3);
+    assert(dispCIR.controlOperations[0].targetGoolEidValid);
+    assert(dispCIR.controlOperations[0].targetGoolEid == 0x4E938CCD);
+    assert(dispCIR.controlOperations[1].kind == GoolIRControlOperationKind::Return);
+    const auto dispCText = decompileGoolIR(dispCIR);
+    assert(dispCText.text.find("transition state_descriptor[3]") != std::string::npos);
+    assert(dispCText.text.find("GOOL 0x4E938CCD") != std::string::npos);
+    assert(dispCText.text.find("return") != std::string::npos);
+    assert(dispCText.text.find("@0x0048") != std::string::npos);
+    assert(dispCText.text.find("@0x004C") != std::string::npos);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
