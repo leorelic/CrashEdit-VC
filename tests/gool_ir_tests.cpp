@@ -552,6 +552,39 @@ int main() {
     assert(labeledRoutineText.text.find("L00002:\n") != std::string::npos);
     assert(labeledRoutineText.text.find("@0x0704") == std::string::npos);
 
+    // A valid branch destination outside the selected routine must not
+    // become a dangling local label. Keep its absolute target explicit.
+    GoolIRProgram leavingRoutineProgram;
+    GoolIRInstruction leavingBranch;
+    leavingBranch.opcode = 50U;
+    leavingBranch.opcodeKnown = true;
+    leavingBranch.mnemonic = "BRA";
+    leavingBranch.sourceByteOffset = 0x720;
+    leavingBranch.operands.push_back({'I', 12, 1, 1,
+        GoolIROperandKind::Signed, "1"}); // instruction 0 -> instruction 2
+    leavingRoutineProgram.instructions.push_back(leavingBranch);
+    GoolIRInstruction middleInstruction;
+    middleInstruction.opcode = 47U;
+    middleInstruction.opcodeKnown = true;
+    middleInstruction.mnemonic = "NOP";
+    middleInstruction.sourceByteOffset = 0x724;
+    leavingRoutineProgram.instructions.push_back(middleInstruction);
+    GoolIRInstruction otherRoutineEntry;
+    otherRoutineEntry.opcode = 49U;
+    otherRoutineEntry.opcodeKnown = true;
+    otherRoutineEntry.mnemonic = "RET";
+    otherRoutineEntry.sourceByteOffset = 0x728;
+    leavingRoutineProgram.instructions.push_back(otherRoutineEntry);
+    GoolIRRoutine leavingRoutine;
+    leavingRoutine.entryInstruction = 0;
+    leavingRoutine.instructions = {0};
+    leavingRoutineProgram.routines.push_back(leavingRoutine);
+    const auto leavingRoutineText = decompileGoolIRRoutine(leavingRoutineProgram, 0);
+    assert(leavingRoutineText.text.find("goto instruction 2") != std::string::npos);
+    assert(leavingRoutineText.text.find("branch leaves this routine") != std::string::npos);
+    assert(leavingRoutineText.text.find("goto L00002") == std::string::npos);
+    assert(leavingRoutineText.text.find("L00002:\\n") == std::string::npos);
+
     // RET is an explicit routine exit, while a final ordinary instruction is
     // reported as an incomplete end-of-program path rather than an invented RET.
     NsfGool exitSource;

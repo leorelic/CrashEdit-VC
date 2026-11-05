@@ -527,6 +527,34 @@ GoolIRDecompilation decompileGoolIRRoutine(
         std::size_t note = 0;
         while ((note = instruction.text.find(misleadingRangeNote, note)) != std::string::npos)
             instruction.text.erase(note, misleadingRangeNote.size());
+
+        // A branch can leave this routine while still targeting a valid
+        // instruction in the containing GOOL object. Do not emit a dangling
+        // routine-local label for that edge: name the absolute instruction
+        // destination and make the routine boundary explicit instead.
+        const auto& sourceInstruction = program.instructions[instructionIndex];
+        if (!sourceInstruction.nativeMips && sourceInstruction.opcodeKnown &&
+            sourceInstruction.opcode >= 50U && sourceInstruction.opcode <= 52U) {
+            const auto* displacement = findOperand(sourceInstruction, 'I');
+            if (displacement) {
+                const auto target = static_cast<std::int64_t>(instructionIndex) + 1 +
+                    displacement->value;
+                if (target >= 0 &&
+                    static_cast<std::uint64_t>(target) < program.instructions.size() &&
+                    !belongsToRoutine(static_cast<std::size_t>(target))) {
+                    const auto targetIndex = static_cast<std::size_t>(target);
+                    const auto label = labelName(targetIndex);
+                    const auto absoluteTarget = "instruction " + std::to_string(targetIndex);
+                    std::size_t labelPosition = 0;
+                    while ((labelPosition = instruction.text.find(label, labelPosition)) !=
+                        std::string::npos) {
+                        instruction.text.replace(labelPosition, label.size(), absoluteTarget);
+                        labelPosition += absoluteTarget.size();
+                    }
+                    instruction.text += "    // branch leaves this routine\\n";
+                }
+            }
+        }
         result.text += instruction.text;
         const auto call = std::find_if(routine.calls.begin(), routine.calls.end(),
             [instructionIndex](const GoolIRRoutineCall& candidate) {
