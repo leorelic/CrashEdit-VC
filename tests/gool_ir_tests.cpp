@@ -295,6 +295,42 @@ int main() {
     assert(structuredText.text.find("@0x0204") != std::string::npos);
     assert(structuredText.text.find("@0x0208") == std::string::npos);
 
+    // Two adjacent forward-if clauses with a shared join become else-if.
+    GoolIRProgram chainProgram;
+    auto appendChainInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                      std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        chainProgram.instructions.push_back(std::move(item));
+    };
+    const GoolIROperand chainField{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->subtype"};
+    const GoolIROperand chainValue2{'R', 12, 2, 2,
+        GoolIROperandKind::Value, "2"};
+    const auto chainDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    appendChainInstruction(4, 0x400, {chainField, chainValue2});
+    appendChainInstruction(52, 0x404, {chainDisplacement(3)});
+    appendChainInstruction(47, 0x408);
+    appendChainInstruction(50, 0x40C, {chainDisplacement(5)});
+    appendChainInstruction(4, 0x410, {chainField,
+        GoolIROperand{'R', 12, 10, 10, GoolIROperandKind::Value, "10"}});
+    appendChainInstruction(52, 0x414, {chainDisplacement(2)});
+    appendChainInstruction(47, 0x418);
+    appendChainInstruction(50, 0x41C, {chainDisplacement(1)});
+    appendChainInstruction(47, 0x420);
+    appendChainInstruction(47, 0x424);
+    const auto chainOutput = decompileGoolIR(chainProgram);
+    assert(chainOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
+    assert(chainOutput.text.find("} else if (self->subtype == 10) {") != std::string::npos);
+
     // A comparison immediately feeding BEQZ should become the source
     // expression, not expose the temporary stack result as "sp != 0".
     GoolIRProgram comparisonProgram;
