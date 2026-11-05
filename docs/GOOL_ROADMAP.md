@@ -57,6 +57,7 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [x] Reconstruct a plain `else` arm when a final conditional skips to a unique fallback body and both paths reach a proven join.
 - [x] Reconstruct simple pre-test loops when a conditional exit and a single backward branch prove the loop region; reject interior entries and additional control flow.
 - [ ] Extend structured control-flow reconstruction to nested conditionals and more complex loops, with explicit fallback when region boundaries or branch conditions cannot be proven.
+- [x] Apply the IR/decompiler to the first 20-word real Crash 2 sample region: DispC's Code hook at instruction 0; record its decoded words, descriptor-3 state transition, following RET, and unresolved execution question in `docs/DISPC_INITIAL_ROUTINE.md`.
 - [ ] Apply the decompiler to real Crash 2 routines, beginning with the `BoxsC` Code hook at instruction 558; use the resulting output to identify missing semantics rather than inventing high-level behavior.
 - [ ] Evolve the initial snapshot into a fully game-independent semantic IR; keep Crash 2 binary decoding/encoding in a separate backend.
 - [ ] Develop a readable, source-like GOOL representation rather than exposing raw instruction words as the primary editing surface.
