@@ -60,6 +60,31 @@ void addDiagnostic(GoolIRDecompilation& result, std::size_t instruction,
     result.diagnostics.push_back("instruction " + std::to_string(instruction) + ": " + message);
 }
 
+std::string comparisonCondition(const GoolIRProgram& program, std::size_t branchIndex) {
+    if (branchIndex == 0 || branchIndex >= program.instructions.size()) return {};
+    const auto& comparison = program.instructions[branchIndex - 1];
+    const auto& branch = program.instructions[branchIndex];
+    if (comparison.nativeMips || !comparison.opcodeKnown ||
+        comparison.opcode < 4U || comparison.opcode > 12U)
+        return {};
+
+    const auto* left = findOperand(comparison, 'L');
+    const auto* right = findOperand(comparison, 'R');
+    if (!left || !right) return {};
+
+    static constexpr const char* normal[] = {
+        "", "", "", "", "==", "", "", "", "", "<", "<=", ">", ">="
+    };
+    static constexpr const char* inverted[] = {
+        "", "", "", "", "!=", "", "", "", "", ">=", ">", "<=", "<"
+    };
+    const bool branchOnZero = branch.opcode == 52U;
+    const char* op = branchOnZero ? normal[comparison.opcode] : inverted[comparison.opcode];
+    if (!op || *op == '\0') return {};
+    return operandText(*left) + " " + op + " " + operandText(*right);
+}
+
+
 } // namespace
 
 GoolIRDecompilation decompileGoolIR(
@@ -165,8 +190,13 @@ GoolIRDecompilation decompileGoolIR(
             result.text += labelName(index) + ":\n";
 
         if (structuredIfEnd.find(index) != structuredIfEnd.end()) {
-            result.text += "    if (" + fieldText(instruction) +
-                (instruction.opcode == 51U ? " == 0) {\n" : " != 0) {\n");
+            const auto comparison = comparisonCondition(program, index);
+            if (!comparison.empty()) {
+                result.text += "    if (" + comparison + ") {\n";
+            } else {
+                result.text += "    if (" + fieldText(instruction) +
+                    (instruction.opcode == 51U ? " == 0) {\n" : " != 0) {\n");
+            }
             continue;
         }
 
