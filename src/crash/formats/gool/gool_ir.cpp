@@ -313,10 +313,12 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             result.unassignedInstructions.push_back(instruction);
     }
     for (auto& routine : result.routines) {
-        routine.hasSharedInstructions = std::any_of(routine.instructions.begin(),
-            routine.instructions.end(), [&result](std::size_t instruction) {
-                return result.instructionRoutineMembership[instruction] > 1U;
-            });
+        routine.sharedInstructions.clear();
+        for (const auto instruction : routine.instructions) {
+            if (result.instructionRoutineMembership[instruction] > 1U)
+                routine.sharedInstructions.push_back(instruction);
+        }
+        routine.hasSharedInstructions = !routine.sharedInstructions.empty();
         if (routine.hasSharedInstructions)
             routine.diagnostics.push_back("Some reachable instructions are shared with another discovered entry point.");
         if (!routine.entryPointBoundaries.empty())
