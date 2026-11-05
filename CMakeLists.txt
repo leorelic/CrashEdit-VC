@@ -64,6 +64,7 @@ if(CRASHEDIT_BUILD_APP)
         src/crash/formats/gool/gool_opcodes.cpp
         src/crash/formats/gool/gool_control_flow.cpp
         src/crash/formats/gool/gool_ir.cpp
+        src/crash/formats/gool/gool_decompiler.cpp
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
     )
@@ -145,6 +146,7 @@ if(CRASHEDIT_BUILD_TESTS)
         src/crash/formats/gool/gool_ir.cpp
         src/crash/formats/gool/gool_opcodes.cpp
         src/crash/formats/gool/gool_control_flow.cpp
+        src/crash/formats/gool/gool_decompiler.cpp
     )
     target_include_directories(crashedit_gool_ir_tests PRIVATE src)
     if(MSVC)
