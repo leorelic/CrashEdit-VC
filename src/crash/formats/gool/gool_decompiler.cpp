@@ -70,7 +70,9 @@ GoolIRDecompilation decompileGoolIR(
     const std::size_t boundedEnd = std::max(start, end);
 
     std::map<std::size_t, bool> labels;
-    for (std::size_t index = start; index < boundedEnd; ++index) {
+    // Scan the whole entry for incoming edges too, so a selected range still
+    // receives a label when a branch or call outside the range targets it.
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         const auto& instruction = program.instructions[index];
         if (instruction.nativeMips || !instruction.opcodeKnown) continue;
 
@@ -80,7 +82,7 @@ GoolIRDecompilation decompileGoolIR(
                 const auto target = static_cast<std::int64_t>(index) + 1 + displacement->value;
                 if (target >= 0 && static_cast<std::uint64_t>(target) < program.instructions.size())
                     labels[static_cast<std::size_t>(target)] = true;
-                else
+                else if (index >= start && index < boundedEnd)
                     addDiagnostic(result, index, "branch destination is outside this GOOL entry.");
             }
         }
