@@ -498,5 +498,23 @@ int main(){
  barrierGool.instructions.push_back(consumer);
  const auto barrierFlow=analyzeGoolDataFlow(barrierGool);
  assert(std::any_of(barrierFlow.uses.begin(),barrierFlow.uses.end(),[](const auto& use){return use.instructionIndex==2&&use.location=="stack[0]"&&use.reachingDefinitions.empty();}));
+ assert(std::any_of(barrierFlow.uses.begin(),barrierFlow.uses.end(),[](const auto& use){
+  return use.instructionIndex==2&&use.location=="stack[0]"&&use.mayHaveUnmodeledValue;
+ }));
+ // A proven write kills the unknown incoming value for that same location.
+ NsfGool initializedFlowGool;initializedFlowGool.version=NsfGoolVersion::Version2;
+ initializedFlowGool.instructions.push_back(producer);
+ initializedFlowGool.instructions.push_back(consumer);
+ const auto initializedFlow=analyzeGoolDataFlow(initializedFlowGool);
+ assert(std::any_of(initializedFlow.uses.begin(),initializedFlow.uses.end(),[](const auto& use){
+  return use.instructionIndex==1&&use.location=="stack[0]"&&!use.mayHaveUnmodeledValue;
+ }));
+ // An initial read with no in-stream definition is explicitly marked unknown.
+ NsfGool entryReadGool;entryReadGool.version=NsfGoolVersion::Version2;
+ entryReadGool.instructions.push_back(consumer);
+ const auto entryReadFlow=analyzeGoolDataFlow(entryReadGool);
+ assert(std::any_of(entryReadFlow.uses.begin(),entryReadFlow.uses.end(),[](const auto& use){
+  return use.instructionIndex==0&&use.location=="stack[0]"&&use.reachingDefinitions.empty()&&use.mayHaveUnmodeledValue;
+ }));
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }

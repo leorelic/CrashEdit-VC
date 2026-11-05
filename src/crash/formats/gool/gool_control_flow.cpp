@@ -202,13 +202,19 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
             }
 
     using DefinitionSet=std::set<std::size_t>;
+    using UnknownLocationSet=std::set<std::string>;
+    UnknownLocationSet allTrackableLocations;
+    for(const auto& definition:result.definitions)
+        allTrackableLocations.insert(definition.location);
     std::vector<DefinitionSet> incoming(count),outgoing(count);
+    std::vector<UnknownLocationSet> unknownIncoming(count),unknownOutgoing(count);
+    auto mayInvokeExternalBehavior=[&](std::size_t instructionIndex) {
+        const auto& instruction=gool.instructions[instructionIndex];
+        return !instruction.isMips && instruction.opcode>=59U && instruction.opcode<=71U;
+    };
     auto transfer=[&](std::size_t instructionIndex,DefinitionSet state) {
         const auto& analysis=analyses[instructionIndex];
-        const auto& instruction=gool.instructions[instructionIndex];
-        const bool mayInvokeExternalBehavior=!instruction.isMips &&
-            instruction.opcode>=59U && instruction.opcode<=71U;
-        if(!analysis.operandsKnown || mayInvokeExternalBehavior) {
+        if(!analysis.operandsKnown || mayInvokeExternalBehavior(instructionIndex)) {
             state.clear();
             return state;
         }
@@ -222,17 +228,40 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
         }
         return state;
     };
+    auto transferUnknown=[&](std::size_t instructionIndex,UnknownLocationSet state) {
+        const auto& analysis=analyses[instructionIndex];
+        if(!analysis.operandsKnown || mayInvokeExternalBehavior(instructionIndex))
+            state=allTrackableLocations;
+        else {
+            for(const auto id:definitionsAt[instructionIndex])
+                state.erase(result.definitions[id].location);
+        }
+        return state;
+    };
     bool changed=true;
     while(changed) {
         changed=false;
         for(std::size_t i=0;i<count;++i) {
             DefinitionSet nextIn;
-            for(const auto predecessor:predecessors[i])
+            UnknownLocationSet nextUnknownIn;
+            // A program entry (and any disconnected component) may receive
+            // values from outside the decoded stream. Keep that fact alive
+            // independently for each tracked location.
+            if(i==0U || predecessors[i].empty())
+                nextUnknownIn=allTrackableLocations;
+            for(const auto predecessor:predecessors[i]) {
                 nextIn.insert(outgoing[predecessor].begin(),outgoing[predecessor].end());
+                nextUnknownIn.insert(unknownOutgoing[predecessor].begin(),
+                    unknownOutgoing[predecessor].end());
+            }
             auto nextOut=transfer(i,nextIn);
-            if(nextIn!=incoming[i] || nextOut!=outgoing[i]) {
+            auto nextUnknownOut=transferUnknown(i,nextUnknownIn);
+            if(nextIn!=incoming[i] || nextOut!=outgoing[i] ||
+                nextUnknownIn!=unknownIncoming[i] || nextUnknownOut!=unknownOutgoing[i]) {
                 incoming[i]=std::move(nextIn);
                 outgoing[i]=std::move(nextOut);
+                unknownIncoming[i]=std::move(nextUnknownIn);
+                unknownOutgoing[i]=std::move(nextUnknownOut);
                 changed=true;
             }
         }
@@ -245,6 +274,8 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
             use.location=effect.reference;
             for(const auto id:incoming[i])
                 if(result.definitions[id].location==effect.reference) use.reachingDefinitions.push_back(id);
+            use.mayHaveUnmodeledValue =
+                unknownIncoming[i].find(effect.reference)!=unknownIncoming[i].end();
             result.uses.push_back(std::move(use));
         }
     return result;
