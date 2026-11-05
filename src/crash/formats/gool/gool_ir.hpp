@@ -149,6 +149,21 @@ struct GoolIRBasicBlock {
     std::size_t endInstruction = 0; // exclusive
 };
 
+enum class GoolIRRoutineEntryKind : std::uint8_t { CodeHook, LocalCall };
+struct GoolIRRoutineEntry {
+    std::size_t instruction = 0;
+    bool fromCodeHook = false;
+    bool fromLocalCall = false;
+};
+struct GoolIRRoutine {
+    std::size_t entryInstruction = 0;
+    bool fromCodeHook = false;
+    bool fromLocalCall = false;
+    std::vector<std::size_t> instructions;
+    bool hasSharedInstructions = false;
+    std::vector<std::string> diagnostics;
+};
+
 struct GoolIRFlowEdge {
     std::size_t sourceBlock = 0;
     std::size_t targetInstruction = 0;
@@ -168,6 +183,9 @@ struct GoolIRProgram {
     std::vector<GoolIRInstruction> instructions;
     std::vector<std::size_t> instructionToBlock;
     std::vector<GoolIRBasicBlock> basicBlocks;
+    std::vector<GoolIRRoutineEntry> routineEntries;
+    std::vector<GoolIRRoutine> routines;
+    std::vector<std::size_t> instructionRoutineMembership; // number of discovered routines reaching each instruction
     std::vector<GoolIRFlowEdge> flowEdges;
     std::vector<GoolIRControlOperation> controlOperations;
     std::vector<std::string> controlFlowDiagnostics;
