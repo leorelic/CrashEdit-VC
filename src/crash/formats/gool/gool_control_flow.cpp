@@ -276,6 +276,11 @@ NsfGoolDataFlowResult analyzeGoolDataFlow(const NsfGool& gool) {
             use.location=effect.reference;
             for(const auto id:incoming[i])
                 if(result.definitions[id].location==effect.reference) use.reachingDefinitions.push_back(id);
+            use.kind=use.reachingDefinitions.empty()
+                ?NsfGoolDataFlowUseKind::NoInStreamDefinition
+                :use.reachingDefinitions.size()==1U
+                    ?NsfGoolDataFlowUseKind::SingleReachingDefinition
+                    :NsfGoolDataFlowUseKind::MultipleReachingDefinitions;
             use.mayHaveUnmodeledValue =
                 unknownIncoming[i].find(effect.reference)!=unknownIncoming[i].end();
             result.uses.push_back(std::move(use));

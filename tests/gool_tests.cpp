@@ -468,8 +468,8 @@ int main(){
  assert(dataFlow.definitions.size()==2);
  assert(dataFlow.definitions[0].instructionIndex==0&&dataFlow.definitions[0].location=="stack[0]");
  assert(dataFlow.definitions[1].instructionIndex==2&&dataFlow.definitions[1].location=="stack[1]");
- assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==1&&use.location=="stack[0]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==0;}));
- assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==3&&use.location=="stack[1]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==1;}));
+ assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==1&&use.location=="stack[0]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==0&&use.kind==NsfGoolDataFlowUseKind::SingleReachingDefinition;}));
+ assert(std::any_of(dataFlow.uses.begin(),dataFlow.uses.end(),[](const auto& use){return use.instructionIndex==3&&use.location=="stack[1]"&&use.reachingDefinitions.size()==1&&use.reachingDefinitions[0]==1&&use.kind==NsfGoolDataFlowUseKind::SingleReachingDefinition;}));
  // At a conditional join, both path-specific reaching definitions remain visible.
  NsfGool joinGool;joinGool.version=NsfGoolVersion::Version2;
  joinGool.instructions.push_back(producer);
@@ -479,7 +479,7 @@ int main(){
  joinGool.instructions.push_back(consumer);
  const auto joinFlow=analyzeGoolDataFlow(joinGool);
  assert(std::any_of(joinFlow.uses.begin(),joinFlow.uses.end(),[](const auto& use){
-  return use.instructionIndex==3&&use.location=="stack[0]"&&use.reachingDefinitions.size()==2;
+  return use.instructionIndex==3&&use.location=="stack[0]"&&use.reachingDefinitions.size()==2&&use.kind==NsfGoolDataFlowUseKind::MultipleReachingDefinitions;
  }));
  // Engine-call/event instructions can invoke code with unmodeled side effects.
  NsfGool callBarrierGool;callBarrierGool.version=NsfGoolVersion::Version2;
@@ -514,7 +514,7 @@ int main(){
  entryReadGool.instructions.push_back(consumer);
  const auto entryReadFlow=analyzeGoolDataFlow(entryReadGool);
  assert(std::any_of(entryReadFlow.uses.begin(),entryReadFlow.uses.end(),[](const auto& use){
-  return use.instructionIndex==0&&use.location=="stack[0]"&&use.reachingDefinitions.empty()&&use.mayHaveUnmodeledValue;
+  return use.instructionIndex==0&&use.location=="stack[0]"&&use.reachingDefinitions.empty()&&use.kind==NsfGoolDataFlowUseKind::NoInStreamDefinition&&use.mayHaveUnmodeledValue;
  }));
  std::cout<<"GOOL entry parsing, Crash 2 opcode recognition, and operand decoding checks passed\n";
 }
