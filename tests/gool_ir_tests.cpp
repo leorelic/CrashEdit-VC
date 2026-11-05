@@ -454,6 +454,30 @@ int main() {
     assert(comparisonOutput.text.find("if (sp != 0)") == std::string::npos);
 
 
+    // Routine discovery is shared across GOOL objects: local Code hooks
+    // establish entry points, while RET prevents traversal into the next routine.
+    NsfGool routineSource;
+    routineSource.version = NsfGoolVersion::Version2;
+    for (std::size_t i = 0; i < 5; ++i) {
+        NsfGoolInstruction instruction;
+        instruction.opcode = (i == 2U || i == 4U) ? 49U : 47U;
+        instruction.byteOffset = i * 4U;
+        routineSource.instructions.push_back(instruction);
+    }
+    routineSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    routineSource.stateHookReferences.push_back({1, 0, 0, NsfGoolStateHookKind::Code,
+        3, 3, false, true, NsfGoolStateHookStatus::Local});
+    const auto routineIR = buildGoolIR(routineSource);
+    assert(routineIR.routineEntries.size() == 2);
+    assert(routineIR.routines.size() == 2);
+    assert(routineIR.routines[0].entryInstruction == 0);
+    assert((routineIR.routines[0].instructions == std::vector<std::size_t>{0, 1, 2}));
+    assert(routineIR.routines[1].entryInstruction == 3);
+    assert((routineIR.routines[1].instructions == std::vector<std::size_t>{3, 4}));
+    assert(!routineIR.routines[0].hasSharedInstructions);
+    assert(!routineIR.routines[1].hasSharedInstructions);
+
     // Real Crash 2 sample: DispC's Code hook at instruction 0. These twenty
     // words are copied from the extracted entry; this is a focused IR/decompiler
     // regression, not a replacement for parsing the complete NSF entry.
