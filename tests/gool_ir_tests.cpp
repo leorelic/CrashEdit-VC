@@ -102,6 +102,7 @@ int main() {
     assert(ir.hookDispatches[2].kind == GoolIRHookKind::Code);
     assert(ir.hookDispatches[2].resolution == GoolIRHookResolution::Absent);
     assert(ir.hookDispatches[3].resolution == GoolIRHookResolution::OffsetOutOfRange);
+    assert(ir.routineEntries.empty() && ir.routines.empty());
     assert(ir.frameGroupBytes == 12 && ir.frameGroupsDecoded && ir.frameGroups.size() == 1);
     assert(ir.frameGroups[0].sourceByteOffset == 0x60 && ir.frameGroups[0].interpolated);
 
