@@ -96,6 +96,11 @@ GoolIRDecompilation decompileGoolIR(
                 labels[operation->targetInstruction] = true;
         }
     }
+    for (const auto& hook : program.hookDispatches) {
+        if (hook.resolution == GoolIRHookResolution::Local &&
+            hook.instructionOffset < program.instructions.size())
+            labels[hook.instructionOffset] = true;
+    }
 
     if (options.includeHeader) {
         result.text += "// Best-effort GOOL decompilation; unresolved semantics remain explicit.\n";
