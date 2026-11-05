@@ -27,7 +27,10 @@ struct NsfGoolOperandEffect {
     bool trackable = false;
 };
 struct NsfGoolDataFlowDefinition { std::size_t instructionIndex=0; std::string location; };
-// True when at least one incoming path may still carry an initial or otherwise\n// unmodeled value for this location. Reaching definitions alone cannot express\n// that possibility at joins or after unknown/native side effects.\nstruct NsfGoolDataFlowUse { std::size_t instructionIndex=0; std::string location; std::vector<std::size_t> reachingDefinitions; bool mayHaveUnmodeledValue=false; };
+// True when at least one incoming path may still carry an initial or otherwise
+// unmodeled value for this location. Reaching definitions alone cannot express
+// that possibility at joins or after unknown/native side effects.
+struct NsfGoolDataFlowUse { std::size_t instructionIndex=0; std::string location; std::vector<std::size_t> reachingDefinitions; bool mayHaveUnmodeledValue=false; };
 struct NsfGoolDataFlowResult { std::vector<NsfGoolDataFlowDefinition> definitions; std::vector<NsfGoolDataFlowUse> uses; };
 struct NsfGoolInstructionAnalysis {
     bool operandsKnown=false;
