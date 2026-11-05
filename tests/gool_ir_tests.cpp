@@ -540,10 +540,10 @@ int main() {
     // ordinary control flow. The destination remains its own discovered routine.
     NsfGool callSource;
     callSource.version = NsfGoolVersion::Version2;
-    NsfGoolInstruction localCall;
-    localCall.opcode = 59U;
-    localCall.operandBits = 1U; // local instruction target 1
-    callSource.instructions.push_back(localCall);
+    NsfGoolInstruction routineLocalCall;
+    routineLocalCall.opcode = 59U;
+    routineLocalCall.operandBits = 1U; // local instruction target 1
+    callSource.instructions.push_back(routineLocalCall);
     NsfGoolInstruction callReturn;
     callReturn.opcode = 49U;
     callSource.instructions.push_back(callReturn);
