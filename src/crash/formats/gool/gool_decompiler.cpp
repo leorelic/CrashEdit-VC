@@ -535,7 +535,7 @@ GoolIRDecompilation decompileGoolIRRoutine(
         if (call != routine.calls.end()) {
             if (call->targetRoutineFound)
                 result.text += "    // calls discovered routine " +
-                    std::to_string(call->targetRoutineIndex) + "\\n";
+                    std::to_string(call->targetRoutineIndex) + "\n";
             else if (call->external)
                 result.text += "    // calls an external GOOL target\\n";
             else if (!call->targetInstructionValid)
