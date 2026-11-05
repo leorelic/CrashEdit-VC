@@ -24,6 +24,19 @@ struct GoolIROperand {
 };
 
 enum class GoolIRMipsFormat : std::uint8_t { Unknown, Register, Immediate, Jump };
+enum class GoolIRMipsMemoryEffect : std::uint8_t { Unknown, None, Read, Write, ReadWrite };
+
+struct GoolIRMipsEffects {
+    bool known = false;
+    std::uint32_t gprReadMask = 0;
+    std::uint32_t gprWriteMask = 0;
+    bool readsHi = false;
+    bool writesHi = false;
+    bool readsLo = false;
+    bool writesLo = false;
+    GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
+    bool controlTransfer = false;
+};
 
 // Structural R3000A word fields. These are encoding facts, not a claim that
 // the instruction's runtime side effects have been fully audited.
@@ -52,6 +65,7 @@ struct GoolIRInstruction {
     std::string nativeArguments;
     bool nativeFieldsDecoded = false;
     GoolIRMipsFields nativeFields;
+    GoolIRMipsEffects nativeEffects;
     std::vector<GoolIROperand> operands;
 };
 

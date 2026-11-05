@@ -36,6 +36,87 @@ GoolIRHookResolution convertHookResolution(NsfGoolStateHookStatus status) {
     case NsfGoolStateHookStatus::Absent: default: return GoolIRHookResolution::Absent;
     }
 }
+
+GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
+    GoolIRMipsEffects effects;
+    const auto read = [&effects](std::uint8_t reg) {
+        effects.gprReadMask |= (std::uint32_t{1} << reg);
+    };
+    const auto write = [&effects](std::uint8_t reg) {
+        // Writes to $zero are architecturally discarded.
+        if (reg != 0U) effects.gprWriteMask |= (std::uint32_t{1} << reg);
+    };
+    const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
+
+    if (fields.primaryOpcode == 0U) {
+        switch (fields.function) {
+        case 0U: case 2U: case 3U: // sll, srl, sra
+            read(fields.rt); write(fields.rd); break;
+        case 4U: case 6U: case 7U: // sllv, srlv, srav
+            readRsRt(); write(fields.rd); break;
+        case 8U: // jr
+            read(fields.rs); effects.controlTransfer = true; break;
+        case 9U: // jalr
+            read(fields.rs); write(fields.rd); effects.controlTransfer = true; break;
+        case 16U: // mfhi
+            effects.readsHi = true; write(fields.rd); break;
+        case 17U: // mthi
+            read(fields.rs); effects.writesHi = true; break;
+        case 18U: // mflo
+            effects.readsLo = true; write(fields.rd); break;
+        case 19U: // mtlo
+            read(fields.rs); effects.writesLo = true; break;
+        case 24U: case 25U: case 26U: case 27U: // mult[u], div[u]
+            readRsRt(); effects.writesHi = true; effects.writesLo = true; break;
+        case 32U: case 33U: case 34U: case 35U: // add[u], sub[u]
+        case 36U: case 37U: case 38U: case 39U: // and, or, xor, nor
+        case 42U: case 43U: // slt[u]
+            readRsRt(); write(fields.rd); break;
+        default: return effects;
+        }
+    } else {
+        switch (fields.primaryOpcode) {
+        case 1U: // REGIMM branches
+            if (fields.rt != 0U && fields.rt != 1U &&
+                fields.rt != 16U && fields.rt != 17U) return effects;
+            read(fields.rs);
+            if (fields.rt == 16U || fields.rt == 17U) write(31U);
+            effects.controlTransfer = true;
+            break;
+        case 2U: // j
+            effects.controlTransfer = true; break;
+        case 3U: // jal
+            write(31U); effects.controlTransfer = true; break;
+        case 4U: case 5U: // beq, bne
+            readRsRt(); effects.controlTransfer = true; break;
+        case 6U: case 7U: // blez, bgtz
+            read(fields.rs); effects.controlTransfer = true; break;
+        case 8U: case 9U: case 10U: case 11U:
+        case 12U: case 13U: case 14U: // immediate ALU operations
+            read(fields.rs); write(fields.rt); break;
+        case 15U: // lui
+            write(fields.rt); break;
+        case 32U: case 33U: case 34U: case 35U:
+        case 36U: case 37U: case 38U: // byte/half/word loads and unaligned loads
+            read(fields.rs);
+            if (fields.primaryOpcode == 34U || fields.primaryOpcode == 38U)
+                read(fields.rt); // merge with the old destination value
+            write(fields.rt);
+            effects.memory = GoolIRMipsMemoryEffect::Read;
+            break;
+        case 40U: case 41U: case 42U: case 43U: case 46U: // stores
+            readRsRt();
+            effects.memory = GoolIRMipsMemoryEffect::Write;
+            break;
+        default: return effects;
+        }
+    }
+
+    effects.known = true;
+    if (effects.memory == GoolIRMipsMemoryEffect::Unknown)
+        effects.memory = GoolIRMipsMemoryEffect::None;
+    return effects;
+}
 }
 
 GoolIRProgram buildGoolIR(const NsfGool& source) {
@@ -82,6 +163,7 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
                 fields.format = GoolIRMipsFormat::Jump;
             else fields.format = GoolIRMipsFormat::Immediate;
             ir.nativeFieldsDecoded = true;
+            ir.nativeEffects = analyzeMipsEffects(fields);
         }
         if (!instruction.isMips) {
             const auto& info = goolOpcodeInfo(source.version, instruction.opcode);

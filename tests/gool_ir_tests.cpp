@@ -194,8 +194,47 @@ int main() {
     assert(jalrIR.nativeFields.rs == 21);
     assert(jalrIR.nativeFields.rd == 31);
     assert(jalrIR.nativeFields.function == 9);
+    assert(jalrIR.nativeEffects.known);
+    assert((jalrIR.nativeEffects.gprReadMask & (std::uint32_t{1} << 21U)) != 0U);
+    assert((jalrIR.nativeEffects.gprWriteMask & (std::uint32_t{1} << 31U)) != 0U);
+    assert(jalrIR.nativeEffects.controlTransfer);
     assert(jalrIR.rawWord == 0x02A0F809U);
     assert(jalrIR.sourceByteOffset == 0x44);
+
+    // Conservative R3000A register and memory effects are tracked independently
+    // from mnemonic text, with unsupported encodings left explicitly unknown.
+    NsfGool effectSource;
+    effectSource.version = NsfGoolVersion::Version2;
+    const auto addMipsWord = [&effectSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        effectSource.instructions.push_back(instruction);
+    };
+    addMipsWord((9U << 26U) | (29U << 21U) | (8U << 16U) | 0xFFF0U); // addiu t0,sp,-16
+    addMipsWord((35U << 26U) | (8U << 21U) | (9U << 16U) | 4U); // lw t1,4(t0)
+    addMipsWord((43U << 26U) | (8U << 21U) | (9U << 16U) | 8U); // sw t1,8(t0)
+    addMipsWord((8U << 21U) | (9U << 16U) | 24U); // mult t0,t1
+    addMipsWord((4U << 26U) | (8U << 21U) | (9U << 16U) | 2U); // beq t0,t1,...
+    const auto effectIR = buildGoolIR(effectSource);
+    assert(effectIR.instructions.size() == 5);
+    const auto& addiuEffects = effectIR.instructions[0].nativeEffects;
+    assert(addiuEffects.known && addiuEffects.memory == GoolIRMipsMemoryEffect::None);
+    assert((addiuEffects.gprReadMask & (std::uint32_t{1} << 29U)) != 0U);
+    assert((addiuEffects.gprWriteMask & (std::uint32_t{1} << 8U)) != 0U);
+    const auto& loadEffects = effectIR.instructions[1].nativeEffects;
+    assert(loadEffects.known && loadEffects.memory == GoolIRMipsMemoryEffect::Read);
+    assert((loadEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
+    assert((loadEffects.gprWriteMask & (std::uint32_t{1} << 9U)) != 0U);
+    const auto& storeEffects = effectIR.instructions[2].nativeEffects;
+    assert(storeEffects.known && storeEffects.memory == GoolIRMipsMemoryEffect::Write);
+    assert((storeEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
+    const auto& multiplyEffects = effectIR.instructions[3].nativeEffects;
+    assert(multiplyEffects.known && multiplyEffects.writesHi && multiplyEffects.writesLo);
+    const auto& branchEffects = effectIR.instructions[4].nativeEffects;
+    assert(branchEffects.known && branchEffects.controlTransfer);
+    assert((branchEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
+    assert((branchEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
 
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
