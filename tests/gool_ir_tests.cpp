@@ -3,6 +3,7 @@
 #endif
 
 #include "crash/formats/gool/gool_ir.hpp"
+#include "crash/formats/gool/gool_decompiler.hpp"
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -188,6 +189,72 @@ int main() {
     assert(jalrIR.nativeFields.function == 9);
     assert(jalrIR.rawWord == 0x02A0F809U);
     assert(jalrIR.sourceByteOffset == 0x44);
+
+    // The first source-like decompiler keeps branches, calls, transitions,
+    // returns, and unsupported words traceable to their original instruction.
+    NsfGool decompileSource;
+    decompileSource.version = NsfGoolVersion::Version2;
+    decompileSource.id = 0x0200007B;
+    decompileSource.dataPool = {static_cast<std::int32_t>(0x0200007B)};
+    decompileSource.stateDescriptors.push_back({0, 0, 0, 0, 0, 0});
+
+    NsfGoolInstruction conditionalBranch;
+    conditionalBranch.byteOffset = 0x100;
+    conditionalBranch.opcode = 51; // BNEZ subtype, relative target = instruction 2.
+    conditionalBranch.operandBits = (29U << 14U) | 1U;
+    decompileSource.instructions.push_back(conditionalBranch);
+
+    NsfGoolInstruction call;
+    call.byteOffset = 0x104;
+    call.opcode = 59;
+    call.operandBits = 3U | (1U << 20U); // Local instruction 3, one argument.
+    decompileSource.instructions.push_back(call);
+
+    NsfGoolInstruction transition;
+    transition.byteOffset = 0x108;
+    transition.opcode = 53; // GO state descriptor 0.
+    transition.operandBits = 0U;
+    decompileSource.instructions.push_back(transition);
+
+    NsfGoolInstruction returnInstruction;
+    returnInstruction.byteOffset = 0x10C;
+    returnInstruction.opcode = 49;
+    decompileSource.instructions.push_back(returnInstruction);
+
+    NsfGoolInstruction unknownInstruction;
+    unknownInstruction.byteOffset = 0x110;
+    unknownInstruction.word = 0xFA123456U;
+    unknownInstruction.opcode = 250;
+    unknownInstruction.operandBits = 0x123456U;
+    decompileSource.instructions.push_back(unknownInstruction);
+
+    NsfGoolInstruction unknownMips;
+    unknownMips.byteOffset = 0x114;
+    unknownMips.word = 0xFFFFFFFFU;
+    unknownMips.isMips = true;
+    decompileSource.instructions.push_back(unknownMips);
+
+    const auto decompileIR = buildGoolIR(decompileSource);
+    const auto decompiled = decompileGoolIR(decompileIR);
+    assert(decompiled.text.find("if (subtype != 0) goto L00002") != std::string::npos);
+    assert(decompiled.text.find("call L00003(args=1)") != std::string::npos);
+    assert(decompiled.text.find("transition state_descriptor[0]") != std::string::npos);
+    assert(decompiled.text.find("GOOL 0x0200007B") != std::string::npos);
+    assert(decompiled.text.find("return") != std::string::npos);
+    assert(decompiled.text.find(".gool_word 0xFA123456") != std::string::npos);
+    assert(decompiled.text.find(".mips_word 0xFFFFFFFF") != std::string::npos);
+    assert(decompiled.text.find("@0x0100") != std::string::npos);
+    assert(decompiled.diagnostics.size() == 2);
+
+    GoolIRDecompileOptions selectedRange;
+    selectedRange.startInstruction = 2;
+    selectedRange.endInstruction = 4;
+    selectedRange.includeHeader = false;
+    const auto selectedDecompilation = decompileGoolIR(decompileIR, selectedRange);
+    assert(selectedDecompilation.text.find("L00002:") == 0);
+    assert(selectedDecompilation.text.find("transition state_descriptor[0]") != std::string::npos);
+    assert(selectedDecompilation.text.find("return") != std::string::npos);
+    assert(selectedDecompilation.text.find(".gool_word") == std::string::npos);
 
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
