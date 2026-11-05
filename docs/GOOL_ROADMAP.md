@@ -46,7 +46,8 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 
 ## 4. Readable decompilation
 
-- [x] Introduce an initial loss-preserving GOOL IR snapshot for decoded instructions, operands, data pools, state metadata/references/hooks, frame groups, and original instruction locations; preserve unknown opcodes and native MIPS words.\n- [ ] Evolve the initial snapshot into a fully game-independent semantic IR with explicit control-flow, call/return, state-transition, event, and native-instruction models; keep Crash 2 binary decoding/encoding in a separate backend.
+- [x] Introduce an initial loss-preserving GOOL IR snapshot for decoded instructions, operands, data pools, state metadata/references/hooks, frame groups, and original instruction locations; preserve unknown opcodes and native MIPS words.\n- [x] Add source-mapped IR control-operation records for local/external calls, dynamic returns, and state transitions; resolve local instruction targets and state descriptor/data-pool EIDs only when bounds-checked, retaining diagnostics for unresolved destinations.
+- [ ] Evolve the initial snapshot into a fully game-independent semantic IR with explicit event and native-instruction models; keep Crash 2 binary decoding/encoding in a separate backend.
 - [ ] Develop a readable, source-like GOOL representation rather than exposing raw instruction words as the primary editing surface.
 - [ ] Represent branches, loops, calls, returns, and state transitions in a way that can be traced back to their original instruction locations.
 - [ ] Preserve unknown or not-yet-understood instructions without silently changing their meaning.
