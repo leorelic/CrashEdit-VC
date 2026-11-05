@@ -137,6 +137,11 @@ GoolIRDecompilation decompileGoolIR(
     std::map<std::size_t, bool> elseArms;
     std::map<std::size_t, bool> suppressedElseLabels;
     std::map<std::size_t, bool> closeElseAt;
+    struct StructuredLoop { std::size_t backBranch; std::size_t exitTarget; };
+    std::map<std::size_t, StructuredLoop> structuredLoops;
+    std::map<std::size_t, bool> suppressedLoopBackBranches;
+    std::map<std::size_t, bool> suppressedLoopLabels;
+    std::map<std::size_t, bool> suppressedLoopConditions;
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (instruction.nativeMips || !instruction.opcodeKnown ||
@@ -228,6 +233,75 @@ GoolIRDecompilation decompileGoolIR(
         closeElseAt[clause.joinTarget] = true;
     }
 
+    // Recognize a simple pre-test loop: a conditional branch exits forward,
+    // while the final instruction in its fallthrough body branches back to
+    // the condition. Reject interior entries and additional control flow.
+    for (std::size_t header = start + 1; header < boundedEnd; ++header) {
+        const auto& conditionBranch = program.instructions[header];
+        if (conditionBranch.nativeMips || !conditionBranch.opcodeKnown ||
+            (conditionBranch.opcode != 51U && conditionBranch.opcode != 52U) ||
+            comparisonCondition(program, header).empty())
+            continue;
+        const auto* exitDisplacement = findOperand(conditionBranch, 'I');
+        const auto* popCount = findOperand(conditionBranch, 'V');
+        if (!exitDisplacement || (popCount && popCount->value != 0))
+            continue;
+        const auto exitSigned = static_cast<std::int64_t>(header) + 1 +
+            exitDisplacement->value;
+        if (exitSigned <= static_cast<std::int64_t>(header + 1) ||
+            exitSigned >= static_cast<std::int64_t>(boundedEnd))
+            continue;
+        const auto exitTarget = static_cast<std::size_t>(exitSigned);
+
+        for (std::size_t back = header + 1; back < exitTarget; ++back) {
+            const auto& candidate = program.instructions[back];
+            if (candidate.nativeMips || !candidate.opcodeKnown || candidate.opcode != 50U)
+                continue;
+            const auto* backDisplacement = findOperand(candidate, 'I');
+            if (!backDisplacement) continue;
+            const auto backTarget = static_cast<std::int64_t>(back) + 1 +
+                backDisplacement->value;
+            if (backTarget != static_cast<std::int64_t>(header) || back + 1 != exitTarget)
+                continue;
+
+            bool unsafeBody = false;
+            for (std::size_t body = header + 1; body < back; ++body) {
+                const auto& bodyInstruction = program.instructions[body];
+                if (bodyInstruction.nativeMips || !bodyInstruction.opcodeKnown ||
+                    (bodyInstruction.opcode >= 50U && bodyInstruction.opcode <= 55U)) {
+                    unsafeBody = true;
+                    break;
+                }
+                if (labels.find(body) != labels.end()) {
+                    unsafeBody = true;
+                    break;
+                }
+            }
+            if (unsafeBody) continue;
+
+            structuredLoops[header] = {back, exitTarget};
+            suppressedLoopBackBranches[back] = true;
+            suppressedLoopConditions[header - 1] = true;
+            suppressedLoopLabels[header] = true;
+            std::size_t exitIncoming = 0;
+            for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+                const auto& sourceInstruction = program.instructions[source];
+                if (sourceInstruction.nativeMips || !sourceInstruction.opcodeKnown ||
+                    sourceInstruction.opcode < 50U || sourceInstruction.opcode > 52U)
+                    continue;
+                const auto* displacement = findOperand(sourceInstruction, 'I');
+                if (!displacement) continue;
+                const auto destination = static_cast<std::int64_t>(source) + 1 +
+                    displacement->value;
+                if (destination == static_cast<std::int64_t>(exitTarget))
+                    ++exitIncoming;
+            }
+            if (exitIncoming == 1)
+                suppressedLoopLabels[exitTarget] = true;
+            break;
+        }
+    }
+
     if (options.includeHeader) {
         result.text += "// Best-effort GOOL decompilation; unresolved semantics remain explicit.\n";
         result.text += "// Instruction range: [" + std::to_string(start) + ", " +
@@ -255,10 +329,21 @@ GoolIRDecompilation decompileGoolIR(
         }
         if (closeElseAt.find(index) != closeElseAt.end())
             result.text += "    }\n";
-        if (suppressedConditionProducers.find(index) == suppressedConditionProducers.end() &&
+        if (suppressedLoopBackBranches.find(index) != suppressedLoopBackBranches.end()) {
+            result.text += "    }\n";
+            continue;
+        }
+        if (suppressedLoopLabels.find(index) == suppressedLoopLabels.end() &&
+            suppressedConditionProducers.find(index) == suppressedConditionProducers.end() &&
             suppressedElseLabels.find(index) == suppressedElseLabels.end() &&
             labels.find(index) != labels.end())
             result.text += labelName(index) + ":\n";
+        if (structuredLoops.find(index) != structuredLoops.end()) {
+            result.text += "    while (" + comparisonCondition(program, index) + ") {\n";
+            continue;
+        }
+        if (suppressedLoopConditions.find(index) != suppressedLoopConditions.end())
+            continue;
 
         if (structuredIfs.find(index) != structuredIfs.end()) {
             const auto comparison = comparisonCondition(program, index);

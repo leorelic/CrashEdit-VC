@@ -365,6 +365,38 @@ int main() {
     assert(elseOutput.text.find("L00004:") == std::string::npos);
     assert(elseOutput.text.find("@0x0514") != std::string::npos);
 
+    // A pre-test loop with one backward BRA is reconstructed as while.
+    GoolIRProgram loopProgram;
+    auto appendLoopInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                     std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        loopProgram.instructions.push_back(std::move(item));
+    };
+    const GoolIROperand loopField{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->counter"};
+    const GoolIROperand loopLimit{'R', 12, 3, 3,
+        GoolIROperandKind::Value, "3"};
+    const auto loopDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    appendLoopInstruction(4, 0x600, {loopField, loopLimit});
+    appendLoopInstruction(52, 0x604, {loopDisplacement(3)});
+    appendLoopInstruction(47, 0x608);
+    appendLoopInstruction(47, 0x60C);
+    appendLoopInstruction(50, 0x610, {loopDisplacement(-4)});
+    appendLoopInstruction(47, 0x614);
+    const auto loopOutput = decompileGoolIR(loopProgram);
+    assert(loopOutput.text.find("while (self->counter == 3) {") != std::string::npos);
+    assert(loopOutput.text.find("goto L") == std::string::npos);
+    assert(loopOutput.text.find("@0x0614") != std::string::npos);
+
     // A comparison immediately feeding BEQZ should become the source
     // expression, not expose the temporary stack result as "sp != 0".
     GoolIRProgram comparisonProgram;
