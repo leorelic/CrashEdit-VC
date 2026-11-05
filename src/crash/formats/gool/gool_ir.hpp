@@ -218,7 +218,8 @@ struct GoolIRProgram {
     std::int32_t heapBase = 0;
     std::int32_t eventCount = 0;
     std::int32_t entryCount = 0;
-    std::vector<GoolIRInstruction> instructions;\n    std::vector<GoolIRValueUse> valueUses;
+    std::vector<GoolIRInstruction> instructions;
+    std::vector<GoolIRValueUse> valueUses;
     std::vector<std::size_t> instructionToBlock;
     std::vector<GoolIRBasicBlock> basicBlocks;
     std::vector<GoolIRRoutineEntry> routineEntries;
