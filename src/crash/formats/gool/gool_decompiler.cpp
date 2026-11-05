@@ -506,6 +506,42 @@ GoolIRDecompilation decompileGoolIRRoutine(
     routineBranchTargets.erase(std::unique(routineBranchTargets.begin(),
         routineBranchTargets.end()), routineBranchTargets.end());
 
+    bool contiguousRoutine = !routine.instructions.empty();
+    for (std::size_t i = 0; i < routine.instructions.size(); ++i) {
+        if (routine.instructions[i] >= program.instructions.size() ||
+            (i != 0 && routine.instructions[i] != routine.instructions[i - 1] + 1U)) {
+            contiguousRoutine = false;
+            break;
+        }
+    }
+
+    if (contiguousRoutine) {
+        // When the routine occupies one uninterrupted instruction span, let
+        // the range decompiler see its complete control-flow region. This
+        // enables the existing conservative if/else/loop recognizers to
+        // reason across instructions instead of formatting each word alone.
+        GoolIRDecompileOptions options;
+        options.startInstruction = routine.instructions.front();
+        options.endInstruction = routine.instructions.back() + 1U;
+        options.includeHeader = false;
+        auto structured = decompileGoolIR(program, options);
+        result.text += structured.text;
+        result.diagnostics.insert(result.diagnostics.end(),
+            structured.diagnostics.begin(), structured.diagnostics.end());
+
+        for (const auto& call : routine.calls) {
+            if (call.targetRoutineFound)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " reaches discovered routine " +
+                    std::to_string(call.targetRoutineIndex) + "\n";
+            else if (call.external)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " targets external GOOL\n";
+            else if (!call.targetInstructionValid)
+                result.text += "    // call at instruction " +
+                    std::to_string(call.sourceInstruction) + " has unresolved local target\n";
+        }
+    } else {
     for (const auto instructionIndex : routine.instructions) {
         if (instructionIndex >= program.instructions.size()) {
             result.diagnostics.push_back(
@@ -571,6 +607,7 @@ GoolIRDecompilation decompileGoolIRRoutine(
         }
         result.diagnostics.insert(result.diagnostics.end(),
             instruction.diagnostics.begin(), instruction.diagnostics.end());
+    }
     }
 
     const auto exitName = [](GoolIRRoutineExitKind kind) -> const char* {

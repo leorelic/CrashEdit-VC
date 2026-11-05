@@ -519,6 +519,65 @@ int main() {
     assert(firstRoutineText.text.find("entry-point boundary") != std::string::npos);
     assert(!decompileGoolIRRoutine(boundaryIR, 99).diagnostics.empty());
 
+    // A contiguous discovered routine is decompiled as one control-flow
+    // region, allowing the existing conservative conditional recognizer to
+    // structure the complete routine rather than isolated instruction words.
+    GoolIRProgram structuredRoutineProgram;
+    const auto structuredField = GoolIROperand{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->subtype"};
+    const auto structuredValue = GoolIROperand{'R', 12, 2, 2,
+        GoolIROperandKind::Value, "2"};
+    const auto structuredDisp = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    GoolIRInstruction structuredCompare;
+    structuredCompare.opcode = 4U;
+    structuredCompare.opcodeKnown = true;
+    structuredCompare.mnemonic = "EQL";
+    structuredCompare.operands = {structuredField, structuredValue};
+    structuredRoutineProgram.instructions.push_back(structuredCompare);
+    GoolIRInstruction structuredBranch;
+    structuredBranch.opcode = 52U;
+    structuredBranch.opcodeKnown = true;
+    structuredBranch.mnemonic = "BEQZ";
+    structuredBranch.operands.push_back(structuredDisp(2));
+    structuredBranch.operands.push_back({'V', 4, 0, 0, GoolIROperandKind::Value, "0"});
+    structuredBranch.operands.push_back({'R', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "sp"});
+    structuredRoutineProgram.instructions.push_back(structuredBranch);
+    GoolIRInstruction structuredBody;
+    structuredBody.opcode = 47U;
+    structuredBody.opcodeKnown = true;
+    structuredBody.mnemonic = "NOP";
+    structuredRoutineProgram.instructions.push_back(structuredBody);
+    GoolIRInstruction structuredJoinBranch;
+    structuredJoinBranch.opcode = 50U;
+    structuredJoinBranch.opcodeKnown = true;
+    structuredJoinBranch.mnemonic = "BRA";
+    structuredJoinBranch.operands.push_back(structuredDisp(1));
+    structuredRoutineProgram.instructions.push_back(structuredJoinBranch);
+    GoolIRInstruction structuredElse;
+    structuredElse.opcode = 47U;
+    structuredElse.opcodeKnown = true;
+    structuredElse.mnemonic = "NOP";
+    structuredRoutineProgram.instructions.push_back(structuredElse);
+    GoolIRInstruction structuredJoin;
+    structuredJoin.opcode = 49U;
+    structuredJoin.opcodeKnown = true;
+    structuredJoin.mnemonic = "RET";
+    structuredRoutineProgram.instructions.push_back(structuredJoin);
+    GoolIRRoutine structuredRoutine;
+    structuredRoutine.entryInstruction = 0;
+    structuredRoutine.instructions = {0, 1, 2, 3, 4, 5};
+    structuredRoutineProgram.routines.push_back(structuredRoutine);
+    const auto structuredRoutineText = decompileGoolIRRoutine(
+        structuredRoutineProgram, 0);
+    assert(structuredRoutineText.text.find("if (self->subtype == 2) {") !=
+        std::string::npos);
+    assert(structuredRoutineText.text.find("} else {") != std::string::npos);
+    assert(structuredRoutineText.text.find("goto L") == std::string::npos);
+
     // A routine listing must define labels for branch destinations even
     // when the routine's reachable instructions are non-contiguous in the
     // containing GOOL instruction stream.
