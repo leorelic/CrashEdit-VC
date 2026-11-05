@@ -105,7 +105,6 @@ GoolIRDecompilation decompileGoolIR(
     // branch to a later join point. This is common in GOOL's if/else-if chains.
     // We only structure the body when the complete pattern is visible.
     std::map<std::size_t, std::size_t> structuredIfEnd;
-    std::map<std::size_t, std::size_t> structuredIfJoin;
     std::map<std::size_t, bool> suppressedBranches;
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
@@ -143,7 +142,6 @@ GoolIRDecompilation decompileGoolIR(
             }
             if (hasInteriorEntry) continue;
             structuredIfEnd[index] = bodyEnd;
-            structuredIfJoin[index] = static_cast<std::size_t>(joinSigned);
             suppressedBranches[bodyEnd] = true;
             break;
         }
@@ -159,7 +157,7 @@ GoolIRDecompilation decompileGoolIR(
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (suppressedBranches.find(index) != suppressedBranches.end()) {
-            result.text += "    }\\n";
+            result.text += "    }\n";
             continue;
         }
         if (labels.find(index) != labels.end())
@@ -167,7 +165,7 @@ GoolIRDecompilation decompileGoolIR(
 
         if (structuredIfEnd.find(index) != structuredIfEnd.end()) {
             result.text += "    if (" + fieldText(instruction) +
-                (instruction.opcode == 51U ? " == 0) {\\n" : " != 0) {\\n");
+                (instruction.opcode == 51U ? " == 0) {\n" : " != 0) {\n");
             continue;
         }
 
