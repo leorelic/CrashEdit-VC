@@ -43,6 +43,24 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         ir.nativeInstructionDecoded = instruction.mipsKnown;
         ir.mnemonic = instruction.mnemonic;
         ir.nativeArguments = instruction.arguments;
+        if (instruction.isMips) {
+            const std::uint32_t word = instruction.word;
+            auto& fields = ir.nativeFields;
+            fields.primaryOpcode = static_cast<std::uint8_t>((word >> 26U) & 0x3FU);
+            fields.rs = static_cast<std::uint8_t>((word >> 21U) & 0x1FU);
+            fields.rt = static_cast<std::uint8_t>((word >> 16U) & 0x1FU);
+            fields.rd = static_cast<std::uint8_t>((word >> 11U) & 0x1FU);
+            fields.shiftAmount = static_cast<std::uint8_t>((word >> 6U) & 0x1FU);
+            fields.function = static_cast<std::uint8_t>(word & 0x3FU);
+            fields.immediate = static_cast<std::uint16_t>(word & 0xFFFFU);
+            fields.signedImmediate = static_cast<std::int16_t>(fields.immediate);
+            fields.jumpTarget = word & 0x03FFFFFFU;
+            if (fields.primaryOpcode == 0U) fields.format = GoolIRMipsFormat::Register;
+            else if (fields.primaryOpcode == 2U || fields.primaryOpcode == 3U)
+                fields.format = GoolIRMipsFormat::Jump;
+            else fields.format = GoolIRMipsFormat::Immediate;
+            ir.nativeFieldsDecoded = true;
+        }
         if (!instruction.isMips) {
             const auto& info = goolOpcodeInfo(source.version, instruction.opcode);
             ir.opcodeKnown = info.known && !goolOpcodeFormat(source.version, instruction.opcode).empty();
