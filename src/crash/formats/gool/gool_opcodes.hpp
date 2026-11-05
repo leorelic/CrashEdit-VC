@@ -1,5 +1,6 @@
 #pragma once
 #include "crash/formats/nsf/nsf_archive.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -26,6 +27,7 @@ std::string_view goolOpcodeFormat(NsfGoolVersion version, std::uint8_t opcode) n
 std::vector<NsfGoolOperand> decodeGoolOperands(NsfGoolVersion version, std::uint8_t opcode, std::uint32_t operandBits);
 std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands);
 std::string formatGoolControlFlow(std::uint8_t opcode, const std::vector<NsfGoolOperand>& operands, const NsfGool& gool, std::size_t instructionIndex);
-void decodeMipsInstruction(std::uint32_t word, std::string& mnemonic, std::string& arguments, bool& known);
+void decodeMipsInstruction(std::uint32_t word, std::string& mnemonic, std::string& arguments, bool& known,
+    std::size_t instructionByteOffset = 0, std::size_t instructionStreamSize = 0);
 void resolveGoolOperands(std::vector<NsfGoolOperand>& operands, const NsfGool& gool, const std::vector<std::int32_t>* parentData = nullptr);
 }

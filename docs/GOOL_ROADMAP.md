@@ -19,8 +19,9 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 
 ## 2. Native MIPS and PlayStation instruction support
 
-- [ ] Restore the original CrashEdit MIPS-mode return sentinel behavior and add regression tests for the exact raw-word conventions.
-- [ ] Complete the R3000A decoder audit, including accurate branch and jump target presentation.
+- [x] Restore the original CrashEdit MIPS-mode return sentinel behavior and add regression tests for both exact raw-word conventions (`0x03E0A809` and `0x03E00008`).
+- [x] Show PC-relative MIPS branch destinations as GOOL-stream byte offsets; show the encoded jump index while explicitly retaining the unresolved upper PC bits.
+- [ ] Complete the R3000A decoder audit, including remaining instruction encodings and control-flow edge cases.
 - [ ] Audit the PlayStation COP2/GTE instruction space: command words, command flags, register transfers, and load/store forms.
 - [ ] Decode supported GTE instructions while preserving raw words and clearly identifying unknown or reserved encodings.
 - [ ] Connect native MIPS/GTE instructions back to their position and role in the surrounding GOOL stream.

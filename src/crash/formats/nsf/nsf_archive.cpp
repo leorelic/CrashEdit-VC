@@ -256,7 +256,7 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
    for(std::size_t p=0;p<code.size;p+=4){
     const std::uint32_t word=u32(chunk.bytes,code.offset+p);
     NsfGoolInstruction instruction;instruction.byteOffset=p;instruction.word=word;instruction.isMips=mipsMode;
-    if(mipsMode)decodeMipsInstruction(word,instruction.mnemonic,instruction.arguments,instruction.mipsKnown);
+    if(mipsMode)decodeMipsInstruction(word,instruction.mnemonic,instruction.arguments,instruction.mipsKnown,p,code.size);
     else{
      instruction.opcode=static_cast<std::uint8_t>(word>>24U);instruction.operandBits=word&0x00FFFFFFU;
      const auto&info=goolOpcodeInfo(version,instruction.opcode);instruction.mnemonic=std::string(info.mnemonic);

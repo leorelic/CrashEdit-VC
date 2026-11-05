@@ -227,13 +227,32 @@ std::string formatGoolOperands(const std::vector<NsfGoolOperand>& operands){
  return out;
 }
 
-void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string& arguments,bool& known){
+void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string& arguments,bool& known,
+ std::size_t instructionByteOffset,std::size_t instructionStreamSize){
  static constexpr const char* regs[]={"zr","at","v0","v1","a0","a1","a2","a3","t0","t1","t2","t3","t4","t5","t6","t7","s0","s1","s2","s3","s4","s5","s6","s7","t8","t9","k0","k1","gp","sp","s8","ra"};
  const auto op=(word>>26U)&63U,rs=(word>>21U)&31U,rt=(word>>16U)&31U,rd=(word>>11U)&31U,sh=(word>>6U)&31U,fn=word&63U;
  const auto imm=static_cast<std::int16_t>(word&0xFFFFU);
  auto reg=[](unsigned n){return std::string("$")+regs[n&31U];};
  mnemonic.clear();arguments.clear();known=true;
  auto args=[&](std::string a){arguments=std::move(a);};
+ auto branchTargetSuffix=[&]()->std::string {
+  if(instructionStreamSize==0U) return {};
+  const auto target=static_cast<std::int64_t>(instructionByteOffset)+4+
+   static_cast<std::int64_t>(imm)*4;
+  std::ostringstream text;
+  text<<" -> stream+0x"<<std::uppercase<<std::hex<<std::setfill('0')<<std::setw(4)
+      <<static_cast<std::uint64_t>(target);
+  if(target<0||static_cast<std::uint64_t>(target)>=instructionStreamSize)
+   text<<" (outside instruction stream)";
+  return text.str();
+ };
+ auto jumpTargetSuffix=[&]()->std::string {
+  if(instructionStreamSize==0U) return {};
+  std::ostringstream text;
+  text<<" -> index=0x"<<std::uppercase<<std::hex<<std::setfill('0')<<std::setw(7)
+      <<(word&0x03FFFFFFU)<<" (upper address bits inherited from PC+4)";
+  return text.str();
+ };
  switch(op){
  case 0:
   switch(fn){
@@ -259,10 +278,10 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
   }break;
  case 1:
   if(rt==0)mnemonic="bltz";else if(rt==1)mnemonic="bgez";else if(rt==16)mnemonic="bltzal";else if(rt==17)mnemonic="bgezal";else{known=false;break;}
-  args(reg(rs)+","+std::to_string(imm));break;
- case 2:case 3:mnemonic=op==2?"j":"jal";args(std::to_string(word&0x03FFFFFFU));break;
- case 4:case 5:mnemonic=op==4?"beq":"bne";args(reg(rs)+","+reg(rt)+","+std::to_string(imm));break;
- case 6:case 7:mnemonic=op==6?"blez":"bgtz";args(reg(rs)+","+std::to_string(imm));break;
+  args(reg(rs)+","+std::to_string(imm)+branchTargetSuffix());break;
+ case 2:case 3:mnemonic=op==2?"j":"jal";args(std::to_string(word&0x03FFFFFFU)+jumpTargetSuffix());break;
+ case 4:case 5:mnemonic=op==4?"beq":"bne";args(reg(rs)+","+reg(rt)+","+std::to_string(imm)+branchTargetSuffix());break;
+ case 6:case 7:mnemonic=op==6?"blez":"bgtz";args(reg(rs)+","+std::to_string(imm)+branchTargetSuffix());break;
  case 8:case 9:case 10:case 11:case 12:case 13:case 14:
   {static constexpr const char* names[]={"addi","addiu","slti","sltiu","andi","ori","xori"};mnemonic=names[op-8];args(reg(rt)+","+reg(rs)+","+std::to_string((op>=12)?(word&0xFFFFU):static_cast<std::uint32_t>(static_cast<std::int32_t>(imm))));}break;
  case 15:mnemonic="lui";args(reg(rt)+","+std::to_string(word&0xFFFFU));break;
@@ -290,7 +309,7 @@ void decodeMipsInstruction(std::uint32_t word,std::string& mnemonic,std::string&
    if(rt==0U) mnemonic="bc2f";
    else if(rt==1U) mnemonic="bc2t";
    else {known=false;break;}
-   args(std::to_string(imm));
+   args(std::to_string(imm)+branchTargetSuffix());
   } else if((rs&0x10U)!=0) {
    decodeGteCommand(word,mnemonic,arguments,known);
   } else {

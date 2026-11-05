@@ -71,6 +71,14 @@ int main(){
  assert(mipsKnown&&mipsName=="swc2"&&mipsArgs=="IR2,-4($a1)");
  decodeMipsInstruction(0x49000004U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="bc2f"&&mipsArgs=="4");
+ decodeMipsInstruction(0x1000FFFFU,mipsName,mipsArgs,mipsKnown,0x20U,0x100U);
+ assert(mipsKnown&&mipsName=="beq"&&mipsArgs=="$zr,$zr,-1 -> stream+0x0020");
+ decodeMipsInstruction(0x10000002U,mipsName,mipsArgs,mipsKnown,0x20U,0x28U);
+ assert(mipsKnown&&mipsArgs=="$zr,$zr,2 -> stream+0x002C (outside instruction stream)");
+ decodeMipsInstruction(0x49000004U,mipsName,mipsArgs,mipsKnown,0x20U,0x100U);
+ assert(mipsKnown&&mipsName=="bc2f"&&mipsArgs=="4 -> stream+0x0034");
+ decodeMipsInstruction(0x08000004U,mipsName,mipsArgs,mipsKnown,0x20U,0x100U);
+ assert(mipsKnown&&mipsName=="j"&&mipsArgs=="4 -> index=0x0000004 (upper address bits inherited from PC+4)");
  decodeMipsInstruction(0x49010004U,mipsName,mipsArgs,mipsKnown);
  assert(mipsKnown&&mipsName=="bc2t"&&mipsArgs=="4");
  decodeMipsInstruction(0x49020004U,mipsName,mipsArgs,mipsKnown);
