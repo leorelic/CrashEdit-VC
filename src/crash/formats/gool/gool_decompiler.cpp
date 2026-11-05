@@ -146,21 +146,23 @@ GoolIRDecompilation decompileGoolIR(
             }
         } else if (instruction.opcode == 59U) {
             const auto* operation = findControlOperation(program, index);
+            const auto* argumentCount = findOperand(instruction, 'V');
+            const std::string arguments = argumentCount
+                ? std::to_string(argumentCount->value) : "unknown";
             if (operation && operation->external) {
                 const auto* target = findOperand(instruction, 'I');
-                line << "call_external(" << (target ? operandText(*target) : "unknown_target");
+                line << "call_external(" << (target ? operandText(*target) : "unknown_target")
+                     << ", args=" << arguments << ")";
             } else if (operation && operation->targetInstructionValid) {
-                line << "call " << labelName(operation->targetInstruction) << "(";
+                line << "call " << labelName(operation->targetInstruction)
+                     << "(args=" << arguments << ")";
+                if (operation->targetInstruction < start || operation->targetInstruction >= boundedEnd)
+                    line << " // target is outside selected range";
             } else {
-                line << "call(/* unresolved local target */";
+                line << "call_unresolved(args=" << arguments << ")";
                 addDiagnostic(result, index, operation && !operation->diagnostic.empty()
                     ? operation->diagnostic : "local call target could not be resolved.");
             }
-            const auto* argumentCount = findOperand(instruction, 'V');
-            line << ", args=" << (argumentCount ? std::to_string(argumentCount->value) : "unknown") << ")";
-            if (operation && operation->targetInstructionValid &&
-                (operation->targetInstruction < start || operation->targetInstruction >= boundedEnd))
-                line << " // target is outside selected range";
         } else if (instruction.opcode >= 53U && instruction.opcode <= 55U) {
             const auto* operation = findControlOperation(program, index);
             if (instruction.opcode == 54U || instruction.opcode == 55U) {
