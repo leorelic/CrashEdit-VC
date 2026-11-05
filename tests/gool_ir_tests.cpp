@@ -236,6 +236,35 @@ int main() {
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
 
+    // R3000A SPECIAL instructions are only considered analyzed when their
+    // reserved fields satisfy the encoding constraints. Exception instructions
+    // are recognized without inventing GPR or memory effects.
+    NsfGool validationSource;
+    validationSource.version = NsfGoolVersion::Version2;
+    const auto addValidationWord = [&validationSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        validationSource.instructions.push_back(instruction);
+    };
+    addValidationWord((1U << 21U) | (2U << 16U) | (3U << 11U) | (4U << 6U)); // invalid sll: rs != 0
+    addValidationWord((8U << 21U) | (9U << 16U) | (10U << 11U) | (1U << 6U) | 33U); // invalid addu: shamt != 0
+    addValidationWord(0x0000000CU); // syscall
+    addValidationWord(0x0000000DU); // break
+    addValidationWord((21U << 21U) | (1U << 16U) | 8U); // invalid jr: rt != 0
+    const auto validationIR = buildGoolIR(validationSource);
+    assert(validationIR.instructions.size() == 5);
+    assert(!validationIR.instructions[0].nativeEffects.known);
+    assert(!validationIR.instructions[1].nativeEffects.known);
+    for (std::size_t i = 2; i <= 3; ++i) {
+        const auto& exceptionEffects = validationIR.instructions[i].nativeEffects;
+        assert(exceptionEffects.known);
+        assert(exceptionEffects.gprReadMask == 0U && exceptionEffects.gprWriteMask == 0U);
+        assert(exceptionEffects.memory == GoolIRMipsMemoryEffect::None);
+        assert(!exceptionEffects.controlTransfer);
+    }
+    assert(!validationIR.instructions[4].nativeEffects.known);
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;

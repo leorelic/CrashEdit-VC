@@ -51,26 +51,38 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
     if (fields.primaryOpcode == 0U) {
         switch (fields.function) {
         case 0U: case 2U: case 3U: // sll, srl, sra
+            if (fields.rs != 0U) return effects;
             read(fields.rt); write(fields.rd); break;
         case 4U: case 6U: case 7U: // sllv, srlv, srav
+            if (fields.shiftAmount != 0U) return effects;
             readRsRt(); write(fields.rd); break;
         case 8U: // jr
+            if (fields.rt != 0U || fields.rd != 0U || fields.shiftAmount != 0U) return effects;
             read(fields.rs); effects.controlTransfer = true; break;
         case 9U: // jalr
+            if (fields.rt != 0U || fields.shiftAmount != 0U) return effects;
             read(fields.rs); write(fields.rd); effects.controlTransfer = true; break;
+        case 12U: case 13U: // syscall, break (exception instructions; code field is opaque)
+            break;
         case 16U: // mfhi
+            if (fields.rs != 0U || fields.rt != 0U || fields.shiftAmount != 0U) return effects;
             effects.readsHi = true; write(fields.rd); break;
         case 17U: // mthi
+            if (fields.rt != 0U || fields.rd != 0U || fields.shiftAmount != 0U) return effects;
             read(fields.rs); effects.writesHi = true; break;
         case 18U: // mflo
+            if (fields.rs != 0U || fields.rt != 0U || fields.shiftAmount != 0U) return effects;
             effects.readsLo = true; write(fields.rd); break;
         case 19U: // mtlo
+            if (fields.rt != 0U || fields.rd != 0U || fields.shiftAmount != 0U) return effects;
             read(fields.rs); effects.writesLo = true; break;
         case 24U: case 25U: case 26U: case 27U: // mult[u], div[u]
+            if (fields.rd != 0U || fields.shiftAmount != 0U) return effects;
             readRsRt(); effects.writesHi = true; effects.writesLo = true; break;
         case 32U: case 33U: case 34U: case 35U: // add[u], sub[u]
         case 36U: case 37U: case 38U: case 39U: // and, or, xor, nor
         case 42U: case 43U: // slt[u]
+            if (fields.shiftAmount != 0U) return effects;
             readRsRt(); write(fields.rd); break;
         default: return effects;
         }
