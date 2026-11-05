@@ -61,6 +61,7 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [x] Apply the IR/decompiler to the first 20-word real Crash 2 sample region: DispC's Code hook at instruction 0; record its decoded words, descriptor-3 state transition, following RET, and unresolved execution question in `docs/DISPC_INITIAL_ROUTINE.md`.
 - [ ] Apply the decompiler to real Crash 2 routines, beginning with the `BoxsC` Code hook at instruction 558; use the resulting output to identify missing semantics rather than inventing high-level behavior.
 - [ ] Validate routine discovery against additional real GOOL objects and local-call patterns; investigate ambiguous/shared code and entry points not represented by local Code hooks or local calls.
+- [x] Report when a discovered routine's control flow reaches another known entry point, preserving it as an explicit routine boundary instead of silently absorbing it or misclassifying it as shared code.
 - [ ] Evolve the initial snapshot into a fully game-independent semantic IR; keep Crash 2 binary decoding/encoding in a separate backend.
 - [ ] Develop a readable, source-like GOOL representation rather than exposing raw instruction words as the primary editing surface.
 - [ ] Represent branches, loops, calls, returns, and state transitions in a way that can be traced back to their original instruction locations.
