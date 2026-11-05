@@ -329,9 +329,10 @@ GoolIRDecompilation decompileGoolIR(
             if (!closingLine.empty()) {
                 // Structured braces replace the original branch instruction,
                 // but keep its byte address visible for source-level tracing.
-                closingLine += " // @" + hexValue(
-                    static_cast<std::uint32_t>(instruction.sourceByteOffset), 4) + "\n";
-                result.text += closingLine;
+                if (options.preserveStructuredBranchOffsets)
+                    closingLine += " // @" + hexValue(
+                        static_cast<std::uint32_t>(instruction.sourceByteOffset), 4);
+                result.text += closingLine + "\n";
             }
             continue;
         }
@@ -657,6 +658,7 @@ GoolIRDecompilation decompileGoolIRRoutine(
             options.startInstruction = 0;
             options.endInstruction = compactProgram.instructions.size();
             options.includeHeader = false;
+            options.preserveStructuredBranchOffsets = true;
             auto structured = decompileGoolIR(compactProgram, options);
 
             // Translate temporary labels back to their original instruction

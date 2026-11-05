@@ -11,6 +11,7 @@ struct GoolIRDecompileOptions {
     std::size_t startInstruction = 0;
     std::size_t endInstruction = static_cast<std::size_t>(-1); // Exclusive.
     bool includeHeader = true;
+    bool preserveStructuredBranchOffsets = false;
 };
 
 struct GoolIRDecompilation {
