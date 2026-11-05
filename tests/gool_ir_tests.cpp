@@ -583,7 +583,7 @@ int main() {
     assert(leavingRoutineText.text.find("goto instruction 2") != std::string::npos);
     assert(leavingRoutineText.text.find("branch leaves this routine") != std::string::npos);
     assert(leavingRoutineText.text.find("goto L00002") == std::string::npos);
-    assert(leavingRoutineText.text.find("L00002:\\n") == std::string::npos);
+    assert(leavingRoutineText.text.find("L00002:\n") == std::string::npos);
 
     // RET is an explicit routine exit, while a final ordinary instruction is
     // reported as an incomplete end-of-program path rather than an invented RET.

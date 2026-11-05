@@ -551,7 +551,7 @@ GoolIRDecompilation decompileGoolIRRoutine(
                         instruction.text.replace(labelPosition, label.size(), absoluteTarget);
                         labelPosition += absoluteTarget.size();
                     }
-                    instruction.text += "    // branch leaves this routine\\n";
+                    instruction.text += "    // branch leaves this routine\n";
                 }
             }
         }
