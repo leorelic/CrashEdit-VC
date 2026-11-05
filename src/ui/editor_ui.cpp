@@ -4,6 +4,8 @@
 #include "crash/formats/eid.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include "crash/formats/gool/gool_control_flow.hpp"
+#include "crash/formats/gool/gool_ir.hpp"
+#include "crash/formats/gool/gool_decompiler.hpp"
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -1529,6 +1531,55 @@ void EditorUI::drawGoolInspector(){
    }
    if(!graph.diagnostics.empty()){ImGui::Separator();ImGui::Text("Analysis diagnostics");for(const auto&diagnostic:graph.diagnostics)ImGui::BulletText("%s",diagnostic.c_str());}
    if(graph.blocks.empty())ImGui::TextDisabled("No instructions are available to analyze.");
+   ImGui::EndTabItem();
+  }
+  if(ImGui::BeginTabItem("GOOL Script")){
+   static const Crash::NsfGool* cachedSource=nullptr;
+   static int cachedChunk=-1,cachedEntry=-1;
+   static int scriptStart=0,scriptEnd=0;
+   static Crash::GoolIRProgram cachedIR;
+   bool rebuild=cachedSource!=&g||cachedChunk!=selectedChunk_||cachedEntry!=selectedEntry_;
+   if(rebuild){
+    cachedIR=Crash::buildGoolIR(g);
+    cachedSource=&g;cachedChunk=selectedChunk_;cachedEntry=selectedEntry_;
+    scriptStart=0;scriptEnd=static_cast<int>(g.instructions.size());
+   }
+   ImGui::TextDisabled("Source-like preview generated from the shared GOOL IR. It is not editable yet; unknown behavior and raw words remain visible.");
+   if(ImGui::Button("Refresh from GOOL entry")){
+    cachedIR=Crash::buildGoolIR(g);scriptStart=0;scriptEnd=static_cast<int>(g.instructions.size());
+   }
+   ImGui::SameLine();
+   if(ImGui::Button("First local Code hook (80 instructions)")){
+    const auto hook=std::find_if(g.stateHookReferences.begin(),g.stateHookReferences.end(),[&](const auto&reference){
+     return reference.kind==Crash::NsfGoolStateHookKind::Code&&reference.status==Crash::NsfGoolStateHookStatus::Local&&
+      reference.targetChunkIndex==static_cast<std::size_t>(selectedChunk_)&&reference.targetEntryIndex==static_cast<std::size_t>(selectedEntry_);
+    });
+    if(hook!=g.stateHookReferences.end()){
+     scriptStart=std::min(static_cast<int>(hook->instructionOffset),static_cast<int>(g.instructions.size()));
+     scriptEnd=std::min(scriptStart+80,static_cast<int>(g.instructions.size()));
+    }else ImGui::SetTooltip("This entry has no resolved local Code hook.");
+   }
+   ImGui::SetNextItemWidth(110.0f);ImGui::InputInt("Start instruction",&scriptStart,1,16);
+   ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);ImGui::InputInt("End (exclusive)",&scriptEnd,1,16);
+   const int instructionCount=static_cast<int>(g.instructions.size());
+   scriptStart=std::clamp(scriptStart,0,instructionCount);
+   scriptEnd=std::clamp(scriptEnd,scriptStart,instructionCount);
+   ImGui::TextDisabled("Viewing window only; this does not claim to infer a complete routine boundary.");
+   Crash::GoolIRDecompileOptions options;
+   options.startInstruction=static_cast<std::size_t>(scriptStart);
+   options.endInstruction=static_cast<std::size_t>(scriptEnd);
+   const auto decompilation=Crash::decompileGoolIR(cachedIR,options);
+   ImGui::Text("%zu instructions | %zu diagnostics",static_cast<std::size_t>(scriptEnd-scriptStart),decompilation.diagnostics.size());
+   if(ImGui::BeginChild("GOOLScriptSource",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
+    ImGui::PushFont(ImGui::GetFont());
+    ImGui::TextUnformatted(decompilation.text.c_str());
+    ImGui::PopFont();
+    if(!decompilation.diagnostics.empty()){
+     ImGui::Separator();ImGui::TextUnformatted("Decompiler diagnostics");
+     for(const auto&diagnostic:decompilation.diagnostics)ImGui::BulletText("%s",diagnostic.c_str());
+    }
+   }
+   ImGui::EndChild();
    ImGui::EndTabItem();
   }
   ImGui::EndTabBar();
