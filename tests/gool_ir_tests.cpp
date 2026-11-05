@@ -151,5 +151,27 @@ int main() {
     assert(semanticIR.controlOperations[2].kind == GoolIRControlOperationKind::Return);
     assert(!semanticIR.controlOperations[2].targetInstructionValid);
 
+    NsfGool mipsSource;
+    mipsSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction jalr;
+    jalr.isMips = true;
+    jalr.word = 0x02A0F809U; // jalr $ra, $s5
+    jalr.byteOffset = 0x44;
+    jalr.mnemonic = "jalr";
+    jalr.arguments = "$ra,$s5";
+    jalr.mipsKnown = true;
+    mipsSource.instructions.push_back(jalr);
+    const auto mipsIR = buildGoolIR(mipsSource);
+    assert(mipsIR.instructions.size() == 1);
+    const auto& native = mipsIR.instructions[0];
+    assert(native.nativeMips && native.nativeFieldsDecoded);
+    assert(native.nativeFields.format == GoolIRMipsFormat::Register);
+    assert(native.nativeFields.primaryOpcode == 0);
+    assert(native.nativeFields.rs == 21);
+    assert(native.nativeFields.rd == 31);
+    assert(native.nativeFields.function == 9);
+    assert(native.rawWord == 0x02A0F809U);
+    assert(native.sourceByteOffset == 0x44);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
