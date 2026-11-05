@@ -485,16 +485,6 @@ int main() {
     assert(!routineIR.routines[1].hasSharedInstructions);
     assert((routineIR.unassignedInstructions == std::vector<std::size_t>{5}));
 
-    const auto firstRoutineText = decompileGoolIRRoutine(boundaryIR, 0);
-    assert(firstRoutineText.text.find("Routine 0 entry: L00000") != std::string::npos);
-    assert(firstRoutineText.text.find("@0x0000") != std::string::npos);
-    assert(firstRoutineText.text.find("@0x0004") != std::string::npos);
-    assert(firstRoutineText.text.find("@0x0008") == std::string::npos);
-    assert(firstRoutineText.text.find("entry-point boundary") != std::string::npos);
-    const auto invalidRoutineText = decompileGoolIRRoutine(invalidBranchIR, 0);
-    assert(invalidRoutineText.text.find("invalid branch target") != std::string::npos);
-    assert(!decompileGoolIRRoutine(boundaryIR, 99).diagnostics.empty());
-
     // Reaching another known entry point is reported as a boundary rather than
     // silently treating it as shared code or absorbing it into the first routine.
     NsfGool boundarySource;
@@ -521,6 +511,13 @@ int main() {
     assert(boundaryIR.routines[0].exits[0].kind == GoolIRRoutineExitKind::EntryPointBoundary);
     assert(boundaryIR.routines[0].exits[0].sourceInstruction == 1);
     assert(boundaryIR.routines[0].exits[0].targetInstruction == 2);
+    const auto firstRoutineText = decompileGoolIRRoutine(boundaryIR, 0);
+    assert(firstRoutineText.text.find("Routine 0 entry: L00000") != std::string::npos);
+    assert(firstRoutineText.text.find("@0x0000") != std::string::npos);
+    assert(firstRoutineText.text.find("@0x0004") != std::string::npos);
+    assert(firstRoutineText.text.find("@0x0008") == std::string::npos);
+    assert(firstRoutineText.text.find("entry-point boundary") != std::string::npos);
+    assert(!decompileGoolIRRoutine(boundaryIR, 99).diagnostics.empty());
 
     // RET is an explicit routine exit, while a final ordinary instruction is
     // reported as an incomplete end-of-program path rather than an invented RET.
@@ -566,6 +563,8 @@ int main() {
     assert(invalidBranchIR.routines[0].exits[0].flowKind == GoolIRFlowEdgeKind::Branch);
     assert(!invalidBranchIR.routines[0].exits[0].targetValid);
     assert(!invalidBranchIR.routines[0].exits[0].diagnostic.empty());
+    const auto invalidRoutineText = decompileGoolIRRoutine(invalidBranchIR, 0);
+    assert(invalidRoutineText.text.find("invalid branch target") != std::string::npos);
 
     // Local calls are represented as call relationships, not traversed as
     // ordinary control flow. The destination remains its own discovered routine.
