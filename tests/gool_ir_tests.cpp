@@ -265,6 +265,30 @@ int main() {
     }
     assert(!validationIR.instructions[4].nativeEffects.known);
 
+    // Immediate-format instructions also have reserved-field constraints.
+    NsfGool immediateValidationSource;
+    immediateValidationSource.version = NsfGoolVersion::Version2;
+    const auto addImmediateWord = [&immediateValidationSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        immediateValidationSource.instructions.push_back(instruction);
+    };
+    addImmediateWord((6U << 26U) | (4U << 21U) | (1U << 16U) | 0x10U); // invalid blez: rt != 0
+    addImmediateWord((7U << 26U) | (5U << 21U) | (2U << 16U) | 0x20U); // invalid bgtz: rt != 0
+    addImmediateWord((15U << 26U) | (3U << 21U) | (6U << 16U) | 0x1234U); // invalid lui: rs != 0
+    addImmediateWord((6U << 26U) | (4U << 21U) | 0x10U); // valid blez
+    addImmediateWord((15U << 26U) | (6U << 16U) | 0x1234U); // valid lui
+    const auto immediateValidationIR = buildGoolIR(immediateValidationSource);
+    assert(immediateValidationIR.instructions.size() == 5);
+    assert(!immediateValidationIR.instructions[0].nativeEffects.known);
+    assert(!immediateValidationIR.instructions[1].nativeEffects.known);
+    assert(!immediateValidationIR.instructions[2].nativeEffects.known);
+    assert(immediateValidationIR.instructions[3].nativeEffects.known);
+    assert(immediateValidationIR.instructions[3].nativeEffects.controlTransfer);
+    assert(immediateValidationIR.instructions[4].nativeEffects.known);
+    assert(immediateValidationIR.instructions[4].nativeEffects.gprWriteMask == (std::uint32_t{1} << 6U));
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;

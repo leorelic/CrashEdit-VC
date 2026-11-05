@@ -102,11 +102,13 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         case 4U: case 5U: // beq, bne
             readRsRt(); effects.controlTransfer = true; break;
         case 6U: case 7U: // blez, bgtz
+            if (fields.rt != 0U) return effects;
             read(fields.rs); effects.controlTransfer = true; break;
         case 8U: case 9U: case 10U: case 11U:
         case 12U: case 13U: case 14U: // immediate ALU operations
             read(fields.rs); write(fields.rt); break;
         case 15U: // lui
+            if (fields.rs != 0U) return effects;
             write(fields.rt); break;
         case 32U: case 33U: case 34U: case 35U:
         case 36U: case 37U: case 38U: // byte/half/word loads and unaligned loads
