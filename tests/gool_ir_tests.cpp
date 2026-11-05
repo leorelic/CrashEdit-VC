@@ -290,7 +290,7 @@ int main() {
     const auto structuredIR = buildGoolIR(structuredSource);
     const auto structuredText = decompileGoolIR(structuredIR);
     assert(structuredText.text.find("if (subtype != 0) {") != std::string::npos);
-    assert(structuredText.text.find("    }\\n") != std::string::npos);
+    assert(structuredText.text.find("    }\n") != std::string::npos);
     assert(structuredText.text.find("goto L00004") == std::string::npos);
     assert(structuredText.text.find("@0x0204") != std::string::npos);
     assert(structuredText.text.find("@0x0208") == std::string::npos);
