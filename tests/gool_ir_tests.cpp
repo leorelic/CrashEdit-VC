@@ -536,6 +536,27 @@ int main() {
     assert(!exitIR.routines[1].exits[0].targetValid);
     assert(!exitIR.routines[1].diagnostics.empty());
 
+    // Invalid branch destinations remain explicit routine exits. The
+    // analysis must not silently drop an out-of-range edge or invent a return.
+    NsfGool invalidBranchSource;
+    invalidBranchSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction invalidBranch;
+    invalidBranch.opcode = 50U; // BRA to instruction 6, outside this one-word program.
+    invalidBranch.operandBits = 5U;
+    invalidBranchSource.instructions.push_back(invalidBranch);
+    invalidBranchSource.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
+    const auto invalidBranchIR = buildGoolIR(invalidBranchSource);
+    assert(invalidBranchIR.routines.size() == 1);
+    assert(invalidBranchIR.routines[0].instructions == std::vector<std::size_t>{0});
+    assert(invalidBranchIR.routines[0].exits.size() == 1);
+    assert(invalidBranchIR.routines[0].exits[0].kind ==
+        GoolIRRoutineExitKind::InvalidBranchTarget);
+    assert(invalidBranchIR.routines[0].exits[0].sourceInstruction == 0);
+    assert(invalidBranchIR.routines[0].exits[0].flowKind == GoolIRFlowEdgeKind::Branch);
+    assert(!invalidBranchIR.routines[0].exits[0].targetValid);
+    assert(!invalidBranchIR.routines[0].exits[0].diagnostic.empty());
+
     // Local calls are represented as call relationships, not traversed as
     // ordinary control flow. The destination remains its own discovered routine.
     NsfGool callSource;
