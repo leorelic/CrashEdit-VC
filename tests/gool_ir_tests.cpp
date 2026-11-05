@@ -577,8 +577,22 @@ int main() {
         instruction.mnemonic = dispCMnemonics[i];
         dispC.instructions.push_back(std::move(instruction));
     }
+    // DispC descriptor 0's resolved local Code hook begins at instruction 0.
+    dispC.stateHookReferences.push_back({0, 0, 0, NsfGoolStateHookKind::Code,
+        0, 0, false, true, NsfGoolStateHookStatus::Local});
     const auto dispCIR = buildGoolIR(dispC);
     assert(dispCIR.instructions.size() == 20);
+    assert(dispCIR.routineEntries.size() == 1);
+    assert(dispCIR.routineEntries[0].instruction == 0);
+    assert(dispCIR.routineEntries[0].fromCodeHook);
+    assert(dispCIR.routines.size() == 1);
+    assert(dispCIR.routines[0].entryInstruction == 0);
+    assert(dispCIR.routines[0].instructions.size() == 20);
+    assert(dispCIR.routines[0].instructions.front() == 0);
+    assert(dispCIR.routines[0].instructions.back() == 19);
+    assert(!dispCIR.routines[0].hasSharedInstructions);
+    assert(dispCIR.routines[0].entryPointBoundaries.empty());
+    assert(dispCIR.unassignedInstructions.empty());
     assert(dispCIR.instructions.front().rawWord == 0x2086480DU);
     assert(dispCIR.instructions[18].rawWord == 0x35494003U);
     assert(dispCIR.instructions[19].rawWord == 0x31894000U);
