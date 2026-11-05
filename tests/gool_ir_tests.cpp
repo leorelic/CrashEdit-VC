@@ -505,6 +505,20 @@ int main() {
     assert(dispCIR.controlOperations[0].targetGoolEidValid);
     assert(dispCIR.controlOperations[0].targetGoolEid == 0x4E938CCD);
     assert(dispCIR.controlOperations[1].kind == GoolIRControlOperationKind::Return);
+    const auto goBlock = dispCIR.instructionToBlock[18];
+    const auto returnBlock = dispCIR.instructionToBlock[19];
+    assert(goBlock != returnBlock);
+    bool hasGoTransitionEdge = false;
+    bool hasGoFallthroughEdge = false;
+    for (const auto& edge : dispCIR.flowEdges) {
+        if (edge.sourceBlock != goBlock) continue;
+        if (edge.kind == GoolIRFlowEdgeKind::StateTransition && !edge.targetValid)
+            hasGoTransitionEdge = true;
+        if (edge.kind == GoolIRFlowEdgeKind::Fallthrough &&
+            edge.targetValid && edge.targetInstruction == 19)
+            hasGoFallthroughEdge = true;
+    }
+    assert(hasGoTransitionEdge && hasGoFallthroughEdge);
     const auto dispCText = decompileGoolIR(dispCIR);
     assert(dispCText.text.find("transition state_descriptor[3]") != std::string::npos);
     assert(dispCText.text.find("GOOL 0x4E938CCD") != std::string::npos);

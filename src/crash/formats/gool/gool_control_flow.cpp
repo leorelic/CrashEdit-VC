@@ -90,9 +90,12 @@ NsfGoolControlFlowGraph analyzeGoolControlFlow(const NsfGool& gool) {
             // Unconditional relative branch: no fallthrough edge.
         } else if(opcode==51U||opcode==52U) {
             if(last+1U<count) addEdge(last,last+1U,NsfGoolFlowEdgeKind::Fallthrough,true,{});
-        } else if(opcode==53U) {
-            // Unconditional GO transfers control to another state.
-        } else if(opcode==54U||opcode==55U) {
+        } else if(opcode==53U||opcode==54U||opcode==55U) {
+            // Preserve the sequential continuation after a state-transition
+            // instruction. The original CrashEdit decompiler treats GO as an
+            // ordinary statement and continues with the next instruction.
+            // Keep the dynamic state-transition edge above as a separate fact;
+            // exact runtime scheduling remains subject to semantic validation.
             if(last+1U<count) addEdge(last,last+1U,NsfGoolFlowEdgeKind::Fallthrough,true,{});
         } else if(opcode==59U) {
             if(last+1U<count) addEdge(last,last+1U,NsfGoolFlowEdgeKind::Fallthrough,true,{});
