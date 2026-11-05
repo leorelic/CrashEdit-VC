@@ -305,6 +305,10 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         }
         result.routines.push_back(std::move(routine));
     }
+    for (std::size_t instruction = 0; instruction < instructionCount; ++instruction) {
+        if (result.instructionRoutineMembership[instruction] == 0U)
+            result.unassignedInstructions.push_back(instruction);
+    }
     for (auto& routine : result.routines) {
         routine.hasSharedInstructions = std::any_of(routine.instructions.begin(),
             routine.instructions.end(), [&result](std::size_t instruction) {
