@@ -317,7 +317,7 @@ int main() {
             GoolIROperandKind::Signed, std::to_string(value)};
     };
     appendChainInstruction(4, 0x400, {chainField, chainValue2});
-    appendChainInstruction(52, 0x404, {chainDisplacement(3)});
+    appendChainInstruction(52, 0x404, {chainDisplacement(2)});
     appendChainInstruction(47, 0x408);
     appendChainInstruction(50, 0x40C, {chainDisplacement(5)});
     appendChainInstruction(4, 0x410, {chainField,
