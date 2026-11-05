@@ -85,8 +85,6 @@ GoolIRDecompilation decompileGoolIR(
                 const auto target = static_cast<std::int64_t>(index) + 1 + displacement->value;
                 if (target >= 0 && static_cast<std::uint64_t>(target) < program.instructions.size())
                     labels[static_cast<std::size_t>(target)] = true;
-                else if (index >= start && index < boundedEnd)
-                    addDiagnostic(result, index, "branch destination is outside this GOOL entry.");
             }
         }
 
