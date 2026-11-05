@@ -465,4 +465,67 @@ GoolIRDecompilation decompileGoolIR(
     return result;
 }
 
+
+GoolIRDecompilation decompileGoolIRRoutine(
+    const GoolIRProgram& program, std::size_t routineIndex) {
+    GoolIRDecompilation result;
+    if (routineIndex >= program.routines.size()) {
+        result.diagnostics.push_back("routine index is out of range.");
+        return result;
+    }
+
+    const auto& routine = program.routines[routineIndex];
+    result.text = "// Routine " + std::to_string(routineIndex) +
+        " entry: " + labelName(routine.entryInstruction) + "\\n";
+    result.text += "// Instructions are listed in discovered routine order.\\n";
+
+    for (const auto instructionIndex : routine.instructions) {
+        if (instructionIndex >= program.instructions.size()) {
+            result.diagnostics.push_back(
+                "routine contains an out-of-range instruction index " +
+                std::to_string(instructionIndex) + ".");
+            continue;
+        }
+        GoolIRDecompileOptions options;
+        options.startInstruction = instructionIndex;
+        options.endInstruction = instructionIndex + 1;
+        options.includeHeader = false;
+        auto instruction = decompileGoolIR(program, options);
+        constexpr std::string_view misleadingRangeNote =
+            " // target is outside selected range";
+        std::size_t note = 0;
+        while ((note = instruction.text.find(misleadingRangeNote, note)) != std::string::npos)
+            instruction.text.erase(note, misleadingRangeNote.size());
+        result.text += instruction.text;
+        result.diagnostics.insert(result.diagnostics.end(),
+            instruction.diagnostics.begin(), instruction.diagnostics.end());
+    }
+
+    const auto exitName = [](GoolIRRoutineExitKind kind) -> const char* {
+        switch (kind) {
+        case GoolIRRoutineExitKind::Return: return "return";
+        case GoolIRRoutineExitKind::EntryPointBoundary: return "entry-point boundary";
+        case GoolIRRoutineExitKind::InvalidBranchTarget: return "invalid branch target";
+        case GoolIRRoutineExitKind::EndOfProgram: return "end of program (incomplete)";
+        }
+        return "unknown exit";
+    };
+    for (const auto& exit : routine.exits) {
+        result.text += "    // exit at instruction " +
+            std::to_string(exit.sourceInstruction) + ": " + exitName(exit.kind);
+        if (exit.targetValid)
+            result.text += " -> " + labelName(exit.targetInstruction);
+        if (!exit.diagnostic.empty())
+            result.text += " (" + exit.diagnostic + ")";
+        result.text += "\\n";
+        if (!exit.diagnostic.empty())
+            result.diagnostics.push_back("routine exit at instruction " +
+                std::to_string(exit.sourceInstruction) + ": " + exit.diagnostic);
+    }
+    for (const auto& diagnostic : routine.diagnostics)
+        result.diagnostics.push_back("routine " + std::to_string(routineIndex) +
+            ": " + diagnostic);
+    return result;
+}
+
 }
