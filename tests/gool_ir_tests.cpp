@@ -358,6 +358,7 @@ int main() {
     appendElseInstruction(50, 0x50C, {elseDisplacement(2)});
     appendElseInstruction(47, 0x510);
     appendElseInstruction(47, 0x514);
+    appendElseInstruction(47, 0x518); // common join
     const auto elseOutput = decompileGoolIR(elseProgram);
     assert(elseOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
     assert(elseOutput.text.find("} else {") != std::string::npos);
