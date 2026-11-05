@@ -288,11 +288,10 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             std::size_t instruction = 0;
             std::size_t sourceInstruction = 0;
             GoolIRFlowEdgeKind incomingKind = GoolIRFlowEdgeKind::Fallthrough;
-            bool hasSource = false;
         };
         std::vector<bool> visited(instructionCount, false);
         std::vector<PendingInstruction> pending{{candidate.instruction, 0U,
-            GoolIRFlowEdgeKind::Fallthrough, false}};
+            GoolIRFlowEdgeKind::Fallthrough}};
         while (!pending.empty()) {
             const auto next = pending.back();
             pending.pop_back();
@@ -315,11 +314,11 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             if (blockIndex >= result.basicBlocks.size()) continue;
             const auto& block = result.basicBlocks[blockIndex];
             if (current + 1U < block.endInstruction) {
-                pending.push_back({current + 1U, current, GoolIRFlowEdgeKind::Fallthrough, true});
+                pending.push_back({current + 1U, current, GoolIRFlowEdgeKind::Fallthrough});
             } else {
                 for (const auto& successor : blockSuccessors[blockIndex])
                     pending.push_back({successor.target, block.endInstruction - 1U,
-                        successor.kind, true});
+                        successor.kind});
             }
         }
         std::sort(routine.instructions.begin(), routine.instructions.end());
