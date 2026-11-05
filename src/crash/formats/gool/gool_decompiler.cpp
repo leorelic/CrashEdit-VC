@@ -100,6 +100,55 @@ GoolIRDecompilation decompileGoolIR(
             labels[hook.instructionOffset] = true;
     }
 
+    // Recognize a conservative forward-if pattern: a conditional branch skips
+    // to the next clause, while the fallthrough body ends in an unconditional
+    // branch to a later join point. This is common in GOOL's if/else-if chains.
+    // We only structure the body when the complete pattern is visible.
+    std::map<std::size_t, std::size_t> structuredIfEnd;
+    std::map<std::size_t, std::size_t> structuredIfJoin;
+    std::map<std::size_t, bool> suppressedBranches;
+    for (std::size_t index = start; index < boundedEnd; ++index) {
+        const auto& instruction = program.instructions[index];
+        if (instruction.nativeMips || !instruction.opcodeKnown ||
+            (instruction.opcode != 51U && instruction.opcode != 52U))
+            continue;
+        const auto* displacement = findOperand(instruction, 'I');
+        if (!displacement) continue;
+        const auto branchTargetSigned = static_cast<std::int64_t>(index) + 1 + displacement->value;
+        if (branchTargetSigned <= static_cast<std::int64_t>(index + 1) ||
+            branchTargetSigned >= static_cast<std::int64_t>(boundedEnd))
+            continue;
+        const auto branchTarget = static_cast<std::size_t>(branchTargetSigned);
+
+        // The fallthrough body must terminate with BRA to a join beyond the
+        // conditional destination. Do not infer structure across ambiguous flow.
+        for (std::size_t bodyEnd = index + 1; bodyEnd < branchTarget; ++bodyEnd) {
+            const auto& terminator = program.instructions[bodyEnd];
+            if (terminator.nativeMips || !terminator.opcodeKnown || terminator.opcode != 50U)
+                continue;
+            const auto* joinDisplacement = findOperand(terminator, 'I');
+            if (!joinDisplacement) continue;
+            const auto joinSigned = static_cast<std::int64_t>(bodyEnd) + 1 + joinDisplacement->value;
+            if (joinSigned <= branchTargetSigned ||
+                joinSigned >= static_cast<std::int64_t>(boundedEnd))
+                continue;
+
+            bool hasInteriorEntry = false;
+            for (const auto& [target, unused] : labels) {
+                (void)unused;
+                if (target > index + 1 && target <= bodyEnd) {
+                    hasInteriorEntry = true;
+                    break;
+                }
+            }
+            if (hasInteriorEntry) continue;
+            structuredIfEnd[index] = bodyEnd;
+            structuredIfJoin[index] = static_cast<std::size_t>(joinSigned);
+            suppressedBranches[bodyEnd] = true;
+            break;
+        }
+    }
+
     if (options.includeHeader) {
         result.text += "// Best-effort GOOL decompilation; unresolved semantics remain explicit.\n";
         result.text += "// Instruction range: [" + std::to_string(start) + ", " +
@@ -109,8 +158,18 @@ GoolIRDecompilation decompileGoolIR(
 
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
+        if (suppressedBranches.find(index) != suppressedBranches.end()) {
+            result.text += "    }\\n";
+            continue;
+        }
         if (labels.find(index) != labels.end())
             result.text += labelName(index) + ":\n";
+
+        if (structuredIfEnd.find(index) != structuredIfEnd.end()) {
+            result.text += "    if (" + fieldText(instruction) +
+                (instruction.opcode == 51U ? " == 0) {\\n" : " != 0) {\\n");
+            continue;
+        }
 
         std::ostringstream line;
         line << "    ";
