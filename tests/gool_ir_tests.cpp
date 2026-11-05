@@ -884,5 +884,21 @@ int main() {
     assert(dispCText.text.find("@0x0048") != std::string::npos);
     assert(dispCText.text.find("@0x004C") != std::string::npos);
 
+    // SETF is a proven destination/source operation: render it as an assignment
+    // while retaining the original instruction address and raw word comment.
+    NsfGool assignmentSource;
+    assignmentSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction setField;
+    setField.opcode = 17U;
+    setField.operandBits = (0x408U << 12U) | 5U; // x = immediate 5
+    setField.byteOffset = 0x24;
+    setField.word = 0x11000000U | setField.operandBits;
+    assignmentSource.instructions.push_back(setField);
+    const auto assignmentIR = buildGoolIR(assignmentSource);
+    const auto assignmentText = decompileGoolIR(assignmentIR);
+    assert(assignmentText.text.find("x = 5") != std::string::npos);
+    assert(assignmentText.text.find("@0x0024") != std::string::npos);
+    assert(assignmentText.text.find("raw=0x11040805") != std::string::npos);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }

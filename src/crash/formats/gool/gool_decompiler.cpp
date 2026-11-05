@@ -384,6 +384,15 @@ GoolIRDecompilation decompileGoolIR(
             line << ".gool_word " << hexValue(instruction.rawWord, 8)
                  << " // unknown opcode " << static_cast<unsigned>(instruction.opcode);
             addDiagnostic(result, index, "unknown GOOL opcode preserved as its original word.");
+        } else if (instruction.opcode == 17U) {
+            const auto* destination = findOperand(instruction, 'D');
+            const auto* value = findOperand(instruction, 'S');
+            if (destination && value) {
+                line << operandText(*destination) << " = " << operandText(*value);
+            } else {
+                line << "SETF /* missing destination or source */";
+                addDiagnostic(result, index, "SETF operands could not be resolved.");
+            }
         } else if (instruction.opcode == 73U) {
             line << ".mips_mode";
         } else if (instruction.opcode == 49U) {
