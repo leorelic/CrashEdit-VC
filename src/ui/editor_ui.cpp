@@ -45,7 +45,7 @@ static EditorPreferences editorPreferences;
 struct BlueprintInstructionCacheRow {
  Crash::NsfGoolInstructionAnalysis analysis;
  std::string reads,writes,uncertain,from,usedBy;
- std::vector<std::string> usedByLinks;
+ std::vector<std::string> fromLinks,usedByLinks;
 };
 struct BlueprintAnalysisCache {
  const Crash::NsfGool* source=nullptr;
@@ -89,9 +89,9 @@ static void prepareBlueprintDataFlow(BlueprintAnalysisCache& cache,const Crash::
    if(definitionId<cache.dataFlow.definitions.size())
     relation+="#"+std::to_string(cache.dataFlow.definitions[definitionId].instructionIndex);
   }
-  auto& from=cache.rows[use.instructionIndex].from;
-  if(!from.empty())from+=", ";
-  from+=relation;
+  auto& fromLinks=cache.rows[use.instructionIndex].fromLinks;
+  if(std::find(fromLinks.begin(),fromLinks.end(),relation)==fromLinks.end())
+   fromLinks.push_back(relation);
   const std::string reverseRelation=use.location+" -> #"+std::to_string(use.instructionIndex);
   for(const auto definitionId:use.reachingDefinitions) {
    if(definitionId>=cache.dataFlow.definitions.size())continue;
@@ -102,11 +102,16 @@ static void prepareBlueprintDataFlow(BlueprintAnalysisCache& cache,const Crash::
     links.push_back(reverseRelation);
   }
  }
- for(auto& row:cache.rows)
+ for(auto& row:cache.rows) {
+  for(const auto& link:row.fromLinks) {
+   if(!row.from.empty())row.from+=", ";
+   row.from+=link;
+  }
   for(const auto& link:row.usedByLinks) {
    if(!row.usedBy.empty())row.usedBy+=", ";
    row.usedBy+=link;
   }
+ }
  cache.dataFlowReady=true;
 }
 static void invalidateBlueprintAnalysisCache() {
@@ -2044,7 +2049,8 @@ void EditorUI::drawGoolBlueprintGraph(){
      ImGui::TableSetColumnIndex(5);if(row.from.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.from.c_str());
      ImGui::TableSetColumnIndex(6);if(row.usedBy.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.usedBy.c_str());
      ImGui::TableSetColumnIndex(7);if(row.analysis.executionEffect.empty())ImGui::TextDisabled("—");else ImGui::TextWrapped("%s",row.analysis.executionEffect.c_str());
-    }    ImGui::EndTable();
+    }
+    ImGui::EndTable();
    }
   }
   ImGui::End();
