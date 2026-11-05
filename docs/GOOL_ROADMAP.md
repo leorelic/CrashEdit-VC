@@ -60,6 +60,7 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 
 ## 5. Editing and recompilation
 
+- [x] Add a read-only GOOL Script decompilation preview to the Inspector, with instruction-range controls and a shortcut to the first resolved local Code hook.
 - [ ] Design a readable GOOL Script Editor for manual source-like editing.
 - [ ] Develop Blueprint into a visual authoring interface, allowing users to understand and eventually edit execution flow visually.
 - [ ] Keep the Script Editor and Blueprint backed by the same structured GOOL representation so changes remain consistent between views.
