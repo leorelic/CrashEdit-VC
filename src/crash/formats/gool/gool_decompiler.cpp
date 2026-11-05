@@ -476,8 +476,8 @@ GoolIRDecompilation decompileGoolIRRoutine(
 
     const auto& routine = program.routines[routineIndex];
     result.text = "// Routine " + std::to_string(routineIndex) +
-        " entry: " + labelName(routine.entryInstruction) + "\\n";
-    result.text += "// Instructions are listed in discovered routine order.\\n";
+        " entry: " + labelName(routine.entryInstruction) + "\n";
+    result.text += "// Instructions are listed in discovered routine order.\n";
 
     for (const auto instructionIndex : routine.instructions) {
         if (instructionIndex >= program.instructions.size()) {
@@ -517,7 +517,7 @@ GoolIRDecompilation decompileGoolIRRoutine(
             result.text += " -> " + labelName(exit.targetInstruction);
         if (!exit.diagnostic.empty())
             result.text += " (" + exit.diagnostic + ")";
-        result.text += "\\n";
+        result.text += "\n";
         if (!exit.diagnostic.empty())
             result.diagnostics.push_back("routine exit at instruction " +
                 std::to_string(exit.sourceInstruction) + ": " + exit.diagnostic);
