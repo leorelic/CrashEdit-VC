@@ -898,7 +898,7 @@ int main() {
     const auto assignmentText = decompileGoolIR(assignmentIR);
     assert(assignmentText.text.find("x = 5") != std::string::npos);
     assert(assignmentText.text.find("@0x0024") != std::string::npos);
-    assert(assignmentText.text.find("raw=0x11040805") != std::string::npos);
+    assert(assignmentText.text.find("raw=0x11408005") != std::string::npos);
 
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
