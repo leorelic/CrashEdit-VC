@@ -1536,24 +1536,36 @@ void EditorUI::drawGoolInspector(){
   if(ImGui::BeginTabItem("GOOL Script")){
    static const Crash::NsfGool* cachedSource=nullptr;
    static int cachedChunk=-1,cachedEntry=-1;
-   static int scriptStart=0,scriptEnd=0;
+   static int scriptStart=0,scriptEnd=0,renderedStart=-1,renderedEnd=-1;
    static Crash::GoolIRProgram cachedIR;
+   static Crash::GoolIRDecompilation cachedDecompilation;
+   auto firstLocalCodeHook= [&](){
+    return std::find_if(g.stateHookReferences.begin(),g.stateHookReferences.end(),[&](const auto&reference){
+     return reference.kind==Crash::NsfGoolStateHookKind::Code&&reference.status==Crash::NsfGoolStateHookStatus::Local&&
+      reference.targetChunkIndex==static_cast<std::size_t>(selectedChunk_)&&reference.targetEntryIndex==static_cast<std::size_t>(selectedEntry_);
+    });
+   };
    bool rebuild=cachedSource!=&g||cachedChunk!=selectedChunk_||cachedEntry!=selectedEntry_;
    if(rebuild){
     cachedIR=Crash::buildGoolIR(g);
     cachedSource=&g;cachedChunk=selectedChunk_;cachedEntry=selectedEntry_;
-    scriptStart=0;scriptEnd=static_cast<int>(g.instructions.size());
+    scriptStart=0;scriptEnd=std::min(80,static_cast<int>(g.instructions.size()));
+    const auto hook=firstLocalCodeHook();
+    if(hook!=g.stateHookReferences.end()){
+     scriptStart=std::min(static_cast<int>(hook->instructionOffset),static_cast<int>(g.instructions.size()));
+     scriptEnd=std::min(scriptStart+80,static_cast<int>(g.instructions.size()));
+    }
+    renderedStart=-1;renderedEnd=-1;
    }
    ImGui::TextDisabled("Source-like preview generated from the shared GOOL IR. It is not editable yet; unknown behavior and raw words remain visible.");
    if(ImGui::Button("Refresh from GOOL entry")){
-    cachedIR=Crash::buildGoolIR(g);scriptStart=0;scriptEnd=static_cast<int>(g.instructions.size());
+    cachedIR=Crash::buildGoolIR(g);renderedStart=-1;renderedEnd=-1;
    }
    ImGui::SameLine();
+   if(ImGui::Button("Full entry")){scriptStart=0;scriptEnd=static_cast<int>(g.instructions.size());}
+   ImGui::SameLine();
    if(ImGui::Button("First local Code hook (80 instructions)")){
-    const auto hook=std::find_if(g.stateHookReferences.begin(),g.stateHookReferences.end(),[&](const auto&reference){
-     return reference.kind==Crash::NsfGoolStateHookKind::Code&&reference.status==Crash::NsfGoolStateHookStatus::Local&&
-      reference.targetChunkIndex==static_cast<std::size_t>(selectedChunk_)&&reference.targetEntryIndex==static_cast<std::size_t>(selectedEntry_);
-    });
+    const auto hook=firstLocalCodeHook();
     if(hook!=g.stateHookReferences.end()){
      scriptStart=std::min(static_cast<int>(hook->instructionOffset),static_cast<int>(g.instructions.size()));
      scriptEnd=std::min(scriptStart+80,static_cast<int>(g.instructions.size()));
@@ -1565,10 +1577,14 @@ void EditorUI::drawGoolInspector(){
    scriptStart=std::clamp(scriptStart,0,instructionCount);
    scriptEnd=std::clamp(scriptEnd,scriptStart,instructionCount);
    ImGui::TextDisabled("Viewing window only; this does not claim to infer a complete routine boundary.");
-   Crash::GoolIRDecompileOptions options;
-   options.startInstruction=static_cast<std::size_t>(scriptStart);
-   options.endInstruction=static_cast<std::size_t>(scriptEnd);
-   const auto decompilation=Crash::decompileGoolIR(cachedIR,options);
+   if(renderedStart!=scriptStart||renderedEnd!=scriptEnd){
+    Crash::GoolIRDecompileOptions options;
+    options.startInstruction=static_cast<std::size_t>(scriptStart);
+    options.endInstruction=static_cast<std::size_t>(scriptEnd);
+    cachedDecompilation=Crash::decompileGoolIR(cachedIR,options);
+    renderedStart=scriptStart;renderedEnd=scriptEnd;
+   }
+   const auto&decompilation=cachedDecompilation;
    ImGui::Text("%zu instructions | %zu diagnostics",static_cast<std::size_t>(scriptEnd-scriptStart),decompilation.diagnostics.size());
    if(ImGui::BeginChild("GOOLScriptSource",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
     ImGui::PushFont(ImGui::GetFont());
