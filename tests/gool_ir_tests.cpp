@@ -605,6 +605,25 @@ int main() {
     assert(discontiguousStructuredText.text.find("@0x07F0") == std::string::npos);
     assert(discontiguousStructuredText.text.find("@0x07F4") != std::string::npos);
 
+    // The routine-wide CFG view can structure a conditional whose two
+    // arms are separated by an unrelated instruction in the containing stream.
+    GoolIRProgram crossRegionProgram = structuredRoutineProgram;
+    GoolIRInstruction gapInstruction;
+    gapInstruction.opcode = 47U;
+    gapInstruction.opcodeKnown = true;
+    gapInstruction.mnemonic = "NOP";
+    gapInstruction.sourceByteOffset = 0x7F0;
+    crossRegionProgram.instructions.insert(crossRegionProgram.instructions.begin() + 3,
+        gapInstruction);
+    crossRegionProgram.instructions[1].operands[0].value = 3; // old target 4 -> new 5
+    crossRegionProgram.instructions[4].operands[0].value = 1; // new source 4 -> target 6
+    crossRegionProgram.routines[0].instructions = {0, 1, 2, 4, 5, 6};
+    const auto crossRegionText = decompileGoolIRRoutine(crossRegionProgram, 0);
+    assert(crossRegionText.text.find("if (self->subtype == 2) {") != std::string::npos);
+    assert(crossRegionText.text.find("} else {") != std::string::npos);
+    assert(crossRegionText.text.find("@0x07F0") == std::string::npos);
+    assert(crossRegionText.text.find("@0x000C") != std::string::npos);
+
     // A routine listing must define labels for branch destinations even
     // when the routine's reachable instructions are non-contiguous in the
     // containing GOOL instruction stream.

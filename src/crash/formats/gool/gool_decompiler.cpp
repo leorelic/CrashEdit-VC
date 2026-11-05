@@ -545,6 +545,111 @@ GoolIRDecompilation decompileGoolIRRoutine(
                     std::to_string(call.sourceInstruction) + " has unresolved local target\n";
         }
     } else {
+        // Compact a routine's own instruction sequence into a temporary IR
+        // stream when every control-flow edge remains inside the routine.
+        // This lets the existing structured recognizers see across gaps in
+        // the original object without importing unrelated instructions.
+        bool canCompact = !routine.instructions.empty();
+        std::map<std::size_t, std::size_t> compactIndex;
+        for (const auto original : routine.instructions) {
+            if (original >= program.instructions.size() ||
+                compactIndex.find(original) != compactIndex.end()) {
+                canCompact = false;
+                break;
+            }
+            compactIndex.emplace(original, compactIndex.size());
+        }
+        GoolIRProgram compactProgram;
+        if (canCompact) {
+            compactProgram = program;
+            compactProgram.instructions.clear();
+            compactProgram.instructions.reserve(routine.instructions.size());
+            for (const auto original : routine.instructions)
+                compactProgram.instructions.push_back(program.instructions[original]);
+
+            for (std::size_t compactSource = 0;
+                 compactSource < compactProgram.instructions.size(); ++compactSource) {
+                auto& instruction = compactProgram.instructions[compactSource];
+                if (instruction.nativeMips || !instruction.opcodeKnown ||
+                    instruction.opcode < 50U || instruction.opcode > 52U)
+                    continue;
+                auto* displacement = const_cast<GoolIROperand*>(findOperand(instruction, 'I'));
+                if (!displacement) { canCompact = false; break; }
+                const auto originalSource = routine.instructions[compactSource];
+                const auto originalTarget = static_cast<std::int64_t>(originalSource) +
+                    1 + displacement->value;
+                if (originalTarget < 0 ||
+                    static_cast<std::uint64_t>(originalTarget) >= program.instructions.size()) {
+                    canCompact = false;
+                    break;
+                }
+                const auto mappedTarget = compactIndex.find(static_cast<std::size_t>(originalTarget));
+                if (mappedTarget == compactIndex.end()) { canCompact = false; break; }
+                displacement->value = static_cast<std::int32_t>(mappedTarget->second) -
+                    static_cast<std::int32_t>(compactSource) - 1;
+            }
+        }
+        if (canCompact) {
+            compactProgram.controlOperations.clear();
+            for (auto operation : program.controlOperations) {
+                const auto source = compactIndex.find(operation.sourceInstruction);
+                if (source == compactIndex.end()) continue;
+                operation.sourceInstruction = source->second;
+                if (operation.kind == GoolIRControlOperationKind::Call &&
+                    operation.targetInstructionValid) {
+                    const auto target = compactIndex.find(operation.targetInstruction);
+                    if (target == compactIndex.end()) { canCompact = false; break; }
+                    operation.targetInstruction = target->second;
+                }
+                compactProgram.controlOperations.push_back(std::move(operation));
+            }
+        }
+        if (canCompact) {
+            compactProgram.hookDispatches.clear();
+            for (auto hook : program.hookDispatches) {
+                if (hook.resolution == GoolIRHookResolution::Local) {
+                    const auto target = compactIndex.find(hook.instructionOffset);
+                    if (target == compactIndex.end()) { canCompact = false; break; }
+                    hook.instructionOffset = static_cast<std::uint16_t>(target->second);
+                }
+                compactProgram.hookDispatches.push_back(std::move(hook));
+            }
+        }
+        if (canCompact) {
+            GoolIRDecompileOptions options;
+            options.startInstruction = 0;
+            options.endInstruction = compactProgram.instructions.size();
+            options.includeHeader = false;
+            auto structured = decompileGoolIR(compactProgram, options);
+
+            // Translate temporary labels back to their original instruction
+            // indices without allowing one replacement to affect another.
+            for (const auto& [original, compact] : compactIndex) {
+                const auto temporary = labelName(compact);
+                const auto placeholder = "__GOOL_ROUTINE_LABEL_" +
+                    std::to_string(compact) + "__";
+                std::size_t position = 0;
+                while ((position = structured.text.find(temporary, position)) !=
+                    std::string::npos) {
+                    structured.text.replace(position, temporary.size(), placeholder);
+                    position += placeholder.size();
+                }
+            }
+            for (const auto& [original, compact] : compactIndex) {
+                const auto placeholder = "__GOOL_ROUTINE_LABEL_" +
+                    std::to_string(compact) + "__";
+                std::size_t position = 0;
+                const auto replacement = labelName(original);
+                while ((position = structured.text.find(placeholder, position)) !=
+                    std::string::npos) {
+                    structured.text.replace(position, placeholder.size(), replacement);
+                    position += replacement.size();
+                }
+            }
+            result.text += structured.text;
+            result.diagnostics.insert(result.diagnostics.end(),
+                structured.diagnostics.begin(), structured.diagnostics.end());
+        } else {
         // Non-contiguous routines are split into maximal adjacent instruction
         // regions. Each region is decompiled as a unit, so local control-flow
         // patterns can still be recognized without pulling unrelated
@@ -627,6 +732,8 @@ GoolIRDecompilation decompileGoolIRRoutine(
                 region.diagnostics.begin(), region.diagnostics.end());
             regionBegin = regionEnd;
         }
+
+        } // End region-by-region fallback when safe compaction is not possible.
 
         for (const auto& call : routine.calls) {
             if (!call.targetRoutineFound && !call.external && call.targetInstructionValid)
