@@ -160,6 +160,12 @@ int main() {
     assert(semanticIR.controlOperations[0].sourceByteOffset == 0x80);
     assert(semanticIR.controlOperations[0].targetInstructionValid);
     assert(semanticIR.controlOperations[0].targetInstruction == 2);
+    assert(semanticIR.routineEntries.size() == 1);
+    assert(semanticIR.routineEntries[0].instruction == 2);
+    assert(semanticIR.routineEntries[0].fromLocalCall);
+    assert(semanticIR.routines.size() == 1);
+    assert(semanticIR.routines[0].entryInstruction == 2);
+    assert((semanticIR.routines[0].instructions == std::vector<std::size_t>{2}));
     assert(!semanticIR.controlOperations[0].external);
     assert(semanticIR.controlOperations[1].kind == GoolIRControlOperationKind::StateTransition);
     assert(semanticIR.controlOperations[1].targetDescriptorValid);
@@ -458,7 +464,7 @@ int main() {
     // establish entry points, while RET prevents traversal into the next routine.
     NsfGool routineSource;
     routineSource.version = NsfGoolVersion::Version2;
-    for (std::size_t i = 0; i < 5; ++i) {
+    for (std::size_t i = 0; i < 6; ++i) {
         NsfGoolInstruction instruction;
         instruction.opcode = (i == 2U || i == 4U) ? 49U : 47U;
         instruction.byteOffset = i * 4U;
@@ -477,6 +483,7 @@ int main() {
     assert((routineIR.routines[1].instructions == std::vector<std::size_t>{3, 4}));
     assert(!routineIR.routines[0].hasSharedInstructions);
     assert(!routineIR.routines[1].hasSharedInstructions);
+    assert((routineIR.unassignedInstructions == std::vector<std::size_t>{5}));
 
     // Real Crash 2 sample: DispC's Code hook at instruction 0. These twenty
     // words are copied from the extracted entry; this is a focused IR/decompiler
