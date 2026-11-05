@@ -479,6 +479,33 @@ GoolIRDecompilation decompileGoolIRRoutine(
         " entry: " + labelName(routine.entryInstruction) + "\n";
     result.text += "// Instructions are listed in discovered routine order.\n";
 
+    // Routine listings need label definitions for branches that remain inside
+    // the selected routine. The range decompiler emits branch references, but
+    // a one-instruction range cannot know which other routine instructions
+    // should receive those labels.
+    const auto belongsToRoutine = [&routine](std::size_t instructionIndex) {
+        return std::find(routine.instructions.begin(), routine.instructions.end(),
+            instructionIndex) != routine.instructions.end();
+    };
+    std::vector<std::size_t> routineBranchTargets;
+    for (const auto instructionIndex : routine.instructions) {
+        if (instructionIndex >= program.instructions.size()) continue;
+        const auto& instruction = program.instructions[instructionIndex];
+        if (instruction.nativeMips || !instruction.opcodeKnown ||
+            instruction.opcode < 50U || instruction.opcode > 52U)
+            continue;
+        const auto* displacement = findOperand(instruction, 'I');
+        if (!displacement) continue;
+        const auto target = static_cast<std::int64_t>(instructionIndex) + 1 +
+            displacement->value;
+        if (target >= 0 && static_cast<std::uint64_t>(target) < program.instructions.size() &&
+            belongsToRoutine(static_cast<std::size_t>(target)))
+            routineBranchTargets.push_back(static_cast<std::size_t>(target));
+    }
+    std::sort(routineBranchTargets.begin(), routineBranchTargets.end());
+    routineBranchTargets.erase(std::unique(routineBranchTargets.begin(),
+        routineBranchTargets.end()), routineBranchTargets.end());
+
     for (const auto instructionIndex : routine.instructions) {
         if (instructionIndex >= program.instructions.size()) {
             result.diagnostics.push_back(
@@ -486,6 +513,10 @@ GoolIRDecompilation decompileGoolIRRoutine(
                 std::to_string(instructionIndex) + ".");
             continue;
         }
+        if (std::binary_search(routineBranchTargets.begin(), routineBranchTargets.end(),
+                instructionIndex))
+            result.text += labelName(instructionIndex) + ":\n";
+
         GoolIRDecompileOptions options;
         options.startInstruction = instructionIndex;
         options.endInstruction = instructionIndex + 1;
@@ -497,6 +528,19 @@ GoolIRDecompilation decompileGoolIRRoutine(
         while ((note = instruction.text.find(misleadingRangeNote, note)) != std::string::npos)
             instruction.text.erase(note, misleadingRangeNote.size());
         result.text += instruction.text;
+        const auto call = std::find_if(routine.calls.begin(), routine.calls.end(),
+            [instructionIndex](const GoolIRRoutineCall& candidate) {
+                return candidate.sourceInstruction == instructionIndex;
+            });
+        if (call != routine.calls.end()) {
+            if (call->targetRoutineFound)
+                result.text += "    // calls discovered routine " +
+                    std::to_string(call->targetRoutineIndex) + "\\n";
+            else if (call->external)
+                result.text += "    // calls an external GOOL target\\n";
+            else if (!call->targetInstructionValid)
+                result.text += "    // local call target is unresolved\\n";
+        }
         result.diagnostics.insert(result.diagnostics.end(),
             instruction.diagnostics.begin(), instruction.diagnostics.end());
     }
