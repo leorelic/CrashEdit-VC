@@ -519,6 +519,39 @@ int main() {
     assert(firstRoutineText.text.find("entry-point boundary") != std::string::npos);
     assert(!decompileGoolIRRoutine(boundaryIR, 99).diagnostics.empty());
 
+    // A routine listing must define labels for branch destinations even
+    // when the routine's reachable instructions are non-contiguous in the
+    // containing GOOL instruction stream.
+    GoolIRProgram labeledRoutineProgram;
+    GoolIRInstruction routineBranch;
+    routineBranch.opcode = 50U;
+    routineBranch.opcodeKnown = true;
+    routineBranch.mnemonic = "BRA";
+    routineBranch.sourceByteOffset = 0x700;
+    routineBranch.operands.push_back({'I', 12, 1, 1,
+        GoolIROperandKind::Signed, "1"}); // instruction 0 -> instruction 2
+    labeledRoutineProgram.instructions.push_back(routineBranch);
+    GoolIRInstruction skippedInstruction;
+    skippedInstruction.opcode = 47U;
+    skippedInstruction.opcodeKnown = true;
+    skippedInstruction.mnemonic = "NOP";
+    skippedInstruction.sourceByteOffset = 0x704;
+    labeledRoutineProgram.instructions.push_back(skippedInstruction);
+    GoolIRInstruction routineTarget;
+    routineTarget.opcode = 49U;
+    routineTarget.opcodeKnown = true;
+    routineTarget.mnemonic = "RET";
+    routineTarget.sourceByteOffset = 0x708;
+    labeledRoutineProgram.instructions.push_back(routineTarget);
+    GoolIRRoutine labeledRoutine;
+    labeledRoutine.entryInstruction = 0;
+    labeledRoutine.instructions = {0, 2};
+    labeledRoutineProgram.routines.push_back(labeledRoutine);
+    const auto labeledRoutineText = decompileGoolIRRoutine(labeledRoutineProgram, 0);
+    assert(labeledRoutineText.text.find("goto L00002") != std::string::npos);
+    assert(labeledRoutineText.text.find("L00002:\\n") != std::string::npos);
+    assert(labeledRoutineText.text.find("@0x0704") == std::string::npos);
+
     // RET is an explicit routine exit, while a final ordinary instruction is
     // reported as an incomplete end-of-program path rather than an invented RET.
     NsfGool exitSource;
