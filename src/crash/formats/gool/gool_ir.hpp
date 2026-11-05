@@ -186,6 +186,7 @@ struct GoolIRProgram {
     std::vector<GoolIRRoutineEntry> routineEntries;
     std::vector<GoolIRRoutine> routines;
     std::vector<std::size_t> instructionRoutineMembership; // number of discovered routines reaching each instruction
+    std::vector<std::size_t> unassignedInstructions; // no discovered entry point reaches these instructions
     std::vector<GoolIRFlowEdge> flowEdges;
     std::vector<GoolIRControlOperation> controlOperations;
     std::vector<std::string> controlFlowDiagnostics;
