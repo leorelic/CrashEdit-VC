@@ -15,7 +15,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [ ] Extend data-flow analysis with validated value propagation, call/return context, and state-transition/event relationships without guessing at undocumented opcode behavior.
 - [ ] Improve explanations of calls, state transitions, event dispatch, and relationships between GOOL data structures.
 - [ ] Expand regression coverage across more real GOOL entries and unusual control-flow patterns.
-- [x] Discover routine entry candidates generically from resolved local Code hooks and local GOOL calls; trace conservative CFG reachability, stop at other known entry points, retain shared-instruction diagnostics, and report instructions not reached by any discovered entry point.
+- [x] Discover routine entry candidates generically from resolved local Code hooks and local GOOL calls; trace conservative CFG reachability, stop at other known entry points, identify exact shared instruction indices, and report instructions not reached by any discovered entry point.
 
 ## 2. Native MIPS and PlayStation instruction support
 
