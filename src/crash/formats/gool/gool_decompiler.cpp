@@ -627,6 +627,24 @@ GoolIRDecompilation decompileGoolIRRoutine(
             }
         }
         if (canCompact) {
+            // Keep the original stream's region boundaries visible in the
+            // source even though the compact IR can now structure across them.
+            for (std::size_t i = 1; i < routine.instructions.size(); ++i) {
+                if (routine.instructions[i] != routine.instructions[i - 1] + 1U) {
+                    const auto first = routine.instructions[i];
+                    std::size_t end = i + 1;
+                    while (end < routine.instructions.size() &&
+                        routine.instructions[end] < program.instructions.size() &&
+                        routine.instructions[end - 1] < program.instructions.size() &&
+                        routine.instructions[end] == routine.instructions[end - 1] + 1U)
+                        ++end;
+                    const auto last = routine.instructions[end - 1];
+                    result.text += "    // Discontiguous routine region [" +
+                        std::to_string(first) + ", " + std::to_string(last + 1U) + ")\\n";
+                    i = end - 1;
+                }
+            }
+
             GoolIRDecompileOptions options;
             options.startInstruction = 0;
             options.endInstruction = compactProgram.instructions.size();
