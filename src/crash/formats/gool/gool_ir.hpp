@@ -38,6 +38,12 @@ struct GoolIRMipsEffects {
     std::uint32_t coprocessor0ReadMask = 0;
     std::uint32_t coprocessor0WriteMask = 0;
     bool readsCoprocessor0Condition = false;
+    // COP2 data and control registers are distinct architectural banks.
+    std::uint32_t coprocessor2DataReadMask = 0;
+    std::uint32_t coprocessor2DataWriteMask = 0;
+    std::uint32_t coprocessor2ControlReadMask = 0;
+    std::uint32_t coprocessor2ControlWriteMask = 0;
+    bool readsCoprocessor2Condition = false;
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
     bool controlTransfer = false;
 };

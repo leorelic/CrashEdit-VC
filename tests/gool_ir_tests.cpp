@@ -335,6 +335,48 @@ int main() {
     assert(rfeEffects.coprocessor0WriteMask == (std::uint32_t{1} << 12U));
     assert(!cop0ControlIR.instructions[6].nativeEffects.known);
 
+    // COP2/GTE register transfers use separate data/control register banks.
+    // Condition branches are modeled; command words remain unknown until their
+    // command-specific register and flag effects have been audited.
+    NsfGool cop2Source;
+    cop2Source.version = NsfGoolVersion::Version2;
+    const auto addCop2Word = [&cop2Source](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        cop2Source.instructions.push_back(instruction);
+    };
+    addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (3U << 11U)); // mfc2 v0,v3
+    addCop2Word((18U << 26U) | (2U << 21U) | (4U << 16U) | (4U << 11U)); // cfc2 a0,c4
+    addCop2Word((18U << 26U) | (4U << 21U) | (5U << 16U) | (6U << 11U)); // mtc2 a1,d6
+    addCop2Word((18U << 26U) | (6U << 21U) | (7U << 16U) | (8U << 11U)); // ctc2 a3,c8
+    addCop2Word((18U << 26U) | (8U << 21U) | (1U << 16U) | 4U); // bc2t
+    addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (3U << 11U) | 1U); // malformed mfc2
+    addCop2Word((18U << 26U) | (8U << 21U) | (2U << 16U) | 4U); // malformed bc2
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x12345U); // GTE command: not yet modeled
+    const auto cop2IR = buildGoolIR(cop2Source);
+    assert(cop2IR.instructions.size() == 8);
+    const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
+    assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
+    assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
+    assert(mfc2Effects.coprocessor2ControlReadMask == 0U);
+    const auto& cfc2Effects = cop2IR.instructions[1].nativeEffects;
+    assert(cfc2Effects.known && cfc2Effects.gprWriteMask == (std::uint32_t{1} << 4U));
+    assert(cfc2Effects.coprocessor2ControlReadMask == (std::uint32_t{1} << 4U));
+    const auto& mtc2Effects = cop2IR.instructions[2].nativeEffects;
+    assert(mtc2Effects.known && mtc2Effects.gprReadMask == (std::uint32_t{1} << 5U));
+    assert(mtc2Effects.coprocessor2DataWriteMask == (std::uint32_t{1} << 6U));
+    const auto& ctc2Effects = cop2IR.instructions[3].nativeEffects;
+    assert(ctc2Effects.known && ctc2Effects.gprReadMask == (std::uint32_t{1} << 7U));
+    assert(ctc2Effects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 8U));
+    const auto& bc2Effects = cop2IR.instructions[4].nativeEffects;
+    assert(bc2Effects.known && bc2Effects.controlTransfer);
+    assert(bc2Effects.readsCoprocessor2Condition);
+    assert(bc2Effects.gprReadMask == 0U && bc2Effects.gprWriteMask == 0U);
+    assert(!cop2IR.instructions[5].nativeEffects.known);
+    assert(!cop2IR.instructions[6].nativeEffects.known);
+    assert(!cop2IR.instructions[7].nativeEffects.known);
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;

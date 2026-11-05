@@ -132,6 +132,34 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 return effects;
             }
             break;
+        case 18U: // PlayStation COP2/GTE register transfers and condition branches
+            if (fields.rs == 0U || fields.rs == 2U ||
+                fields.rs == 4U || fields.rs == 6U) {
+                // MFC2/CFC2/MTC2/CTC2 reserve bits 10..0.
+                if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
+                if (fields.rs == 0U) { // mfc2 rt, rd
+                    effects.coprocessor2DataReadMask |= (std::uint32_t{1} << fields.rd);
+                    write(fields.rt);
+                } else if (fields.rs == 2U) { // cfc2 rt, rd
+                    effects.coprocessor2ControlReadMask |= (std::uint32_t{1} << fields.rd);
+                    write(fields.rt);
+                } else if (fields.rs == 4U) { // mtc2 rt, rd
+                    read(fields.rt);
+                    effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << fields.rd);
+                } else { // ctc2 rt, rd
+                    read(fields.rt);
+                    effects.coprocessor2ControlWriteMask |= (std::uint32_t{1} << fields.rd);
+                }
+            } else if (fields.rs == 8U) { // bc2f / bc2t
+                if (fields.rt > 1U) return effects;
+                effects.readsCoprocessor2Condition = true;
+                effects.controlTransfer = true;
+            } else {
+                // COP2 command words (rs=16) and other operations need
+                // command-specific GTE semantics; retain them as unknown.
+                return effects;
+            }
+            break;
         case 32U: case 33U: case 34U: case 35U:
         case 36U: case 37U: case 38U: // byte/half/word loads and unaligned loads
             read(fields.rs);
