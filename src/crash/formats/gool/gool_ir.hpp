@@ -50,6 +50,8 @@ struct GoolIRMipsEffects {
     bool coprocessor2ConditionKnownFalse = false;
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
     bool controlTransfer = false;
+    // The next instruction executes before a control transfer takes effect (R3000A delay slot).
+    bool controlTransferHasDelaySlot = false;
 };
 
 // Structural R3000A word fields. These are encoding facts, not a claim that

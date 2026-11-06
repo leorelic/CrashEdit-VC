@@ -79,6 +79,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         if (reg != 0U) effects.gprWriteHasLoadDelay = true;
     };
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
+    const auto markControlTransfer = [&effects]() {
+        markControlTransfer();
+        effects.controlTransferHasDelaySlot = true;
+    };
     const auto readCop2Data = [&effects](std::uint8_t reg) {
         effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
         // IRGB and ORGB are packed views of the three IR color components.
@@ -117,10 +121,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             readRsRt(); write(fields.rd); break;
         case 8U: // jr
             if (fields.rt != 0U || fields.rd != 0U || fields.shiftAmount != 0U) return effects;
-            read(fields.rs); effects.controlTransfer = true; break;
+            read(fields.rs); markControlTransfer(); break;
         case 9U: // jalr
             if (fields.rt != 0U || fields.shiftAmount != 0U) return effects;
-            read(fields.rs); write(fields.rd); effects.controlTransfer = true; break;
+            read(fields.rs); write(fields.rd); markControlTransfer(); break;
         case 12U: case 13U: // syscall, break (exception instructions; code field is opaque)
             break;
         case 16U: // mfhi
@@ -152,17 +156,17 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 fields.rt != 16U && fields.rt != 17U) return effects;
             read(fields.rs);
             if (fields.rt == 16U || fields.rt == 17U) write(31U);
-            effects.controlTransfer = true;
+            markControlTransfer();
             break;
         case 2U: // j
-            effects.controlTransfer = true; break;
+            markControlTransfer(); break;
         case 3U: // jal
-            write(31U); effects.controlTransfer = true; break;
+            write(31U); markControlTransfer(); break;
         case 4U: case 5U: // beq, bne
-            readRsRt(); effects.controlTransfer = true; break;
+            readRsRt(); markControlTransfer(); break;
         case 6U: case 7U: // blez, bgtz
             if (fields.rt != 0U) return effects;
-            read(fields.rs); effects.controlTransfer = true; break;
+            read(fields.rs); markControlTransfer(); break;
         case 8U: case 9U: case 10U: case 11U:
         case 12U: case 13U: case 14U: // immediate ALU operations
             read(fields.rs); write(fields.rt); break;
@@ -181,7 +185,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             } else if (fields.rs == 8U) { // bc0f / bc0t
                 if (fields.rt > 1U) return effects;
                 effects.readsCoprocessor0Condition = true;
-                effects.controlTransfer = true;
+                markControlTransfer();
             } else if (fields.rs == 16U && fields.rt == 0U &&
                        fields.rd == 0U && fields.shiftAmount == 0U &&
                        fields.function == 16U) { // rfe: restore previous status mode
@@ -490,7 +494,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 // PS1 COP2 does not drive the condition input: BC2F is
                 // always taken and BC2T is never taken.
                 effects.coprocessor2ConditionKnownFalse = true;
-                effects.controlTransfer = true;
+                markControlTransfer();
             } else {
                 // COP2 command words (rs=16) and other operations need
                 // command-specific GTE semantics; retain them as unknown.

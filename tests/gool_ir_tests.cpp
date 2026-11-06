@@ -198,6 +198,7 @@ int main() {
     assert((jalrIR.nativeEffects.gprReadMask & (std::uint32_t{1} << 21U)) != 0U);
     assert((jalrIR.nativeEffects.gprWriteMask & (std::uint32_t{1} << 31U)) != 0U);
     assert(jalrIR.nativeEffects.controlTransfer);
+    assert(jalrIR.nativeEffects.controlTransferHasDelaySlot);
     assert(jalrIR.rawWord == 0x02A0F809U);
     assert(jalrIR.sourceByteOffset == 0x44);
 
@@ -231,8 +232,10 @@ int main() {
     assert((storeEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
     const auto& multiplyEffects = effectIR.instructions[3].nativeEffects;
     assert(multiplyEffects.known && multiplyEffects.writesHi && multiplyEffects.writesLo);
+    assert(!multiplyEffects.controlTransferHasDelaySlot);
     const auto& branchEffects = effectIR.instructions[4].nativeEffects;
     assert(branchEffects.known && branchEffects.controlTransfer);
+    assert(branchEffects.controlTransferHasDelaySlot);
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
 
@@ -317,6 +320,7 @@ int main() {
     assert(!cop0IR.instructions[2].nativeEffects.known);
     const auto& bc0fEffects = cop0IR.instructions[3].nativeEffects;
     assert(bc0fEffects.known && bc0fEffects.controlTransfer);
+    assert(bc0fEffects.controlTransferHasDelaySlot);
     assert(bc0fEffects.readsCoprocessor0Condition);
     assert(bc0fEffects.gprReadMask == 0U && bc0fEffects.gprWriteMask == 0U);
 
@@ -414,6 +418,7 @@ int main() {
     assert(ctc2Effects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 8U));
     const auto& bc2Effects = cop2IR.instructions[4].nativeEffects;
     assert(bc2Effects.known && bc2Effects.controlTransfer);
+    assert(bc2Effects.controlTransferHasDelaySlot);
     assert(bc2Effects.readsCoprocessor2Condition);
     assert(bc2Effects.coprocessor2ConditionKnownFalse);
     assert(bc2Effects.gprReadMask == 0U && bc2Effects.gprWriteMask == 0U);
@@ -858,6 +863,7 @@ int main() {
         (irColorMask | (std::uint32_t{1} << 28U)));
     const auto& bc2fEffects = cop2IR.instructions[43].nativeEffects;
     assert(bc2fEffects.known && bc2fEffects.controlTransfer);
+    assert(bc2fEffects.controlTransferHasDelaySlot);
     assert(bc2fEffects.readsCoprocessor2Condition);
     assert(bc2fEffects.coprocessor2ConditionKnownFalse);
     const auto& lwEffects = cop2IR.instructions[44].nativeEffects;
