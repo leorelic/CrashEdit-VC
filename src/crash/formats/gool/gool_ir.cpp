@@ -75,6 +75,24 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         if (reg != 0U) effects.gprWriteMask |= (std::uint32_t{1} << reg);
     };
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
+    const auto readCop2Data = [&effects](std::uint8_t reg) {
+        effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
+        // ORGB is a read-only packed view of the three IR color components.
+        if (reg == 29U) {
+            effects.coprocessor2DataReadMask |= (std::uint32_t{1} << 9U) |
+                (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U);
+        }
+    };
+    const auto writeCop2Data = [&effects](std::uint8_t reg) {
+        effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << reg);
+        // IRGB expands packed RGB into IR1..IR3; LZCS updates the LZCR result.
+        if (reg == 28U) {
+            effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << 9U) |
+                (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U);
+        } else if (reg == 30U) {
+            effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << 31U);
+        }
+    };
 
     if (fields.primaryOpcode == 0U) {
         switch (fields.function) {
@@ -441,14 +459,14 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 // MFC2/CFC2/MTC2/CTC2 reserve bits 10..0.
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 if (fields.rs == 0U) { // mfc2 rt, rd
-                    effects.coprocessor2DataReadMask |= (std::uint32_t{1} << fields.rd);
+                    readCop2Data(fields.rd);
                     write(fields.rt);
                 } else if (fields.rs == 2U) { // cfc2 rt, rd
                     effects.coprocessor2ControlReadMask |= (std::uint32_t{1} << fields.rd);
                     write(fields.rt);
                 } else if (fields.rs == 4U) { // mtc2 rt, rd
                     read(fields.rt);
-                    effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << fields.rd);
+                    writeCop2Data(fields.rd);
                 } else { // ctc2 rt, rd
                     read(fields.rt);
                     effects.coprocessor2ControlWriteMask |= (std::uint32_t{1} << fields.rd);
@@ -477,12 +495,12 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             break;
         case 50U: // LWC2 rt, offset(rs): load a word into GTE data register rt
             read(fields.rs);
-            effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << fields.rt);
+            writeCop2Data(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Read;
             break;
         case 58U: // SWC2 rt, offset(rs): store GTE data register rt
             read(fields.rs);
-            effects.coprocessor2DataReadMask |= (std::uint32_t{1} << fields.rt);
+            readCop2Data(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Write;
             break;
         default: return effects;
