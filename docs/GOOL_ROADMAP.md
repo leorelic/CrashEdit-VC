@@ -25,6 +25,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Validate reserved-field constraints for common R3000A SPECIAL-format instructions and recognize SYSCALL/BREAK without inventing register or memory effects.
 - [x] Validate reserved `rt` fields for BLEZ/BGTZ and the reserved `rs` field for LUI; keep malformed immediate-format words unanalyzed.
 - [x] Model validated COP0 MFC0/MTC0 transfers with separate coprocessor-register read/write effects; leave unsupported COP0 operations and malformed transfer encodings unanalyzed.
+- [x] Record the R3000A one-instruction GPR load delay for memory loads and COP0/COP2 MFC/CFC transfers, excluding discarded writes to `$zero`; keep GTE-register pipeline timing separate.
 - [x] Model R3000A BC0 condition branches and RFE status-mode restoration separately from GPR effects; reject malformed branch encodings and leave other COP0 operations unsupported.
 - [x] Model validated COP2 MFC2/CFC2/MTC2/CTC2 transfers with separate data/control register effects, plus BC2 condition branches; keep malformed encodings and command words explicitly unanalyzed.
 - [x] Model PlayStation LWC2/SWC2 memory transfers as GTE data-register writes/reads, retaining the base GPR dependency and explicit memory read/write classification; leave other coprocessor load/store encodings unsupported.

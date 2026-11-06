@@ -30,6 +30,8 @@ struct GoolIRMipsEffects {
     bool known = false;
     std::uint32_t gprReadMask = 0;
     std::uint32_t gprWriteMask = 0;
+    // The destination becomes visible after the following instruction (R3000A load delay).
+    bool gprWriteHasLoadDelay = false;
     bool readsHi = false;
     bool writesHi = false;
     bool readsLo = false;

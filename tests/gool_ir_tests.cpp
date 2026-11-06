@@ -393,15 +393,19 @@ int main() {
     addCop2Word((18U << 26U) | (0U << 21U) | (6U << 16U) | (28U << 11U)); // mfc2 a2,irgb
     addCop2Word((58U << 26U) | (5U << 21U) | (28U << 16U) | 0x3CU); // swc2 irgb,0x3c(a1)
     addCop2Word((18U << 26U) | (8U << 21U) | (0U << 16U) | 4U); // bc2f
+    addCop2Word((35U << 26U) | (4U << 21U) | (8U << 16U) | 0x10U); // lw t0,0x10(a0)
+    addCop2Word((18U << 26U) | (0U << 21U) | (0U << 16U) | (3U << 11U)); // mfc2 zero,v3
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 44);
+    assert(cop2IR.instructions.size() == 46);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
     assert(mfc2Effects.coprocessor2ControlReadMask == 0U);
+    assert(mfc2Effects.gprWriteHasLoadDelay);
     const auto& cfc2Effects = cop2IR.instructions[1].nativeEffects;
     assert(cfc2Effects.known && cfc2Effects.gprWriteMask == (std::uint32_t{1} << 4U));
     assert(cfc2Effects.coprocessor2ControlReadMask == (std::uint32_t{1} << 4U));
+    assert(cfc2Effects.gprWriteHasLoadDelay);
     const auto& mtc2Effects = cop2IR.instructions[2].nativeEffects;
     assert(mtc2Effects.known && mtc2Effects.gprReadMask == (std::uint32_t{1} << 5U));
     assert(mtc2Effects.coprocessor2DataWriteMask == (std::uint32_t{1} << 6U));
@@ -856,6 +860,12 @@ int main() {
     assert(bc2fEffects.known && bc2fEffects.controlTransfer);
     assert(bc2fEffects.readsCoprocessor2Condition);
     assert(bc2fEffects.coprocessor2ConditionKnownFalse);
+    const auto& lwEffects = cop2IR.instructions[44].nativeEffects;
+    assert(lwEffects.known && lwEffects.gprWriteHasLoadDelay);
+    assert(lwEffects.gprWriteMask == (std::uint32_t{1} << 8U));
+    const auto& zeroMfc2Effects = cop2IR.instructions[45].nativeEffects;
+    assert(zeroMfc2Effects.known && zeroMfc2Effects.gprWriteMask == 0U);
+    assert(!zeroMfc2Effects.gprWriteHasLoadDelay);
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);

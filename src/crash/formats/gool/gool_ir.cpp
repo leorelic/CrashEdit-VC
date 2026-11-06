@@ -74,6 +74,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         // Writes to $zero are architecturally discarded.
         if (reg != 0U) effects.gprWriteMask |= (std::uint32_t{1} << reg);
     };
+    const auto writeLoad = [&effects, &write](std::uint8_t reg) {
+        write(reg);
+        if (reg != 0U) effects.gprWriteHasLoadDelay = true;
+    };
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
     const auto readCop2Data = [&effects](std::uint8_t reg) {
         effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
@@ -169,7 +173,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             if (fields.rs == 0U) { // mfc0 rt, rd
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 effects.coprocessor0ReadMask |= (std::uint32_t{1} << fields.rd);
-                write(fields.rt);
+                writeLoad(fields.rt);
             } else if (fields.rs == 4U) { // mtc0 rd, rt
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 read(fields.rt);
@@ -469,10 +473,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;
                 if (fields.rs == 0U) { // mfc2 rt, rd
                     readCop2Data(fields.rd);
-                    write(fields.rt);
+                    writeLoad(fields.rt);
                 } else if (fields.rs == 2U) { // cfc2 rt, rd
                     effects.coprocessor2ControlReadMask |= (std::uint32_t{1} << fields.rd);
-                    write(fields.rt);
+                    writeLoad(fields.rt);
                 } else if (fields.rs == 4U) { // mtc2 rt, rd
                     read(fields.rt);
                     writeCop2Data(fields.rd);
@@ -498,7 +502,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             read(fields.rs);
             if (fields.primaryOpcode == 34U || fields.primaryOpcode == 38U)
                 read(fields.rt); // merge with the old destination value
-            write(fields.rt);
+            writeLoad(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Read;
             break;
         case 40U: case 41U: case 42U: case 43U: case 46U: // stores
