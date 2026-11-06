@@ -371,8 +371,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x1CU); // cc
     addCop2Word((18U << 26U) | (16U << 21U) | 0x14U); // cdp
     addCop2Word((18U << 26U) | (16U << 21U) | 0x1BU); // nccs
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x1EU); // ncs
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 22);
+    assert(cop2IR.instructions.size() == 23);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -591,6 +592,27 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(nccsEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& ncsEffects = cop2IR.instructions[22].nativeEffects;
+    assert(ncsEffects.known);
+    // NCS shares NCCS lighting stages but does not consume RGBC; its RGB FIFO
+    // output still carries the command's color result.
+    assert(ncsEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 0U) | (std::uint32_t{1} << 1U)));
+    assert(ncsEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 8U) | (std::uint32_t{1} << 9U) |
+         (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U) |
+         (std::uint32_t{1} << 12U) | (std::uint32_t{1} << 13U) |
+         (std::uint32_t{1} << 14U) | (std::uint32_t{1} << 15U) |
+         (std::uint32_t{1} << 16U) | (std::uint32_t{1} << 17U) |
+         (std::uint32_t{1} << 18U) | (std::uint32_t{1} << 19U) |
+         (std::uint32_t{1} << 20U)));
+    assert(ncsEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 20U) |
+         (std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(ncsEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
