@@ -131,6 +131,7 @@ These are different views of the same underlying GOOL model, not separate implem
 
 - [x] Model GTE data-register aliases in COP2 transfers: IRGB reads and ORGB reads depend on IR1–IR3, IRGB writes update IR1–IR3, and LZCS writes update LZCR; cover register and memory transfer forms.
 - [x] Model the SXYP screen-coordinate FIFO alias in COP2 transfers: reads mirror SXY2, while writes shift SXY0–SXY2; cover register and memory transfer forms.
+- [x] Record the PlayStation's fixed-false COP2 condition input in native MIPS effects, distinguishing the architectural condition source from ordinary data dependencies for BC2F/BC2T.
 
 ## Progress policy
 

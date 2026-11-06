@@ -392,8 +392,9 @@ int main() {
     addCop2Word((58U << 26U) | (5U << 21U) | (15U << 16U) | 0x38U); // swc2 sxyp,0x38(a1)
     addCop2Word((18U << 26U) | (0U << 21U) | (6U << 16U) | (28U << 11U)); // mfc2 a2,irgb
     addCop2Word((58U << 26U) | (5U << 21U) | (28U << 16U) | 0x3CU); // swc2 irgb,0x3c(a1)
+    addCop2Word((18U << 26U) | (8U << 21U) | (0U << 16U) | 4U); // bc2f
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 43);
+    assert(cop2IR.instructions.size() == 44);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -410,6 +411,7 @@ int main() {
     const auto& bc2Effects = cop2IR.instructions[4].nativeEffects;
     assert(bc2Effects.known && bc2Effects.controlTransfer);
     assert(bc2Effects.readsCoprocessor2Condition);
+    assert(bc2Effects.coprocessor2ConditionKnownFalse);
     assert(bc2Effects.gprReadMask == 0U && bc2Effects.gprWriteMask == 0U);
     assert(!cop2IR.instructions[5].nativeEffects.known);
     assert(!cop2IR.instructions[6].nativeEffects.known);
@@ -850,6 +852,10 @@ int main() {
     assert(irgbStoreEffects.known && irgbStoreEffects.memory == GoolIRMipsMemoryEffect::Write);
     assert(irgbStoreEffects.coprocessor2DataReadMask ==
         (irColorMask | (std::uint32_t{1} << 28U)));
+    const auto& bc2fEffects = cop2IR.instructions[43].nativeEffects;
+    assert(bc2fEffects.known && bc2fEffects.controlTransfer);
+    assert(bc2fEffects.readsCoprocessor2Condition);
+    assert(bc2fEffects.coprocessor2ConditionKnownFalse);
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);

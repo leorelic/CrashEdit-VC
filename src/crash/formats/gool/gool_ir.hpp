@@ -44,6 +44,8 @@ struct GoolIRMipsEffects {
     std::uint32_t coprocessor2ControlReadMask = 0;
     std::uint32_t coprocessor2ControlWriteMask = 0;
     bool readsCoprocessor2Condition = false;
+    // On the PlayStation, the COP2 condition input is hardwired false.
+    bool coprocessor2ConditionKnownFalse = false;
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
     bool controlTransfer = false;
 };

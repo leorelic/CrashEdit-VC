@@ -483,6 +483,9 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             } else if (fields.rs == 8U) { // bc2f / bc2t
                 if (fields.rt > 1U) return effects;
                 effects.readsCoprocessor2Condition = true;
+                // PS1 COP2 does not drive the condition input: BC2F is
+                // always taken and BC2T is never taken.
+                effects.coprocessor2ConditionKnownFalse = true;
                 effects.controlTransfer = true;
             } else {
                 // COP2 command words (rs=16) and other operations need
