@@ -367,8 +367,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x10U); // dpcs
     addCop2Word((18U << 26U) | (16U << 21U) | 0x11U); // intpl
     addCop2Word((18U << 26U) | (16U << 21U) | 0x29U); // dcpl
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x2AU); // dpct
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 18);
+    assert(cop2IR.instructions.size() == 19);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -512,6 +513,24 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(dcplEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& dpctEffects = cop2IR.instructions[18].nativeEffects;
+    assert(dpctEffects.known);
+    // DPCT consumes the three RGB FIFO entries over its three passes; RGBC
+    // supplies only the CODE byte, while IR0 and far color drive depth cueing.
+    assert(dpctEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 6U) | (std::uint32_t{1} << 8U) |
+         (std::uint32_t{1} << 20U) | (std::uint32_t{1} << 21U) |
+         (std::uint32_t{1} << 22U)));
+    assert(dpctEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 23U)));
+    assert(dpctEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 20U) |
+         (std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(dpctEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
