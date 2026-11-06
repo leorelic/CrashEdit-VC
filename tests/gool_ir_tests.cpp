@@ -368,8 +368,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x11U); // intpl
     addCop2Word((18U << 26U) | (16U << 21U) | 0x29U); // dcpl
     addCop2Word((18U << 26U) | (16U << 21U) | 0x2AU); // dpct
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x1CU); // cc
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 19);
+    assert(cop2IR.instructions.size() == 20);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -531,6 +532,23 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(dpctEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& ccEffects = cop2IR.instructions[19].nativeEffects;
+    assert(ccEffects.known);
+    assert(ccEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 6U) | (std::uint32_t{1} << 9U) |
+         (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U)));
+    assert(ccEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 13U) | (std::uint32_t{1} << 14U) |
+         (std::uint32_t{1} << 15U) | (std::uint32_t{1} << 16U) |
+         (std::uint32_t{1} << 17U) | (std::uint32_t{1} << 18U) |
+         (std::uint32_t{1} << 19U) | (std::uint32_t{1} << 20U)));
+    assert(ccEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 20U) |
+         (std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(ccEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
