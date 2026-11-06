@@ -77,8 +77,9 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
     const auto readCop2Data = [&effects](std::uint8_t reg) {
         effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
-        // ORGB is a read-only packed view of the three IR color components.
-        if (reg == 29U) {
+        // IRGB and ORGB are packed views of the three IR color components.
+        // IRGB is also writable (handled by writeCop2Data below).
+        if (reg == 28U || reg == 29U) {
             effects.coprocessor2DataReadMask |= (std::uint32_t{1} << 9U) |
                 (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U);
         } else if (reg == 15U) {

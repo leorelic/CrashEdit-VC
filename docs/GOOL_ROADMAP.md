@@ -129,7 +129,7 @@ The long-term GOOL workflow should provide three complementary ways to understan
 
 These are different views of the same underlying GOOL model, not separate implementations of the format. The Inspector remains useful for precise technical inspection; Blueprint emphasizes visual structure and approachable authoring; GOOL Script emphasizes readability and text-based authoring.
 
-- [x] Model GTE data-register aliases in COP2 transfers: IRGB writes update IR1–IR3, ORGB reads depend on IR1–IR3, and LZCS writes update LZCR; cover both register and memory transfer forms.
+- [x] Model GTE data-register aliases in COP2 transfers: IRGB reads and ORGB reads depend on IR1–IR3, IRGB writes update IR1–IR3, and LZCS writes update LZCR; cover register and memory transfer forms.
 - [x] Model the SXYP screen-coordinate FIFO alias in COP2 transfers: reads mirror SXY2, while writes shift SXY0–SXY2; cover register and memory transfer forms.
 
 ## Progress policy
