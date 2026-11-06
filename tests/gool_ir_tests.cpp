@@ -378,7 +378,6 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x3FU); // ncct
     addCop2Word((18U << 26U) | (16U << 21U) | 0x01U); // rtps
     addCop2Word((18U << 26U) | (16U << 21U) | 0x30U); // rtpt
-    addCop2Word((18U << 26U) | (16U << 21U) | 0x30U); // rtpt
     addCop2Word((50U << 26U) | (4U << 21U) | (7U << 16U) | 0x20U); // lwc2 d7,0x20(a0)
     addCop2Word((58U << 26U) | (5U << 21U) | (12U << 16U) | 0x24U); // swc2 d12,0x24(a1)
     const auto cop2IR = buildGoolIR(cop2Source);
