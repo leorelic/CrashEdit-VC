@@ -336,7 +336,7 @@ int main() {
     assert(!cop0ControlIR.instructions[6].nativeEffects.known);
 
     // COP2/GTE register transfers use separate data/control register banks.
-    // Condition branches are modeled. NCLIP and AVSZ3/4 have conservative,
+    // Condition branches are modeled. NCLIP, SQR, and AVSZ3/4 have conservative,
     // command-specific register effects; other command words remain unknown.
     NsfGool cop2Source;
     cop2Source.version = NsfGoolVersion::Version2;
@@ -360,8 +360,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x06U); // nclip
     addCop2Word((18U << 26U) | (16U << 21U) | 0x2DU); // avsz3
     addCop2Word((18U << 26U) | (16U << 21U) | 0x2EU); // avsz4
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x28U); // sqr
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 11);
+    assert(cop2IR.instructions.size() == 12);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -406,6 +407,15 @@ int main() {
     assert(avsz4Effects.coprocessor2DataWriteMask ==
         ((std::uint32_t{1} << 24U) | (std::uint32_t{1} << 7U)));
     assert(avsz4Effects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& sqrEffects = cop2IR.instructions[11].nativeEffects;
+    assert(sqrEffects.known);
+    assert(sqrEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U)));
+    assert(sqrEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) | (std::uint32_t{1} << 27U)));
+    assert(sqrEffects.coprocessor2ControlReadMask == 0U);
+    assert(sqrEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);

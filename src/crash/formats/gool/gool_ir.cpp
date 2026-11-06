@@ -183,6 +183,12 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     dataWrite(24U);
                     controlWrite(31U);
                     break;
+                case 0x28U: // SQR: IR1..IR3 -> MAC1..MAC3, IR1..IR3, FLAG
+                    dataRead(9U); dataRead(10U); dataRead(11U);
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    controlWrite(31U);
+                    break;
                 case 0x2DU: // AVSZ3: SZ1..SZ3, ZSF3 -> MAC0, OTZ, FLAG
                     dataRead(17U); dataRead(18U); dataRead(19U);
                     controlRead(29U);
