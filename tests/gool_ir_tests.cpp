@@ -354,7 +354,7 @@ int main() {
     addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (3U << 11U) | 1U); // malformed mfc2
     addCop2Word((18U << 26U) | (8U << 21U) | (2U << 16U) | 4U); // malformed bc2
     const std::uint32_t gteCommandWord = (18U << 26U) | (16U << 21U) |
-        (0x12U << 17U) | (2U << 15U) | (1U << 13U) |
+        (1U << 17U) | (2U << 15U) | (1U << 13U) |
         (1U << 19U) | (1U << 10U) | 0x12U; // MVMVA fields, sf=1, lm=1
     addCop2Word(gteCommandWord);
     const auto cop2IR = buildGoolIR(cop2Source);
