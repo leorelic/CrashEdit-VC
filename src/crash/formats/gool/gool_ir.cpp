@@ -235,6 +235,19 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     dataWrite(25U); dataWrite(26U); dataWrite(27U);
                     controlWrite(31U);
                     break;
+                case 0x13U: // NCDS: NCS lighting plus RGBC modulation and IR0/far-color depth cue
+                    dataRead(0U); dataRead(1U); dataRead(6U); dataRead(8U);
+                    controlRead(8U); controlRead(9U); controlRead(10U);
+                    controlRead(11U); controlRead(12U);
+                    controlRead(13U); controlRead(14U); controlRead(15U);
+                    controlRead(16U); controlRead(17U); controlRead(18U);
+                    controlRead(19U); controlRead(20U);
+                    controlRead(21U); controlRead(22U); controlRead(23U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    dataWrite(20U); dataWrite(21U); dataWrite(22U);
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    controlWrite(31U);
+                    break;
                 case 0x1EU: // NCS: V0 normal, light matrix, background and color matrix -> lit color outputs (no RGBC input)
                     dataRead(0U); dataRead(1U);
                     controlRead(8U); controlRead(9U); controlRead(10U);
