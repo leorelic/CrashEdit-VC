@@ -183,6 +183,13 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     dataWrite(24U);
                     controlWrite(31U);
                     break;
+                case 0x0CU: // OP: IR1..IR3 cross product with RT11, RT22, RT33 -> MAC1..MAC3, IR1..IR3, FLAG
+                    dataRead(9U); dataRead(10U); dataRead(11U);
+                    controlRead(0U); controlRead(2U); controlRead(4U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    controlWrite(31U);
+                    break;
                 case 0x28U: // SQR: IR1..IR3 -> MAC1..MAC3, IR1..IR3, FLAG
                     dataRead(9U); dataRead(10U); dataRead(11U);
                     dataWrite(25U); dataWrite(26U); dataWrite(27U);
