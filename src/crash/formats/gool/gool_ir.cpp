@@ -209,6 +209,15 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     dataWrite(25U); dataWrite(26U); dataWrite(27U);
                     controlWrite(31U);
                     break;
+                case 0x3EU: // GPL: previous MAC1..MAC3 plus IR0, IR1..IR3 -> same outputs as GPF
+                    dataRead(6U); dataRead(8U); dataRead(9U); dataRead(10U); dataRead(11U);
+                    dataRead(21U); dataRead(22U);
+                    dataRead(25U); dataRead(26U); dataRead(27U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    dataWrite(20U); dataWrite(21U); dataWrite(22U);
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    controlWrite(31U);
+                    break;
                 default:
                     return effects;
                 }
