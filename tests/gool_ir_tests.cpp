@@ -382,6 +382,7 @@ int main() {
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
+    assert(gteFields.commandKnown && gteFields.mnemonic == "mvmva");
     assert(gteFields.shiftFraction);
     assert(gteFields.matrix == 1U);
     assert(gteFields.vector == 2U);
@@ -390,6 +391,20 @@ int main() {
     assert(gteFields.ignoredCommandBits == 0U);
     assert(gteFields.reservedBits11To12 == 0U);
     assert(gteFields.reservedBits6To9 == 0U);
+
+    // Preserve unknown command numbers without assigning a guessed mnemonic.
+    NsfGool unknownGteSource;
+    unknownGteSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction unknownGte;
+    unknownGte.isMips = true;
+    unknownGte.word = (18U << 26U) | (16U << 21U) | 0x02U;
+    unknownGteSource.instructions.push_back(unknownGte);
+    const auto unknownGteIR = buildGoolIR(unknownGteSource);
+    const auto& unknownGteFields = unknownGteIR.instructions[0].nativeFields.gteCommand;
+    assert(unknownGteFields.decoded);
+    assert(unknownGteFields.command == 0x02U);
+    assert(!unknownGteFields.commandKnown && unknownGteFields.mnemonic.empty());
+    assert(!unknownGteIR.instructions[0].nativeEffects.known);
 
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.

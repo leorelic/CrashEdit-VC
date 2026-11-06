@@ -52,7 +52,9 @@ struct GoolIRMipsEffects {
 // the instruction's runtime side effects have been fully audited.
 struct GoolIRMipsGteCommandFields {
     bool decoded = false;
+    bool commandKnown = false;
     std::uint8_t command = 0;
+    std::string mnemonic;
     std::uint8_t ignoredCommandBits = 0;
     bool shiftFraction = false;
     std::uint8_t matrix = 0;

@@ -37,6 +37,34 @@ GoolIRHookResolution convertHookResolution(NsfGoolStateHookStatus status) {
     }
 }
 
+const char* gteCommandMnemonic(std::uint8_t command) {
+    switch (command) {
+    case 0x01U: return "rtps";
+    case 0x06U: return "nclip";
+    case 0x0CU: return "op";
+    case 0x10U: return "dpcs";
+    case 0x11U: return "intpl";
+    case 0x12U: return "mvmva";
+    case 0x13U: return "ncds";
+    case 0x14U: return "cdp";
+    case 0x16U: return "ncdt";
+    case 0x1BU: return "nccs";
+    case 0x1CU: return "cc";
+    case 0x1EU: return "ncs";
+    case 0x20U: return "nct";
+    case 0x28U: return "sqr";
+    case 0x29U: return "dcpl";
+    case 0x2AU: return "dpct";
+    case 0x2DU: return "avsz3";
+    case 0x2EU: return "avsz4";
+    case 0x30U: return "rtpt";
+    case 0x3DU: return "gpf";
+    case 0x3EU: return "gpl";
+    case 0x3FU: return "ncct";
+    default: return nullptr;
+    }
+}
+
 GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
     GoolIRMipsEffects effects;
     const auto read = [&effects](std::uint8_t reg) {
@@ -236,6 +264,10 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
                 gte.limitMode = ((word >> 10U) & 1U) != 0U;
                 gte.reservedBits6To9 = static_cast<std::uint8_t>((word >> 6U) & 0xFU);
                 gte.command = static_cast<std::uint8_t>(word & 0x3FU);
+                if (const char* mnemonic = gteCommandMnemonic(gte.command)) {
+                    gte.commandKnown = true;
+                    gte.mnemonic = mnemonic;
+                }
             }
             if (fields.primaryOpcode == 0U) fields.format = GoolIRMipsFormat::Register;
             else if (fields.primaryOpcode == 2U || fields.primaryOpcode == 3U)

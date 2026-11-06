@@ -28,6 +28,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Model R3000A BC0 condition branches and RFE status-mode restoration separately from GPR effects; reject malformed branch encodings and leave other COP0 operations unsupported.
 - [x] Model validated COP2 MFC2/CFC2/MTC2/CTC2 transfers with separate data/control register effects, plus BC2 condition branches; keep malformed encodings and command words explicitly unanalyzed.
 - [x] Decode the structural fields of COP2/GTE command words (command number, ignored command bits, sf/mx/v/cv/lm, and reserved-bit snapshots) without claiming command-specific execution effects.
+- [x] Identify documented GTE command numbers by mnemonic while preserving unknown command IDs and leaving command-specific register effects unanalyzed.
 - [ ] Complete the R3000A decoder audit, including remaining instruction encodings and control-flow edge cases.
 - [ ] Audit the PlayStation COP2/GTE instruction space: command words, command flags, register transfers, and load/store forms.
 - [ ] Decode supported GTE instructions while preserving raw words and clearly identifying unknown or reserved encodings.
