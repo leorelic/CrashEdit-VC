@@ -160,8 +160,45 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 return effects;
             }
             break;
-        case 18U: // PlayStation COP2/GTE register transfers and condition branches
-            if (fields.rs == 0U || fields.rs == 2U ||
+        case 18U: // PlayStation COP2/GTE register transfers, branches, and commands
+            if (fields.rs == 16U && fields.gteCommand.decoded) {
+                // Only model commands whose complete register dependencies are
+                // independently documented here. Other known GTE mnemonics stay
+                // structurally decoded but semantically unknown.
+                const auto dataRead = [&effects](std::uint8_t reg) {
+                    effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
+                };
+                const auto dataWrite = [&effects](std::uint8_t reg) {
+                    effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << reg);
+                };
+                const auto controlRead = [&effects](std::uint8_t reg) {
+                    effects.coprocessor2ControlReadMask |= (std::uint32_t{1} << reg);
+                };
+                const auto controlWrite = [&effects](std::uint8_t reg) {
+                    effects.coprocessor2ControlWriteMask |= (std::uint32_t{1} << reg);
+                };
+                switch (fields.gteCommand.command) {
+                case 0x06U: // NCLIP: SXY0..SXY2 -> MAC0, FLAG
+                    dataRead(12U); dataRead(13U); dataRead(14U);
+                    dataWrite(24U);
+                    controlWrite(31U);
+                    break;
+                case 0x2DU: // AVSZ3: SZ1..SZ3, ZSF3 -> MAC0, OTZ, FLAG
+                    dataRead(17U); dataRead(18U); dataRead(19U);
+                    controlRead(29U);
+                    dataWrite(24U); dataWrite(7U);
+                    controlWrite(31U);
+                    break;
+                case 0x2EU: // AVSZ4: SZ0..SZ3, ZSF4 -> MAC0, OTZ, FLAG
+                    dataRead(16U); dataRead(17U); dataRead(18U); dataRead(19U);
+                    controlRead(30U);
+                    dataWrite(24U); dataWrite(7U);
+                    controlWrite(31U);
+                    break;
+                default:
+                    return effects;
+                }
+            } else if (fields.rs == 0U || fields.rs == 2U ||
                 fields.rs == 4U || fields.rs == 6U) {
                 // MFC2/CFC2/MTC2/CTC2 reserve bits 10..0.
                 if (fields.shiftAmount != 0U || fields.function != 0U) return effects;

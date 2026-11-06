@@ -336,8 +336,8 @@ int main() {
     assert(!cop0ControlIR.instructions[6].nativeEffects.known);
 
     // COP2/GTE register transfers use separate data/control register banks.
-    // Condition branches are modeled; command words remain unknown until their
-    // command-specific register and flag effects have been audited.
+    // Condition branches are modeled. NCLIP and AVSZ3/4 have conservative,
+    // command-specific register effects; other command words remain unknown.
     NsfGool cop2Source;
     cop2Source.version = NsfGoolVersion::Version2;
     const auto addCop2Word = [&cop2Source](std::uint32_t word) {
@@ -357,8 +357,11 @@ int main() {
         (1U << 17U) | (2U << 15U) | (1U << 13U) |
         (1U << 19U) | (1U << 10U) | 0x12U; // MVMVA fields, sf=1, lm=1
     addCop2Word(gteCommandWord);
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x06U); // nclip
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x2DU); // avsz3
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x2EU); // avsz4
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 8);
+    assert(cop2IR.instructions.size() == 11);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -379,6 +382,30 @@ int main() {
     assert(!cop2IR.instructions[5].nativeEffects.known);
     assert(!cop2IR.instructions[6].nativeEffects.known);
     assert(!cop2IR.instructions[7].nativeEffects.known);
+    const auto& nclipEffects = cop2IR.instructions[8].nativeEffects;
+    assert(nclipEffects.known);
+    assert(nclipEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 12U) | (std::uint32_t{1} << 13U) | (std::uint32_t{1} << 14U)));
+    assert(nclipEffects.coprocessor2DataWriteMask == (std::uint32_t{1} << 24U));
+    assert(nclipEffects.coprocessor2ControlReadMask == 0U);
+    assert(nclipEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& avsz3Effects = cop2IR.instructions[9].nativeEffects;
+    assert(avsz3Effects.known);
+    assert(avsz3Effects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 17U) | (std::uint32_t{1} << 18U) | (std::uint32_t{1} << 19U)));
+    assert(avsz3Effects.coprocessor2ControlReadMask == (std::uint32_t{1} << 29U));
+    assert(avsz3Effects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 24U) | (std::uint32_t{1} << 7U)));
+    assert(avsz3Effects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& avsz4Effects = cop2IR.instructions[10].nativeEffects;
+    assert(avsz4Effects.known);
+    assert(avsz4Effects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 16U) | (std::uint32_t{1} << 17U) |
+         (std::uint32_t{1} << 18U) | (std::uint32_t{1} << 19U)));
+    assert(avsz4Effects.coprocessor2ControlReadMask == (std::uint32_t{1} << 30U));
+    assert(avsz4Effects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 24U) | (std::uint32_t{1} << 7U)));
+    assert(avsz4Effects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
