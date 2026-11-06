@@ -353,7 +353,10 @@ int main() {
     addCop2Word((18U << 26U) | (8U << 21U) | (1U << 16U) | 4U); // bc2t
     addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (3U << 11U) | 1U); // malformed mfc2
     addCop2Word((18U << 26U) | (8U << 21U) | (2U << 16U) | 4U); // malformed bc2
-    addCop2Word((18U << 26U) | (16U << 21U) | 0x12345U); // GTE command: not yet modeled
+    const std::uint32_t gteCommandWord = (18U << 26U) | (16U << 21U) |
+        (0x12U << 17U) | (2U << 15U) | (1U << 13U) |
+        (1U << 19U) | (1U << 10U) | 0x12U; // MVMVA fields, sf=1, lm=1
+    addCop2Word(gteCommandWord);
     const auto cop2IR = buildGoolIR(cop2Source);
     assert(cop2IR.instructions.size() == 8);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
@@ -376,6 +379,17 @@ int main() {
     assert(!cop2IR.instructions[5].nativeEffects.known);
     assert(!cop2IR.instructions[6].nativeEffects.known);
     assert(!cop2IR.instructions[7].nativeEffects.known);
+    const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
+    assert(gteFields.decoded);
+    assert(gteFields.command == 0x12U);
+    assert(gteFields.shiftFraction);
+    assert(gteFields.matrix == 1U);
+    assert(gteFields.vector == 2U);
+    assert(gteFields.translation == 1U);
+    assert(gteFields.limitMode);
+    assert(gteFields.ignoredCommandBits == 0U);
+    assert(gteFields.reservedBits11To12 == 0U);
+    assert(gteFields.reservedBits6To9 == 0U);
 
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.

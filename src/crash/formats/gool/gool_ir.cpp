@@ -222,6 +222,21 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             fields.immediate = static_cast<std::uint16_t>(word & 0xFFFFU);
             fields.signedImmediate = static_cast<std::int16_t>(fields.immediate);
             fields.jumpTarget = word & 0x03FFFFFFU;
+            if (fields.primaryOpcode == 18U && fields.rs == 16U) {
+                // COP2 command words use a GTE-specific 25-bit layout rather
+                // than the ordinary COP2 register-transfer fields.
+                auto& gte = fields.gteCommand;
+                gte.decoded = true;
+                gte.ignoredCommandBits = static_cast<std::uint8_t>((word >> 20U) & 0x1FU);
+                gte.shiftFraction = ((word >> 19U) & 1U) != 0U;
+                gte.matrix = static_cast<std::uint8_t>((word >> 17U) & 0x3U);
+                gte.vector = static_cast<std::uint8_t>((word >> 15U) & 0x3U);
+                gte.translation = static_cast<std::uint8_t>((word >> 13U) & 0x3U);
+                gte.reservedBits11To12 = static_cast<std::uint8_t>((word >> 11U) & 0x3U);
+                gte.limitMode = ((word >> 10U) & 1U) != 0U;
+                gte.reservedBits6To9 = static_cast<std::uint8_t>((word >> 6U) & 0xFU);
+                gte.command = static_cast<std::uint8_t>(word & 0x3FU);
+            }
             if (fields.primaryOpcode == 0U) fields.format = GoolIRMipsFormat::Register;
             else if (fields.primaryOpcode == 2U || fields.primaryOpcode == 3U)
                 fields.format = GoolIRMipsFormat::Jump;

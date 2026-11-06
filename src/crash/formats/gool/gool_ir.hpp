@@ -50,8 +50,22 @@ struct GoolIRMipsEffects {
 
 // Structural R3000A word fields. These are encoding facts, not a claim that
 // the instruction's runtime side effects have been fully audited.
+struct GoolIRMipsGteCommandFields {
+    bool decoded = false;
+    std::uint8_t command = 0;
+    std::uint8_t ignoredCommandBits = 0;
+    bool shiftFraction = false;
+    std::uint8_t matrix = 0;
+    std::uint8_t vector = 0;
+    std::uint8_t translation = 0;
+    bool limitMode = false;
+    std::uint8_t reservedBits11To12 = 0;
+    std::uint8_t reservedBits6To9 = 0;
+};
+
 struct GoolIRMipsFields {
     GoolIRMipsFormat format = GoolIRMipsFormat::Unknown;
+    GoolIRMipsGteCommandFields gteCommand;
     std::uint8_t primaryOpcode = 0;
     std::uint8_t rs = 0;
     std::uint8_t rt = 0;
