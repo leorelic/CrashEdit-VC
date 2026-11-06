@@ -366,8 +366,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x0CU); // op
     addCop2Word((18U << 26U) | (16U << 21U) | 0x10U); // dpcs
     addCop2Word((18U << 26U) | (16U << 21U) | 0x11U); // intpl
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x29U); // dcpl
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 17);
+    assert(cop2IR.instructions.size() == 18);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -495,6 +496,22 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(intplEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& dcplEffects = cop2IR.instructions[17].nativeEffects;
+    assert(dcplEffects.known);
+    assert(dcplEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 6U) | (std::uint32_t{1} << 8U) |
+         (std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U)));
+    assert(dcplEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 23U)));
+    assert(dcplEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 20U) |
+         (std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(dcplEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
