@@ -178,6 +178,52 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     effects.coprocessor2ControlWriteMask |= (std::uint32_t{1} << reg);
                 };
                 switch (fields.gteCommand.command) {
+                case 0x12U: { // MVMVA: selector-dependent matrix x vector + translation -> MAC1..MAC3, IR1..IR3, FLAG
+                    const auto& selectors = fields.gteCommand;
+                    // Matrix selector 3 is the documented hardware-quirk matrix;
+                    // leave it unknown until its nonstandard inputs are modeled.
+                    if (selectors.matrix > 2U) return effects;
+                    switch (selectors.matrix) {
+                    case 0U: // rotation matrix
+                        controlRead(0U); controlRead(1U); controlRead(2U);
+                        controlRead(3U); controlRead(4U);
+                        break;
+                    case 1U: // light matrix
+                        controlRead(8U); controlRead(9U); controlRead(10U);
+                        controlRead(11U); controlRead(12U);
+                        break;
+                    case 2U: // color matrix
+                        controlRead(16U); controlRead(17U); controlRead(18U);
+                        controlRead(19U); controlRead(20U);
+                        break;
+                    default: return effects;
+                    }
+                    switch (selectors.vector) {
+                    case 0U: dataRead(0U); dataRead(1U); break; // V0
+                    case 1U: dataRead(2U); dataRead(3U); break; // V1
+                    case 2U: dataRead(4U); dataRead(5U); break; // V2
+                    case 3U: dataRead(9U); dataRead(10U); dataRead(11U); break; // IR1..IR3
+                    default: return effects;
+                    }
+                    switch (selectors.translation) {
+                    case 0U: // translation vector
+                        controlRead(5U); controlRead(6U); controlRead(7U);
+                        break;
+                    case 1U: // background color
+                        controlRead(13U); controlRead(14U); controlRead(15U);
+                        break;
+                    case 2U: // far color
+                        controlRead(21U); controlRead(22U); controlRead(23U);
+                        break;
+                    case 3U: // zero vector
+                        break;
+                    default: return effects;
+                    }
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    controlWrite(31U);
+                    break;
+                }
                 case 0x01U: // RTPS: V0, rotation matrix, translation, projection and depth-cue parameters -> projected FIFOs
                     dataRead(0U); dataRead(1U);
                     controlRead(0U); controlRead(1U); controlRead(2U);

@@ -399,7 +399,21 @@ int main() {
     assert(bc2Effects.gprReadMask == 0U && bc2Effects.gprWriteMask == 0U);
     assert(!cop2IR.instructions[5].nativeEffects.known);
     assert(!cop2IR.instructions[6].nativeEffects.known);
-    assert(!cop2IR.instructions[7].nativeEffects.known);
+    const auto& mvmvaEffects = cop2IR.instructions[7].nativeEffects;
+    assert(mvmvaEffects.known);
+    // Fixture selects the light matrix, V2, and background translation.
+    assert(mvmvaEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 4U) | (std::uint32_t{1} << 5U)));
+    assert(mvmvaEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 8U) | (std::uint32_t{1} << 9U) |
+         (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U) |
+         (std::uint32_t{1} << 12U) | (std::uint32_t{1} << 13U) |
+         (std::uint32_t{1} << 14U) | (std::uint32_t{1} << 15U)));
+    assert(mvmvaEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 25U) |
+         (std::uint32_t{1} << 26U) | (std::uint32_t{1} << 27U)));
+    assert(mvmvaEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& nclipEffects = cop2IR.instructions[8].nativeEffects;
     assert(nclipEffects.known);
     assert(nclipEffects.coprocessor2DataReadMask ==
