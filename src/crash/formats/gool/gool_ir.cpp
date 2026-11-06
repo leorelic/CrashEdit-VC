@@ -80,7 +80,7 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
     };
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
     const auto markControlTransfer = [&effects]() {
-        markControlTransfer();
+        effects.controlTransfer = true;
         effects.controlTransferHasDelaySlot = true;
     };
     const auto readCop2Data = [&effects](std::uint8_t reg) {
