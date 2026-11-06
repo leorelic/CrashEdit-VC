@@ -370,8 +370,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x2AU); // dpct
     addCop2Word((18U << 26U) | (16U << 21U) | 0x1CU); // cc
     addCop2Word((18U << 26U) | (16U << 21U) | 0x14U); // cdp
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x1BU); // nccs
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 21);
+    assert(cop2IR.instructions.size() == 22);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -570,6 +571,26 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(cdpEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& nccsEffects = cop2IR.instructions[21].nativeEffects;
+    assert(nccsEffects.known);
+    assert(nccsEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 0U) | (std::uint32_t{1} << 1U) |
+         (std::uint32_t{1} << 6U)));
+    assert(nccsEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 8U) | (std::uint32_t{1} << 9U) |
+         (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U) |
+         (std::uint32_t{1} << 12U) | (std::uint32_t{1} << 13U) |
+         (std::uint32_t{1} << 14U) | (std::uint32_t{1} << 15U) |
+         (std::uint32_t{1} << 16U) | (std::uint32_t{1} << 17U) |
+         (std::uint32_t{1} << 18U) | (std::uint32_t{1} << 19U) |
+         (std::uint32_t{1} << 20U)));
+    assert(nccsEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 9U) | (std::uint32_t{1} << 10U) |
+         (std::uint32_t{1} << 11U) | (std::uint32_t{1} << 20U) |
+         (std::uint32_t{1} << 21U) | (std::uint32_t{1} << 22U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(nccsEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
