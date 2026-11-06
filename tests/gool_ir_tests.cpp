@@ -238,6 +238,36 @@ int main() {
     assert(branchEffects.controlTransferHasDelaySlot);
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
     assert((branchEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);
+    assert(!effectIR.instructions[0].isControlTransferDelaySlot);
+    assert(!effectIR.instructions[4].isControlTransferDelaySlot);
+
+    // A validated branch marks exactly its following instruction as the
+    // architectural delay slot; a final branch with no following word has no slot.
+    NsfGool delaySlotSource;
+    delaySlotSource.version = NsfGoolVersion::Version2;
+    const auto addDelaySlotWord = [&delaySlotSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        delaySlotSource.instructions.push_back(instruction);
+    };
+    addDelaySlotWord((4U << 26U) | (8U << 21U) | (9U << 16U) | 1U); // beq t0,t1,+1
+    addDelaySlotWord((9U << 26U) | (29U << 21U) | (29U << 16U) | 4U); // addiu sp,sp,4
+    const auto delaySlotIR = buildGoolIR(delaySlotSource);
+    assert(delaySlotIR.instructions.size() == 2);
+    assert(!delaySlotIR.instructions[0].isControlTransferDelaySlot);
+    assert(delaySlotIR.instructions[1].isControlTransferDelaySlot);
+
+    NsfGool terminalBranchSource;
+    terminalBranchSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction terminalBranch;
+    terminalBranch.isMips = true;
+    terminalBranch.word = (2U << 26U) | 1U; // j 1
+    terminalBranchSource.instructions.push_back(terminalBranch);
+    const auto terminalBranchIR = buildGoolIR(terminalBranchSource);
+    assert(terminalBranchIR.instructions.size() == 1);
+    assert(terminalBranchIR.instructions[0].nativeEffects.controlTransferHasDelaySlot);
+    assert(!terminalBranchIR.instructions[0].isControlTransferDelaySlot);
 
     // R3000A SPECIAL instructions are only considered analyzed when their
     // reserved fields satisfy the encoding constraints. Exception instructions

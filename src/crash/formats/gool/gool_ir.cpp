@@ -613,6 +613,14 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         result.instructions.push_back(std::move(ir));
     }
 
+    // Mark the instruction following each validated native MIPS control
+    // transfer. Keep the transfer's own effect separate from the slot's role.
+    for (std::size_t i = 1; i < result.instructions.size(); ++i) {
+        const auto& previous = result.instructions[i - 1U];
+        if (previous.nativeMips && previous.nativeEffects.controlTransferHasDelaySlot)
+            result.instructions[i].isControlTransferDelaySlot = true;
+    }
+
     const auto controlFlow = analyzeGoolControlFlow(source);
     result.basicBlocks.reserve(controlFlow.blocks.size());
     for (const auto& block : controlFlow.blocks)

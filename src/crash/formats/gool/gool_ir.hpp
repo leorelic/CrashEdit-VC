@@ -98,6 +98,9 @@ struct GoolIRInstruction {
     bool nativeFieldsDecoded = false;
     GoolIRMipsFields nativeFields;
     GoolIRMipsEffects nativeEffects;
+    // True when this instruction is the sequential instruction after a
+    // validated R3000A control transfer (and therefore executes in its delay slot).
+    bool isControlTransferDelaySlot = false;
     std::vector<GoolIROperand> operands;
 };
 
