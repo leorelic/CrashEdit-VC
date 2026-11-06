@@ -81,6 +81,9 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         if (reg == 29U) {
             effects.coprocessor2DataReadMask |= (std::uint32_t{1} << 9U) |
                 (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U);
+        } else if (reg == 15U) {
+            // SXYP is a read-only mirror of the newest SXY FIFO entry (SXY2).
+            effects.coprocessor2DataReadMask |= (std::uint32_t{1} << 14U);
         }
     };
     const auto writeCop2Data = [&effects](std::uint8_t reg) {
@@ -91,6 +94,11 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U);
         } else if (reg == 30U) {
             effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << 31U);
+        } else if (reg == 15U) {
+            // Writing SXYP pushes a new value and shifts SXY1/SXY2 through
+            // the three-entry FIFO; SXY0, SXY1, and SXY2 are all modified.
+            effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << 12U) |
+                (std::uint32_t{1} << 13U) | (std::uint32_t{1} << 14U);
         }
     };
 

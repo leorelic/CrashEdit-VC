@@ -386,8 +386,12 @@ int main() {
     addCop2Word((50U << 26U) | (4U << 21U) | (28U << 16U) | 0x28U); // lwc2 irgb,0x28(a0)
     addCop2Word((58U << 26U) | (5U << 21U) | (29U << 16U) | 0x2CU); // swc2 orgb,0x2c(a1)
     addCop2Word((50U << 26U) | (4U << 21U) | (30U << 16U) | 0x30U); // lwc2 lzcs,0x30(a0)
+    addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (15U << 11U)); // mfc2 v0,sxyp
+    addCop2Word((18U << 26U) | (4U << 21U) | (3U << 16U) | (15U << 11U)); // mtc2 v1,sxyp
+    addCop2Word((50U << 26U) | (4U << 21U) | (15U << 16U) | 0x34U); // lwc2 sxyp,0x34(a0)
+    addCop2Word((58U << 26U) | (5U << 21U) | (15U << 16U) | 0x38U); // swc2 sxyp,0x38(a1)
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 37);
+    assert(cop2IR.instructions.size() == 41);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -816,6 +820,24 @@ int main() {
     assert(lzcsLoadEffects.known && lzcsLoadEffects.memory == GoolIRMipsMemoryEffect::Read);
     assert(lzcsLoadEffects.coprocessor2DataWriteMask ==
         ((std::uint32_t{1} << 30U) | (std::uint32_t{1} << 31U)));
+    const std::uint32_t sxyFifoMask = (std::uint32_t{1} << 12U) |
+        (std::uint32_t{1} << 13U) | (std::uint32_t{1} << 14U);
+    const auto& sxypReadEffects = cop2IR.instructions[37].nativeEffects;
+    assert(sxypReadEffects.known);
+    assert(sxypReadEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 14U) | (std::uint32_t{1} << 15U)));
+    const auto& sxypWriteEffects = cop2IR.instructions[38].nativeEffects;
+    assert(sxypWriteEffects.known);
+    assert(sxypWriteEffects.coprocessor2DataWriteMask ==
+        (sxyFifoMask | (std::uint32_t{1} << 15U)));
+    const auto& sxypLoadEffects = cop2IR.instructions[39].nativeEffects;
+    assert(sxypLoadEffects.known && sxypLoadEffects.memory == GoolIRMipsMemoryEffect::Read);
+    assert(sxypLoadEffects.coprocessor2DataWriteMask ==
+        (sxyFifoMask | (std::uint32_t{1} << 15U)));
+    const auto& sxypStoreEffects = cop2IR.instructions[40].nativeEffects;
+    assert(sxypStoreEffects.known && sxypStoreEffects.memory == GoolIRMipsMemoryEffect::Write);
+    assert(sxypStoreEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 14U) | (std::uint32_t{1} << 15U)));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
