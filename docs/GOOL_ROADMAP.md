@@ -29,7 +29,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Model validated COP2 MFC2/CFC2/MTC2/CTC2 transfers with separate data/control register effects, plus BC2 condition branches; keep malformed encodings and command words explicitly unanalyzed.
 - [x] Decode the structural fields of COP2/GTE command words (command number, ignored command bits, sf/mx/v/cv/lm, and reserved-bit snapshots) without claiming command-specific execution effects.
 - [x] Identify documented GTE command numbers by mnemonic while preserving unknown command IDs and leaving command-specific register effects unanalyzed.
-- [x] Model the verified register dependencies and outputs of NCLIP, SQR, AVSZ3, and AVSZ4, including their FLAG writes; leave other GTE commands structurally decoded but semantically unknown.
+- [x] Model the verified register dependencies and outputs of NCLIP, SQR, GPF, AVSZ3, and AVSZ4, including GPF's RGB FIFO effects and command FLAG writes; leave other GTE commands structurally decoded but semantically unknown.
 - [ ] Complete the R3000A decoder audit, including remaining instruction encodings and control-flow edge cases.
 - [ ] Audit the PlayStation COP2/GTE instruction space: command words, command flags, register transfers, and load/store forms.
 - [ ] Decode supported GTE instructions while preserving raw words and clearly identifying unknown or reserved encodings.
