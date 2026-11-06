@@ -178,6 +178,21 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                     effects.coprocessor2ControlWriteMask |= (std::uint32_t{1} << reg);
                 };
                 switch (fields.gteCommand.command) {
+                case 0x01U: // RTPS: V0, rotation matrix, translation, projection and depth-cue parameters -> projected FIFOs
+                    dataRead(0U); dataRead(1U);
+                    controlRead(0U); controlRead(1U); controlRead(2U);
+                    controlRead(3U); controlRead(4U);
+                    controlRead(5U); controlRead(6U); controlRead(7U);
+                    controlRead(24U); controlRead(25U); controlRead(26U);
+                    controlRead(27U); controlRead(28U);
+                    dataWrite(8U);
+                    dataWrite(9U); dataWrite(10U); dataWrite(11U);
+                    dataWrite(12U); dataWrite(13U); dataWrite(14U);
+                    dataWrite(16U); dataWrite(17U); dataWrite(18U); dataWrite(19U);
+                    dataWrite(24U);
+                    dataWrite(25U); dataWrite(26U); dataWrite(27U);
+                    controlWrite(31U);
+                    break;
                 case 0x06U: // NCLIP: SXY0..SXY2 -> MAC0, FLAG
                     dataRead(12U); dataRead(13U); dataRead(14U);
                     dataWrite(24U);

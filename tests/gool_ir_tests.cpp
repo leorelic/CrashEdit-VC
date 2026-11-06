@@ -376,8 +376,9 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x16U); // ncdt
     addCop2Word((18U << 26U) | (16U << 21U) | 0x20U); // nct
     addCop2Word((18U << 26U) | (16U << 21U) | 0x3FU); // ncct
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x01U); // rtps
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 27);
+    assert(cop2IR.instructions.size() == 28);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -704,6 +705,28 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(ncctEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& rtpsEffects = cop2IR.instructions[27].nativeEffects;
+    assert(rtpsEffects.known);
+    assert(rtpsEffects.coprocessor2DataReadMask ==
+        ((std::uint32_t{1} << 0U) | (std::uint32_t{1} << 1U)));
+    assert(rtpsEffects.coprocessor2ControlReadMask ==
+        ((std::uint32_t{1} << 0U) | (std::uint32_t{1} << 1U) |
+         (std::uint32_t{1} << 2U) | (std::uint32_t{1} << 3U) |
+         (std::uint32_t{1} << 4U) | (std::uint32_t{1} << 5U) |
+         (std::uint32_t{1} << 6U) | (std::uint32_t{1} << 7U) |
+         (std::uint32_t{1} << 24U) | (std::uint32_t{1} << 25U) |
+         (std::uint32_t{1} << 26U) | (std::uint32_t{1} << 27U) |
+         (std::uint32_t{1} << 28U)));
+    assert(rtpsEffects.coprocessor2DataWriteMask ==
+        ((std::uint32_t{1} << 8U) | (std::uint32_t{1} << 9U) |
+         (std::uint32_t{1} << 10U) | (std::uint32_t{1} << 11U) |
+         (std::uint32_t{1} << 12U) | (std::uint32_t{1} << 13U) |
+         (std::uint32_t{1} << 14U) | (std::uint32_t{1} << 16U) |
+         (std::uint32_t{1} << 17U) | (std::uint32_t{1} << 18U) |
+         (std::uint32_t{1} << 19U) | (std::uint32_t{1} << 24U) |
+         (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
+         (std::uint32_t{1} << 27U)));
+    assert(rtpsEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
