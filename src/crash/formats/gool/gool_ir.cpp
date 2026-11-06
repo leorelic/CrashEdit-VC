@@ -475,6 +475,16 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             readRsRt();
             effects.memory = GoolIRMipsMemoryEffect::Write;
             break;
+        case 50U: // LWC2 rt, offset(rs): load a word into GTE data register rt
+            read(fields.rs);
+            effects.coprocessor2DataWriteMask |= (std::uint32_t{1} << fields.rt);
+            effects.memory = GoolIRMipsMemoryEffect::Read;
+            break;
+        case 58U: // SWC2 rt, offset(rs): store GTE data register rt
+            read(fields.rs);
+            effects.coprocessor2DataReadMask |= (std::uint32_t{1} << fields.rt);
+            effects.memory = GoolIRMipsMemoryEffect::Write;
+            break;
         default: return effects;
         }
     }

@@ -378,8 +378,11 @@ int main() {
     addCop2Word((18U << 26U) | (16U << 21U) | 0x3FU); // ncct
     addCop2Word((18U << 26U) | (16U << 21U) | 0x01U); // rtps
     addCop2Word((18U << 26U) | (16U << 21U) | 0x30U); // rtpt
+    addCop2Word((18U << 26U) | (16U << 21U) | 0x30U); // rtpt
+    addCop2Word((50U << 26U) | (4U << 21U) | (7U << 16U) | 0x20U); // lwc2 d7,0x20(a0)
+    addCop2Word((58U << 26U) | (5U << 21U) | (12U << 16U) | 0x24U); // swc2 d12,0x24(a1)
     const auto cop2IR = buildGoolIR(cop2Source);
-    assert(cop2IR.instructions.size() == 29);
+    assert(cop2IR.instructions.size() == 31);
     const auto& mfc2Effects = cop2IR.instructions[0].nativeEffects;
     assert(mfc2Effects.known && mfc2Effects.gprWriteMask == (std::uint32_t{1} << 2U));
     assert(mfc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 3U));
@@ -766,6 +769,18 @@ int main() {
          (std::uint32_t{1} << 25U) | (std::uint32_t{1} << 26U) |
          (std::uint32_t{1} << 27U)));
     assert(rtptEffects.coprocessor2ControlWriteMask == (std::uint32_t{1} << 31U));
+    const auto& lwc2Effects = cop2IR.instructions[29].nativeEffects;
+    assert(lwc2Effects.known && lwc2Effects.memory == GoolIRMipsMemoryEffect::Read);
+    assert(lwc2Effects.gprReadMask == (std::uint32_t{1} << 4U));
+    assert(lwc2Effects.gprWriteMask == 0U);
+    assert(lwc2Effects.coprocessor2DataWriteMask == (std::uint32_t{1} << 7U));
+    assert(lwc2Effects.coprocessor2DataReadMask == 0U);
+    const auto& swc2Effects = cop2IR.instructions[30].nativeEffects;
+    assert(swc2Effects.known && swc2Effects.memory == GoolIRMipsMemoryEffect::Write);
+    assert(swc2Effects.gprReadMask == (std::uint32_t{1} << 5U));
+    assert(swc2Effects.gprWriteMask == 0U);
+    assert(swc2Effects.coprocessor2DataReadMask == (std::uint32_t{1} << 12U));
+    assert(swc2Effects.coprocessor2DataWriteMask == 0U);
     const auto& gteFields = cop2IR.instructions[7].nativeFields.gteCommand;
     assert(gteFields.decoded);
     assert(gteFields.command == 0x12U);
