@@ -362,6 +362,7 @@ GoolIRDecompilation decompileGoolIR(
     std::map<std::size_t, bool> closeElseAt;
     struct StructuredLoop { std::size_t backBranch; std::size_t exitTarget; };
     std::map<std::size_t, StructuredLoop> structuredLoops;
+    std::map<std::size_t, bool> loopExitBranches;
     std::map<std::size_t, bool> suppressedLoopBackBranches;
     std::map<std::size_t, bool> suppressedLoopLabels;
     std::map<std::size_t, bool> suppressedLoopConditions;
@@ -540,7 +541,12 @@ GoolIRDecompilation decompileGoolIR(
                     if (!nestedDisplacement) { unsafeBody = true; break; }
                     const auto nestedTarget = static_cast<std::int64_t>(body) + 1 +
                         nestedDisplacement->value;
-                    if (nestedTarget < static_cast<std::int64_t>(header + 1) ||
+                    if (nestedTarget == static_cast<std::int64_t>(exitTarget)) {
+                        // A branch that leaves the proven loop at its unique
+                        // exit is a structured break candidate. Other exits
+                        // remain explicit branches and are not folded here.
+                        loopExitBranches[body] = true;
+                    } else if (nestedTarget < static_cast<std::int64_t>(header + 1) ||
                         nestedTarget >= static_cast<std::int64_t>(back)) {
                         unsafeBody = true;
                         break;
@@ -859,11 +865,8 @@ GoolIRDecompilation decompileGoolIR(
             const auto* destination = findOperand(instruction, 'D');
             const auto* value = findOperand(instruction, 'S');
             if (destination && value) {
-                std::string sourceExpression = operandText(*value);
-                constexpr std::string_view immediatePrefix = "immediate ";
-                if (sourceExpression.compare(0, immediatePrefix.size(), immediatePrefix) == 0)
-                    sourceExpression.erase(0, immediatePrefix.size());
-                line << operandText(*destination) << " = " << sourceExpression;
+                line << operandText(*destination) << " = "
+                     << expressionOperandText(program, index, *value);
             } else {
                 line << "SETF /* missing destination or source */";
                 addDiagnostic(result, index, "SETF operands could not be resolved.");
@@ -874,6 +877,18 @@ GoolIRDecompilation decompileGoolIR(
             line << "return";
             line << " // destination depends on runtime call context";
         } else if (instruction.opcode >= 50U && instruction.opcode <= 52U) {
+            if (loopExitBranches.find(index) != loopExitBranches.end()) {
+                const auto condition = comparisonCondition(program, index);
+                if (instruction.opcode == 50U) {
+                    line << "break";
+                } else if (!condition.empty()) {
+                    line << "if (" << condition << ") break";
+                    suppressedConditionProducers[index - 1U] = true;
+                } else {
+                    line << "if (" << fieldText(instruction)
+                         << (instruction.opcode == 51U ? " != 0" : " == 0") << ") break";
+                }
+            } else {
             const auto* displacement = findOperand(instruction, 'I');
             const auto target = displacement
                 ? static_cast<std::int64_t>(index) + 1 + displacement->value
@@ -894,6 +909,7 @@ GoolIRDecompilation decompileGoolIR(
             } else {
                 line << instruction.mnemonic << " /* invalid branch target */";
                 addDiagnostic(result, index, "branch destination could not be resolved.");
+            }
             }
         } else if (instruction.opcode == 59U) {
             const auto* operation = findControlOperation(program, index);
@@ -989,7 +1005,34 @@ GoolIRDecompilation decompileGoolIRRoutine(
     const auto& routine = program.routines[routineIndex];
     result.text = "// Routine " + std::to_string(routineIndex) +
         " entry: " + labelName(routine.entryInstruction) + "\n";
+    result.text += "// Entry source: ";
+    if (routine.fromCodeHook && routine.fromLocalCall)
+        result.text += "Code hook and local call";
+    else if (routine.fromCodeHook)
+        result.text += "Code hook";
+    else if (routine.fromLocalCall)
+        result.text += "local call";
+    else
+        result.text += "discovered control-flow entry";
+    result.text += "\n// Instructions: " + std::to_string(routine.instructions.size());
+    result.text += "; shared instructions: " + std::to_string(routine.sharedInstructions.size()) + "\n";
     result.text += "// Instructions are listed in discovered routine order.\n";
+    for (const auto& exit : routine.exits) {
+        result.text += "// Exit at " + labelName(exit.sourceInstruction) + ": ";
+        switch (exit.kind) {
+        case GoolIRRoutineExitKind::Return: result.text += "return"; break;
+        case GoolIRRoutineExitKind::EntryPointBoundary:
+            result.text += "entry-point boundary";
+            if (exit.targetValid) result.text += " -> " + labelName(exit.targetInstruction);
+            break;
+        case GoolIRRoutineExitKind::InvalidBranchTarget: result.text += "invalid branch target"; break;
+        case GoolIRRoutineExitKind::EndOfProgram: result.text += "end of program"; break;
+        }
+        if (!exit.diagnostic.empty()) result.text += " (" + exit.diagnostic + ")";
+        result.text += "\n";
+    }
+    for (const auto& diagnostic : routine.diagnostics)
+        result.text += "// Routine diagnostic: " + diagnostic + "\n";
 
     // Routine listings need label definitions for branches that remain inside
     // the selected routine. The range decompiler emits branch references, but

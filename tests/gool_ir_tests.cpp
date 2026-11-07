@@ -2238,6 +2238,47 @@ int main() {
     assert(chainedExpressionText.text.find("(5 + 10)") != std::string::npos);
     assert(chainedExpressionText.diagnostics.empty());
 
+    // A second SETF may itself consume a proven value; assignments should
+    // expose the recovered expression rather than retaining a temporary stack name.
+    NsfGool chainedAssignmentSource;
+    chainedAssignmentSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction firstAssignment;
+    firstAssignment.opcode = 17U;
+    firstAssignment.operandBits = (0x805U << 12U) | 0x805U; // stack[5] = 5
+    firstAssignment.byteOffset = 0;
+    chainedAssignmentSource.instructions.push_back(firstAssignment);
+    NsfGoolInstruction secondAssignment;
+    secondAssignment.opcode = 17U;
+    secondAssignment.operandBits = (0x806U << 12U) | 0xB05U; // stack[6] = stack[5]
+    secondAssignment.byteOffset = 4;
+    chainedAssignmentSource.instructions.push_back(secondAssignment);
+    const auto chainedAssignmentIR = buildGoolIR(chainedAssignmentSource);
+    const auto chainedAssignmentText = decompileGoolIR(chainedAssignmentIR);
+    assert(chainedAssignmentText.text.find("stack[6] = 5") != std::string::npos);
+
+    // Routine summaries expose their discovery source, shared ownership,
+    // exits, and unresolved diagnostics without pretending to resolve them.
+    GoolIRProgram summarizedRoutineProgram;
+    GoolIRInstruction routineNop;
+    routineNop.opcode = 47U;
+    routineNop.opcodeKnown = true;
+    routineNop.mnemonic = "NOP";
+    summarizedRoutineProgram.instructions.push_back(routineNop);
+    GoolIRRoutine summarizedRoutine;
+    summarizedRoutine.entryInstruction = 0;
+    summarizedRoutine.fromCodeHook = true;
+    summarizedRoutine.instructions = {0};
+    summarizedRoutine.sharedInstructions = {0};
+    summarizedRoutine.exits.push_back({GoolIRRoutineExitKind::EntryPointBoundary,
+        0, 1, true, GoolIRFlowEdgeKind::Branch, "target is another known entry"});
+    summarizedRoutine.diagnostics.push_back("routine contains an unresolved edge");
+    summarizedRoutineProgram.routines.push_back(summarizedRoutine);
+    const auto summarizedRoutineText = decompileGoolIRRoutine(summarizedRoutineProgram, 0);
+    assert(summarizedRoutineText.text.find("Entry source: Code hook") != std::string::npos);
+    assert(summarizedRoutineText.text.find("shared instructions: 1") != std::string::npos);
+    assert(summarizedRoutineText.text.find("entry-point boundary -> L00001") != std::string::npos);
+    assert(summarizedRoutineText.text.find("unresolved edge") != std::string::npos);
+
     // Compacting a discontiguous routine must not reinterpret an external
     // reaching-definition index as an unrelated instruction in the compact
     // stream. Fall back to original indices when that provenance cannot map.

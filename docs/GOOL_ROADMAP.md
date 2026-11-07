@@ -51,10 +51,12 @@ The native-instruction audit covers the supported PlayStation R3000A integer sub
 ## 4. Readable GOOL decompilation
 
 - [x] Render the documented arithmetic, logical, comparison, random, and unary transformation instructions as source expressions while preserving original offsets and raw words.
-- [x] Inline a single, proven `SETF` definition into later source expressions and structured comparison conditions using reaching-definition data flow; preserve explicit references for merges, unmodeled incoming values, unsupported producers, and recursive chains.
-- [ ] Expand source-level rendering for state, event, animation, entity, and miscellaneous operations as their runtime semantics are verified.
+- [x] Inline a single, proven `SETF` definition into later source expressions, assignments, and structured comparison conditions using reaching-definition data flow; preserve explicit references for merges, unmodeled incoming values, unsupported producers, and recursive chains.
+- [x] Render verified calls, returns, and state transitions as source-level control operations with descriptor/EID resolution and explicit unresolved diagnostics.
+- [ ] Expand source-level rendering for event, animation, entity, and miscellaneous operations as their runtime semantics are verified.
 - [ ] Improve routine-level control-flow structuring for shared blocks, discontiguous regions, and native MIPS branches without hiding unresolved edges.
-- [ ] Validate readable output against representative Crash 2 GOOL entries and retain round-trip/source-map regression coverage.
+- [x] Include routine discovery source, shared-instruction counts, exit boundaries, and routine diagnostics in routine decompilation output.
+- [ ] Validate readable output against additional representative Crash 2 GOOL entries and retain round-trip/source-map regression coverage.
 
 ## 3. Blueprint graph usability and navigation
 
@@ -91,7 +93,8 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [x] Reconstruct nested if/else regions when all interior branch entries originate within the proven parent body; preserve fallback for external entries, calls, and hooks.
 - [x] Reconstruct straight-line post-test loops as `do/while` when a conditional backward branch targets the proven body entry; reject interior entries and nested control flow.
 - [x] Reconstruct nested pre-test loops and branch-containing loop bodies when all nested branch targets and entries remain inside the proven loop region; retain explicit branches/fallback for unsafe or unresolved regions.
-- [ ] Extend structured control-flow reconstruction to more complex loop exits, irreducible regions, and native MIPS control-flow edges without hiding unresolved paths.
+- [x] Reconstruct conditional and unconditional exits from a proven pre-test loop as explicit `break` statements when they target that loop's unique exit; preserve other branch edges as labels/gotos.
+- [ ] Extend structured control-flow reconstruction to irreducible regions and native MIPS control-flow edges without hiding unresolved paths.
 - [x] Apply the IR/decompiler to the first 20-word real Crash 2 sample region: DispC's Code hook at instruction 0; record its decoded words, descriptor-3 state transition, following RET, and unresolved execution question in `docs/DISPC_INITIAL_ROUTINE.md`.
 - [ ] Apply the decompiler to real Crash 2 routines, beginning with the `BoxsC` Code hook at instruction 558; use the resulting output to identify missing semantics rather than inventing high-level behavior.
 - [ ] Validate routine discovery against additional real GOOL objects and local-call patterns; investigate ambiguous/shared code and entry points not represented by local Code hooks or local calls.
@@ -162,3 +165,12 @@ These are different views of the same underlying GOOL model, not separate implem
 - Keep uncertain interpretations explicitly identified as pending research.
 - Prefer small, independently testable changes.
 - Do not enable GOOL recompilation or routine NSF saving based only on successful parsing or display.
+
+
+### Readable decompilation pass — conservative coverage expansion
+
+- Added structured `break` rendering for conditional and unconditional branches that leave a proven pre-test loop at its unique exit. Branches to other destinations remain explicit, and irreducible/native control flow is not guessed into structured syntax.
+- Extended reaching-definition substitution through `SETF` assignments, so proven values can flow through a chain of assignments as well as into arithmetic and branch expressions.
+- Expanded routine headers with entry provenance, instruction/shared-instruction counts, exit classifications, and retained diagnostics.
+- Kept source rendering limited to semantics already represented by verified IR control operations (calls, returns, state transitions); animation/event/entity opcodes without sufficiently established semantics remain low-level mnemonic/operand listings.
+- Regression coverage uses the existing DispC real-routine fixture and synthetic edge cases. Broader validation against additional real Crash 2 entries remains pending because no additional binary sample is part of this repository test fixture.
