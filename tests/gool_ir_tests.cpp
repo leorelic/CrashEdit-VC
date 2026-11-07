@@ -1640,6 +1640,35 @@ int main() {
     assert(nestedLoopOutput.text.find("        while (self->counter == 3) {") != std::string::npos);
     assert(nestedLoopOutput.text.find("goto L") == std::string::npos);
 
+    // Nested post-test loops retain both loop conditions and their indentation.
+    GoolIRProgram nestedDoLoopProgram;
+    const auto appendNestedDoInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                                std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 47U ? "NOP" : "UNKNOWN";
+        item.operands = std::move(operands);
+        nestedDoLoopProgram.instructions.push_back(std::move(item));
+    };
+    appendNestedDoInstruction(47, 0x680);
+    appendNestedDoInstruction(47, 0x684);
+    appendNestedDoInstruction(4, 0x688, {nestedLoopField,
+        GoolIROperand{'R', 12, 3, 3, GoolIROperandKind::Value, "3"}});
+    appendNestedDoInstruction(52, 0x68C, {nestedLoopDisplacement(-3)});
+    appendNestedDoInstruction(47, 0x690);
+    appendNestedDoInstruction(4, 0x694, {nestedLoopField,
+        GoolIROperand{'R', 12, 9, 9, GoolIROperandKind::Value, "9"}});
+    appendNestedDoInstruction(52, 0x698, {nestedLoopDisplacement(-7)});
+    const auto nestedDoLoopOutput = decompileGoolIR(nestedDoLoopProgram);
+    assert(nestedDoLoopOutput.text.find("do {") != std::string::npos);
+    assert(nestedDoLoopOutput.text.find("        do {") != std::string::npos);
+    assert(nestedDoLoopOutput.text.find("} while (self->counter == 3);") != std::string::npos);
+    assert(nestedDoLoopOutput.text.find("} while (self->counter == 9);") != std::string::npos);
+    assert(nestedDoLoopOutput.text.find("goto L") == std::string::npos);
+
     // An external branch into a pre-test loop must retain its target label
     // when the loop is rendered structurally.
     GoolIRProgram externallyEnteredLoop = loopProgram;
