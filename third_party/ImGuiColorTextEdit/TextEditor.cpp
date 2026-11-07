@@ -965,11 +965,10 @@ void TextEditor::Render()
 				auto focused = ImGui::IsWindowFocused();
 
 				// Highlight the current line (where the cursor is)
-				if (!HasSelection())
 				{
+					// Keep a restrained current-line guide visible even while text is selected.
 					auto end = ImVec2(start.x + contentSize.x + scrollX, start.y + mCharAdvance.y);
 					drawList->AddRectFilled(start, end, mPalette[(int)(focused ? PaletteIndex::CurrentLineFill : PaletteIndex::CurrentLineFillInactive)]);
-					drawList->AddRect(start, end, mPalette[(int)PaletteIndex::CurrentLineEdge], 1.0f);
 				}
 
 				// Render the cursor
@@ -2394,7 +2393,9 @@ void TextEditor::ColorizeInternal()
 
 	if (mColorRangeMin < mColorRangeMax)
 	{
-		const int increment = (mLanguageDefinition.mTokenize == nullptr) ? 10 : 10000;
+		// GOOL Script uses a compact regex tokenizer. Colorize the complete pending
+		// range in one pass so syntax colors are visible immediately, not frame-by-frame.
+		const int increment = 10000;
 		const int to = std::min(mColorRangeMin + increment, mColorRangeMax);
 		ColorizeRange(mColorRangeMin, to);
 		mColorRangeMin = to;

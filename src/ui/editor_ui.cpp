@@ -435,7 +435,7 @@ static TextEditor::Palette goolScriptEditorPalette(){
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::KnownIdentifier)]=IM_COL32(130,195,240,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::Comment)]=IM_COL32(135,150,170,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::LineNumber)]=IM_COL32(105,118,135,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFill)]=IM_COL32(43,51,64,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFill)]=IM_COL32(32,36,44,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFillInactive)]=IM_COL32(37,43,53,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineEdge)]=IM_COL32(70,86,108,255);
  return palette;
