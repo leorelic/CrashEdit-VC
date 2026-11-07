@@ -293,13 +293,20 @@ int main() {
     addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0
     addGteDelayWord((18U << 26U) | (16U << 21U) | 0x01U); // rtps reads V0
     addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0, outside delay window
+    addGteDelayWord((58U << 26U) | (8U << 21U)); // swc2 $0,0(t0)
+    addGteDelayWord((18U << 26U) | (16U << 21U) | 0x01U); // rtps reads V0
+    addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0, second delay slot
+    addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0, outside delay window
     const auto gteTransferDelayIR = buildGoolIR(gteTransferDelaySource);
-    assert(gteTransferDelayIR.instructions.size() == 4);
+    assert(gteTransferDelayIR.instructions.size() == 8);
     const auto gteRegisterZeroMask = std::uint32_t{1};
     assert(gteTransferDelayIR.instructions[0].gteDataAccessInTransferDelayMask == 0U);
     assert(gteTransferDelayIR.instructions[1].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
     assert(gteTransferDelayIR.instructions[2].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
     assert(gteTransferDelayIR.instructions[3].gteDataAccessInTransferDelayMask == 0U);
+    assert(gteTransferDelayIR.instructions[5].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
+    assert(gteTransferDelayIR.instructions[6].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
+    assert(gteTransferDelayIR.instructions[7].gteDataAccessInTransferDelayMask == 0U);
 
     // R3000A permits an immediately adjacent complementary LWL/LWR pair to
     // merge through the ordinary load-delay slot; the second load still has

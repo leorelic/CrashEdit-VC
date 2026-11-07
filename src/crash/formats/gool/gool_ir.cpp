@@ -661,7 +661,8 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         if (currentGteAccess == 0U) continue;
         for (std::size_t distance = 1; distance <= 2 && distance <= i; ++distance) {
             const auto& transfer = result.instructions[i - distance];
-            if (!transfer.nativeMips || !transfer.nativeFieldsDecoded) break;
+            if (!transfer.nativeMips) break;
+            if (!transfer.nativeFieldsDecoded) continue; // Still consumes one instruction slot.
             const auto opcode = transfer.nativeFields.primaryOpcode;
             if (opcode != 50U && opcode != 58U) continue; // LWC2 / SWC2
             const auto transferRegister = std::uint32_t{1} << transfer.nativeFields.rt;
