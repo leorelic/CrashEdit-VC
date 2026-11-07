@@ -109,7 +109,8 @@ const char* mipsControlOperationName(GoolIRMipsControlOperation operation) {
 }
 
 void appendNativeMipsAnnotations(
-    std::ostringstream& line, const GoolIRInstruction& instruction) {
+    std::ostringstream& line, const GoolIRProgram& program, std::size_t instructionIndex) {
+    const auto& instruction = program.instructions[instructionIndex];
     const auto& effects = instruction.nativeEffects;
     if (effects.controlTransfer)
         line << "; control=" << mipsControlOperationName(effects.controlOperation);
@@ -128,10 +129,9 @@ void appendNativeMipsAnnotations(
              << " (upper PC bits supplied at runtime)";
     if (instruction.nativeDelaySlotOwnerInstructionValid) {
         line << "; delay-slot-of instruction " << instruction.nativeDelaySlotOwnerInstruction;
-        if (instruction.nativeDelaySlotOwnerInstruction < instruction.nativeDelaySlotOwnerInstruction + 1U) {
-            // The owner index is retained independently from source order; the
-            // source offset is added by the caller when the owner is in range.
-            line << " (owner link validated)";
+        if (instruction.nativeDelaySlotOwnerInstruction < program.instructions.size()) {
+            line << " (@" << hexValue(static_cast<std::uint32_t>(
+                program.instructions[instruction.nativeDelaySlotOwnerInstruction].sourceByteOffset), 4) << ")";
         }
     }
     if (effects.gprReadInLoadDelaySlotMask != 0U)
@@ -602,7 +602,7 @@ GoolIRDecompilation decompileGoolIR(
         line << "  // @" << hexValue(static_cast<std::uint32_t>(instruction.sourceByteOffset), 4)
              << " raw=" << hexValue(instruction.rawWord, 8);
         if (instruction.nativeMips)
-            appendNativeMipsAnnotations(line, instruction);
+            appendNativeMipsAnnotations(line, program, index);
         line << "\n";
         for (const auto& use : program.valueUses) {
             if (use.instructionIndex != index) continue;
