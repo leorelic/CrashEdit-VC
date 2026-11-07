@@ -98,6 +98,36 @@ int main() {
         if (diagnostic.code == "GS202") foundUnclosed = true;
     assert(foundUnclosed);
 
+
+    const auto lexed = lexGoolScript(
+        "event Update:\n"
+        "    call Print(\"hello\", 0x2A) # trailing comment\n"
+        "    value = left >= right\n");
+    assert(lexed.valid());
+    assert(!lexed.tokens.empty());
+    assert(lexed.tokens.front().kind == GoolScriptTokenKind::Identifier);
+    assert(lexed.tokens.front().text == "event");
+    bool foundStringToken = false;
+    bool foundHexNumber = false;
+    bool foundOperator = false;
+    bool foundNewline = false;
+    bool foundEnd = false;
+    for (const auto& token : lexed.tokens) {
+        if (token.kind == GoolScriptTokenKind::String && token.text == "\"hello\"") foundStringToken = true;
+        if (token.kind == GoolScriptTokenKind::Number && token.text == "0x2A") foundHexNumber = true;
+        if (token.kind == GoolScriptTokenKind::Operator && token.text == ">=") foundOperator = true;
+        if (token.kind == GoolScriptTokenKind::Newline) foundNewline = true;
+        if (token.kind == GoolScriptTokenKind::End) foundEnd = true;
+    }
+    assert(foundStringToken && foundHexNumber && foundOperator && foundNewline && foundEnd);
+
+    const auto badHex = lexGoolScript("value = 0x\n");
+    assert(!badHex.valid());
+    assert(badHex.diagnostics.front().code == "GS203");
+    const auto badLexString = lexGoolScript("call Print(\"unfinished\n");
+    assert(!badLexString.valid());
+    assert(badLexString.diagnostics.front().code == "GS200");
+
     std::cout << "GOOL Script indentation tests passed\n";
     return 0;
 }

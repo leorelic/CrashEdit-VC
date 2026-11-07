@@ -154,79 +154,175 @@ GoolScriptIndentationResult analyzeGoolScriptIndentation(
 }
 
 
+
+GoolScriptLexResult lexGoolScript(const std::string& source) {
+    GoolScriptLexResult result;
+    std::size_t i = 0U;
+    std::size_t line = 1U;
+    std::size_t column = 1U;
+    const auto isIdentifierStart = [](unsigned char ch) {
+        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+    };
+    const auto isIdentifierPart = [&](unsigned char ch) {
+        return isIdentifierStart(ch) || (ch >= '0' && ch <= '9');
+    };
+    const auto isOperator = [](char ch) {
+        switch (ch) {
+        case '+': case '-': case '*': case '/': case '%': case '=':
+        case '!': case '<': case '>': case '&': case '|': case '^': case '~':
+            return true;
+        default:
+            return false;
+        }
+    };
+    const auto advance = [](char ch, std::size_t& currentLine, std::size_t& currentColumn) {
+        if (ch == '\n') {
+            ++currentLine;
+            currentColumn = 1U;
+        } else {
+            ++currentColumn;
+        }
+    };
+
+    while (i < source.size()) {
+        const char ch = source[i];
+        const unsigned char uch = static_cast<unsigned char>(ch);
+        if (ch == ' ' || ch == '\t' || ch == '\r') {
+            advance(ch, line, column);
+            ++i;
+            continue;
+        }
+        if (ch == '\n') {
+            result.tokens.push_back({GoolScriptTokenKind::Newline, "\n", line, column, i});
+            advance(ch, line, column);
+            ++i;
+            continue;
+        }
+        if (ch == '#') {
+            while (i < source.size() && source[i] != '\n') {
+                advance(source[i], line, column);
+                ++i;
+            }
+            continue;
+        }
+
+        const std::size_t start = i;
+        const std::size_t tokenLine = line;
+        const std::size_t tokenColumn = column;
+        if (ch == '"' || ch == '\'') {
+            const char quote = ch;
+            advance(ch, line, column);
+            ++i;
+            bool closed = false;
+            while (i < source.size() && source[i] != '\n') {
+                const char current = source[i];
+                advance(current, line, column);
+                ++i;
+                if (current == '\\' && i < source.size() && source[i] != '\n') {
+                    advance(source[i], line, column);
+                    ++i;
+                } else if (current == quote) {
+                    closed = true;
+                    break;
+                }
+            }
+            result.tokens.push_back({GoolScriptTokenKind::String,
+                                     source.substr(start, i - start), tokenLine, tokenColumn, start});
+            if (!closed) {
+                result.diagnostics.push_back({GoolScriptDiagnosticSeverity::Error, tokenLine,
+                    tokenColumn, "GS200", "Unterminated string literal; strings must end on the same line."});
+            }
+            continue;
+        }
+        if (isIdentifierStart(uch)) {
+            do {
+                advance(source[i], line, column);
+                ++i;
+            } while (i < source.size() && isIdentifierPart(static_cast<unsigned char>(source[i])));
+            result.tokens.push_back({GoolScriptTokenKind::Identifier,
+                                     source.substr(start, i - start), tokenLine, tokenColumn, start});
+            continue;
+        }
+        if (uch >= '0' && uch <= '9') {
+            advance(source[i], line, column);
+            ++i;
+            const bool hexPrefix = ch == '0' && i < source.size() && (source[i] == 'x' || source[i] == 'X');
+            if (hexPrefix) {
+                advance(source[i], line, column);
+                ++i;
+                const std::size_t digitsStart = i;
+                while (i < source.size()) {
+                    const unsigned char digit = static_cast<unsigned char>(source[i]);
+                    if (!((digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f') ||
+                          (digit >= 'A' && digit <= 'F') || digit == '_')) break;
+                    advance(source[i], line, column);
+                    ++i;
+                }
+                if (i == digitsStart) {
+                    result.diagnostics.push_back({GoolScriptDiagnosticSeverity::Error, tokenLine,
+                        tokenColumn, "GS203", "Hexadecimal literal requires at least one digit."});
+                }
+            } else {
+                while (i < source.size()) {
+                    const unsigned char digit = static_cast<unsigned char>(source[i]);
+                    if (!((digit >= '0' && digit <= '9') || digit == '_')) break;
+                    advance(source[i], line, column);
+                    ++i;
+                }
+            }
+            result.tokens.push_back({GoolScriptTokenKind::Number,
+                                     source.substr(start, i - start), tokenLine, tokenColumn, start});
+            continue;
+        }
+        if (isOperator(ch)) {
+            do {
+                advance(source[i], line, column);
+                ++i;
+            } while (i < source.size() && isOperator(source[i]));
+            result.tokens.push_back({GoolScriptTokenKind::Operator,
+                                     source.substr(start, i - start), tokenLine, tokenColumn, start});
+            continue;
+        }
+
+        advance(ch, line, column);
+        ++i;
+        result.tokens.push_back({GoolScriptTokenKind::Punctuation,
+                                 source.substr(start, 1U), tokenLine, tokenColumn, start});
+    }
+    result.tokens.push_back({GoolScriptTokenKind::End, "", line, column, source.size()});
+    return result;
+}
+
+
 GoolScriptIndentationResult analyzeGoolScript(const std::string& source,
                                                std::size_t indentationWidth) {
     GoolScriptIndentationResult result = analyzeGoolScriptIndentation(source, indentationWidth);
+    const GoolScriptLexResult lexed = lexGoolScript(source);
+    result.diagnostics.insert(result.diagnostics.end(), lexed.diagnostics.begin(), lexed.diagnostics.end());
     struct Delimiter {
         char value;
         std::size_t line;
         std::size_t column;
     };
     std::vector<Delimiter> delimiters;
-    std::size_t lineNumber = 1U;
-    std::size_t column = 0U;
-    char quote = '\0';
-    std::size_t quoteColumn = 0U;
-    bool escaped = false;
-    bool inComment = false;
-
-    for (std::size_t i = 0; i < source.size(); ++i) {
-        const char ch = source[i];
-        ++column;
-        if (ch == '\n') {
-            if (quote != '\0') {
-                addError(result, lineNumber, quoteColumn, "GS200",
-                         "Unterminated string literal; strings must end on the same line.");
-                quote = '\0';
-            }
-            escaped = false;
-            inComment = false;
-            ++lineNumber;
-            column = 0U;
-            continue;
-        }
-        if (inComment) continue;
-        if (quote != '\0') {
-            if (escaped) {
-                escaped = false;
-            } else if (ch == '\\') {
-                escaped = true;
-            } else if (ch == quote) {
-                quote = '\0';
-            }
-            continue;
-        }
-        if (ch == '#') {
-            inComment = true;
-            continue;
-        }
-        if (ch == '"' || ch == '\'') {
-            quote = ch;
-            quoteColumn = column;
-            continue;
-        }
+    for (const auto& token : lexed.tokens) {
+        if (token.kind != GoolScriptTokenKind::Punctuation || token.text.empty()) continue;
+        const char ch = token.text.front();
         if (ch == '(' || ch == '[') {
-            delimiters.push_back({ch, lineNumber, column});
-            continue;
-        }
-        if (ch == ')' || ch == ']') {
+            delimiters.push_back({ch, token.line, token.column});
+        } else if (ch == ')' || ch == ']') {
             const char expected = ch == ')' ? '(' : '[';
             if (delimiters.empty() || delimiters.back().value != expected) {
-                addError(result, lineNumber, column, "GS201",
-                         "Closing delimiter does not match an earlier opening delimiter.");
+                result.diagnostics.push_back({GoolScriptDiagnosticSeverity::Error, token.line,
+                    token.column, "GS201", "Closing delimiter does not match an earlier opening delimiter."});
             } else {
                 delimiters.pop_back();
             }
         }
     }
-
-    if (quote != '\0') {
-        addError(result, lineNumber, quoteColumn, "GS200",
-                 "Unterminated string literal; strings must end on the same line.");
-    }
     for (const auto& delimiter : delimiters) {
-        addError(result, delimiter.line, delimiter.column, "GS202",
-                 "Opening delimiter is not closed.");
+        result.diagnostics.push_back({GoolScriptDiagnosticSeverity::Error, delimiter.line,
+            delimiter.column, "GS202", "Opening delimiter is not closed."});
     }
     return result;
 }
