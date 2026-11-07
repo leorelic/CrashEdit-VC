@@ -269,7 +269,7 @@ int main() {
     addBranchAt(0x104U, 0U); // delay slot
     addBranchAt(0x108U, 0U); // fallthrough
     addBranchAt(0x10CU, 0U); // target
-    addBranchAt(0x110U, (5U << 26U) | (8U << 21U) | (9U << 16U) | 0xFFFDU); // bne -> 0x104
+    addBranchAt(0x110U, (5U << 26U) | (8U << 21U) | (9U << 16U) | 0xFFFCU); // bne -> 0x104
     addBranchAt(0x114U, 0U); // delay slot
     addBranchAt(0x118U, (4U << 26U) | (8U << 21U) | (9U << 16U) | 0x7FFFU); // valid offset, absent target
     addBranchAt(0x11CU, 0U);
