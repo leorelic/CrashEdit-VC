@@ -454,6 +454,7 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
    line=trim(line.substr(0,comment));
    ++hiddenAnnotations;
   }
+  bool label=false;
   if(!line.empty()){
    bool closes=line.front()=='}';
    if(closes){
@@ -487,7 +488,7 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
    if(!line.empty()){
     // Keep routine labels flush-left; all executable statements follow the
     // reconstructed block indentation.
-    const bool label=line.size()>1U&&line.back()==':'&&line.front()=='L'&&
+    label=line.size()>1U&&line.back()==':'&&line.front()=='L'&&
       std::all_of(line.begin()+1,line.end()-1,[](unsigned char c){return std::isdigit(c)!=0;});
     if(label)indent=0;
     output.append(label?0U:indent*4U,' ');
