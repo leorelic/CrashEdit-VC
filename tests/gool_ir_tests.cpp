@@ -1624,7 +1624,9 @@ int main() {
     appendBreakLoopInstruction(4U, {loopField, loopLimit});
     appendBreakLoopInstruction(52U, {breakLoopDisplacement(4)});
     appendBreakLoopInstruction(47U);
-    appendBreakLoopInstruction(51U, {breakLoopDisplacement(2), loopField});
+    const GoolIROperand breakLoopConditionField{'R', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->counter"};
+    appendBreakLoopInstruction(51U, {breakLoopDisplacement(2), breakLoopConditionField});
     appendBreakLoopInstruction(47U);
     appendBreakLoopInstruction(50U, {breakLoopDisplacement(-5)});
     appendBreakLoopInstruction(47U);
