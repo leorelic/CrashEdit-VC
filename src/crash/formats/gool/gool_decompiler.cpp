@@ -134,11 +134,11 @@ void appendNativeMipsAnnotations(
                 program.instructions[instruction.nativeDelaySlotOwnerInstruction].sourceByteOffset), 4) << ")";
         }
     }
-    if (effects.gprReadInLoadDelaySlotMask != 0U)
-        line << "; load-delay-reads=" << mipsGprMaskText(effects.gprReadInLoadDelaySlotMask);
-    if (effects.gteDataAccessInTransferDelayMask != 0U)
+    if (instruction.gprReadInLoadDelaySlotMask != 0U)
+        line << "; load-delay-reads=" << mipsGprMaskText(instruction.gprReadInLoadDelaySlotMask);
+    if (instruction.gteDataAccessInTransferDelayMask != 0U)
         line << "; gte-transfer-delay-access="
-             << gteDataMaskText(effects.gteDataAccessInTransferDelayMask);
+             << gteDataMaskText(instruction.gteDataAccessInTransferDelayMask);
     if (effects.memoryAccess.decoded) {
         const auto& access = effects.memoryAccess;
         const char* direction = effects.memory == GoolIRMipsMemoryEffect::Read ? "read" :
