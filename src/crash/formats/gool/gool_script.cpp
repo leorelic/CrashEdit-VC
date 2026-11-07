@@ -153,4 +153,82 @@ GoolScriptIndentationResult analyzeGoolScriptIndentation(
     return result;
 }
 
+
+GoolScriptIndentationResult analyzeGoolScript(const std::string& source,
+                                               std::size_t indentationWidth) {
+    GoolScriptIndentationResult result = analyzeGoolScriptIndentation(source, indentationWidth);
+    struct Delimiter {
+        char value;
+        std::size_t line;
+        std::size_t column;
+    };
+    std::vector<Delimiter> delimiters;
+    std::size_t lineNumber = 1U;
+    std::size_t column = 0U;
+    char quote = '\0';
+    std::size_t quoteColumn = 0U;
+    bool escaped = false;
+    bool inComment = false;
+
+    for (std::size_t i = 0; i < source.size(); ++i) {
+        const char ch = source[i];
+        ++column;
+        if (ch == '\n') {
+            if (quote != '\0') {
+                addError(result, lineNumber, quoteColumn, "GS200",
+                         "Unterminated string literal; strings must end on the same line.");
+                quote = '\0';
+            }
+            escaped = false;
+            inComment = false;
+            ++lineNumber;
+            column = 0U;
+            continue;
+        }
+        if (inComment) continue;
+        if (quote != '\0') {
+            if (escaped) {
+                escaped = false;
+            } else if (ch == '\\') {
+                escaped = true;
+            } else if (ch == quote) {
+                quote = '\0';
+            }
+            continue;
+        }
+        if (ch == '#') {
+            inComment = true;
+            continue;
+        }
+        if (ch == '"' || ch == '\'') {
+            quote = ch;
+            quoteColumn = column;
+            continue;
+        }
+        if (ch == '(' || ch == '[') {
+            delimiters.push_back({ch, lineNumber, column});
+            continue;
+        }
+        if (ch == ')' || ch == ']') {
+            const char expected = ch == ')' ? '(' : '[';
+            if (delimiters.empty() || delimiters.back().value != expected) {
+                addError(result, lineNumber, column, "GS201",
+                         "Closing delimiter does not match an earlier opening delimiter.");
+            } else {
+                delimiters.pop_back();
+            }
+        }
+    }
+
+    if (quote != '\0') {
+        addError(result, lineNumber, quoteColumn, "GS200",
+                 "Unterminated string literal; strings must end on the same line.");
+    }
+    for (const auto& delimiter : delimiters) {
+        addError(result, delimiter.line, delimiter.column, "GS202",
+                 "Opening delimiter is not closed.");
+    }
+    return result;
+}
+
 } // namespace CrashEdit::Crash

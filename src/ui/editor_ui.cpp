@@ -676,7 +676,7 @@ void EditorUI::drawGoolScriptEditor(){
     if(fontCount>1.0f)ImGui::PopFont();
     const std::string scratchText=scratchEditor.GetText();
     if(scratchText!=lastScratchAnalysisText){
-     analysis=Crash::analyzeGoolScriptIndentation(scratchText);
+     analysis=Crash::analyzeGoolScript(scratchText);
      lastScratchAnalysisText=scratchText;
      TextEditor::ErrorMarkers markers;
      for(const auto& diagnostic:analysis.diagnostics){

@@ -31,4 +31,9 @@ GoolScriptIndentationResult analyzeGoolScriptIndentation(
     const std::string& source,
     std::size_t indentationWidth = 4);
 
+// Run indentation and conservative lexical validation for the current draft language.
+// This does not claim to parse or validate GOOL semantics.
+GoolScriptIndentationResult analyzeGoolScript(const std::string& source,
+                                               std::size_t indentationWidth = 4);
+
 } // namespace CrashEdit::Crash
