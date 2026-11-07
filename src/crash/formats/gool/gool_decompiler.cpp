@@ -395,7 +395,42 @@ GoolIRDecompilation decompileGoolIR(
             bool hasInteriorEntry = false;
             for (const auto& [target, unused] : labels) {
                 (void)unused;
-                if (target >= index + 1 && target <= bodyEnd) {
+                if (target < index + 1 || target > bodyEnd) continue;
+
+                // Nested branches may enter an inner region. Preserve the
+                // outer structure only when every incoming edge to this
+                // label originates inside the candidate body; calls and
+                // hook entries remain hard boundaries.
+                bool hasInternalBranchEntry = false;
+                bool hasUnsafeEntry = false;
+                for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+                    const auto& incoming = program.instructions[source];
+                    if (incoming.nativeMips || !incoming.opcodeKnown ||
+                        incoming.opcode < 50U || incoming.opcode > 52U)
+                        continue;
+                    const auto* incomingDisplacement = findOperand(incoming, 'I');
+                    if (!incomingDisplacement) continue;
+                    const auto incomingTarget = static_cast<std::int64_t>(source) + 1 +
+                        incomingDisplacement->value;
+                    if (incomingTarget != static_cast<std::int64_t>(target)) continue;
+                    if (source < index + 1 || source > bodyEnd) {
+                        hasUnsafeEntry = true;
+                        break;
+                    }
+                    hasInternalBranchEntry = true;
+                }
+                for (const auto& operation : program.controlOperations) {
+                    if (operation.kind == GoolIRControlOperationKind::Call &&
+                        !operation.external && operation.targetInstructionValid &&
+                        operation.targetInstruction == target)
+                        hasUnsafeEntry = true;
+                }
+                for (const auto& hook : program.hookDispatches) {
+                    if (hook.resolution == GoolIRHookResolution::Local &&
+                        hook.instructionOffset == target)
+                        hasUnsafeEntry = true;
+                }
+                if (!hasInternalBranchEntry || hasUnsafeEntry) {
                     hasInteriorEntry = true;
                     break;
                 }
@@ -532,6 +567,7 @@ GoolIRDecompilation decompileGoolIR(
         result.text += "gool " + hexValue(static_cast<std::uint32_t>(program.id), 8) + " {\n";
     }
 
+    std::size_t indentDepth = 0;
     for (std::size_t index = start; index < boundedEnd; ++index) {
         const auto& instruction = program.instructions[index];
         if (suppressedBranches.find(index) != suppressedBranches.end()) {
@@ -540,14 +576,14 @@ GoolIRDecompilation decompileGoolIR(
             std::string closingLine;
             if (owningClause != structuredIfs.end() &&
                 elseArms.find(owningClause->first) != elseArms.end()) {
-                closingLine = "    } else {";
+                closingLine = "} else {";
             } else {
                 const bool closesForElseIf = std::any_of(elseIfClauses.begin(), elseIfClauses.end(),
                     [&](const auto& entry) {
                         const auto clause = structuredIfs.find(entry.first);
                         return clause != structuredIfs.end() && clause->second.bodyEnd == index;
                     });
-                if (!closesForElseIf) closingLine = "    }";
+                if (!closesForElseIf) closingLine = "}";
             }
             if (!closingLine.empty()) {
                 // Structured braces replace the original branch instruction,
@@ -555,14 +591,19 @@ GoolIRDecompilation decompileGoolIR(
                 if (options.preserveStructuredBranchOffsets)
                     closingLine += " // @" + hexValue(
                         static_cast<std::uint32_t>(instruction.sourceByteOffset), 4);
-                result.text += closingLine + "\n";
+                if (indentDepth != 0U) --indentDepth;
+                result.text += std::string((indentDepth + 1U) * 4U, ' ') + closingLine + "\n";
+                if (closingLine == "} else {") ++indentDepth;
             }
             continue;
         }
-        if (closeElseAt.find(index) != closeElseAt.end())
-            result.text += "    }\n";
+        if (closeElseAt.find(index) != closeElseAt.end()) {
+            if (indentDepth != 0U) --indentDepth;
+            result.text += std::string((indentDepth + 1U) * 4U, ' ') + "}\n";
+        }
         if (suppressedLoopBackBranches.find(index) != suppressedLoopBackBranches.end()) {
-            result.text += "    }\n";
+            if (indentDepth != 0U) --indentDepth;
+            result.text += std::string((indentDepth + 1U) * 4U, ' ') + "}\n";
             continue;
         }
         if (suppressedLoopLabels.find(index) == suppressedLoopLabels.end() &&
@@ -571,7 +612,9 @@ GoolIRDecompilation decompileGoolIR(
             labels.find(index) != labels.end())
             result.text += labelName(index) + ":\n";
         if (structuredLoops.find(index) != structuredLoops.end()) {
-            result.text += "    while (" + comparisonCondition(program, index) + ") {\n";
+            result.text += std::string((indentDepth + 1U) * 4U, ' ') +
+                "while (" + comparisonCondition(program, index) + ") {\n";
+            ++indentDepth;
             continue;
         }
         if (suppressedLoopConditions.find(index) != suppressedLoopConditions.end())
@@ -580,20 +623,25 @@ GoolIRDecompilation decompileGoolIR(
         if (structuredIfs.find(index) != structuredIfs.end()) {
             const auto comparison = comparisonCondition(program, index);
             if (elseIfClauses.find(index) != elseIfClauses.end()) {
-                result.text += "    } else if (" + comparison + ") {\n";
+                if (indentDepth != 0U) --indentDepth;
+                result.text += std::string((indentDepth + 1U) * 4U, ' ') +
+                    "} else if (" + comparison + ") {\n";
             } else if (!comparison.empty()) {
-                result.text += "    if (" + comparison + ") {\n";
+                result.text += std::string((indentDepth + 1U) * 4U, ' ') +
+                    "if (" + comparison + ") {\n";
             } else {
-                result.text += "    if (" + fieldText(instruction) +
+                result.text += std::string((indentDepth + 1U) * 4U, ' ') +
+                    "if (" + fieldText(instruction) +
                     (instruction.opcode == 51U ? " == 0) {\n" : " != 0) {\n");
             }
+            ++indentDepth;
             continue;
         }
         if (suppressedConditionProducers.find(index) != suppressedConditionProducers.end())
             continue;
 
         std::ostringstream line;
-        line << "    ";
+        line << std::string((indentDepth + 1U) * 4U, ' ');
 
         if (instruction.nativeMips) {
             if (instruction.nativeInstructionDecoded && !instruction.mnemonic.empty()) {

@@ -1527,6 +1527,51 @@ int main() {
     assert(elseOutput.text.find("L00004:") == std::string::npos);
     assert(elseOutput.text.find("@0x0514") != std::string::npos);
 
+    // Nested if/else regions may contain branch labels when every incoming
+    // branch is internal to the parent body; rendered blocks keep their depth.
+    GoolIRProgram nestedProgram;
+    auto appendNestedInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                       std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        nestedProgram.instructions.push_back(std::move(item));
+    };
+    const GoolIROperand nestedField{'L', 12, 29, 29,
+        GoolIROperandKind::ProcessField, "self->subtype"};
+    const auto nestedDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    const auto nestedComparison = [&](std::uint32_t value) {
+        return std::vector<GoolIROperand>{nestedField,
+            GoolIROperand{'R', 12, value, static_cast<std::int32_t>(value),
+                GoolIROperandKind::Value, std::to_string(value)}};
+    };
+    appendNestedInstruction(4, 0x700, nestedComparison(1));
+    appendNestedInstruction(52, 0x704, {nestedDisplacement(7),
+        GoolIROperand{'V', 4, 0, 0, GoolIROperandKind::Value, "0"}, nestedField});
+    appendNestedInstruction(4, 0x708, nestedComparison(2));
+    appendNestedInstruction(52, 0x70C, {nestedDisplacement(2),
+        GoolIROperand{'V', 4, 0, 0, GoolIROperandKind::Value, "0"}, nestedField});
+    appendNestedInstruction(47, 0x710);
+    appendNestedInstruction(50, 0x714, {nestedDisplacement(1)});
+    appendNestedInstruction(47, 0x718); // inner else
+    appendNestedInstruction(47, 0x71C); // inner join
+    appendNestedInstruction(50, 0x720, {nestedDisplacement(1)});
+    appendNestedInstruction(47, 0x724); // outer else
+    appendNestedInstruction(47, 0x728); // outer join
+    const auto nestedOutput = decompileGoolIR(nestedProgram);
+    assert(nestedOutput.text.find("if (self->subtype == 1) {") != std::string::npos);
+    assert(nestedOutput.text.find("        if (self->subtype == 2) {") != std::string::npos);
+    assert(nestedOutput.text.find("        } else {") != std::string::npos);
+    assert(nestedOutput.text.find("    } else {") != std::string::npos);
+    assert(nestedOutput.text.find("goto L") == std::string::npos);
+
     // A pre-test loop with one backward BRA is reconstructed as while.
     GoolIRProgram loopProgram;
     auto appendLoopInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
