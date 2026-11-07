@@ -51,18 +51,6 @@ if(CRASHEDIT_BUILD_APP)
     )
     target_link_libraries(crashedit_imgui PUBLIC glfw OpenGL::GL)
 
-    # Lightweight Dear ImGui code editor (MIT licensed).
-    FetchContent_Declare(
-        imgui_color_text_edit
-        GIT_REPOSITORY https://github.com/BalazsJako/ImGuiColorTextEdit.git
-        GIT_TAG ca2f9f1462e3b60e56351bc466acda448c5ea50d
-        GIT_SHALLOW FALSE
-    )
-    FetchContent_GetProperties(imgui_color_text_edit)
-    if(NOT imgui_color_text_edit_POPULATED)
-        FetchContent_Populate(imgui_color_text_edit)
-    endif()
-
     # JetBrains Mono is the app's optional modern UI font and the code editor font.
     FetchContent_Declare(
         jetbrains_mono
@@ -74,14 +62,6 @@ if(CRASHEDIT_BUILD_APP)
     if(NOT jetbrains_mono_POPULATED)
         FetchContent_Populate(jetbrains_mono)
     endif()
-
-    add_library(crashedit_text_editor STATIC
-        ${imgui_color_text_edit_SOURCE_DIR}/TextEditor.cpp
-    )
-    target_include_directories(crashedit_text_editor PUBLIC
-        ${imgui_color_text_edit_SOURCE_DIR}
-    )
-    target_link_libraries(crashedit_text_editor PUBLIC crashedit_imgui)
 
     if(WIN32)
         set(CRASHEDIT_EXECUTABLE_TYPE WIN32)
@@ -100,9 +80,10 @@ if(CRASHEDIT_BUILD_APP)
         src/crash/formats/gool/gool_script.cpp
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
+        src/ui/gool_script_editor.cpp
     )
     target_include_directories(CrashEdit PRIVATE src)
-    target_link_libraries(CrashEdit PRIVATE crashedit_imgui crashedit_text_editor glfw OpenGL::GL)
+    target_link_libraries(CrashEdit PRIVATE crashedit_imgui glfw OpenGL::GL)
     if(WIN32)
         target_link_libraries(CrashEdit PRIVATE comdlg32)
     endif()

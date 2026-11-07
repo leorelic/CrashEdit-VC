@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include "ui/gool_script_editor.hpp"
 namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {

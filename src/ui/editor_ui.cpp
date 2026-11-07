@@ -1,4 +1,5 @@
 #include "ui/editor_ui.hpp"
+#include "ui/gool_script_editor.hpp"
 #include "core/diagnostics.hpp"
 #include "core/file_save.hpp"
 #include "crash/formats/eid.hpp"
@@ -10,7 +11,6 @@
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
-#include "TextEditor.h"
 #include <map>
 #include <algorithm>
 #include <cmath>
@@ -393,97 +393,6 @@ void EditorUI::draw(){
 }
 
 
-static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
- static const TextEditor::LanguageDefinition language=[] {
-  TextEditor::LanguageDefinition value;
-  value.mName="GOOL Script";
-  value.mAutoIndentation=true;
-  value.mCaseSensitive=false;
-  value.mSingleLineComment="#";
-  value.mPreprocChar=0;
-  value.mKeywords={
-   "EVENT","STATE","ROUTINE","IF","ELSE","WHILE","FOR","IN","BREAK","CONTINUE",
-   "RETURN","CALL","TRANSITION","TRUE","FALSE","NULL","AND","OR","NOT",
-   "NATIVE","UNKNOWN","LET","VAR","CONST"
-  };
-  // Use an explicit lexer so every GOOL token receives a deterministic palette index.
-  value.mTokenize=[](const char* begin,const char* end,const char*& tokenBegin,
-      const char*& tokenEnd,TextEditor::PaletteIndex& color)->bool {
-   const char* p=begin;
-   while(p<end&&std::isspace(static_cast<unsigned char>(*p)))++p;
-   if(p>=end)return false;
-   tokenBegin=p;
-   const char first=*p;
-   if(first=='"'||first==39){
-    const char quote=first;
-    ++p;
-    while(p<end){
-     if(static_cast<unsigned char>(*p)==92&&p+1<end){p+=2;continue;}
-     if(*p==quote){++p;break;}
-     ++p;
-    }
-    color=quote=='"'?TextEditor::PaletteIndex::String:TextEditor::PaletteIndex::CharLiteral;
-   }else if(std::isdigit(static_cast<unsigned char>(first))){
-    if(first=='0'&&p+1<end&&(p[1]=='x'||p[1]=='X')){
-     p+=2;
-     while(p<end&&(std::isxdigit(static_cast<unsigned char>(*p))||*p=='_'))++p;
-    }else{
-     while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
-     if(p<end&&*p=='.'){
-      ++p;
-      while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
-     }
-     if(p<end&&(*p=='e'||*p=='E')){
-      const char* exponent=p++;
-      if(p<end&&(*p=='+'||*p=='-'))++p;
-      const char* digits=p;
-      while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
-      if(p==digits)p=exponent;
-     }
-    }
-    color=TextEditor::PaletteIndex::Number;
-   }else if(std::isalpha(static_cast<unsigned char>(first))||first=='_'){
-    ++p;
-    while(p<end&&(std::isalnum(static_cast<unsigned char>(*p))||*p=='_'))++p;
-    color=TextEditor::PaletteIndex::Identifier;
-   }else if(std::strchr("+-*/%=!<>|&^~",first)!=nullptr){
-    ++p;
-    while(p<end&&std::strchr("+-*/%=!<>|&^~",*p)!=nullptr)++p;
-    color=TextEditor::PaletteIndex::Punctuation;
-   }else if(std::strchr("[]{}(),.;:",first)!=nullptr){
-    ++p;
-    color=TextEditor::PaletteIndex::Punctuation;
-   }else{
-    return false;
-   }
-   tokenEnd=p;
-   return true;
-  };
-  return value;
- }();
- return language;
-}
-
-static TextEditor::Palette goolScriptEditorPalette(){
- auto palette=TextEditor::GetDarkPalette();
- // Retain the near-black editor surface with a brighter, high-contrast code palette.
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Background)]=IM_COL32(24,26,31,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Default)]=IM_COL32(225,228,235,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Keyword)]=IM_COL32(205,160,245,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Number)]=IM_COL32(181,210,145,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::String)]=IM_COL32(235,190,135,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::CharLiteral)]=IM_COL32(224,184,132,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Punctuation)]=IM_COL32(195,202,215,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Identifier)]=IM_COL32(225,228,235,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::KnownIdentifier)]=IM_COL32(130,195,240,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Comment)]=IM_COL32(135,150,170,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::LineNumber)]=IM_COL32(105,118,135,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFill)]=IM_COL32(32,36,44,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFillInactive)]=IM_COL32(37,43,53,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineEdge)]=IM_COL32(70,86,108,255);
- return palette;
-}
-
 // Present the conservative IR decompilation using the chosen indentation-based
 // source layout. Provenance/debug comments remain available through the Inspector.
 static std::string formatGoolIRForScriptView(const std::string& source,std::size_t& hiddenAnnotations){
@@ -594,38 +503,20 @@ void EditorUI::drawGoolScriptEditor(){
   activeRoutine=0;programReady=false;
  }
 
- static TextEditor selectedEditor;
- static TextEditor scratchEditor;
- static bool editorsInitialized=false;
+ static GoolScriptEditor selectedEditor;
+ static GoolScriptEditor scratchEditor;
  static std::string selectedEditorText;
  static std::string lastScratchAnalysisText;
  static Crash::GoolScriptIndentationResult analysis;
  static std::size_t hiddenAnnotations=0;
  static int displayedChunk=-1,displayedEntry=-1;
  static std::size_t displayedRoutine=static_cast<std::size_t>(-1);
- if(!editorsInitialized){
-  const auto& language=goolScriptLanguageDefinition();
-  const auto palette=goolScriptEditorPalette();
-  selectedEditor.SetLanguageDefinition(language);
-  selectedEditor.SetPalette(palette);
-  selectedEditor.SetColorizerEnable(true);
-  selectedEditor.SetTabSize(4);
-  selectedEditor.SetShowWhitespaces(false);
-  selectedEditor.SetReadOnly(true);
-  scratchEditor.SetLanguageDefinition(language);
-  scratchEditor.SetPalette(palette);
-  scratchEditor.SetColorizerEnable(true);
-  scratchEditor.SetTabSize(4);
-  scratchEditor.SetShowWhitespaces(false);
-  scratchEditor.SetReadOnly(false);
-  scratchEditor.SetText(
-   "event Update:\n"
-   "    if health <= 0:\n"
-   "        transition Dead\n"
-   "    else:\n"
-   "        call UpdateMovement\n");
-  editorsInitialized=true;
- }
+ if(!scratchEditor.GetText().size())scratchEditor.SetText(
+  "event Update:\n"
+  "    if health <= 0:\n"
+  "        transition Dead\n"
+  "    else:\n"
+  "        call UpdateMovement\n");
 
  if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
   ImGui::TextDisabled("GOOL authoring workspace");
@@ -730,13 +621,7 @@ void EditorUI::drawGoolScriptEditor(){
     if(scratchText!=lastScratchAnalysisText){
      analysis=Crash::analyzeGoolScript(scratchText);
      lastScratchAnalysisText=scratchText;
-     TextEditor::ErrorMarkers markers;
-     for(const auto& diagnostic:analysis.diagnostics){
-      const int line=static_cast<int>(diagnostic.line>0?diagnostic.line-1U:0U);
-      markers[line]=diagnostic.code+": "+diagnostic.message;
-     }
-     scratchEditor.SetErrorMarkers(markers);
-    }
+         }
     ImGui::Separator();
     ImGui::Text("Script diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
     ImGui::BeginChild("GoolScriptProblems",ImVec2(0.0f,0.0f),false,
