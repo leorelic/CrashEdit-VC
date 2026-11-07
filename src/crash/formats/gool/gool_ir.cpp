@@ -724,13 +724,18 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
     // register (not unrelated GTE registers or the control-register bank).
     for (std::size_t i = 1; i < result.instructions.size(); ++i) {
         auto& current = result.instructions[i];
-        if (!current.nativeMips || !current.nativeEffects.known) continue;
+        if (!current.nativeMips || !current.nativeEffects.known ||
+            current.sourceByteOffset % 4U != 0U) continue;
         const auto currentGteAccess = current.nativeEffects.coprocessor2DataReadMask |
             current.nativeEffects.coprocessor2DataWriteMask;
         if (currentGteAccess == 0U) continue;
+        auto nextByteOffset = current.sourceByteOffset;
         for (std::size_t distance = 1; distance <= 2 && distance <= i; ++distance) {
             const auto& transfer = result.instructions[i - distance];
-            if (!transfer.nativeMips) break;
+            if (!transfer.nativeMips || transfer.sourceByteOffset % 4U != 0U ||
+                transfer.sourceByteOffset > std::numeric_limits<std::size_t>::max() - 4U ||
+                transfer.sourceByteOffset + 4U != nextByteOffset) break;
+            nextByteOffset = transfer.sourceByteOffset;
             if (!transfer.nativeFieldsDecoded) continue; // Still consumes one instruction slot.
             const auto opcode = transfer.nativeFields.primaryOpcode;
             if (opcode != 50U && opcode != 58U) continue; // LWC2 / SWC2
@@ -744,7 +749,10 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
     for (std::size_t i = 1; i < result.instructions.size(); ++i) {
         const auto& previous = result.instructions[i - 1U];
         auto& current = result.instructions[i];
-        if (!previous.nativeMips || !current.nativeMips) continue;
+        if (!previous.nativeMips || !current.nativeMips ||
+            previous.sourceByteOffset % 4U != 0U ||
+            previous.sourceByteOffset > std::numeric_limits<std::size_t>::max() - 4U ||
+            previous.sourceByteOffset + 4U != current.sourceByteOffset) continue;
         if (previous.nativeEffects.controlTransferHasDelaySlot)
             current.isControlTransferDelaySlot = true;
         if (previous.nativeEffects.gprWriteHasLoadDelay && current.nativeEffects.known) {

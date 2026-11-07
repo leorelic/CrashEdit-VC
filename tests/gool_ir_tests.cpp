@@ -210,6 +210,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = mipsControlSource.instructions.size() * 4U;
         mipsControlSource.instructions.push_back(instruction);
     };
     addMipsControlWord((8U << 21U) | 8U); // jr t0
@@ -349,6 +350,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = effectSource.instructions.size() * 4U;
         effectSource.instructions.push_back(instruction);
     };
     addMipsWord((9U << 26U) | (29U << 21U) | (8U << 16U) | 0xFFF0U); // addiu t0,sp,-16
@@ -390,6 +392,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = hiLoSource.instructions.size() * 4U;
         hiLoSource.instructions.push_back(instruction);
     };
     addHiLoWord((8U << 21U) | (9U << 16U) | 24U); // mult
@@ -426,6 +429,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = gteTransferDelaySource.instructions.size() * 4U;
         gteTransferDelaySource.instructions.push_back(instruction);
     };
     addGteDelayWord((50U << 26U) | (8U << 21U)); // lwc2 $0,0(t0)
@@ -457,6 +461,7 @@ int main() {
         instruction.isMips = true;
         instruction.word = (static_cast<std::uint32_t>(opcode) << 26U) |
             (8U << 21U) | (static_cast<std::uint32_t>(rt) << 16U);
+        instruction.byteOffset = unalignedPairSource.instructions.size() * 4U;
         unalignedPairSource.instructions.push_back(instruction);
     };
     const auto addUnalignedConsumer = [&unalignedPairSource](std::uint8_t source, std::uint8_t destination) {
@@ -464,6 +469,7 @@ int main() {
         instruction.isMips = true;
         instruction.word = (9U << 26U) | (static_cast<std::uint32_t>(source) << 21U) |
             (static_cast<std::uint32_t>(destination) << 16U);
+        instruction.byteOffset = unalignedPairSource.instructions.size() * 4U;
         unalignedPairSource.instructions.push_back(instruction);
     };
     addUnalignedLoad(34U, 9U); // lwl t1,0(t0)
@@ -493,6 +499,7 @@ int main() {
         instruction.isMips = true;
         instruction.word = (static_cast<std::uint32_t>(opcode) << 26U) |
             (8U << 21U) | (static_cast<std::uint32_t>(rt) << 16U) | offset;
+        instruction.byteOffset = memoryAccessSource.instructions.size() * 4U;
         memoryAccessSource.instructions.push_back(instruction);
     };
     addMemoryWord(32U, 9U, 0xFFF0U); // lb t1,-16(t0)
@@ -545,6 +552,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = delaySlotSource.instructions.size() * 4U;
         delaySlotSource.instructions.push_back(instruction);
     };
     addDelaySlotWord((4U << 26U) | (8U << 21U) | (9U << 16U) | 1U); // beq t0,t1,+1
@@ -574,6 +582,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = validationSource.instructions.size() * 4U;
         validationSource.instructions.push_back(instruction);
     };
     addValidationWord((1U << 21U) | (2U << 16U) | (3U << 11U) | (4U << 6U)); // invalid sll: rs != 0
@@ -601,6 +610,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = immediateValidationSource.instructions.size() * 4U;
         immediateValidationSource.instructions.push_back(instruction);
     };
     addImmediateWord((6U << 26U) | (4U << 21U) | (1U << 16U) | 0x10U); // invalid blez: rt != 0
@@ -626,6 +636,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = cop0Source.instructions.size() * 4U;
         cop0Source.instructions.push_back(instruction);
     };
     addCop0Word((16U << 26U) | (2U << 16U) | (12U << 11U)); // mfc0 v0,status
@@ -674,6 +685,7 @@ int main() {
         NsfGoolInstruction instruction;
         instruction.isMips = true;
         instruction.word = word;
+        instruction.byteOffset = cop2Source.instructions.size() * 4U;
         cop2Source.instructions.push_back(instruction);
     };
     addCop2Word((18U << 26U) | (0U << 21U) | (2U << 16U) | (3U << 11U)); // mfc2 v0,v3
