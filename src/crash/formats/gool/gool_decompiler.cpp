@@ -303,7 +303,8 @@ std::string comparisonCondition(const GoolIRProgram& program, std::size_t branch
     const bool branchOnZero = branch.opcode == 52U;
     const char* op = branchOnZero ? normal[comparison.opcode] : inverted[comparison.opcode];
     if (!op || *op == '\0') return {};
-    return operandText(*left) + " " + op + " " + operandText(*right);
+    return expressionOperandText(program, branchIndex - 1, *left) + " " + op + " " +
+        expressionOperandText(program, branchIndex - 1, *right);
 }
 
 

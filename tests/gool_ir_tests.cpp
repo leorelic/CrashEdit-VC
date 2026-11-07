@@ -1415,6 +1415,48 @@ int main() {
     assert(structuredText.text.find("@0x0204") != std::string::npos);
     assert(structuredText.text.find("@0x0208") == std::string::npos);
 
+
+    // A comparison used as a structured branch condition can also consume a
+    // single proven SETF value; ambiguous data-flow must still stay explicit.
+    NsfGool comparisonSource;
+    comparisonSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction comparisonAssignment;
+    comparisonAssignment.opcode = 17U;
+    comparisonAssignment.operandBits = (0x805U << 12U) | 0x805U; // stack[5] = 5
+    comparisonAssignment.byteOffset = 0x300;
+    comparisonSource.instructions.push_back(comparisonAssignment);
+    NsfGoolInstruction comparisonProducer;
+    comparisonProducer.opcode = 4U; // EQL stack[5], 10
+    comparisonProducer.operandBits = (0x80AU << 12U) | 0xB05U;
+    comparisonProducer.byteOffset = 0x304;
+    comparisonSource.instructions.push_back(comparisonProducer);
+    NsfGoolInstruction comparisonBranch;
+    comparisonBranch.opcode = 52U; // BEQZ skips to instruction 5
+    comparisonBranch.operandBits = 2U | (29U << 14U);
+    comparisonBranch.byteOffset = 0x308;
+    comparisonSource.instructions.push_back(comparisonBranch);
+    NsfGoolInstruction comparisonBody;
+    comparisonBody.opcode = 47U;
+    comparisonBody.byteOffset = 0x30C;
+    comparisonSource.instructions.push_back(comparisonBody);
+    NsfGoolInstruction comparisonJoinBranch;
+    comparisonJoinBranch.opcode = 50U; // BRA to instruction 6
+    comparisonJoinBranch.operandBits = 1U;
+    comparisonJoinBranch.byteOffset = 0x310;
+    comparisonSource.instructions.push_back(comparisonJoinBranch);
+    NsfGoolInstruction comparisonAlternate;
+    comparisonAlternate.opcode = 47U;
+    comparisonAlternate.byteOffset = 0x314;
+    comparisonSource.instructions.push_back(comparisonAlternate);
+    NsfGoolInstruction comparisonJoin;
+    comparisonJoin.opcode = 47U;
+    comparisonJoin.byteOffset = 0x318;
+    comparisonSource.instructions.push_back(comparisonJoin);
+    const auto comparisonIR = buildGoolIR(comparisonSource);
+    const auto comparisonText = decompileGoolIR(comparisonIR);
+    assert(comparisonText.text.find("if (5 == 10) {") != std::string::npos);
+    assert(comparisonText.text.find("stack[5] == 10") == std::string::npos);
+
     // Two adjacent forward-if clauses with a shared join become else-if.
     GoolIRProgram chainProgram;
     auto appendChainInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
