@@ -72,9 +72,16 @@ bool appendGoolExpression(
             "+", "-", "*", "/", "==", "&&", "||", "&", "|",
             "<", "<=", ">", ">=", "%", "^", "has"
         };
-        if (instruction.opcode == 21U) {
-            line << "(" << expressionOperandText(*left) << " << "
-                 << expressionOperandText(*right) << ")";
+        if (instruction.opcode == 15U) {
+            const auto leftText = expressionOperandText(*left);
+            const auto rightText = expressionOperandText(*right);
+            line << "(((" << leftText << " & " << rightText << ") ^ "
+                 << rightText << ") == 0)";
+        } else if (instruction.opcode == 21U) {
+            const auto leftText = expressionOperandText(*left);
+            const auto rightText = expressionOperandText(*right);
+            line << "(" << rightText << " < 0 ? (" << leftText << " >> -"
+                 << rightText << ") : (" << leftText << " << " << rightText << "))";
         } else {
             line << "(" << expressionOperandText(*left) << " "
                  << operators[instruction.opcode] << " "
@@ -86,8 +93,10 @@ bool appendGoolExpression(
         const auto* first = findOperand(instruction, 'B');
         const auto* second = findOperand(instruction, 'A');
         if (!first || !second) return false;
-        line << "rand(" << expressionOperandText(*first) << ", "
-             << expressionOperandText(*second) << ")";
+        const auto lower = expressionOperandText(*first);
+        const auto upper = expressionOperandText(*second);
+        line << "(" << lower << " + (rand() % (" << upper << " - "
+             << lower << ")))";
         return true;
     }
     case 18U: case 20U: case 23U: case 25U: case 39U: case 43U: case 44U:

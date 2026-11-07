@@ -2037,7 +2037,7 @@ int main() {
         std::uint8_t{12}, std::uint8_t{13}, std::uint8_t{14}, std::uint8_t{15},
         std::uint8_t{21}})
         addExpressionInstruction(opcode, binaryOperands);
-    addExpressionInstruction(16U, rightImmediate | (leftImmediate << 12U));
+    addExpressionInstruction(16U, leftImmediate | (rightImmediate << 12U));
     const std::uint32_t unaryOperands = 5U | (leftImmediate << 12U);
     for (const std::uint8_t opcode : {
         std::uint8_t{18}, std::uint8_t{20}, std::uint8_t{23},
@@ -2061,9 +2061,9 @@ int main() {
     assert(expressionText.text.find("(5 >= 10)") != std::string::npos);
     assert(expressionText.text.find("(5 % 10)") != std::string::npos);
     assert(expressionText.text.find("(5 ^ 10)") != std::string::npos);
-    assert(expressionText.text.find("(5 has 10)") != std::string::npos);
-    assert(expressionText.text.find("(5 << 10)") != std::string::npos);
-    assert(expressionText.text.find("rand(10, 5)") != std::string::npos);
+    assert(expressionText.text.find("(((5 & 10) ^ 10) == 0)") != std::string::npos);
+    assert(expressionText.text.find("(10 < 0 ? (5 >> -10) : (5 << 10))") != std::string::npos);
+    assert(expressionText.text.find("(5 + (rand() % (10 - 5)))") != std::string::npos);
     assert(expressionText.text.find("stack[5] = !5") != std::string::npos);
     assert(expressionText.text.find("stack[5] = &5") != std::string::npos);
     assert(expressionText.text.find("stack[5] = ~5") != std::string::npos);
