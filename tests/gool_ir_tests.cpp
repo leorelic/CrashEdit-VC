@@ -227,6 +227,8 @@ int main() {
     assert(loadEffects.known && loadEffects.memory == GoolIRMipsMemoryEffect::Read);
     assert((loadEffects.gprReadMask & (std::uint32_t{1} << 8U)) != 0U);
     assert((loadEffects.gprWriteMask & (std::uint32_t{1} << 9U)) != 0U);
+    assert(effectIR.instructions[1].gprReadInLoadDelaySlotMask == 0U);
+    assert(effectIR.instructions[2].gprReadInLoadDelaySlotMask == (std::uint32_t{1} << 9U));
     const auto& storeEffects = effectIR.instructions[2].nativeEffects;
     assert(storeEffects.known && storeEffects.memory == GoolIRMipsMemoryEffect::Write);
     assert((storeEffects.gprReadMask & (std::uint32_t{1} << 9U)) != 0U);

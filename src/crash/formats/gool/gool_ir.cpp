@@ -617,8 +617,13 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
     // transfer. Keep the transfer's own effect separate from the slot's role.
     for (std::size_t i = 1; i < result.instructions.size(); ++i) {
         const auto& previous = result.instructions[i - 1U];
-        if (previous.nativeMips && previous.nativeEffects.controlTransferHasDelaySlot)
-            result.instructions[i].isControlTransferDelaySlot = true;
+        auto& current = result.instructions[i];
+        if (!previous.nativeMips || !current.nativeMips) continue;
+        if (previous.nativeEffects.controlTransferHasDelaySlot)
+            current.isControlTransferDelaySlot = true;
+        if (previous.nativeEffects.gprWriteHasLoadDelay && current.nativeEffects.known)
+            current.gprReadInLoadDelaySlotMask = previous.nativeEffects.gprWriteMask &
+                current.nativeEffects.gprReadMask;
     }
 
     const auto controlFlow = analyzeGoolControlFlow(source);
