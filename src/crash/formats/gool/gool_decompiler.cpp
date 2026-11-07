@@ -48,16 +48,50 @@ std::string fieldText(const GoolIRInstruction& instruction) {
     return goolObjectFieldName(field->rawValue);
 }
 
-std::string expressionOperandText(const GoolIROperand& operand) {
+std::string expressionOperandText(
+    const GoolIRProgram& program, std::size_t instructionIndex,
+    const GoolIROperand& operand, unsigned depth = 0) {
     std::string value = operandText(operand);
     constexpr std::string_view immediatePrefix = "immediate ";
-    if (value.compare(0, immediatePrefix.size(), immediatePrefix) == 0)
+    if (value.compare(0, immediatePrefix.size(), immediatePrefix) == 0) {
         value.erase(0, immediatePrefix.size());
-    return value;
+        return value;
+    }
+
+    // Inline only a single, proven SETF definition. A merge, unknown incoming
+    // value, non-SETF producer, or recursive chain stays as an explicit reference.
+    if (depth >= 8U || operand.kind != GoolIROperandKind::Reference ||
+        operand.resolvedText.empty())
+        return value;
+    const GoolIRValueUse* use = nullptr;
+    for (const auto& candidate : program.valueUses) {
+        if (candidate.instructionIndex == instructionIndex &&
+            candidate.location == operand.resolvedText) {
+            use = &candidate;
+            break;
+        }
+    }
+    if (!use || use->kind != GoolIRValueOriginKind::SingleReachingDefinition ||
+        use->mayHaveUnmodeledValue ||
+        use->reachingDefinitionInstructions.size() != 1U)
+        return value;
+
+    const auto definitionIndex = use->reachingDefinitionInstructions.front();
+    if (definitionIndex >= program.instructions.size() || definitionIndex == instructionIndex)
+        return value;
+    const auto& definition = program.instructions[definitionIndex];
+    if (definition.nativeMips || !definition.opcodeKnown || definition.opcode != 17U)
+        return value;
+    const auto* destination = findOperand(definition, 'D');
+    const auto* source = findOperand(definition, 'S');
+    if (!destination || !source || destination->resolvedText != use->location)
+        return value;
+    return expressionOperandText(program, definitionIndex, *source, depth + 1U);
 }
 
 bool appendGoolExpression(
-    std::ostringstream& line, const GoolIRInstruction& instruction) {
+    std::ostringstream& line, const GoolIRProgram& program,
+    std::size_t instructionIndex, const GoolIRInstruction& instruction) {
     const auto* left = findOperand(instruction, 'L');
     const auto* right = findOperand(instruction, 'R');
     const auto* destination = findOperand(instruction, 'D');
@@ -73,19 +107,19 @@ bool appendGoolExpression(
             "<", "<=", ">", ">=", "%", "^", "has"
         };
         if (instruction.opcode == 15U) {
-            const auto leftText = expressionOperandText(*left);
-            const auto rightText = expressionOperandText(*right);
+            const auto leftText = expressionOperandText(program, instructionIndex, *left);
+            const auto rightText = expressionOperandText(program, instructionIndex, *right);
             line << "(((" << leftText << " & " << rightText << ") ^ "
                  << rightText << ") == 0)";
         } else if (instruction.opcode == 21U) {
-            const auto leftText = expressionOperandText(*left);
-            const auto rightText = expressionOperandText(*right);
+            const auto leftText = expressionOperandText(program, instructionIndex, *left);
+            const auto rightText = expressionOperandText(program, instructionIndex, *right);
             line << "(" << rightText << " < 0 ? (" << leftText << " >> -"
                  << rightText << ") : (" << leftText << " << " << rightText << "))";
         } else {
-            line << "(" << expressionOperandText(*left) << " "
+            line << "(" << expressionOperandText(program, instructionIndex, *left) << " "
                  << operators[instruction.opcode] << " "
-                 << expressionOperandText(*right) << ")";
+                 << expressionOperandText(program, instructionIndex, *right) << ")";
         }
         return true;
     }
@@ -93,23 +127,23 @@ bool appendGoolExpression(
         const auto* first = findOperand(instruction, 'B');
         const auto* second = findOperand(instruction, 'A');
         if (!first || !second) return false;
-        const auto lower = expressionOperandText(*first);
-        const auto upper = expressionOperandText(*second);
+        const auto lower = expressionOperandText(program, instructionIndex, *first);
+        const auto upper = expressionOperandText(program, instructionIndex, *second);
         line << "(" << lower << " + (rand() % (" << upper << " - "
              << lower << ")))";
         return true;
     }
     case 18U: case 20U: case 23U: case 25U: case 39U: case 43U: case 44U:
         if (!destination || !source) return false;
-        line << expressionOperandText(*destination) << " = ";
+        line << expressionOperandText(program, instructionIndex, *destination) << " = ";
         switch (instruction.opcode) {
-        case 18U: line << "!" << expressionOperandText(*source); break;
-        case 20U: line << "&" << expressionOperandText(*source); break;
-        case 23U: line << "~" << expressionOperandText(*source); break;
-        case 25U: line << "abs(" << expressionOperandText(*source) << ")"; break;
-        case 39U: line << "&anim[" << expressionOperandText(*source) << "]"; break;
-        case 43U: line << "sin(" << expressionOperandText(*source) << ")"; break;
-        case 44U: line << "cos(" << expressionOperandText(*source) << ")"; break;
+        case 18U: line << "!" << expressionOperandText(program, instructionIndex, *source); break;
+        case 20U: line << "&" << expressionOperandText(program, instructionIndex, *source); break;
+        case 23U: line << "~" << expressionOperandText(program, instructionIndex, *source); break;
+        case 25U: line << "abs(" << expressionOperandText(program, instructionIndex, *source) << ")"; break;
+        case 39U: line << "&anim[" << expressionOperandText(program, instructionIndex, *source) << "]"; break;
+        case 43U: line << "sin(" << expressionOperandText(program, instructionIndex, *source) << ")"; break;
+        case 44U: line << "cos(" << expressionOperandText(program, instructionIndex, *source) << ")"; break;
         default: return false;
         }
         return true;
@@ -580,7 +614,7 @@ GoolIRDecompilation decompileGoolIR(
                    instruction.opcode == 23U || instruction.opcode == 25U ||
                    instruction.opcode == 39U || instruction.opcode == 43U ||
                    instruction.opcode == 44U) {
-            if (!appendGoolExpression(line, instruction)) {
+            if (!appendGoolExpression(line, program, index, instruction)) {
                 line << instruction.mnemonic << " /* missing expression operand */";
                 addDiagnostic(result, index, "expression operands could not be resolved.");
             }

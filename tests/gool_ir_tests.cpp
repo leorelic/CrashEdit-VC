@@ -2073,5 +2073,25 @@ int main() {
     assert(expressionText.text.find("stack[5] = cos(5)") != std::string::npos);
     assert(expressionText.diagnostics.empty());
 
+    // A single reaching SETF definition can be substituted into a later
+    // expression. Ambiguous and unmodeled values remain explicit references.
+    NsfGool chainedExpressionSource;
+    chainedExpressionSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction stackAssignment;
+    stackAssignment.opcode = 17U;
+    stackAssignment.operandBits = (0xB05U << 12U) | 0x805U; // stack[5] = 5
+    stackAssignment.byteOffset = 0;
+    chainedExpressionSource.instructions.push_back(stackAssignment);
+    NsfGoolInstruction chainedAdd;
+    chainedAdd.opcode = 0U;
+    chainedAdd.operandBits = (0x80AU << 12U) | 0xB05U; // stack[5] + 10
+    chainedAdd.byteOffset = 4;
+    chainedExpressionSource.instructions.push_back(chainedAdd);
+    const auto chainedExpressionIR = buildGoolIR(chainedExpressionSource);
+    const auto chainedExpressionText = decompileGoolIR(chainedExpressionIR);
+    assert(chainedExpressionText.text.find("stack[5] = 5") != std::string::npos);
+    assert(chainedExpressionText.text.find("(5 + 10)") != std::string::npos);
+    assert(chainedExpressionText.diagnostics.empty());
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }
