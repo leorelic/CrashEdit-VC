@@ -19,6 +19,7 @@
 #include <cctype>
 #include <cfloat>
 #include <cstdint>
+#include <string_view>
 #include <chrono>
 #include <ctime>
 #include <filesystem>
