@@ -494,7 +494,7 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
     output+=line;
     output+='\n';
    }
-   if(!closes&&line.size()>1U&&line.back()==':')++indent;
+   if(!closes&&!label&&line.size()>1U&&line.back()==':')++indent;
   }
   if(newline==std::string::npos)break;
   start=newline+1U;
