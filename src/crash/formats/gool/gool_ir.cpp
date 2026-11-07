@@ -226,6 +226,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             break;
         case 18U: // PlayStation COP2/GTE register transfers, branches, and commands
             if (fields.rs == 16U && fields.gteCommand.decoded) {
+                // Nonzero reserved command bits are retained structurally but
+                // never treated as a verified execution form.
+                if (fields.gteCommand.reservedBits11To12 != 0U ||
+                    fields.gteCommand.reservedBits6To9 != 0U) return effects;
                 // Only model commands whose complete register dependencies are
                 // independently documented here. Other known GTE mnemonics stay
                 // structurally decoded but semantically unknown.

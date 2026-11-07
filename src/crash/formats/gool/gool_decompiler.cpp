@@ -48,6 +48,124 @@ std::string fieldText(const GoolIRInstruction& instruction) {
     return goolObjectFieldName(field->rawValue);
 }
 
+const char* mipsGprName(std::size_t index) {
+    static constexpr const char* names[] = {
+        "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3",
+        "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+        "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+        "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra"
+    };
+    return index < 32U ? names[index] : "?";
+}
+
+std::string mipsGprMaskText(std::uint32_t mask) {
+    std::ostringstream text;
+    text << "{";
+    bool first = true;
+    for (std::size_t reg = 0; reg < 32U; ++reg) {
+        if ((mask & (std::uint32_t{1} << reg)) == 0U) continue;
+        if (!first) text << ", ";
+        text << "$" << mipsGprName(reg);
+        first = false;
+    }
+    text << "}";
+    return text.str();
+}
+
+std::string gteDataMaskText(std::uint32_t mask) {
+    std::ostringstream text;
+    text << "{";
+    bool first = true;
+    for (std::size_t reg = 0; reg < 32U; ++reg) {
+        if ((mask & (std::uint32_t{1} << reg)) == 0U) continue;
+        if (!first) text << ", ";
+        text << "d" << reg;
+        first = false;
+    }
+    text << "}";
+    return text.str();
+}
+
+const char* mipsControlOperationName(GoolIRMipsControlOperation operation) {
+    switch (operation) {
+    case GoolIRMipsControlOperation::Jump: return "j";
+    case GoolIRMipsControlOperation::JumpAndLink: return "jal";
+    case GoolIRMipsControlOperation::JumpRegister: return "jr";
+    case GoolIRMipsControlOperation::JumpAndLinkRegister: return "jalr";
+    case GoolIRMipsControlOperation::BranchEqual: return "beq";
+    case GoolIRMipsControlOperation::BranchNotEqual: return "bne";
+    case GoolIRMipsControlOperation::BranchLessThanZero: return "bltz";
+    case GoolIRMipsControlOperation::BranchGreaterEqualZero: return "bgez";
+    case GoolIRMipsControlOperation::BranchLessThanZeroAndLink: return "bltzal";
+    case GoolIRMipsControlOperation::BranchGreaterEqualZeroAndLink: return "bgezal";
+    case GoolIRMipsControlOperation::BranchLessOrEqualZero: return "blez";
+    case GoolIRMipsControlOperation::BranchGreaterThanZero: return "bgtz";
+    case GoolIRMipsControlOperation::BranchCoprocessor0False: return "bc0f";
+    case GoolIRMipsControlOperation::BranchCoprocessor0True: return "bc0t";
+    case GoolIRMipsControlOperation::BranchCoprocessor2False: return "bc2f";
+    case GoolIRMipsControlOperation::BranchCoprocessor2True: return "bc2t";
+    case GoolIRMipsControlOperation::None: default: return "unknown";
+    }
+}
+
+void appendNativeMipsAnnotations(
+    std::ostringstream& line, const GoolIRInstruction& instruction) {
+    const auto& effects = instruction.nativeEffects;
+    if (effects.controlTransfer)
+        line << "; control=" << mipsControlOperationName(effects.controlOperation);
+
+    if (instruction.nativeBranchTargetByteOffsetValid) {
+        line << "; branch-target=@" << hexValue(
+            static_cast<std::uint32_t>(instruction.nativeBranchTargetByteOffset), 4);
+        if (instruction.nativeBranchTargetInstructionValid) {
+            line << " (instruction " << instruction.nativeBranchTargetInstruction << ")";
+        } else {
+            line << " (not mapped to a unique native instruction)";
+        }
+    }
+    if (instruction.nativeJumpTargetLow28Valid)
+        line << "; jump-low28=" << hexValue(instruction.nativeJumpTargetLow28, 7)
+             << " (upper PC bits supplied at runtime)";
+    if (instruction.nativeDelaySlotOwnerInstructionValid) {
+        line << "; delay-slot-of instruction " << instruction.nativeDelaySlotOwnerInstruction;
+        if (instruction.nativeDelaySlotOwnerInstruction < instruction.nativeDelaySlotOwnerInstruction + 1U) {
+            // The owner index is retained independently from source order; the
+            // source offset is added by the caller when the owner is in range.
+            line << " (owner link validated)";
+        }
+    }
+    if (effects.gprReadInLoadDelaySlotMask != 0U)
+        line << "; load-delay-reads=" << mipsGprMaskText(effects.gprReadInLoadDelaySlotMask);
+    if (effects.gteDataAccessInTransferDelayMask != 0U)
+        line << "; gte-transfer-delay-access="
+             << gteDataMaskText(effects.gteDataAccessInTransferDelayMask);
+    if (effects.memoryAccess.decoded) {
+        const auto& access = effects.memoryAccess;
+        const char* direction = effects.memory == GoolIRMipsMemoryEffect::Read ? "read" :
+            effects.memory == GoolIRMipsMemoryEffect::Write ? "write" : "access";
+        line << "; memory-" << direction << "=" << static_cast<unsigned>(access.accessBytes)
+             << "B [$" << mipsGprName(access.baseRegister);
+        if (access.signedOffset < 0)
+            line << " - " << -static_cast<std::int32_t>(access.signedOffset);
+        else if (access.signedOffset > 0)
+            line << " + " << access.signedOffset;
+        line << "]";
+        if (access.signExtendsLoad) line << " sign-extended";
+        if (access.unalignedWordMerge) line << " merge";
+    }
+    if (instruction.nativeFields.gteCommand.decoded) {
+        const auto& gte = instruction.nativeFields.gteCommand;
+        line << "; gte=" << (gte.commandKnown ? gte.mnemonic :
+            "command " + hexValue(gte.command, 2))
+             << "(sf=" << (gte.shiftFraction ? 1 : 0)
+             << ",mx=" << static_cast<unsigned>(gte.matrix)
+             << ",v=" << static_cast<unsigned>(gte.vector)
+             << ",cv=" << static_cast<unsigned>(gte.translation)
+             << ",lm=" << (gte.limitMode ? 1 : 0) << ")";
+        if (!effects.known) line << " effects=unknown";
+    }
+}
+
 const GoolIRControlOperation* findControlOperation(
     const GoolIRProgram& program, std::size_t instructionIndex) {
     for (const auto& operation : program.controlOperations)
@@ -380,6 +498,9 @@ GoolIRDecompilation decompileGoolIR(
                 line << ".mips_word " << hexValue(instruction.rawWord, 8);
                 addDiagnostic(result, index, "native MIPS instruction is not decoded.");
             }
+            if (instruction.nativeInstructionDecoded && !instruction.nativeEffects.known)
+                addDiagnostic(result, index,
+                    "native MIPS instruction is preserved, but its execution effects are not modeled.");
         } else if (!instruction.opcodeKnown) {
             line << ".gool_word " << hexValue(instruction.rawWord, 8)
                  << " // unknown opcode " << static_cast<unsigned>(instruction.opcode);
@@ -479,7 +600,10 @@ GoolIRDecompilation decompileGoolIR(
         }
 
         line << "  // @" << hexValue(static_cast<std::uint32_t>(instruction.sourceByteOffset), 4)
-             << " raw=" << hexValue(instruction.rawWord, 8) << "\n";
+             << " raw=" << hexValue(instruction.rawWord, 8);
+        if (instruction.nativeMips)
+            appendNativeMipsAnnotations(line, instruction);
+        line << "\n";
         for (const auto& use : program.valueUses) {
             if (use.instructionIndex != index) continue;
             line << "    // value " << use.location << ": ";

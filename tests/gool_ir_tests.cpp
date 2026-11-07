@@ -1240,6 +1240,76 @@ int main() {
     assert(!unknownGteFields.commandKnown && unknownGteFields.mnemonic.empty());
     assert(!unknownGteIR.instructions[0].nativeEffects.known);
 
+    // Known command IDs with nonzero reserved command bits remain losslessly
+    // decoded but do not receive guessed execution effects.
+    NsfGool reservedGteSource;
+    reservedGteSource.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction reservedGte;
+    reservedGte.isMips = true;
+    reservedGte.word = (18U << 26U) | (16U << 21U) | (1U << 6U) | 0x06U;
+    reservedGteSource.instructions.push_back(reservedGte);
+    const auto reservedGteIR = buildGoolIR(reservedGteSource);
+    assert(reservedGteIR.instructions[0].nativeFields.gteCommand.commandKnown);
+    assert(reservedGteIR.instructions[0].nativeFields.gteCommand.mnemonic == "nclip");
+    assert(reservedGteIR.instructions[0].nativeFields.gteCommand.reservedBits6To9 == 1U);
+    assert(!reservedGteIR.instructions[0].nativeEffects.known);
+
+    // Native instructions remain source-mapped to their GOOL stream position.
+    // The listing exposes branch destinations, delay-slot ownership, CPU/GTE
+    // pipeline hazards, memory operands, and decoded GTE command selectors.
+    NsfGool nativeListingSource;
+    nativeListingSource.version = NsfGoolVersion::Version2;
+    const auto addNativeListingWord = [&nativeListingSource](
+        std::uint32_t word, const char* mnemonic, const char* arguments) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.mipsKnown = true;
+        instruction.word = word;
+        instruction.byteOffset = 0x300U + nativeListingSource.instructions.size() * 4U;
+        instruction.mnemonic = mnemonic;
+        instruction.arguments = arguments;
+        nativeListingSource.instructions.push_back(instruction);
+    };
+    addNativeListingWord((4U << 26U) | (8U << 21U) | (9U << 16U) | 2U,
+        "beq", "$t0, $t1, 0x2");
+    addNativeListingWord((9U << 26U) | (10U << 16U) | 1U,
+        "addiu", "$t2, $zero, 1");
+    addNativeListingWord((9U << 26U) | (2U << 16U),
+        "addiu", "$v0, $zero, 0");
+    addNativeListingWord((35U << 26U) | (29U << 21U) | (11U << 16U) | 4U,
+        "lw", "$t3, 4($sp)");
+    addNativeListingWord((11U << 21U) | (8U << 16U) | (12U << 11U) | 33U,
+        "addu", "$t4, $t3, $t0");
+    addNativeListingWord((50U << 26U) | (4U << 21U) | (7U << 16U) | 0x20U,
+        "lwc2", "$7, 0x20($a0)");
+    addNativeListingWord((9U << 26U) | (2U << 16U),
+        "addiu", "$v0, $zero, 0");
+    addNativeListingWord((18U << 26U) | (8U << 16U) | (7U << 11U),
+        "mfc2", "$t0, $7");
+    addNativeListingWord((18U << 26U) | (16U << 21U) | 0x06U,
+        "nclip", "");
+    addNativeListingWord((18U << 26U) | (16U << 21U) | 0x02U,
+        "cop2", "");
+    const auto nativeListingIR = buildGoolIR(nativeListingSource);
+    assert(nativeListingIR.instructions[0].nativeBranchTargetInstructionValid);
+    assert(nativeListingIR.instructions[0].nativeBranchTargetInstruction == 3U);
+    assert(nativeListingIR.instructions[1].nativeDelaySlotOwnerInstructionValid);
+    assert(nativeListingIR.instructions[1].nativeDelaySlotOwnerInstruction == 0U);
+    assert(nativeListingIR.instructions[4].gprReadInLoadDelaySlotMask ==
+        (std::uint32_t{1} << 11U));
+    assert(nativeListingIR.instructions[7].gteDataAccessInTransferDelayMask ==
+        (std::uint32_t{1} << 7U));
+    const auto nativeListing = decompileGoolIR(nativeListingIR);
+    assert(nativeListing.text.find("control=beq") != std::string::npos);
+    assert(nativeListing.text.find("branch-target=@0x030C (instruction 3)") != std::string::npos);
+    assert(nativeListing.text.find("delay-slot-of instruction 0") != std::string::npos);
+    assert(nativeListing.text.find("load-delay-reads={$t3}") != std::string::npos);
+    assert(nativeListing.text.find("memory-read=4B [$sp + 4]") != std::string::npos);
+    assert(nativeListing.text.find("gte-transfer-delay-access={d7}") != std::string::npos);
+    assert(nativeListing.text.find("gte=nclip(sf=0,mx=0,v=0,cv=0,lm=0)") != std::string::npos);
+    assert(nativeListing.text.find("gte=command 0x02") != std::string::npos);
+    assert(!nativeListing.diagnostics.empty());
+
     // The first source-like decompiler keeps branches, calls, transitions,
     // returns, and unsupported words traceable to their original instruction.
     NsfGool decompileSource;
