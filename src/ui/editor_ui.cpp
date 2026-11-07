@@ -686,10 +686,10 @@ void EditorUI::drawGoolScriptEditor(){
      scratchEditor.SetErrorMarkers(markers);
     }
     ImGui::Separator();
-    ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
+    ImGui::Text("Script diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
     ImGui::BeginChild("GoolScriptProblems",ImVec2(0.0f,0.0f),false,
       ImGuiWindowFlags_HorizontalScrollbar);
-    if(analysis.diagnostics.empty())ImGui::TextDisabled("No indentation errors detected.");
+    if(analysis.diagnostics.empty())ImGui::TextDisabled("No script errors detected.");
     else for(const auto& diagnostic:analysis.diagnostics){
      ImGui::PushID(static_cast<int>(diagnostic.line));
      ImGui::TextColored(ImVec4(1.0f,0.42f,0.36f,1.0f),
