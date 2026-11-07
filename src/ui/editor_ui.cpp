@@ -400,14 +400,13 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
   value.mAutoIndentation=true;
   value.mCaseSensitive=false;
   value.mSingleLineComment="#";
-  value.mPreprocChar='\\0';
+  value.mPreprocChar=0;
   value.mKeywords={
    "EVENT","STATE","ROUTINE","IF","ELSE","WHILE","FOR","IN","BREAK","CONTINUE",
    "RETURN","CALL","TRANSITION","TRUE","FALSE","NULL","AND","OR","NOT",
    "NATIVE","UNKNOWN","LET","VAR","CONST"
   };
-  // Use an explicit lexer instead of std::regex here. The editor's regex path
-  // was leaving GOOL source as Default-colored glyphs in the standalone window.
+  // Use an explicit lexer so every GOOL token receives a deterministic palette index.
   value.mTokenize=[](const char* begin,const char* end,const char*& tokenBegin,
       const char*& tokenEnd,TextEditor::PaletteIndex& color)->bool {
    const char* p=begin;
@@ -415,11 +414,11 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
    if(p>=end)return false;
    tokenBegin=p;
    const char first=*p;
-   if(first=='"'||first=='\\''){
+   if(first=='"'||first==39){
     const char quote=first;
     ++p;
     while(p<end){
-     if(*p=='\\\\'&&p+1<end){p+=2;continue;}
+     if(static_cast<unsigned char>(*p)==92&&p+1<end){p+=2;continue;}
      if(*p==quote){++p;break;}
      ++p;
     }
