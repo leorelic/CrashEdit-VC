@@ -1604,6 +1604,35 @@ int main() {
     assert(loopOutput.text.find("goto L") == std::string::npos);
     assert(loopOutput.text.find("@0x0614") != std::string::npos);
 
+    // A proven conditional branch to the loop's unique exit becomes break,
+    // while the loop's own back edge remains the structured while condition.
+    GoolIRProgram breakLoopProgram;
+    const auto breakLoopDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    const auto appendBreakLoopInstruction = [&](std::uint8_t opcode,
+            std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+            opcode == 51U ? "BNEZ" : opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        breakLoopProgram.instructions.push_back(std::move(item));
+    };
+    appendBreakLoopInstruction(4U, {loopField, loopLimit});
+    appendBreakLoopInstruction(52U, {breakLoopDisplacement(4)});
+    appendBreakLoopInstruction(47U);
+    appendBreakLoopInstruction(51U, {breakLoopDisplacement(2), loopField});
+    appendBreakLoopInstruction(47U);
+    appendBreakLoopInstruction(50U, {breakLoopDisplacement(-5)});
+    appendBreakLoopInstruction(47U);
+    const auto breakLoopOutput = decompileGoolIR(breakLoopProgram);
+    assert(breakLoopOutput.text.find("while (self->counter == 3) {") != std::string::npos);
+    assert(breakLoopOutput.text.find("if (self->counter != 0) break;") != std::string::npos);
+    assert(breakLoopOutput.text.find("goto L") == std::string::npos);
+
     // Nested pre-test loops are reconstructed only when every nested branch
     // remains inside its enclosing loop region.
     GoolIRProgram nestedLoopProgram;
