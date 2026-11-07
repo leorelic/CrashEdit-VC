@@ -543,7 +543,48 @@ GoolIRDecompilation decompileGoolIR(
             structuredLoops[header] = {back, exitTarget};
             suppressedLoopBackBranches[back] = true;
             suppressedLoopConditions[header - 1] = true;
-            suppressedLoopLabels[header] = true;
+
+            // Keep the loop-header label when another control-flow entry
+            // targets it. The loop's own back edge is the only edge that may
+            // be hidden by the structured while form.
+            bool hasExternalHeaderEntry = false;
+            for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+                if (source == back) continue;
+                const auto& sourceInstruction = program.instructions[source];
+                if (sourceInstruction.nativeMips || !sourceInstruction.opcodeKnown ||
+                    sourceInstruction.opcode < 50U || sourceInstruction.opcode > 52U)
+                    continue;
+                const auto* sourceDisplacement = findOperand(sourceInstruction, 'I');
+                if (!sourceDisplacement) continue;
+                const auto destination = static_cast<std::int64_t>(source) + 1 +
+                    sourceDisplacement->value;
+                if (destination == static_cast<std::int64_t>(header)) {
+                    hasExternalHeaderEntry = true;
+                    break;
+                }
+            }
+            if (!hasExternalHeaderEntry) {
+                for (const auto& operation : program.controlOperations) {
+                    if (operation.kind == GoolIRControlOperationKind::Call &&
+                        !operation.external && operation.targetInstructionValid &&
+                        operation.targetInstruction == header) {
+                        hasExternalHeaderEntry = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasExternalHeaderEntry) {
+                for (const auto& hook : program.hookDispatches) {
+                    if (hook.resolution == GoolIRHookResolution::Local &&
+                        hook.instructionOffset == header) {
+                        hasExternalHeaderEntry = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasExternalHeaderEntry)
+                suppressedLoopLabels[header] = true;
+
             std::size_t exitIncoming = 0;
             for (std::size_t source = 0; source < program.instructions.size(); ++source) {
                 const auto& sourceInstruction = program.instructions[source];

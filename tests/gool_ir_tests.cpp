@@ -1604,6 +1604,22 @@ int main() {
     assert(loopOutput.text.find("goto L") == std::string::npos);
     assert(loopOutput.text.find("@0x0614") != std::string::npos);
 
+    // An external branch into a pre-test loop must retain its target label
+    // when the loop is rendered structurally.
+    GoolIRProgram externallyEnteredLoop = loopProgram;
+    GoolIRInstruction externalLoopEntry;
+    externalLoopEntry.opcode = 50U;
+    externalLoopEntry.opcodeKnown = true;
+    externalLoopEntry.sourceByteOffset = 0x618;
+    externalLoopEntry.mnemonic = "BRA";
+    externalLoopEntry.operands.push_back(
+        GoolIROperand{'I', 12, static_cast<std::uint32_t>(-6), -6,
+            GoolIROperandKind::Signed, "-6"});
+    externallyEnteredLoop.instructions.push_back(externalLoopEntry);
+    const auto externalLoopOutput = decompileGoolIR(externallyEnteredLoop);
+    assert(externalLoopOutput.text.find("L00001:") != std::string::npos);
+    assert(externalLoopOutput.text.find("goto L00001") != std::string::npos);
+
     // A post-test loop with a conditional backward branch is rendered as do/while.
     GoolIRProgram doLoopProgram;
     auto appendDoLoopInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
