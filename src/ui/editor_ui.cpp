@@ -615,7 +615,7 @@ void EditorUI::drawGoolScriptEditor(){
     const float editorHeight=std::max(140.0f,editorAvail.y-diagnosticsHeight);
     const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
     if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-    scratchEditor.Render("##ScratchGoolCode",ImVec2(0.0f,editorHeight),true);
+    scratchEditor.Render("##ScratchGoolCode",ImVec2(0.0f,editorHeight),false);
     if(fontCount>1.0f)ImGui::PopFont();
     const std::string scratchText=scratchEditor.GetText();
     if(scratchText!=lastScratchAnalysisText){
