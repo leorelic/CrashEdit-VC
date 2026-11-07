@@ -527,6 +527,8 @@ GoolIRDecompilation decompileGoolIR(
                 continue;
 
             bool unsafeBody = false;
+            std::vector<std::size_t> candidateLoopExitBranches;
+            std::vector<std::size_t> candidateLoopExitConditionProducers;
             for (std::size_t body = header + 1; body < back; ++body) {
                 const auto& bodyInstruction = program.instructions[body];
                 if (bodyInstruction.nativeMips || !bodyInstruction.opcodeKnown ||
@@ -545,7 +547,10 @@ GoolIRDecompilation decompileGoolIR(
                         // A branch that leaves the proven loop at its unique
                         // exit is a structured break candidate. Other exits
                         // remain explicit branches and are not folded here.
-                        loopExitBranches[body] = true;
+                        candidateLoopExitBranches.push_back(body);
+                        if ((body == 0U) == false &&
+                            !comparisonCondition(program, body).empty())
+                            candidateLoopExitConditionProducers.push_back(body - 1U);
                     } else if (nestedTarget < static_cast<std::int64_t>(header + 1) ||
                         nestedTarget >= static_cast<std::int64_t>(back)) {
                         unsafeBody = true;
@@ -592,6 +597,10 @@ GoolIRDecompilation decompileGoolIR(
             if (unsafeBody) continue;
 
             structuredLoops[header] = {back, exitTarget};
+            for (const auto branch : candidateLoopExitBranches)
+                loopExitBranches[branch] = true;
+            for (const auto producer : candidateLoopExitConditionProducers)
+                suppressedConditionProducers[producer] = true;
             suppressedLoopBackBranches[back] = true;
             suppressedLoopConditions[header - 1] = true;
 
@@ -883,7 +892,6 @@ GoolIRDecompilation decompileGoolIR(
                     line << "break";
                 } else if (!condition.empty()) {
                     line << "if (" << condition << ") break";
-                    suppressedConditionProducers[index - 1U] = true;
                 } else {
                     line << "if (" << fieldText(instruction)
                          << (instruction.opcode == 51U ? " != 0" : " == 0") << ") break";
