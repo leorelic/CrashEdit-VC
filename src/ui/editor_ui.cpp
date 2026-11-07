@@ -6,6 +6,7 @@
 #include "crash/formats/gool/gool_control_flow.hpp"
 #include "crash/formats/gool/gool_ir.hpp"
 #include "crash/formats/gool/gool_decompiler.hpp"
+#include "crash/formats/gool/gool_script.hpp"
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -316,7 +317,7 @@ void EditorUI::draw(){
  auto id=ImGui::GetID("CrashEditDockSpace");
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();drawGoolBlueprintInstructions();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
+ drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
@@ -388,6 +389,74 @@ void EditorUI::draw(){
  static EditorPreferences previousPreferences=editorPreferences;
  if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
 }
+
+void EditorUI::drawGoolScriptEditor(){
+ if(!showGoolScriptEditor_)return;
+ if(!goolScriptBufferInitialized_){
+  const char* starter=
+   "# GOOL Script indentation playground\\n"
+   "# Illustrative syntax only; this prototype does not compile or modify NSF data.\\n"
+   "event Update:\\n"
+   "    if health <= 0:\\n"
+   "        transition Dead\\n"
+   "    else:\\n"
+   "        call UpdateMovement\\n";
+  std::snprintf(goolScriptBuffer_.data(),goolScriptBuffer_.size(),"%s",starter);
+  goolScriptBufferInitialized_=true;
+ }
+ static Crash::GoolScriptIndentationResult analysis=
+  Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
+ if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
+  ImGui::TextDisabled("Prototype workspace  ·  indentation validation only  ·  no GOOL recompilation yet");
+  ImGui::SameLine();
+  if(ImGui::SmallButton(showGoolScriptNavigator_?"Hide Navigator":"Show Navigator"))
+   showGoolScriptNavigator_=!showGoolScriptNavigator_;
+  ImGui::Separator();
+  const ImVec2 available=ImGui::GetContentRegionAvail();
+  if(showGoolScriptNavigator_){
+   ImGui::BeginChild("GoolScriptNavigator",ImVec2(185.0f,available.y),true);
+   ImGui::TextUnformatted("Document");
+   ImGui::Separator();
+   ImGui::TextDisabled("Scratch GOOL");
+   ImGui::Spacing();
+   ImGui::TextUnformatted("Outline");
+   ImGui::TextDisabled("Events");
+   ImGui::TextDisabled("States");
+   ImGui::TextDisabled("Routines");
+   ImGui::Spacing();
+   ImGui::TextWrapped("The outline will populate from parsed GOOL symbols once the language grammar is established.");
+   ImGui::EndChild();
+   ImGui::SameLine();
+  }
+  ImGui::BeginChild("GoolScriptEditorSurface",ImVec2(0,available.y),false);
+  ImGui::TextUnformatted("Script source");
+  const float diagnosticsHeight=145.0f;
+  const ImVec2 editorSize(0.0f,std::max(100.0f,ImGui::GetContentRegionAvail().y-diagnosticsHeight));
+  if(ImGui::InputTextMultiline("##GoolScriptSource",goolScriptBuffer_.data(),
+      goolScriptBuffer_.size(),editorSize,ImGuiInputTextFlags_AllowTabInput)){
+   analysis=Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
+  }
+  ImGui::Separator();
+  ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
+  if(analysis.diagnostics.empty()){
+   ImGui::TextDisabled("No indentation errors detected.");
+  }else if(ImGui::BeginChild("GoolScriptProblems",ImVec2(0,0),false,
+      ImGuiWindowFlags_HorizontalScrollbar)){
+   for(const auto& diagnostic:analysis.diagnostics){
+    ImGui::PushID(static_cast<int>(diagnostic.line));
+    ImGui::TextColored(ImVec4(1.0f,0.42f,0.36f,1.0f),
+      "Error %s  ·  line %zu, column %zu",
+      diagnostic.code.c_str(),diagnostic.line,diagnostic.column);
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s",diagnostic.message.c_str());
+    ImGui::PopID();
+   }
+   ImGui::EndChild();
+  }
+  ImGui::EndChild();
+ }
+ ImGui::End();
+}
 void EditorUI::drawMenu(){
  int& uiScaling=editorPreferences.uiScaling;
  static int appliedScaling=100;
@@ -409,7 +478,7 @@ void EditorUI::drawMenu(){
  }
  if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
- if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
+ if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::Separator();ImGui::MenuItem("GOOL Script Editor",nullptr,&showGoolScriptEditor_);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
   if(ImGui::MenuItem("Create .bak backups during save",nullptr,&editorPreferences.createBakBackup))ImGui::MarkIniSettingsDirty();
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, copy the previous NSF and NSD to matching .bak files.");
