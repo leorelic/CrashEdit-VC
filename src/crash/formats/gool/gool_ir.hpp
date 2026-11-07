@@ -122,6 +122,9 @@ struct GoolIRInstruction {
     // Registers merged by an immediately adjacent LWL/LWR pair. This is the
     // R3000A exception to the ordinary load-delay dependency rule.
     std::uint32_t gprLoadDelayPairMergeMask = 0;
+    // GTE data registers accessed within two native instructions of an LWC2/SWC2
+    // transfer; this is distinct from the CPU's GPR load-delay tracking.
+    std::uint32_t gteDataAccessInTransferDelayMask = 0;
     std::vector<GoolIROperand> operands;
 };
 

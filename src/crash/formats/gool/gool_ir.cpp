@@ -649,6 +649,26 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         result.instructions.push_back(std::move(ir));
     }
 
+    // Track the PlayStation GTE's two-instruction LWC2/SWC2 access delay
+    // independently from the R3000A GPR load delay. Only compare contiguous
+    // native MIPS instructions, and only flag accesses to the transferred data
+    // register (not unrelated GTE registers or the control-register bank).
+    for (std::size_t i = 1; i < result.instructions.size(); ++i) {
+        auto& current = result.instructions[i];
+        if (!current.nativeMips || !current.nativeEffects.known) continue;
+        const auto currentGteAccess = current.nativeEffects.coprocessor2DataReadMask |
+            current.nativeEffects.coprocessor2DataWriteMask;
+        if (currentGteAccess == 0U) continue;
+        for (std::size_t distance = 1; distance <= 2 && distance <= i; ++distance) {
+            const auto& transfer = result.instructions[i - distance];
+            if (!transfer.nativeMips || !transfer.nativeFieldsDecoded) break;
+            const auto opcode = transfer.nativeFields.primaryOpcode;
+            if (opcode != 50U && opcode != 58U) continue; // LWC2 / SWC2
+            const auto transferRegister = std::uint32_t{1} << transfer.nativeFields.rt;
+            current.gteDataAccessInTransferDelayMask |= currentGteAccess & transferRegister;
+        }
+    }
+
     // Mark the instruction following each validated native MIPS control
     // transfer. Keep the transfer's own effect separate from the slot's role.
     for (std::size_t i = 1; i < result.instructions.size(); ++i) {

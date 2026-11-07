@@ -279,6 +279,28 @@ int main() {
     assert(hiLoInstructions[6].nativeEffects.readsLo && !hiLoInstructions[6].nativeEffects.writesLo);
     assert(hiLoInstructions[7].nativeEffects.writesLo && !hiLoInstructions[7].nativeEffects.readsLo);
 
+    // LWC2/SWC2 impose a two-instruction access delay on the addressed GTE
+    // data register. Track the overlap separately from GPR load delays.
+    NsfGool gteTransferDelaySource;
+    gteTransferDelaySource.version = NsfGoolVersion::Version2;
+    const auto addGteDelayWord = [&gteTransferDelaySource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        gteTransferDelaySource.instructions.push_back(instruction);
+    };
+    addGteDelayWord((50U << 26U) | (8U << 21U)); // lwc2 $0,0(t0)
+    addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0
+    addGteDelayWord((18U << 26U) | (16U << 21U) | 0x01U); // rtps reads V0
+    addGteDelayWord((18U << 26U) | (8U << 16U)); // mfc2 t0,$0, outside delay window
+    const auto gteTransferDelayIR = buildGoolIR(gteTransferDelaySource);
+    assert(gteTransferDelayIR.instructions.size() == 4);
+    const auto gteRegisterZeroMask = std::uint32_t{1};
+    assert(gteTransferDelayIR.instructions[0].gteDataAccessInTransferDelayMask == 0U);
+    assert(gteTransferDelayIR.instructions[1].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
+    assert(gteTransferDelayIR.instructions[2].gteDataAccessInTransferDelayMask == gteRegisterZeroMask);
+    assert(gteTransferDelayIR.instructions[3].gteDataAccessInTransferDelayMask == 0U);
+
     // R3000A permits an immediately adjacent complementary LWL/LWR pair to
     // merge through the ordinary load-delay slot; the second load still has
     // its own delay before a subsequent consumer.
