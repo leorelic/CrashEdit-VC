@@ -223,7 +223,8 @@ void appendNativeMipsAnnotations(
         line << "; branch-target=@" << hexValue(
             static_cast<std::uint32_t>(instruction.nativeBranchTargetByteOffset), 4);
         if (instruction.nativeBranchTargetInstructionValid) {
-            line << " (instruction " << instruction.nativeBranchTargetInstruction << ")";
+            line << " (instruction " << instruction.nativeBranchTargetInstruction
+                 << ", " << labelName(instruction.nativeBranchTargetInstruction) << ")";
         } else {
             line << " (not mapped to a unique native instruction)";
         }
@@ -325,7 +326,13 @@ GoolIRDecompilation decompileGoolIR(
     // receives a label when a branch or call outside the range targets it.
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         const auto& instruction = program.instructions[index];
-        if (instruction.nativeMips || !instruction.opcodeKnown) continue;
+        if (instruction.nativeMips) {
+            if (instruction.nativeBranchTargetInstructionValid &&
+                instruction.nativeBranchTargetInstruction < program.instructions.size())
+                labels[instruction.nativeBranchTargetInstruction] = true;
+            continue;
+        }
+        if (!instruction.opcodeKnown) continue;
 
         if (instruction.opcode >= 50U && instruction.opcode <= 52U) {
             const auto* displacement = findOperand(instruction, 'I');
@@ -1054,7 +1061,13 @@ GoolIRDecompilation decompileGoolIRRoutine(
     for (const auto instructionIndex : routine.instructions) {
         if (instructionIndex >= program.instructions.size()) continue;
         const auto& instruction = program.instructions[instructionIndex];
-        if (instruction.nativeMips || !instruction.opcodeKnown ||
+        if (instruction.nativeMips) {
+            if (instruction.nativeBranchTargetInstructionValid &&
+                belongsToRoutine(instruction.nativeBranchTargetInstruction))
+                routineBranchTargets.push_back(instruction.nativeBranchTargetInstruction);
+            continue;
+        }
+        if (!instruction.opcodeKnown ||
             instruction.opcode < 50U || instruction.opcode > 52U)
             continue;
         const auto* displacement = findOperand(instruction, 'I');
@@ -1142,6 +1155,22 @@ GoolIRDecompilation decompileGoolIRRoutine(
                 if (!canCompact) break;
             }
         }
+        // Native MIPS branches carry resolved targets as absolute instruction
+        // indices rather than GOOL-relative operands. Compact only when every
+        // resolved target belongs to this routine, then remap it explicitly.
+        if (canCompact) {
+            for (const auto original : routine.instructions) {
+                const auto& instruction = program.instructions[original];
+                if (!instruction.nativeMips ||
+                    !instruction.nativeBranchTargetInstructionValid)
+                    continue;
+                if (compactIndex.find(instruction.nativeBranchTargetInstruction) ==
+                    compactIndex.end()) {
+                    canCompact = false;
+                    break;
+                }
+            }
+        }
 
         GoolIRProgram compactProgram;
         if (canCompact) {
@@ -1167,7 +1196,19 @@ GoolIRDecompilation decompileGoolIRRoutine(
             for (std::size_t compactSource = 0;
                  compactSource < compactProgram.instructions.size(); ++compactSource) {
                 auto& instruction = compactProgram.instructions[compactSource];
-                if (instruction.nativeMips || !instruction.opcodeKnown ||
+                if (instruction.nativeMips) {
+                    if (instruction.nativeBranchTargetInstructionValid) {
+                        const auto mappedTarget = compactIndex.find(
+                            instruction.nativeBranchTargetInstruction);
+                        if (mappedTarget == compactIndex.end()) {
+                            canCompact = false;
+                            break;
+                        }
+                        instruction.nativeBranchTargetInstruction = mappedTarget->second;
+                    }
+                    continue;
+                }
+                if (!instruction.opcodeKnown ||
                     instruction.opcode < 50U || instruction.opcode > 52U)
                     continue;
                 auto* displacement = const_cast<GoolIROperand*>(findOperand(instruction, 'I'));
@@ -1322,19 +1363,27 @@ GoolIRDecompilation decompileGoolIRRoutine(
             for (const auto instructionIndex : routine.instructions) {
                 if (instructionIndex < first || instructionIndex > last) continue;
                 const auto& sourceInstruction = program.instructions[instructionIndex];
-                if (sourceInstruction.nativeMips || !sourceInstruction.opcodeKnown ||
-                    sourceInstruction.opcode < 50U || sourceInstruction.opcode > 52U)
+                std::size_t targetIndex = 0;
+                bool targetValid = false;
+                if (sourceInstruction.nativeMips) {
+                    targetValid = sourceInstruction.nativeBranchTargetInstructionValid;
+                    targetIndex = sourceInstruction.nativeBranchTargetInstruction;
+                } else if (sourceInstruction.opcodeKnown &&
+                    sourceInstruction.opcode >= 50U && sourceInstruction.opcode <= 52U) {
+                    const auto* displacement = findOperand(sourceInstruction, 'I');
+                    if (displacement) {
+                        const auto target = static_cast<std::int64_t>(instructionIndex) + 1 +
+                            displacement->value;
+                        if (target >= 0 &&
+                            static_cast<std::uint64_t>(target) < program.instructions.size()) {
+                            targetIndex = static_cast<std::size_t>(target);
+                            targetValid = true;
+                        }
+                    }
+                }
+                if (!targetValid || targetIndex >= program.instructions.size() ||
+                    belongsToRoutine(targetIndex))
                     continue;
-                const auto* displacement = findOperand(sourceInstruction, 'I');
-                if (!displacement) continue;
-                const auto target = static_cast<std::int64_t>(instructionIndex) + 1 +
-                    displacement->value;
-                if (target < 0 ||
-                    static_cast<std::uint64_t>(target) >= program.instructions.size() ||
-                    belongsToRoutine(static_cast<std::size_t>(target)))
-                    continue;
-
-                const auto targetIndex = static_cast<std::size_t>(target);
                 const auto label = labelName(targetIndex);
                 const auto absoluteTarget = "instruction " + std::to_string(targetIndex);
                 std::size_t labelPosition = 0;

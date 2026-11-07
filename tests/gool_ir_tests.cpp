@@ -1914,6 +1914,42 @@ int main() {
     assert(crossRegionText.text.find("@0x07F0") == std::string::npos);
     assert(crossRegionText.text.find("@0x000C") != std::string::npos);
 
+    // Resolved native MIPS branch targets participate in labels and are
+    // remapped safely when a discontiguous routine is compacted for display.
+    GoolIRProgram nativeBranchProgram;
+    GoolIRInstruction nativeBranch;
+    nativeBranch.nativeMips = true;
+    nativeBranch.nativeInstructionDecoded = true;
+    nativeBranch.mnemonic = "beq";
+    nativeBranch.nativeBranchTargetByteOffset = 8U;
+    nativeBranch.nativeBranchTargetByteOffsetValid = true;
+    nativeBranch.nativeBranchTargetInstruction = 2U;
+    nativeBranch.nativeBranchTargetInstructionValid = true;
+    nativeBranchProgram.instructions.push_back(nativeBranch);
+    GoolIRInstruction nativeBranchGap;
+    nativeBranchGap.opcode = 47U;
+    nativeBranchGap.opcodeKnown = true;
+    nativeBranchGap.mnemonic = "NOP";
+    nativeBranchProgram.instructions.push_back(nativeBranchGap);
+    GoolIRInstruction nativeBranchTarget;
+    nativeBranchTarget.opcode = 49U;
+    nativeBranchTarget.opcodeKnown = true;
+    nativeBranchTarget.mnemonic = "RET";
+    nativeBranchProgram.instructions.push_back(nativeBranchTarget);
+    const auto nativeBranchText = decompileGoolIR(nativeBranchProgram);
+    assert(nativeBranchText.text.find("L00002:") != std::string::npos);
+    assert(nativeBranchText.text.find("branch-target=@0x0008 (instruction 2, L00002)") !=
+        std::string::npos);
+
+    GoolIRRoutine nativeBranchRoutine;
+    nativeBranchRoutine.entryInstruction = 0;
+    nativeBranchRoutine.instructions = {0, 2};
+    nativeBranchProgram.routines.push_back(nativeBranchRoutine);
+    const auto nativeBranchRoutineText = decompileGoolIRRoutine(nativeBranchProgram, 0);
+    assert(nativeBranchRoutineText.text.find("L00002:") != std::string::npos);
+    assert(nativeBranchRoutineText.text.find("branch-target=@0x0008 (instruction 2, L00002)") !=
+        std::string::npos);
+
     // A routine listing must define labels for branch destinations even
     // when the routine's reachable instructions are non-contiguous in the
     // containing GOOL instruction stream.

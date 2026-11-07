@@ -54,7 +54,8 @@ The native-instruction audit covers the supported PlayStation R3000A integer sub
 - [x] Inline a single, proven `SETF` definition into later source expressions, assignments, and structured comparison conditions using reaching-definition data flow; preserve explicit references for merges, unmodeled incoming values, unsupported producers, and recursive chains.
 - [x] Render verified calls, returns, and state transitions as source-level control operations with descriptor/EID resolution and explicit unresolved diagnostics.
 - [ ] Expand source-level rendering for event, animation, entity, and miscellaneous operations as their runtime semantics are verified.
-- [ ] Improve routine-level control-flow structuring for shared blocks, discontiguous regions, and native MIPS branches without hiding unresolved edges.
+- [ ] Improve routine-level control-flow structuring for shared blocks, discontiguous regions, and irreducible regions without hiding unresolved edges.
+- [x] Include resolved native MIPS branch destinations in source labels and routine listings; remap targets only when a discontiguous routine can be compacted safely, and preserve external targets as explicit instruction references.
 - [x] Include routine discovery source, shared-instruction counts, exit boundaries, and routine diagnostics in routine decompilation output.
 - [ ] Validate readable output against additional representative Crash 2 GOOL entries and retain round-trip/source-map regression coverage.
 
@@ -174,3 +175,11 @@ These are different views of the same underlying GOOL model, not separate implem
 - Expanded routine headers with entry provenance, instruction/shared-instruction counts, exit classifications, and retained diagnostics.
 - Kept source rendering limited to semantics already represented by verified IR control operations (calls, returns, state transitions); animation/event/entity opcodes without sufficiently established semantics remain low-level mnemonic/operand listings.
 - Regression coverage uses the existing DispC real-routine fixture and synthetic edge cases. Broader validation against additional real Crash 2 entries remains pending because no additional binary sample is part of this repository test fixture.
+
+
+### Native MIPS source-edge integration
+
+- Resolved native MIPS PC-relative branch targets now create source labels in range decompilation and routine listings.
+- Discontiguous routine compaction remaps resolved native targets only when the target is also owned by that routine; otherwise it falls back to the non-compacted listing path.
+- Native MIPS instructions remain explicitly native assembly. This change does not infer GOOL-level conditions or restructure MIPS branches as GOOL loops.
+- Regression coverage checks whole-stream labels and target remapping in a discontiguous routine. Broader real-routine validation and irreducible CFG structuring remain open.
