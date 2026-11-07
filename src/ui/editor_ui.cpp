@@ -399,12 +399,14 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
   value.mName="GOOL Script";
   value.mAutoIndentation=true;
   // TextEditor uppercases identifiers before keyword lookup when case sensitivity is disabled.
-  value.mCaseSensitive=true;
+  // Store keywords in that normalized form so both lower- and upper-case source spellings match.
+  value.mCaseSensitive=false;
   value.mSingleLineComment="#";
+  value.mPreprocChar='\0';
   value.mKeywords={
-   "event","state","routine","if","else","while","for","in","break","continue",
-   "return","call","transition","true","false","null","and","or","not",
-   "native","unknown","let","var","const"
+   "EVENT","STATE","ROUTINE","IF","ELSE","WHILE","FOR","IN","BREAK","CONTINUE",
+   "RETURN","CALL","TRANSITION","TRUE","FALSE","NULL","AND","OR","NOT",
+   "NATIVE","UNKNOWN","LET","VAR","CONST"
   };
   value.mTokenRegexStrings={
    {"0[xX][0-9A-Fa-f_]+",TextEditor::PaletteIndex::Number},
