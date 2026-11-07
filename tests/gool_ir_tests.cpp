@@ -2013,5 +2013,65 @@ int main() {
     assert(assignmentText.text.find("@0x0024") != std::string::npos);
     assert(assignmentText.text.find("raw=0x11805408") != std::string::npos);
 
+    // Common arithmetic, logical, comparison, random, and unary GOOL
+    // operations are rendered as source expressions using their documented
+    // operand order and reference resolution.
+    NsfGool expressionSource;
+    expressionSource.version = NsfGoolVersion::Version2;
+    const auto addExpressionInstruction = [&expressionSource](
+        std::uint8_t opcode, std::uint32_t operands) {
+        NsfGoolInstruction instruction;
+        instruction.opcode = opcode;
+        instruction.operandBits = operands;
+        instruction.word = (static_cast<std::uint32_t>(opcode) << 24U) | operands;
+        instruction.byteOffset = expressionSource.instructions.size() * 4U;
+        expressionSource.instructions.push_back(instruction);
+    };
+    const std::uint32_t leftImmediate = 0x805U;
+    const std::uint32_t rightImmediate = 0x80AU;
+    const std::uint32_t binaryOperands = leftImmediate | (rightImmediate << 12U);
+    for (const std::uint8_t opcode : {
+        std::uint8_t{0}, std::uint8_t{1}, std::uint8_t{2}, std::uint8_t{3},
+        std::uint8_t{4}, std::uint8_t{5}, std::uint8_t{6}, std::uint8_t{7},
+        std::uint8_t{8}, std::uint8_t{9}, std::uint8_t{10}, std::uint8_t{11},
+        std::uint8_t{12}, std::uint8_t{13}, std::uint8_t{14}, std::uint8_t{15},
+        std::uint8_t{21}})
+        addExpressionInstruction(opcode, binaryOperands);
+    addExpressionInstruction(16U, rightImmediate | (leftImmediate << 12U));
+    const std::uint32_t unaryOperands = 5U | (leftImmediate << 12U);
+    for (const std::uint8_t opcode : {
+        std::uint8_t{18}, std::uint8_t{20}, std::uint8_t{23},
+        std::uint8_t{25}, std::uint8_t{39}, std::uint8_t{43},
+        std::uint8_t{44}})
+        addExpressionInstruction(opcode, unaryOperands);
+    const auto expressionIR = buildGoolIR(expressionSource);
+    const auto expressionText = decompileGoolIR(expressionIR);
+    assert(expressionText.text.find("(5 + 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 - 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 * 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 / 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 == 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 && 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 || 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 & 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 | 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 < 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 <= 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 > 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 >= 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 % 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 ^ 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 has 10)") != std::string::npos);
+    assert(expressionText.text.find("(5 << 10)") != std::string::npos);
+    assert(expressionText.text.find("rand(10, 5)") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = !5") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = &5") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = ~5") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = abs(5)") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = &anim[5]") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = sin(5)") != std::string::npos);
+    assert(expressionText.text.find("stack[5] = cos(5)") != std::string::npos);
+    assert(expressionText.diagnostics.empty());
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }

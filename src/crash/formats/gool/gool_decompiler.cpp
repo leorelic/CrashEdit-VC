@@ -48,6 +48,67 @@ std::string fieldText(const GoolIRInstruction& instruction) {
     return goolObjectFieldName(field->rawValue);
 }
 
+std::string expressionOperandText(const GoolIROperand& operand) {
+    std::string value = operandText(operand);
+    constexpr std::string_view immediatePrefix = "immediate ";
+    if (value.compare(0, immediatePrefix.size(), immediatePrefix) == 0)
+        value.erase(0, immediatePrefix.size());
+    return value;
+}
+
+bool appendGoolExpression(
+    std::ostringstream& line, const GoolIRInstruction& instruction) {
+    const auto* left = findOperand(instruction, 'L');
+    const auto* right = findOperand(instruction, 'R');
+    const auto* destination = findOperand(instruction, 'D');
+    const auto* source = findOperand(instruction, 'S');
+    switch (instruction.opcode) {
+    case 0U: case 1U: case 2U: case 3U: case 4U:
+    case 5U: case 6U: case 7U: case 8U: case 9U:
+    case 10U: case 11U: case 12U: case 13U: case 14U:
+    case 15U: case 21U: {
+        if (!left || !right) return false;
+        static constexpr const char* operators[] = {
+            "+", "-", "*", "/", "==", "&&", "||", "&", "|",
+            "<", "<=", ">", ">=", "%", "^", "has"
+        };
+        if (instruction.opcode == 21U) {
+            line << "(" << expressionOperandText(*left) << " << "
+                 << expressionOperandText(*right) << ")";
+        } else {
+            line << "(" << expressionOperandText(*left) << " "
+                 << operators[instruction.opcode] << " "
+                 << expressionOperandText(*right) << ")";
+        }
+        return true;
+    }
+    case 16U: {
+        const auto* first = findOperand(instruction, 'B');
+        const auto* second = findOperand(instruction, 'A');
+        if (!first || !second) return false;
+        line << "rand(" << expressionOperandText(*first) << ", "
+             << expressionOperandText(*second) << ")";
+        return true;
+    }
+    case 18U: case 20U: case 23U: case 25U: case 39U: case 43U: case 44U:
+        if (!destination || !source) return false;
+        line << expressionOperandText(*destination) << " = ";
+        switch (instruction.opcode) {
+        case 18U: line << "!" << expressionOperandText(*source); break;
+        case 20U: line << "&" << expressionOperandText(*source); break;
+        case 23U: line << "~" << expressionOperandText(*source); break;
+        case 25U: line << "abs(" << expressionOperandText(*source) << ")"; break;
+        case 39U: line << "&anim[" << expressionOperandText(*source) << "]"; break;
+        case 43U: line << "sin(" << expressionOperandText(*source) << ")"; break;
+        case 44U: line << "cos(" << expressionOperandText(*source) << ")"; break;
+        default: return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
 const char* mipsGprName(std::size_t index) {
     static constexpr const char* names[] = {
         "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3",
@@ -505,6 +566,15 @@ GoolIRDecompilation decompileGoolIR(
             line << ".gool_word " << hexValue(instruction.rawWord, 8)
                  << " // unknown opcode " << static_cast<unsigned>(instruction.opcode);
             addDiagnostic(result, index, "unknown GOOL opcode preserved as its original word.");
+        } else if (instruction.opcode <= 16U || instruction.opcode == 18U ||
+                   instruction.opcode == 20U || instruction.opcode == 21U ||
+                   instruction.opcode == 23U || instruction.opcode == 25U ||
+                   instruction.opcode == 39U || instruction.opcode == 43U ||
+                   instruction.opcode == 44U) {
+            if (!appendGoolExpression(line, instruction)) {
+                line << instruction.mnemonic << " /* missing expression operand */";
+                addDiagnostic(result, index, "expression operands could not be resolved.");
+            }
         } else if (instruction.opcode == 17U) {
             const auto* destination = findOperand(instruction, 'D');
             const auto* value = findOperand(instruction, 'S');

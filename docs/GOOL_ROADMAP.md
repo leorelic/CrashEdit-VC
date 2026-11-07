@@ -48,6 +48,14 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 
 The native-instruction audit covers the supported PlayStation R3000A integer subset and modeled COP0/COP2/GTE forms. FPU/COP1 instructions, unsupported privileged operations, unknown GTE commands, and malformed/reserved encodings remain loss-preserving and explicitly unanalyzed rather than being assigned speculative semantics.
 
+## 4. Readable GOOL decompilation
+
+- [x] Render the documented arithmetic, logical, comparison, random, and unary transformation instructions as source expressions while preserving original offsets and raw words.
+- [ ] Recover reusable expressions across stack/reference operations using proven data-flow relationships; retain explicit references when a value cannot be reconstructed safely.
+- [ ] Expand source-level rendering for state, event, animation, entity, and miscellaneous operations as their runtime semantics are verified.
+- [ ] Improve routine-level control-flow structuring for shared blocks, discontiguous regions, and native MIPS branches without hiding unresolved edges.
+- [ ] Validate readable output against representative Crash 2 GOOL entries and retain round-trip/source-map regression coverage.
+
 ## 3. Blueprint graph usability and navigation
 
 ### Near-term improvements
