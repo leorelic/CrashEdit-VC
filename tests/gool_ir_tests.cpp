@@ -1938,7 +1938,7 @@ int main() {
     nativeBranchProgram.instructions.push_back(nativeBranchTarget);
     const auto nativeBranchText = decompileGoolIR(nativeBranchProgram);
     assert(nativeBranchText.text.find("L00002:") != std::string::npos);
-    assert(nativeBranchText.text.find("branch-target=@0x0008 (instruction 2, L00002)") !=
+    assert(nativeBranchText.text.find("branch-target=@0x0008 (instruction 2); target-label=L00002") !=
         std::string::npos);
 
     GoolIRRoutine nativeBranchRoutine;
@@ -1947,7 +1947,7 @@ int main() {
     nativeBranchProgram.routines.push_back(nativeBranchRoutine);
     const auto nativeBranchRoutineText = decompileGoolIRRoutine(nativeBranchProgram, 0);
     assert(nativeBranchRoutineText.text.find("L00002:") != std::string::npos);
-    assert(nativeBranchRoutineText.text.find("branch-target=@0x0008 (instruction 2, L00002)") !=
+    assert(nativeBranchRoutineText.text.find("branch-target=@0x0008 (instruction 2); target-label=L00002") !=
         std::string::npos);
 
     // A routine listing must define labels for branch destinations even

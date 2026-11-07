@@ -224,7 +224,7 @@ void appendNativeMipsAnnotations(
             static_cast<std::uint32_t>(instruction.nativeBranchTargetByteOffset), 4);
         if (instruction.nativeBranchTargetInstructionValid) {
             line << " (instruction " << instruction.nativeBranchTargetInstruction
-                 << ", " << labelName(instruction.nativeBranchTargetInstruction) << ")";
+                 << "); target-label=" << labelName(instruction.nativeBranchTargetInstruction);
         } else {
             line << " (not mapped to a unique native instruction)";
         }
