@@ -66,9 +66,14 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  const bool visible=ImGui::BeginChild(child.c_str(),size,true);bool changed=false;
  if(visible){
   ImGui::SetWindowFontScale(fontScale_);
-  const ImGuiStyle& style=ImGui::GetStyle();const float lh=ImGui::GetTextLineHeight(),gutter=48.0f;
-  const auto lines=linesOf(text_);const float h=std::max(size.y,static_cast<float>(lines.size())*lh+style.FramePadding.y*2+8);
-  const ImVec2 origin=ImGui::GetCursorScreenPos();const float w=std::max(80.0f,ImGui::GetContentRegionAvail().x-gutter);
+  const ImGuiStyle& style=ImGui::GetStyle();const float lh=ImGui::GetTextLineHeightWithSpacing(),gutter=48.0f;
+  const auto lines=linesOf(text_);
+  const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
+  // Keep the input surface taller than its text so it never creates a second,
+  // independent vertical scrollbar. The surrounding editor child owns scrolling.
+  const float textHeight=static_cast<float>(lines.size())*lh+style.FramePadding.y*2+lh*2.0f;
+  const float h=std::max(contentAvail.y,textHeight);
+  const ImVec2 origin=ImGui::GetCursorScreenPos();const float w=std::max(80.0f,contentAvail.x-gutter);
   ImGui::SetCursorScreenPos(ImVec2(origin.x+gutter,origin.y));
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6,style.FramePadding.y));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,0);
