@@ -1290,6 +1290,32 @@ GoolIRDecompilation decompileGoolIRRoutine(
             options.preserveStructuredBranchOffsets = true;
             auto structured = decompileGoolIR(compactProgram, options);
 
+            // Native branch metadata is compacted alongside its target.
+            // Restore the original instruction number in the annotation before
+            // translating the temporary label names.
+            for (const auto& [original, compact] : compactIndex) {
+                const auto& originalInstruction = program.instructions[original];
+                if (!originalInstruction.nativeMips ||
+                    !originalInstruction.nativeBranchTargetInstructionValid)
+                    continue;
+                const auto compactTarget = compactIndex.find(
+                    originalInstruction.nativeBranchTargetInstruction);
+                if (compactTarget == compactIndex.end()) continue;
+                const auto oldAnnotation = "(instruction " +
+                    std::to_string(compactTarget->second) + ", " +
+                    labelName(compactTarget->second) + ")";
+                const auto newAnnotation = "(instruction " +
+                    std::to_string(originalInstruction.nativeBranchTargetInstruction) +
+                    ", " + labelName(originalInstruction.nativeBranchTargetInstruction) + ")";
+                std::size_t annotationPosition = 0;
+                while ((annotationPosition = structured.text.find(
+                    oldAnnotation, annotationPosition)) != std::string::npos) {
+                    structured.text.replace(annotationPosition, oldAnnotation.size(),
+                        newAnnotation);
+                    annotationPosition += newAnnotation.size();
+                }
+            }
+
             // Translate temporary labels back to their original instruction
             // indices without allowing one replacement to affect another.
             for (const auto& [original, compact] : compactIndex) {
