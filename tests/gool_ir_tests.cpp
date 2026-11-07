@@ -243,6 +243,35 @@ int main() {
     assert(!effectIR.instructions[0].isControlTransferDelaySlot);
     assert(!effectIR.instructions[4].isControlTransferDelaySlot);
 
+    // R3000A permits an immediately adjacent complementary LWL/LWR pair to
+    // merge through the ordinary load-delay slot; the second load still has
+    // its own delay before a subsequent consumer.
+    NsfGool unalignedPairSource;
+    unalignedPairSource.version = NsfGoolVersion::Version2;
+    const auto addUnalignedLoad = [&unalignedPairSource](std::uint8_t opcode, std::uint8_t rt) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = (static_cast<std::uint32_t>(opcode) << 26U) |
+            (8U << 21U) | (static_cast<std::uint32_t>(rt) << 16U);
+        unalignedPairSource.instructions.push_back(instruction);
+    };
+    addUnalignedLoad(34U, 9U); // lwl t1,0(t0)
+    addUnalignedLoad(38U, 9U); // lwr t1,0(t0)
+    addUnalignedLoad(9U, 10U); // addiu t2,t1,0 -- still in the second load's delay slot
+    addUnalignedLoad(38U, 11U); // lwr t3,0(t0)
+    addUnalignedLoad(34U, 11U); // lwl t3,0(t0)
+    addUnalignedLoad(9U, 12U); // addiu t4,t3,0 -- still in the second load's delay slot
+    const auto unalignedPairIR = buildGoolIR(unalignedPairSource);
+    assert(unalignedPairIR.instructions.size() == 6);
+    const auto t1Mask = std::uint32_t{1} << 9U;
+    const auto t3Mask = std::uint32_t{1} << 11U;
+    assert(unalignedPairIR.instructions[1].gprLoadDelayPairMergeMask == t1Mask);
+    assert(unalignedPairIR.instructions[1].gprReadInLoadDelaySlotMask == 0U);
+    assert(unalignedPairIR.instructions[2].gprReadInLoadDelaySlotMask == t1Mask);
+    assert(unalignedPairIR.instructions[4].gprLoadDelayPairMergeMask == t3Mask);
+    assert(unalignedPairIR.instructions[4].gprReadInLoadDelaySlotMask == 0U);
+    assert(unalignedPairIR.instructions[5].gprReadInLoadDelaySlotMask == t3Mask);
+
     // A validated branch marks exactly its following instruction as the
     // architectural delay slot; a final branch with no following word has no slot.
     NsfGool delaySlotSource;

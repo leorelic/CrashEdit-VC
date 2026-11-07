@@ -621,9 +621,21 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         if (!previous.nativeMips || !current.nativeMips) continue;
         if (previous.nativeEffects.controlTransferHasDelaySlot)
             current.isControlTransferDelaySlot = true;
-        if (previous.nativeEffects.gprWriteHasLoadDelay && current.nativeEffects.known)
-            current.gprReadInLoadDelaySlotMask = previous.nativeEffects.gprWriteMask &
-                current.nativeEffects.gprReadMask;
+        if (previous.nativeEffects.gprWriteHasLoadDelay && current.nativeEffects.known) {
+            const auto& previousFields = previous.nativeFields;
+            const auto& currentFields = current.nativeFields;
+            const bool complementaryUnalignedLoads =
+                ((previousFields.primaryOpcode == 34U && currentFields.primaryOpcode == 38U) ||
+                 (previousFields.primaryOpcode == 38U && currentFields.primaryOpcode == 34U)) &&
+                previousFields.rt == currentFields.rt;
+            if (complementaryUnalignedLoads) {
+                current.gprLoadDelayPairMergeMask =
+                    previous.nativeEffects.gprWriteMask & current.nativeEffects.gprReadMask;
+            }
+            current.gprReadInLoadDelaySlotMask =
+                (previous.nativeEffects.gprWriteMask & current.nativeEffects.gprReadMask) &
+                ~current.gprLoadDelayPairMergeMask;
+        }
     }
 
     const auto controlFlow = analyzeGoolControlFlow(source);

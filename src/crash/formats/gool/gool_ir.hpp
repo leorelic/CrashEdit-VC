@@ -104,6 +104,9 @@ struct GoolIRInstruction {
     // GPRs read here that were written by the immediately preceding delayed load.
     // This records overlap; LWL/LWR pair semantics require separate interpretation.
     std::uint32_t gprReadInLoadDelaySlotMask = 0;
+    // Registers merged by an immediately adjacent LWL/LWR pair. This is the
+    // R3000A exception to the ordinary load-delay dependency rule.
+    std::uint32_t gprLoadDelayPairMergeMask = 0;
     std::vector<GoolIROperand> operands;
 };
 
