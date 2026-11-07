@@ -2278,7 +2278,7 @@ int main() {
     chainedAssignmentSource.instructions.push_back(firstAssignment);
     NsfGoolInstruction secondAssignment;
     secondAssignment.opcode = 17U;
-    secondAssignment.operandBits = (0x806U << 12U) | 0xB05U; // stack[6] = stack[5]
+    secondAssignment.operandBits = (0xB05U << 12U) | 0x806U; // stack[6] = stack[5]
     secondAssignment.byteOffset = 4;
     chainedAssignmentSource.instructions.push_back(secondAssignment);
     const auto chainedAssignmentIR = buildGoolIR(chainedAssignmentSource);
