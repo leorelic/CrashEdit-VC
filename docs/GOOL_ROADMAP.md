@@ -32,6 +32,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Track the PlayStation's two-instruction LWC2/SWC2 GTE data-register access delay separately from the CPU GPR load delay, flagging only same-register COP2 accesses within the window.
 - [x] Mark the architectural one-instruction delay slot on every validated R3000A branch/jump control transfer, including JR/JALR and COP0/COP2 condition branches; leave non-control instructions unmarked.
 - [x] Mark the following native MIPS instruction as the delay-slot instruction for each validated control transfer, without changing CFG behavior or inventing a missing slot at the end of a stream.
+- [x] Preserve the specific validated R3000A control-transfer operation in the IR: direct/register jumps and links, integer conditional branches (including REGIMM link forms), and COP0/COP2 condition branches; retain the generic control-transfer and delay-slot flags.
 - [x] Model R3000A BC0 condition branches and RFE status-mode restoration separately from GPR effects; reject malformed branch encodings and leave other COP0 operations unsupported.
 - [x] Model validated COP2 MFC2/CFC2/MTC2/CTC2 transfers with separate data/control register effects, plus BC2 condition branches; keep malformed encodings and command words explicitly unanalyzed.
 - [x] Model PlayStation LWC2/SWC2 memory transfers as GTE data-register writes/reads, retaining the base GPR dependency and explicit memory read/write classification; leave other coprocessor load/store encodings unsupported.

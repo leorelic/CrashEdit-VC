@@ -25,6 +25,15 @@ struct GoolIROperand {
 
 enum class GoolIRMipsFormat : std::uint8_t { Unknown, Register, Immediate, Jump };
 enum class GoolIRMipsMemoryEffect : std::uint8_t { Unknown, None, Read, Write, ReadWrite };
+enum class GoolIRMipsControlOperation : std::uint8_t {
+    None, Jump, JumpAndLink, JumpRegister, JumpAndLinkRegister,
+    BranchEqual, BranchNotEqual, BranchLessThanZero, BranchGreaterEqualZero,
+    BranchLessThanZeroAndLink, BranchGreaterEqualZeroAndLink,
+    BranchLessOrEqualZero, BranchGreaterThanZero,
+    BranchCoprocessor0False, BranchCoprocessor0True,
+    BranchCoprocessor2False, BranchCoprocessor2True
+};
+
 enum class GoolIRMipsHiLoOperation : std::uint8_t {
     None, MoveFromHi, MoveToHi, MoveFromLo, MoveToLo,
     MultiplySigned, MultiplyUnsigned, DivideSigned, DivideUnsigned
@@ -66,6 +75,8 @@ struct GoolIRMipsEffects {
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
     GoolIRMipsMemoryAccess memoryAccess;
     bool controlTransfer = false;
+    // Exact validated R3000A control-transfer form; None for non-control instructions.
+    GoolIRMipsControlOperation controlOperation = GoolIRMipsControlOperation::None;
     // The next instruction executes before a control transfer takes effect (R3000A delay slot).
     bool controlTransferHasDelaySlot = false;
 };

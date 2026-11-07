@@ -88,9 +88,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         effects.memoryAccess.signExtendsLoad = signExtendsLoad;
         effects.memoryAccess.unalignedWordMerge = unalignedWordMerge;
     };
-    const auto markControlTransfer = [&effects]() {
+    const auto markControlTransfer = [&effects](GoolIRMipsControlOperation operation) {
         effects.controlTransfer = true;
         effects.controlTransferHasDelaySlot = true;
+        effects.controlOperation = operation;
     };
     const auto readCop2Data = [&effects](std::uint8_t reg) {
         effects.coprocessor2DataReadMask |= (std::uint32_t{1} << reg);
@@ -130,10 +131,10 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             readRsRt(); write(fields.rd); break;
         case 8U: // jr
             if (fields.rt != 0U || fields.rd != 0U || fields.shiftAmount != 0U) return effects;
-            read(fields.rs); markControlTransfer(); break;
+            read(fields.rs); markControlTransfer(GoolIRMipsControlOperation::JumpRegister); break;
         case 9U: // jalr
             if (fields.rt != 0U || fields.shiftAmount != 0U) return effects;
-            read(fields.rs); write(fields.rd); markControlTransfer(); break;
+            read(fields.rs); write(fields.rd); markControlTransfer(GoolIRMipsControlOperation::JumpAndLinkRegister); break;
         case 12U: case 13U: // syscall, break (exception instructions; code field is opaque)
             break;
         case 16U: // mfhi
@@ -174,17 +175,23 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 fields.rt != 16U && fields.rt != 17U) return effects;
             read(fields.rs);
             if (fields.rt == 16U || fields.rt == 17U) write(31U);
-            markControlTransfer();
+            markControlTransfer(fields.rt == 0U ? GoolIRMipsControlOperation::BranchLessThanZero :
+                fields.rt == 1U ? GoolIRMipsControlOperation::BranchGreaterEqualZero :
+                fields.rt == 16U ? GoolIRMipsControlOperation::BranchLessThanZeroAndLink :
+                GoolIRMipsControlOperation::BranchGreaterEqualZeroAndLink);
             break;
         case 2U: // j
-            markControlTransfer(); break;
+            markControlTransfer(GoolIRMipsControlOperation::Jump); break;
         case 3U: // jal
-            write(31U); markControlTransfer(); break;
+            write(31U); markControlTransfer(GoolIRMipsControlOperation::JumpAndLink); break;
         case 4U: case 5U: // beq, bne
-            readRsRt(); markControlTransfer(); break;
+            readRsRt(); markControlTransfer(fields.primaryOpcode == 4U ?
+                GoolIRMipsControlOperation::BranchEqual : GoolIRMipsControlOperation::BranchNotEqual); break;
         case 6U: case 7U: // blez, bgtz
             if (fields.rt != 0U) return effects;
-            read(fields.rs); markControlTransfer(); break;
+            read(fields.rs); markControlTransfer(fields.primaryOpcode == 6U ?
+                GoolIRMipsControlOperation::BranchLessOrEqualZero :
+                GoolIRMipsControlOperation::BranchGreaterThanZero); break;
         case 8U: case 9U: case 10U: case 11U:
         case 12U: case 13U: case 14U: // immediate ALU operations
             read(fields.rs); write(fields.rt); break;
@@ -203,7 +210,8 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
             } else if (fields.rs == 8U) { // bc0f / bc0t
                 if (fields.rt > 1U) return effects;
                 effects.readsCoprocessor0Condition = true;
-                markControlTransfer();
+                markControlTransfer(fields.rt == 0U ? GoolIRMipsControlOperation::BranchCoprocessor0False :
+                    GoolIRMipsControlOperation::BranchCoprocessor0True);
             } else if (fields.rs == 16U && fields.rt == 0U &&
                        fields.rd == 0U && fields.shiftAmount == 0U &&
                        fields.function == 16U) { // rfe: restore previous status mode
@@ -512,7 +520,8 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 // PS1 COP2 does not drive the condition input: BC2F is
                 // always taken and BC2T is never taken.
                 effects.coprocessor2ConditionKnownFalse = true;
-                markControlTransfer();
+                markControlTransfer(fields.rt == 0U ? GoolIRMipsControlOperation::BranchCoprocessor2False :
+                    GoolIRMipsControlOperation::BranchCoprocessor2True);
             } else {
                 // COP2 command words (rs=16) and other operations need
                 // command-specific GTE semantics; retain them as unknown.

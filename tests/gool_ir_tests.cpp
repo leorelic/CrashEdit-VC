@@ -202,6 +202,58 @@ int main() {
     assert(jalrIR.rawWord == 0x02A0F809U);
     assert(jalrIR.sourceByteOffset == 0x44);
 
+    // Preserve the exact R3000A control-transfer form, not just a generic
+    // branch/jump flag, for later source reconstruction and CFG integration.
+    NsfGool mipsControlSource;
+    mipsControlSource.version = NsfGoolVersion::Version2;
+    const auto addMipsControlWord = [&mipsControlSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        mipsControlSource.instructions.push_back(instruction);
+    };
+    addMipsControlWord((8U << 21U) | 8U); // jr t0
+    addMipsControlWord((8U << 21U) | (31U << 11U) | 9U); // jalr ra,t0
+    addMipsControlWord((2U << 26U) | 0x12345U); // j
+    addMipsControlWord((3U << 26U) | 0x12345U); // jal
+    addMipsControlWord((4U << 26U) | (8U << 21U) | (9U << 16U)); // beq
+    addMipsControlWord((5U << 26U) | (8U << 21U) | (9U << 16U)); // bne
+    addMipsControlWord((6U << 26U) | (8U << 21U)); // blez
+    addMipsControlWord((7U << 26U) | (8U << 21U)); // bgtz
+    addMipsControlWord((1U << 26U) | (8U << 21U) | (0U << 16U)); // bltz
+    addMipsControlWord((1U << 26U) | (8U << 21U) | (1U << 16U)); // bgez
+    addMipsControlWord((1U << 26U) | (8U << 21U) | (16U << 16U)); // bltzal
+    addMipsControlWord((1U << 26U) | (8U << 21U) | (17U << 16U)); // bgezal
+    addMipsControlWord((16U << 26U) | (8U << 21U)); // bc0f
+    addMipsControlWord((16U << 26U) | (8U << 21U) | (1U << 16U)); // bc0t
+    addMipsControlWord((18U << 26U) | (8U << 21U)); // bc2f
+    addMipsControlWord((18U << 26U) | (8U << 21U) | (1U << 16U)); // bc2t
+    const auto mipsControlIR = buildGoolIR(mipsControlSource);
+    const GoolIRMipsControlOperation expectedMipsControl[] = {
+        GoolIRMipsControlOperation::JumpRegister,
+        GoolIRMipsControlOperation::JumpAndLinkRegister,
+        GoolIRMipsControlOperation::Jump,
+        GoolIRMipsControlOperation::JumpAndLink,
+        GoolIRMipsControlOperation::BranchEqual,
+        GoolIRMipsControlOperation::BranchNotEqual,
+        GoolIRMipsControlOperation::BranchLessOrEqualZero,
+        GoolIRMipsControlOperation::BranchGreaterThanZero,
+        GoolIRMipsControlOperation::BranchLessThanZero,
+        GoolIRMipsControlOperation::BranchGreaterEqualZero,
+        GoolIRMipsControlOperation::BranchLessThanZeroAndLink,
+        GoolIRMipsControlOperation::BranchGreaterEqualZeroAndLink,
+        GoolIRMipsControlOperation::BranchCoprocessor0False,
+        GoolIRMipsControlOperation::BranchCoprocessor0True,
+        GoolIRMipsControlOperation::BranchCoprocessor2False,
+        GoolIRMipsControlOperation::BranchCoprocessor2True
+    };
+    assert(mipsControlIR.instructions.size() == std::size(expectedMipsControl));
+    for (std::size_t i = 0; i < std::size(expectedMipsControl); ++i) {
+        const auto& effects = mipsControlIR.instructions[i].nativeEffects;
+        assert(effects.known && effects.controlTransfer && effects.controlTransferHasDelaySlot);
+        assert(effects.controlOperation == expectedMipsControl[i]);
+    }
+
     // Conservative R3000A register and memory effects are tracked independently
     // from mnemonic text, with unsupported encodings left explicitly unknown.
     NsfGool effectSource;
