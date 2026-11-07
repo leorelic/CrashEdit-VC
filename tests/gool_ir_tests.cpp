@@ -2173,5 +2173,47 @@ int main() {
     assert(chainedExpressionText.text.find("(5 + 10)") != std::string::npos);
     assert(chainedExpressionText.diagnostics.empty());
 
+    // Compacting a discontiguous routine must not reinterpret an external
+    // reaching-definition index as an unrelated instruction in the compact
+    // stream. Fall back to original indices when that provenance cannot map.
+    GoolIRProgram externalDefinitionRoutine;
+    for (std::size_t i = 0; i < 7; ++i) {
+        GoolIRInstruction item;
+        item.opcode = 47U;
+        item.opcodeKnown = true;
+        item.mnemonic = "NOP";
+        item.sourceByteOffset = static_cast<std::uint32_t>(i * 4U);
+        externalDefinitionRoutine.instructions.push_back(std::move(item));
+    }
+    const GoolIROperand externalStackDestination{'D', 12, 0, 0,
+        GoolIROperandKind::Reference, "stack[5]"};
+    const GoolIROperand externalSeven{'S', 12, 7, 7,
+        GoolIROperandKind::Value, "7"};
+    externalDefinitionRoutine.instructions[3].opcode = 17U;
+    externalDefinitionRoutine.instructions[3].mnemonic = "SETF";
+    externalDefinitionRoutine.instructions[3].operands = {
+        externalStackDestination, externalSeven};
+    const GoolIROperand unrelatedNinetyNine{'S', 12, 99, 99,
+        GoolIROperandKind::Value, "99"};
+    externalDefinitionRoutine.instructions[4].opcode = 17U;
+    externalDefinitionRoutine.instructions[4].mnemonic = "SETF";
+    externalDefinitionRoutine.instructions[4].operands = {
+        externalStackDestination, unrelatedNinetyNine};
+    externalDefinitionRoutine.instructions[6].opcode = 0U;
+    externalDefinitionRoutine.instructions[6].mnemonic = "ADD";
+    externalDefinitionRoutine.instructions[6].operands = {
+        GoolIROperand{'L', 12, 0, 0, GoolIROperandKind::Reference, "stack[5]"},
+        GoolIROperand{'R', 12, 1, 1, GoolIROperandKind::Value, "1"}};
+    externalDefinitionRoutine.valueUses.push_back({6, "stack[5]", {3},
+        GoolIRValueOriginKind::SingleReachingDefinition, false});
+    GoolIRRoutine externalDefinition;
+    externalDefinition.entryInstruction = 0;
+    externalDefinition.instructions = {0, 1, 2, 4, 5, 6};
+    externalDefinitionRoutine.routines.push_back(externalDefinition);
+    const auto externalDefinitionText = decompileGoolIRRoutine(
+        externalDefinitionRoutine, 0);
+    assert(externalDefinitionText.text.find("(7 + 1)") != std::string::npos);
+    assert(externalDefinitionText.text.find("(99 + 1)") == std::string::npos);
+
     std::cout << "GOOL IR preservation and control-flow checks passed\\n";
 }

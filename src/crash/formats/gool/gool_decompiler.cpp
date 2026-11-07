@@ -1002,6 +1002,27 @@ GoolIRDecompilation decompileGoolIRRoutine(
             }
             compactIndex.emplace(original, compactIndex.size());
         }
+
+        // A reaching definition outside this routine cannot be represented by
+        // an instruction index in the compact stream. Do not leave its
+        // original index in compact value-flow metadata: it could accidentally
+        // name an unrelated compact instruction and produce a false inline.
+        if (canCompact) {
+            for (const auto& use : program.valueUses) {
+                if (compactIndex.find(use.instructionIndex) == compactIndex.end() ||
+                    use.kind != GoolIRValueOriginKind::SingleReachingDefinition ||
+                    use.mayHaveUnmodeledValue)
+                    continue;
+                for (const auto definition : use.reachingDefinitionInstructions) {
+                    if (compactIndex.find(definition) == compactIndex.end()) {
+                        canCompact = false;
+                        break;
+                    }
+                }
+                if (!canCompact) break;
+            }
+        }
+
         GoolIRProgram compactProgram;
         if (canCompact) {
             compactProgram = program;
