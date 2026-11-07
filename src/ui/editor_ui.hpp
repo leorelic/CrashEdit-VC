@@ -19,6 +19,7 @@ private:
  bool showGoolDataPool_=false,showGoolStateMap_=false,showGoolStateDescriptions_=false,showGoolFrameGroups_=false,focusGoolDataPool_=false,showGoolBlueprintInstructions_=true,showGoolScriptEditor_=false;
  bool goolScriptBufferInitialized_=false,showGoolScriptNavigator_=true;
  std::array<char,32768> goolScriptBuffer_{};
+ std::array<char,524288> goolDecompiledBuffer_{};
  int activeGoolChunk_=-1,activeGoolEntry_=-1;
  std::uint32_t blueprintSelectedEid_=0;
  std::size_t selectedGoolBlueprintBlock_=0;

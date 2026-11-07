@@ -392,67 +392,143 @@ void EditorUI::draw(){
 
 void EditorUI::drawGoolScriptEditor(){
  if(!showGoolScriptEditor_)return;
+ const ImGuiViewport* viewport=ImGui::GetMainViewport();
+ const ImVec2 workSize=viewport->WorkSize;
+ const ImVec2 initialSize(std::min(1120.0f,workSize.x*0.92f),
+                          std::min(760.0f,workSize.y*0.88f));
+ ImGui::SetNextWindowSizeConstraints(ImVec2(700.0f,480.0f),workSize);
+ ImGui::SetNextWindowSize(initialSize,ImGuiCond_FirstUseEver);
+ ImGui::SetNextWindowPos(viewport->GetCenter(),ImGuiCond_FirstUseEver,ImVec2(0.5f,0.5f));
+
+ const Crash::NsfGool* selectedGool=nullptr;
+ std::uint32_t selectedEid=0;
+ std::string selectedName;
+ if(nsfValid_&&selectedChunk_>=0&&selectedEntry_>=0&&
+    static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
+  const auto& chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
+  if(chunk.type==0&&static_cast<std::size_t>(selectedEntry_)<chunk.entries.size()){
+   const auto& entry=chunk.entries[static_cast<std::size_t>(selectedEntry_)];
+   if(entry.valid&&entry.type==11&&entry.gool.decoded){
+    selectedGool=&entry.gool;
+    selectedEid=entry.eid;
+    selectedName=Crash::eidToEName(entry.eid);
+   }
+  }
+ }
+ static int previewChunk=-1,previewEntry=-1;
+ static bool previewInitialized=false;
+ static Crash::GoolIRDecompilation preview;
+ if(selectedGool&&(previewChunk!=selectedChunk_||previewEntry!=selectedEntry_||!previewInitialized)){
+  const auto program=Crash::buildGoolIR(*selectedGool);
+  preview=Crash::decompileGoolIR(program);
+  previewChunk=selectedChunk_;
+  previewEntry=selectedEntry_;
+  previewInitialized=true;
+  std::string source="// Decompiled GOOL preview: "+selectedName+" (EID 0x";
+  char eidText[16]{};
+  std::snprintf(eidText,sizeof(eidText),"%08X",selectedEid);
+  source+=eidText;
+  source+=")\n// Read-only preview; this is not yet the editable GOOL Script language.\n\n";
+  source+=preview.text;
+  std::snprintf(goolDecompiledBuffer_.data(),goolDecompiledBuffer_.size(),"%s",source.c_str());
+ }else if(!selectedGool){
+  previewInitialized=false;
+  previewChunk=previewEntry=-1;
+  preview={};
+ }
+
  if(!goolScriptBufferInitialized_){
   const char* starter=
-   "# GOOL Script indentation playground\\n"
-   "# Illustrative syntax only; this prototype does not compile or modify NSF data.\\n"
-   "event Update:\\n"
-   "    if health <= 0:\\n"
-   "        transition Dead\\n"
-   "    else:\\n"
-   "        call UpdateMovement\\n";
+   "# GOOL Script indentation playground\n"
+   "# Illustrative syntax only; this prototype does not compile or modify NSF data.\n"
+   "event Update:\n"
+   "    if health <= 0:\n"
+   "        transition Dead\n"
+   "    else:\n"
+   "        call UpdateMovement\n";
   std::snprintf(goolScriptBuffer_.data(),goolScriptBuffer_.size(),"%s",starter);
   goolScriptBufferInitialized_=true;
  }
  static Crash::GoolScriptIndentationResult analysis=
   Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
+
  if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
-  ImGui::TextDisabled("Prototype workspace  ·  indentation validation only  ·  no GOOL recompilation yet");
+  ImGui::TextDisabled("GOOL authoring workspace  ·  preview and indentation playground");
   ImGui::SameLine();
   if(ImGui::SmallButton(showGoolScriptNavigator_?"Hide Navigator":"Show Navigator"))
    showGoolScriptNavigator_=!showGoolScriptNavigator_;
   ImGui::Separator();
+
   const ImVec2 available=ImGui::GetContentRegionAvail();
   if(showGoolScriptNavigator_){
-   ImGui::BeginChild("GoolScriptNavigator",ImVec2(185.0f,available.y),true);
+   ImGui::BeginChild("GoolScriptNavigator",ImVec2(190.0f,available.y),true);
    ImGui::TextUnformatted("Document");
    ImGui::Separator();
-   ImGui::TextDisabled("Scratch GOOL");
+   if(selectedGool)ImGui::Text("%s",selectedName.c_str());
+   else ImGui::TextDisabled("No GOOL selected");
    ImGui::Spacing();
    ImGui::TextUnformatted("Outline");
    ImGui::TextDisabled("Events");
    ImGui::TextDisabled("States");
    ImGui::TextDisabled("Routines");
    ImGui::Spacing();
-   ImGui::TextWrapped("The outline will populate from parsed GOOL symbols once the language grammar is established.");
+   ImGui::TextWrapped("Symbol navigation will be populated when the GOOL Script grammar and symbol model are ready.");
    ImGui::EndChild();
    ImGui::SameLine();
   }
-  ImGui::BeginChild("GoolScriptEditorSurface",ImVec2(0,available.y),false);
-  ImGui::TextUnformatted("Script source");
-  const float diagnosticsHeight=145.0f;
-  const ImVec2 editorSize(0.0f,std::max(100.0f,ImGui::GetContentRegionAvail().y-diagnosticsHeight));
-  if(ImGui::InputTextMultiline("##GoolScriptSource",goolScriptBuffer_.data(),
-      goolScriptBuffer_.size(),editorSize,ImGuiInputTextFlags_AllowTabInput)){
-   analysis=Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
-  }
-  ImGui::Separator();
-  ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
-  if(analysis.diagnostics.empty()){
-   ImGui::TextDisabled("No indentation errors detected.");
-  }else{
-   ImGui::BeginChild("GoolScriptProblems",ImVec2(0,0),false,
-       ImGuiWindowFlags_HorizontalScrollbar);
-   for(const auto& diagnostic:analysis.diagnostics){
-    ImGui::PushID(static_cast<int>(diagnostic.line));
-    ImGui::TextColored(ImVec4(1.0f,0.42f,0.36f,1.0f),
-      "Error %s  ·  line %zu, column %zu",
-      diagnostic.code.c_str(),diagnostic.line,diagnostic.column);
+
+  ImGui::BeginChild("GoolScriptEditorSurface",ImVec2(0.0f,available.y),false);
+  if(ImGui::BeginTabBar("GoolScriptDocuments")){
+   if(ImGui::BeginTabItem("Selected GOOL")){
+    ImGui::Text("Decompiled source  ·  %s",selectedGool?selectedName.c_str():"No GOOL object selected");
     ImGui::SameLine();
-    ImGui::TextWrapped("%s",diagnostic.message.c_str());
-    ImGui::PopID();
+    ImGui::TextDisabled("Read-only");
+    const ImVec2 editorAvail=ImGui::GetContentRegionAvail();
+    if(selectedGool){
+     ImGui::InputTextMultiline("##GoolDecompiledPreview",goolDecompiledBuffer_.data(),
+       goolDecompiledBuffer_.size(),ImVec2(editorAvail.x,editorAvail.y),
+       ImGuiInputTextFlags_ReadOnly);
+     if(!preview.diagnostics.empty()){
+      ImGui::TextDisabled("%zu decompiler diagnostic(s) are available in the GOOL analysis views.",preview.diagnostics.size());
+     }
+    }else{
+     ImGui::BeginChild("GoolNoSelection",ImVec2(0.0f,editorAvail.y),true);
+     ImGui::TextWrapped("Select a decoded GOOL entry in the Resource Hierarchy to load its decompiled source here.");
+     ImGui::EndChild();
+    }
+    ImGui::EndTabItem();
    }
-   ImGui::EndChild();
+   if(ImGui::BeginTabItem("Scratch Script")){
+    ImGui::TextDisabled("Illustrative GOOL Script draft  ·  edits are not written to the selected GOOL");
+    const float diagnosticsHeight=118.0f;
+    const ImVec2 editorAvail=ImGui::GetContentRegionAvail();
+    const float editorHeight=std::max(140.0f,editorAvail.y-diagnosticsHeight);
+    if(ImGui::InputTextMultiline("##GoolScriptSource",goolScriptBuffer_.data(),
+       goolScriptBuffer_.size(),ImVec2(editorAvail.x,editorHeight),
+       ImGuiInputTextFlags_AllowTabInput)){
+     analysis=Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
+    }
+    ImGui::Separator();
+    ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
+    ImGui::BeginChild("GoolScriptProblems",ImVec2(0.0f,0.0f),false,
+      ImGuiWindowFlags_HorizontalScrollbar);
+    if(analysis.diagnostics.empty()){
+     ImGui::TextDisabled("No indentation errors detected.");
+    }else{
+     for(const auto& diagnostic:analysis.diagnostics){
+      ImGui::PushID(static_cast<int>(diagnostic.line));
+      ImGui::TextColored(ImVec4(1.0f,0.42f,0.36f,1.0f),
+       "Error %s  ·  line %zu, column %zu",
+       diagnostic.code.c_str(),diagnostic.line,diagnostic.column);
+      ImGui::SameLine();
+      ImGui::TextWrapped("%s",diagnostic.message.c_str());
+      ImGui::PopID();
+     }
+    }
+    ImGui::EndChild();
+    ImGui::EndTabItem();
+   }
+   ImGui::EndTabBar();
   }
   ImGui::EndChild();
  }
