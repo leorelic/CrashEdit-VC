@@ -669,8 +669,8 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
     for (std::size_t i = 0; i < result.instructions.size(); ++i) {
         const auto& candidate = result.instructions[i];
         if (!candidate.nativeMips) continue;
-        const auto [it, inserted] = nativeInstructionAtOffset.emplace(candidate.sourceByteOffset, i);
-        if (!inserted) duplicateNativeOffsets.insert(candidate.sourceByteOffset);
+        const auto inserted = nativeInstructionAtOffset.emplace(candidate.sourceByteOffset, i);
+        if (!inserted.second) duplicateNativeOffsets.insert(candidate.sourceByteOffset);
     }
     for (auto& ir : result.instructions) {
         if (!ir.nativeMips || !ir.nativeEffects.known ||
