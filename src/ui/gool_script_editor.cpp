@@ -71,7 +71,9 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
   // Keep the input surface taller than its text so it never creates a second,
   // independent vertical scrollbar. The surrounding editor child owns scrolling.
-  const float textHeight=static_cast<float>(lines.size())*lh+style.FramePadding.y*2+lh*2.0f;
+  // Leave extra vertical slack for InputTextMultiline's internal line-height
+  // rounding so its private child never develops a tiny, non-functional scrollbar.
+  const float textHeight=static_cast<float>(lines.size())*lh+style.FramePadding.y*2+lh*4.0f;
   const float h=std::max(contentAvail.y,textHeight);
   const ImVec2 origin=ImGui::GetCursorScreenPos();const float w=std::max(80.0f,contentAvail.x-gutter);
   ImGui::SetCursorScreenPos(ImVec2(origin.x+gutter,origin.y));

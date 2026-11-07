@@ -587,7 +587,9 @@ void EditorUI::drawGoolScriptEditor(){
       }
       const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
       if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,0.0f),true);
+      const ImVec2 selectedEditorAvail=ImGui::GetContentRegionAvail();
+      const float selectedEditorHeight=std::max(120.0f,selectedEditorAvail.y-42.0f);
+      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,selectedEditorHeight),true);
       if(fontCount>1.0f)ImGui::PopFont();
       if(!decomp.diagnostics.empty()||hiddenAnnotations>0){
        ImGui::TextDisabled("%zu IR diagnostics  ·  %zu low-level annotations hidden from source view",
@@ -601,7 +603,9 @@ void EditorUI::drawGoolScriptEditor(){
       if(selectedEditorText!=formatted){selectedEditor.SetText(formatted);selectedEditorText=formatted;}
       const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
       if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,0.0f),true);
+      const ImVec2 selectedEditorAvail=ImGui::GetContentRegionAvail();
+      const float selectedEditorHeight=std::max(120.0f,selectedEditorAvail.y-42.0f);
+      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,selectedEditorHeight),true);
       if(fontCount>1.0f)ImGui::PopFont();
      }
     }else{
