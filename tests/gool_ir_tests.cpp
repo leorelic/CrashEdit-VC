@@ -255,12 +255,19 @@ int main() {
             (8U << 21U) | (static_cast<std::uint32_t>(rt) << 16U);
         unalignedPairSource.instructions.push_back(instruction);
     };
+    const auto addUnalignedConsumer = [&unalignedPairSource](std::uint8_t source, std::uint8_t destination) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = (9U << 26U) | (static_cast<std::uint32_t>(source) << 21U) |
+            (static_cast<std::uint32_t>(destination) << 16U);
+        unalignedPairSource.instructions.push_back(instruction);
+    };
     addUnalignedLoad(34U, 9U); // lwl t1,0(t0)
     addUnalignedLoad(38U, 9U); // lwr t1,0(t0)
-    addUnalignedLoad(9U, 10U); // addiu t2,t1,0 -- still in the second load's delay slot
+    addUnalignedConsumer(9U, 10U); // addiu t2,t1,0 -- still in the second load's delay slot
     addUnalignedLoad(38U, 11U); // lwr t3,0(t0)
     addUnalignedLoad(34U, 11U); // lwl t3,0(t0)
-    addUnalignedLoad(9U, 12U); // addiu t4,t3,0 -- still in the second load's delay slot
+    addUnalignedConsumer(11U, 12U); // addiu t4,t3,0 -- still in the second load's delay slot
     const auto unalignedPairIR = buildGoolIR(unalignedPairSource);
     assert(unalignedPairIR.instructions.size() == 6);
     const auto t1Mask = std::uint32_t{1} << 9U;
