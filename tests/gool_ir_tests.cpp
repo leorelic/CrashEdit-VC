@@ -1629,7 +1629,9 @@ int main() {
     appendDoLoopInstruction(52, 0x628, {doLoopDisp(-3),
         GoolIROperand{'V', 4, 0, 0, GoolIROperandKind::Value, "0"}, doLoopField});
     appendDoLoopInstruction(47, 0x62C);
-    const auto doLoopOutput = decompileGoolIR(doLoopProgram);
+    GoolIRDecompileOptions doLoopOptions;
+    doLoopOptions.preserveStructuredBranchOffsets = true;
+    const auto doLoopOutput = decompileGoolIR(doLoopProgram, doLoopOptions);
     assert(doLoopOutput.text.find("do {") != std::string::npos);
     assert(doLoopOutput.text.find("} while (self->counter == 3);") != std::string::npos);
     assert(doLoopOutput.text.find("goto L") == std::string::npos);
