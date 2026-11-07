@@ -1270,7 +1270,8 @@ void TextEditor::EnterCharacter(ImWchar aChar, bool aShift)
 				}
 				else
 				{
-					line.insert(line.begin(), Glyph('\t', TextEditor::PaletteIndex::Background));
+					for (int j = 0; j < mTabSize; ++j)
+						line.insert(line.begin() + j, Glyph(' ', TextEditor::PaletteIndex::Background));
 					modified = true;
 				}
 			}
@@ -1328,8 +1329,17 @@ void TextEditor::EnterCharacter(ImWchar aChar, bool aShift)
 		auto& newLine = mLines[coord.mLine + 1];
 
 		if (mLanguageDefinition.mAutoIndentation)
+		{
 			for (size_t it = 0; it < line.size() && isascii(line[it].mChar) && isblank(line[it].mChar); ++it)
 				newLine.push_back(line[it]);
+			// GOOL Script uses a trailing colon to open an indented block.
+			auto last = line.size();
+			while (last > 0 && isblank(line[last - 1].mChar))
+				--last;
+			if (last > 0 && line[last - 1].mChar == ':')
+				for (int i = 0; i < mTabSize; ++i)
+					newLine.push_back(Glyph(' ', PaletteIndex::Background));
+		}
 
 		const size_t whitespaceSize = newLine.size();
 		auto cindex = GetCharacterIndex(coord);
@@ -1337,6 +1347,16 @@ void TextEditor::EnterCharacter(ImWchar aChar, bool aShift)
 		line.erase(line.begin() + cindex, line.begin() + line.size());
 		SetCursorPosition(Coordinates(coord.mLine + 1, GetCharacterColumn(coord.mLine + 1, (int)whitespaceSize)));
 		u.mAdded = (char)aChar;
+	}
+	else if (aChar == '\t')
+	{
+		auto& line = mLines[coord.mLine];
+		auto cindex = GetCharacterIndex(coord);
+		const int spaces = mTabSize - (coord.mColumn % std::max(1, mTabSize));
+		for (int i = 0; i < spaces; ++i)
+			line.insert(line.begin() + cindex + i, Glyph(' ', PaletteIndex::Background));
+		u.mAdded.assign(static_cast<size_t>(spaces), ' ');
+		SetCursorPosition(Coordinates(coord.mLine, GetCharacterColumn(coord.mLine, cindex + spaces)));
 	}
 	else
 	{

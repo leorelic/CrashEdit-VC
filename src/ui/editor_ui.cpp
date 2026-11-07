@@ -459,11 +459,11 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
    if(closes){
     if(indent>0)--indent;
     if(line.rfind("} else if (",0)==0){
-     line="else if "+line.substr(11U);
-     if(!line.empty()&&line.back()=='}')line.pop_back();
+     line=trim(line.substr(11U));
+     if(line.size()>=2U&&line.compare(line.size()-2U,2U," {")==0)
+      line=trim(line.substr(0,line.size()-2U));
      if(!line.empty()&&line.back()==')')line.pop_back();
-     line=trim(line);
-     line+=":";
+     line="else if "+trim(line)+":";
     }else if(line.rfind("} else",0)==0){
      line="else:";
     }else if(line=="}"){
