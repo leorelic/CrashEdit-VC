@@ -2353,7 +2353,8 @@ void TextEditor::ColorizeInternal()
 						{
 							withinSingleLineComment = true;
 						}
-						else if (!withinSingleLineComment && currentIndex + startStr.size() <= line.size() &&
+						else if (!withinSingleLineComment && !startStr.empty() &&
+							currentIndex + startStr.size() <= line.size() &&
 							equals(startStr.begin(), startStr.end(), from, from + startStr.size(), pred))
 						{
 							commentStartLine = currentLine;
@@ -2366,7 +2367,7 @@ void TextEditor::ColorizeInternal()
 						line[currentIndex].mComment = withinSingleLineComment;
 
 						auto& endStr = mLanguageDefinition.mCommentEnd;
-						if (currentIndex + 1 >= (int)endStr.size() &&
+						if (!endStr.empty() && currentIndex + 1 >= (int)endStr.size() &&
 							equals(endStr.begin(), endStr.end(), from + 1 - endStr.size(), from + 1, pred))
 						{
 							commentStartIndex = endIndex;
