@@ -1989,10 +1989,23 @@ void EditorUI::drawGoolInspector(){
    }
    const auto&decompilation=cachedDecompilation;
    ImGui::Text("%zu instructions | %zu diagnostics",static_cast<std::size_t>(scriptEnd-scriptStart),decompilation.diagnostics.size());
+   static TextEditor scriptPreviewEditor;
+   static bool scriptPreviewEditorInitialized=false;
+   static std::string scriptPreviewText;
+   if(!scriptPreviewEditorInitialized){
+    scriptPreviewEditor.SetLanguageDefinition(goolScriptLanguageDefinition());
+    scriptPreviewEditor.SetPalette(goolScriptEditorPalette());
+    scriptPreviewEditor.SetTabSize(4);
+    scriptPreviewEditor.SetShowWhitespaces(false);
+    scriptPreviewEditor.SetReadOnly(true);
+    scriptPreviewEditorInitialized=true;
+   }
+   if(scriptPreviewText!=decompilation.text){
+    scriptPreviewEditor.SetText(decompilation.text);
+    scriptPreviewText=decompilation.text;
+   }
    if(ImGui::BeginChild("GOOLScriptSource",ImVec2(0,0),true,ImGuiWindowFlags_HorizontalScrollbar)){
-    ImGui::PushFont(ImGui::GetFont());
-    ImGui::TextUnformatted(decompilation.text.c_str());
-    ImGui::PopFont();
+    scriptPreviewEditor.Render("##GOOLScriptPreview",ImVec2(0,0),false);
     if(!decompilation.diagnostics.empty()){
      ImGui::Separator();ImGui::TextUnformatted("Decompiler diagnostics");
      for(const auto&diagnostic:decompilation.diagnostics)ImGui::BulletText("%s",diagnostic.c_str());
