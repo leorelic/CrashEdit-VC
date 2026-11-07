@@ -398,23 +398,67 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
   TextEditor::LanguageDefinition value;
   value.mName="GOOL Script";
   value.mAutoIndentation=true;
-  // TextEditor uppercases identifiers before keyword lookup when case sensitivity is disabled.
-  // Store keywords in that normalized form so both lower- and upper-case source spellings match.
   value.mCaseSensitive=false;
   value.mSingleLineComment="#";
-  value.mPreprocChar='\0';
+  value.mPreprocChar='\\0';
   value.mKeywords={
    "EVENT","STATE","ROUTINE","IF","ELSE","WHILE","FOR","IN","BREAK","CONTINUE",
    "RETURN","CALL","TRANSITION","TRUE","FALSE","NULL","AND","OR","NOT",
    "NATIVE","UNKNOWN","LET","VAR","CONST"
   };
-  value.mTokenRegexStrings={
-   {"0[xX][0-9A-Fa-f_]+",TextEditor::PaletteIndex::Number},
-   {"[0-9]+(\\.[0-9]+)?",TextEditor::PaletteIndex::Number},
-   {"\"([^\"\\\\]|\\\\.)*\"",TextEditor::PaletteIndex::String},
-   {"'([^'\\\\]|\\\\.)*'",TextEditor::PaletteIndex::CharLiteral},
-   {"[A-Za-z_][A-Za-z0-9_]*",TextEditor::PaletteIndex::Identifier},
-   {"[+\\-*/%=!<>|&^~]+",TextEditor::PaletteIndex::Punctuation}
+  // Use an explicit lexer instead of std::regex here. The editor's regex path
+  // was leaving GOOL source as Default-colored glyphs in the standalone window.
+  value.mTokenize=[](const char* begin,const char* end,const char*& tokenBegin,
+      const char*& tokenEnd,TextEditor::PaletteIndex& color)->bool {
+   const char* p=begin;
+   while(p<end&&std::isspace(static_cast<unsigned char>(*p)))++p;
+   if(p>=end)return false;
+   tokenBegin=p;
+   const char first=*p;
+   if(first=='"'||first=='\\''){
+    const char quote=first;
+    ++p;
+    while(p<end){
+     if(*p=='\\\\'&&p+1<end){p+=2;continue;}
+     if(*p==quote){++p;break;}
+     ++p;
+    }
+    color=quote=='"'?TextEditor::PaletteIndex::String:TextEditor::PaletteIndex::CharLiteral;
+   }else if(std::isdigit(static_cast<unsigned char>(first))){
+    if(first=='0'&&p+1<end&&(p[1]=='x'||p[1]=='X')){
+     p+=2;
+     while(p<end&&(std::isxdigit(static_cast<unsigned char>(*p))||*p=='_'))++p;
+    }else{
+     while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
+     if(p<end&&*p=='.'){
+      ++p;
+      while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
+     }
+     if(p<end&&(*p=='e'||*p=='E')){
+      const char* exponent=p++;
+      if(p<end&&(*p=='+'||*p=='-'))++p;
+      const char* digits=p;
+      while(p<end&&std::isdigit(static_cast<unsigned char>(*p)))++p;
+      if(p==digits)p=exponent;
+     }
+    }
+    color=TextEditor::PaletteIndex::Number;
+   }else if(std::isalpha(static_cast<unsigned char>(first))||first=='_'){
+    ++p;
+    while(p<end&&(std::isalnum(static_cast<unsigned char>(*p))||*p=='_'))++p;
+    color=TextEditor::PaletteIndex::Identifier;
+   }else if(std::strchr("+-*/%=!<>|&^~",first)!=nullptr){
+    ++p;
+    while(p<end&&std::strchr("+-*/%=!<>|&^~",*p)!=nullptr)++p;
+    color=TextEditor::PaletteIndex::Punctuation;
+   }else if(std::strchr("[]{}(),.;:",first)!=nullptr){
+    ++p;
+    color=TextEditor::PaletteIndex::Punctuation;
+   }else{
+    return false;
+   }
+   tokenEnd=p;
+   return true;
   };
   return value;
  }();
@@ -565,11 +609,13 @@ void EditorUI::drawGoolScriptEditor(){
   const auto palette=goolScriptEditorPalette();
   selectedEditor.SetLanguageDefinition(language);
   selectedEditor.SetPalette(palette);
+  selectedEditor.SetColorizerEnable(true);
   selectedEditor.SetTabSize(4);
   selectedEditor.SetShowWhitespaces(false);
   selectedEditor.SetReadOnly(true);
   scratchEditor.SetLanguageDefinition(language);
   scratchEditor.SetPalette(palette);
+  scratchEditor.SetColorizerEnable(true);
   scratchEditor.SetTabSize(4);
   scratchEditor.SetShowWhitespaces(false);
   scratchEditor.SetReadOnly(false);
