@@ -10,6 +10,7 @@
 #include "render/gl_api.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "TextEditor.h"
 #include <map>
 #include <algorithm>
 #include <cmath>
@@ -391,6 +392,117 @@ void EditorUI::draw(){
  if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
 }
 
+
+static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
+ static const TextEditor::LanguageDefinition language=[] {
+  TextEditor::LanguageDefinition value;
+  value.mName="GOOL Script";
+  value.mAutoIndentation=true;
+  value.mSingleLineComment="#";
+  value.mKeywords={
+   "event","state","routine","if","else","while","for","in","break","continue",
+   "return","call","transition","true","false","null","and","or","not",
+   "native","unknown","let","var","const"
+  };
+  value.mTokenRegexStrings={
+   {"[0-9]+(\\.[0-9]+)?",TextEditor::PaletteIndex::Number},
+   {"\"([^\"\\\\]|\\\\.)*\"",TextEditor::PaletteIndex::String},
+   {"'([^'\\\\]|\\\\.)*'",TextEditor::PaletteIndex::CharLiteral},
+   {"[A-Za-z_][A-Za-z0-9_]*",TextEditor::PaletteIndex::Identifier},
+   {"[+\\-*/%=!<>|&^~]+",TextEditor::PaletteIndex::Punctuation}
+  };
+  return value;
+ }();
+ return language;
+}
+
+static TextEditor::Palette goolScriptEditorPalette(){
+ auto palette=TextEditor::GetDarkPalette();
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Default)]=IM_COL32(218,222,230,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Keyword)]=IM_COL32(198,150,235,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Number)]=IM_COL32(160,205,160,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::String)]=IM_COL32(224,184,132,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::CharLiteral)]=IM_COL32(224,184,132,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Punctuation)]=IM_COL32(180,190,205,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Identifier)]=IM_COL32(210,216,226,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::KnownIdentifier)]=IM_COL32(130,190,225,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Comment)]=IM_COL32(125,145,160,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::LineNumber)]=IM_COL32(105,118,135,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFill)]=IM_COL32(43,51,64,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFillInactive)]=IM_COL32(37,43,53,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineEdge)]=IM_COL32(70,86,108,255);
+ return palette;
+}
+
+// Present the conservative IR decompilation using the chosen indentation-based
+// source layout. Provenance/debug comments remain available through the Inspector.
+static std::string formatGoolIRForScriptView(const std::string& source,std::size_t& hiddenAnnotations){
+ std::string output;
+ std::size_t indent=0,start=0;
+ const auto trim=[](std::string value){
+  const auto first=value.find_first_not_of(" \t\r");
+  if(first==std::string::npos)return std::string{};
+  const auto last=value.find_last_not_of(" \t\r");
+  return value.substr(first,last-first+1U);
+ };
+ while(start<=source.size()){
+  const auto newline=source.find('\n',start);
+  const auto end=newline==std::string::npos?source.size():newline;
+  std::string line=trim(source.substr(start,end-start));
+  const auto comment=line.find("//");
+  if(comment!=std::string::npos){
+   line=trim(line.substr(0,comment));
+   ++hiddenAnnotations;
+  }
+  if(!line.empty()){
+   bool closes=line.front()=='}';
+   if(closes){
+    if(indent>0)--indent;
+    if(line.rfind("} else if (",0)==0){
+     line="else if "+line.substr(11U);
+     if(!line.empty()&&line.back()=='}')line.pop_back();
+     if(!line.empty()&&line.back()==')')line.pop_back();
+     line=trim(line);
+     line+=":";
+    }else if(line.rfind("} else",0)==0){
+     line="else:";
+    }else if(line=="}"){
+     line.clear();
+    }else{
+     line.erase(line.begin());
+     line=trim(line);
+    }
+   }else if(line.size()>=2U&&line.compare(0,2,"if")==0&&line.back()=='{'){
+    line=trim(line.substr(0,line.size()-1U));
+    if(line.rfind("if (",0)==0&&line.back()==')'){
+     line="if "+line.substr(4U,line.size()-5U)+":";
+    }else line+=":";
+   }else if(line.size()>=2U&&line.back()=='{' ){
+    line=trim(line.substr(0,line.size()-1U));
+    if(line=="else")line="else:";
+    else if(line.rfind("else if (",0)==0&&line.back()==')')
+     line="else if "+line.substr(9U,line.size()-10U)+":";
+    else line+=":";
+   }
+   if(!line.empty()){
+    // Keep routine labels flush-left; all executable statements follow the
+    // reconstructed block indentation.
+    const bool label=line.size()>1U&&line.back()==':'&&line.front()=='L'&&
+      std::all_of(line.begin()+1,line.end()-1,[](unsigned char c){return std::isdigit(c)!=0;});
+    if(label)indent=0;
+    output.append(label?0U:indent*4U,' ');
+    output+=line;
+    output+='\n';
+   }
+   if(!closes&&line.size()>1U&&line.back()==':')++indent;
+  }
+  if(newline==std::string::npos)break;
+  start=newline+1U;
+ }
+ return output;
+}
+
+
 void EditorUI::drawGoolScriptEditor(){
  if(!showGoolScriptEditor_)return;
  const ImGuiViewport* viewport=ImGui::GetMainViewport();
@@ -431,18 +543,36 @@ void EditorUI::drawGoolScriptEditor(){
   activeRoutine=0;programReady=false;
  }
 
- if(!goolScriptBufferInitialized_){
-  const char* starter=
+ static TextEditor selectedEditor;
+ static TextEditor scratchEditor;
+ static bool editorsInitialized=false;
+ static std::string selectedEditorText;
+ static std::string lastScratchAnalysisText;
+ static Crash::GoolScriptIndentationResult analysis;
+ static std::size_t hiddenAnnotations=0;
+ static int displayedChunk=-1,displayedEntry=-1;
+ static std::size_t displayedRoutine=static_cast<std::size_t>(-1);
+ if(!editorsInitialized){
+  const auto& language=goolScriptLanguageDefinition();
+  const auto palette=goolScriptEditorPalette();
+  selectedEditor.SetLanguageDefinition(language);
+  selectedEditor.SetPalette(palette);
+  selectedEditor.SetTabSize(4);
+  selectedEditor.SetShowWhitespaces(false);
+  selectedEditor.SetReadOnly(true);
+  scratchEditor.SetLanguageDefinition(language);
+  scratchEditor.SetPalette(palette);
+  scratchEditor.SetTabSize(4);
+  scratchEditor.SetShowWhitespaces(false);
+  scratchEditor.SetReadOnly(false);
+  scratchEditor.SetText(
    "event Update:\n"
    "    if health <= 0:\n"
    "        transition Dead\n"
    "    else:\n"
-   "        call UpdateMovement\n";
-  std::snprintf(goolScriptBuffer_.data(),goolScriptBuffer_.size(),"%s",starter);
-  goolScriptBufferInitialized_=true;
+   "        call UpdateMovement\n");
+  editorsInitialized=true;
  }
- static Crash::GoolScriptIndentationResult analysis=
-  Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
 
  if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
   ImGui::TextDisabled("GOOL authoring workspace");
@@ -486,7 +616,7 @@ void EditorUI::drawGoolScriptEditor(){
     ImGui::SameLine();
     ImGui::TextDisabled("EID %08X",selectedEid);
     ImGui::SameLine();
-    ImGui::TextDisabled("Read-only");
+    ImGui::TextDisabled("IR preview · read-only");
     ImGui::Separator();
     if(selectedGool){
      if(!program.routines.empty()){
@@ -501,63 +631,59 @@ void EditorUI::drawGoolScriptEditor(){
       ImGui::SameLine();
       if(ImGui::ArrowButton("##NextRoutine",ImGuiDir_Right)&&activeRoutine+1<program.routines.size())++activeRoutine;
       auto decomp=Crash::decompileGoolIRRoutine(program,activeRoutine);
-      std::string_view source(decomp.text);
-      // Routine identity and boundary metadata are shown in the editor chrome,
-      // not as explanatory comments mixed into the source listing.
-      while(!source.empty()&&source.front()=='/'){
-       const auto newline=source.find('\n');
-       if(newline==std::string_view::npos){source={};break;}
-       source.remove_prefix(newline+1U);
+      std::size_t hidden=0;
+      const std::string formatted=formatGoolIRForScriptView(decomp.text,hidden);
+      if(displayedChunk!=selectedChunk_||displayedEntry!=selectedEntry_||
+         displayedRoutine!=activeRoutine||selectedEditorText!=formatted){
+       selectedEditor.SetText(formatted);
+       selectedEditorText=formatted;
+       displayedChunk=selectedChunk_;displayedEntry=selectedEntry_;
+       displayedRoutine=activeRoutine;hiddenAnnotations=hidden;
       }
-      ImGui::BeginChild("GoolRoutineSource",ImVec2(0.0f,0.0f),true,
-        ImGuiWindowFlags_HorizontalScrollbar);
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0.0f,1.0f));
-      ImGui::SetWindowFontScale(1.12f);
-      std::size_t lineNumber=1;
-      while(!source.empty()){
-       const auto newline=source.find('\n');
-       const std::string_view line=source.substr(0,newline);
-       ImVec4 tint=ImGui::GetStyleColorVec4(ImGuiCol_Text);
-       if(line.find("//")!=std::string_view::npos)tint=ImVec4(.55f,.61f,.68f,1.0f);
-       else if(line.find("mips ")!=std::string_view::npos)tint=ImVec4(.78f,.69f,.53f,1.0f);
-       else if(!line.empty()&&line.back()==':')tint=ImVec4(.42f,.72f,.98f,1.0f);
-       else if(line.find("if ")!=std::string_view::npos||line.find("else")!=std::string_view::npos||
-               line.find("while")!=std::string_view::npos||line.find("return")!=std::string_view::npos||
-               line.find("break")!=std::string_view::npos)tint=ImVec4(.78f,.58f,.96f,1.0f);
-       ImGui::TextColored(ImVec4(.42f,.46f,.51f,1.0f),"%4zu",lineNumber++);
-       ImGui::SameLine(0.0f,12.0f);
-       if(line.empty())ImGui::TextUnformatted(" ");
-       else ImGui::TextColored(tint,"%.*s",static_cast<int>(line.size()),line.data());
-       if(newline==std::string_view::npos)break;
-       source.remove_prefix(newline+1U);
+      const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
+      if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,0.0f),true);
+      if(fontCount>1.0f)ImGui::PopFont();
+      if(!decomp.diagnostics.empty()||hiddenAnnotations>0){
+       ImGui::TextDisabled("%zu IR diagnostics  ·  %zu low-level annotations hidden from source view",
+        decomp.diagnostics.size(),hiddenAnnotations);
       }
-      ImGui::SetWindowFontScale(1.0f);
-      ImGui::PopStyleVar();
-      ImGui::EndChild();
-      if(!decomp.diagnostics.empty())
-       ImGui::TextDisabled("%zu decompiler diagnostics · see GOOL Inspector for low-level details",decomp.diagnostics.size());
      }else{
-      ImGui::TextDisabled("No routine entry points were discovered. Showing the full-entry IR decompilation.");
+      ImGui::TextDisabled("No routine entry points were discovered for this object.");
       auto decomp=Crash::decompileGoolIR(program);
-      ImGui::BeginChild("GoolFullEntrySource",ImVec2(0.0f,0.0f),true,
-        ImGuiWindowFlags_HorizontalScrollbar);
-      ImGui::TextUnformatted(decomp.text.c_str());
-      ImGui::EndChild();
+      std::size_t hidden=0;
+      const std::string formatted=formatGoolIRForScriptView(decomp.text,hidden);
+      if(selectedEditorText!=formatted){selectedEditor.SetText(formatted);selectedEditorText=formatted;}
+      const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
+      if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+      selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,0.0f),true);
+      if(fontCount>1.0f)ImGui::PopFont();
      }
     }else{
-     ImGui::TextWrapped("Select a decoded GOOL entry in the Resource Hierarchy to inspect its decompiled routines.");
+     ImGui::TextWrapped("Select a decoded GOOL entry in the Resource Hierarchy to inspect its IR-backed decompilation.");
     }
     ImGui::EndTabItem();
    }
    if(ImGui::BeginTabItem("Scratch Script")){
-    ImGui::TextDisabled("Draft source");
-    const float diagnosticsHeight=118.0f;
+    ImGui::TextDisabled("Draft source · indentation checked as you type");
+    const float diagnosticsHeight=112.0f;
     const ImVec2 editorAvail=ImGui::GetContentRegionAvail();
     const float editorHeight=std::max(140.0f,editorAvail.y-diagnosticsHeight);
-    if(ImGui::InputTextMultiline("##GoolScriptSource",goolScriptBuffer_.data(),
-       goolScriptBuffer_.size(),ImVec2(editorAvail.x,editorHeight),
-       ImGuiInputTextFlags_AllowTabInput))
-     analysis=Crash::analyzeGoolScriptIndentation(goolScriptBuffer_.data());
+    const float fontCount=static_cast<float>(ImGui::GetIO().Fonts->Fonts.Size);
+    if(fontCount>1.0f)ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+    scratchEditor.Render("##ScratchGoolCode",ImVec2(0.0f,editorHeight),true);
+    if(fontCount>1.0f)ImGui::PopFont();
+    const std::string scratchText=scratchEditor.GetText();
+    if(scratchText!=lastScratchAnalysisText){
+     analysis=Crash::analyzeGoolScriptIndentation(scratchText);
+     lastScratchAnalysisText=scratchText;
+     TextEditor::ErrorMarkers markers;
+     for(const auto& diagnostic:analysis.diagnostics){
+      const int line=static_cast<int>(diagnostic.line>0?diagnostic.line-1U:0U);
+      markers[line]=diagnostic.code+": "+diagnostic.message;
+     }
+     scratchEditor.SetErrorMarkers(markers);
+    }
     ImGui::Separator();
     ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
     ImGui::BeginChild("GoolScriptProblems",ImVec2(0.0f,0.0f),false,
@@ -580,6 +706,7 @@ void EditorUI::drawGoolScriptEditor(){
  }
  ImGui::End();
 }
+
 void EditorUI::drawMenu(){
  int& uiScaling=editorPreferences.uiScaling;
  static int appliedScaling=100;

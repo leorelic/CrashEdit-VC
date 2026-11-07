@@ -17,9 +17,7 @@ private:
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool showGoolDataPool_=false,showGoolStateMap_=false,showGoolStateDescriptions_=false,showGoolFrameGroups_=false,focusGoolDataPool_=false,showGoolBlueprintInstructions_=true,showGoolScriptEditor_=false;
- bool goolScriptBufferInitialized_=false,showGoolScriptNavigator_=true;
- std::array<char,32768> goolScriptBuffer_{};
- std::array<char,524288> goolDecompiledBuffer_{};
+ bool showGoolScriptNavigator_=true;
  int activeGoolChunk_=-1,activeGoolEntry_=-1;
  std::uint32_t blueprintSelectedEid_=0;
  std::size_t selectedGoolBlueprintBlock_=0;
