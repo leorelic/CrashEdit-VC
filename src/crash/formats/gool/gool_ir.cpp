@@ -706,6 +706,18 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
         }
     }
 
+    // J/JAL encode the low 28 target bits; the runtime PC+4 supplies bits 31..28.
+    // Source byte offsets are GOOL-stream-relative, so do not fabricate that nibble
+    // or resolve these targets to stream instruction indices.
+    for (auto& ir : result.instructions) {
+        if (!ir.nativeMips || !ir.nativeFieldsDecoded || !ir.nativeEffects.known) continue;
+        const auto operation = ir.nativeEffects.controlOperation;
+        if (operation != GoolIRMipsControlOperation::Jump &&
+            operation != GoolIRMipsControlOperation::JumpAndLink) continue;
+        ir.nativeJumpTargetLow28 = ir.nativeFields.jumpTarget << 2U;
+        ir.nativeJumpTargetLow28Valid = true;
+    }
+
     // Track the PlayStation GTE's two-instruction LWC2/SWC2 access delay
     // independently from the R3000A GPR load delay. Only compare contiguous
     // native MIPS instructions, and only flag accesses to the transferred data

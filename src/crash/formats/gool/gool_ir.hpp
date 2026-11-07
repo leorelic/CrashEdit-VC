@@ -131,6 +131,9 @@ struct GoolIRInstruction {
     bool nativeBranchTargetByteOffsetValid = false;
     std::size_t nativeBranchTargetInstruction = 0;
     bool nativeBranchTargetInstructionValid = false;
+    // J/JAL expose only the low 28 target bits; the runtime PC supplies the upper nibble.
+    std::uint32_t nativeJumpTargetLow28 = 0;
+    bool nativeJumpTargetLow28Valid = false;
     // True when this instruction is the sequential instruction after a
     // validated R3000A control transfer (and therefore executes in its delay slot).
     bool isControlTransferDelaySlot = false;

@@ -287,6 +287,32 @@ int main() {
     assert(!nativeBranchTargetIR.instructions[6].nativeBranchTargetInstructionValid);
     assert(!nativeBranchTargetIR.instructions[1].nativeBranchTargetByteOffsetValid);
 
+    // J/JAL preserve their pseudo-direct low 28 target bits without inventing
+    // the runtime PC's upper nibble from a GOOL-relative byte offset.
+    NsfGool nativeJumpTargets;
+    nativeJumpTargets.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction directJump;
+    directJump.isMips = true;
+    directJump.word = (2U << 26U) | 0x0123456U;
+    directJump.byteOffset = 0x200U;
+    nativeJumpTargets.instructions.push_back(directJump);
+    NsfGoolInstruction directLink;
+    directLink.isMips = true;
+    directLink.word = (3U << 26U) | 0x03FFFFFFU;
+    directLink.byteOffset = 0x204U;
+    nativeJumpTargets.instructions.push_back(directLink);
+    NsfGoolInstruction ordinaryInstruction;
+    ordinaryInstruction.isMips = true;
+    ordinaryInstruction.word = 0U;
+    ordinaryInstruction.byteOffset = 0x208U;
+    nativeJumpTargets.instructions.push_back(ordinaryInstruction);
+    const auto nativeJumpTargetIR = buildGoolIR(nativeJumpTargets);
+    assert(nativeJumpTargetIR.instructions[0].nativeJumpTargetLow28Valid);
+    assert(nativeJumpTargetIR.instructions[0].nativeJumpTargetLow28 == 0x048D158U);
+    assert(nativeJumpTargetIR.instructions[1].nativeJumpTargetLow28Valid);
+    assert(nativeJumpTargetIR.instructions[1].nativeJumpTargetLow28 == 0x0FFFFFFCU);
+    assert(!nativeJumpTargetIR.instructions[2].nativeJumpTargetLow28Valid);
+
     // Negative target arithmetic and duplicate instruction offsets must never
     // produce a falsely resolved instruction index.
     NsfGool invalidNativeBranchTargets;
