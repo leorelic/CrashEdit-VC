@@ -27,6 +27,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Model validated COP0 MFC0/MTC0 transfers with separate coprocessor-register read/write effects; leave unsupported COP0 operations and malformed transfer encodings unanalyzed.
 - [x] Record the R3000A one-instruction GPR load delay for memory loads and COP0/COP2 MFC/CFC transfers, excluding discarded writes to `$zero`; keep GTE-register pipeline timing separate.
 - [x] Record GPR read/write overlap between an R3000A delayed load and the immediately following native instruction; identify the complementary same-register LWL/LWR pair exception in either order, while retaining the second load's own delay before later consumers.
+- [x] Preserve scalar and GTE load/store address metadata in the IR: base GPR, signed 16-bit offset, access width, signed-load extension, and LWL/LWR/SWL/SWR merge classification.
 - [x] Mark the architectural one-instruction delay slot on every validated R3000A branch/jump control transfer, including JR/JALR and COP0/COP2 condition branches; leave non-control instructions unmarked.
 - [x] Mark the following native MIPS instruction as the delay-slot instruction for each validated control transfer, without changing CFG behavior or inventing a missing slot at the end of a stream.
 - [x] Model R3000A BC0 condition branches and RFE status-mode restoration separately from GPR effects; reject malformed branch encodings and leave other COP0 operations unsupported.

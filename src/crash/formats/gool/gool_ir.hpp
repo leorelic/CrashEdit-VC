@@ -26,6 +26,15 @@ struct GoolIROperand {
 enum class GoolIRMipsFormat : std::uint8_t { Unknown, Register, Immediate, Jump };
 enum class GoolIRMipsMemoryEffect : std::uint8_t { Unknown, None, Read, Write, ReadWrite };
 
+struct GoolIRMipsMemoryAccess {
+    bool decoded = false;
+    std::uint8_t baseRegister = 0;
+    std::int16_t signedOffset = 0;
+    std::uint8_t accessBytes = 0;
+    bool signExtendsLoad = false;
+    bool unalignedWordMerge = false;
+};
+
 struct GoolIRMipsEffects {
     bool known = false;
     std::uint32_t gprReadMask = 0;
@@ -49,6 +58,7 @@ struct GoolIRMipsEffects {
     // On the PlayStation, the COP2 condition input is hardwired false.
     bool coprocessor2ConditionKnownFalse = false;
     GoolIRMipsMemoryEffect memory = GoolIRMipsMemoryEffect::Unknown;
+    GoolIRMipsMemoryAccess memoryAccess;
     bool controlTransfer = false;
     // The next instruction executes before a control transfer takes effect (R3000A delay slot).
     bool controlTransferHasDelaySlot = false;
@@ -102,7 +112,6 @@ struct GoolIRInstruction {
     // validated R3000A control transfer (and therefore executes in its delay slot).
     bool isControlTransferDelaySlot = false;
     // GPRs read here that were written by the immediately preceding delayed load.
-    // This records overlap; LWL/LWR pair semantics require separate interpretation.
     std::uint32_t gprReadInLoadDelaySlotMask = 0;
     // Registers merged by an immediately adjacent LWL/LWR pair. This is the
     // R3000A exception to the ordinary load-delay dependency rule.

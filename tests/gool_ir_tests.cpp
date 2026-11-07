@@ -279,6 +279,60 @@ int main() {
     assert(unalignedPairIR.instructions[4].gprReadInLoadDelaySlotMask == 0U);
     assert(unalignedPairIR.instructions[5].gprReadInLoadDelaySlotMask == t3Mask);
 
+    // Preserve the encoded effective-address recipe and transfer width for
+    // scalar R3000A loads/stores and PlayStation GTE memory transfers.
+    NsfGool memoryAccessSource;
+    memoryAccessSource.version = NsfGoolVersion::Version2;
+    const auto addMemoryWord = [&memoryAccessSource](std::uint8_t opcode, std::uint8_t rt,
+            std::uint16_t offset) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = (static_cast<std::uint32_t>(opcode) << 26U) |
+            (8U << 21U) | (static_cast<std::uint32_t>(rt) << 16U) | offset;
+        memoryAccessSource.instructions.push_back(instruction);
+    };
+    addMemoryWord(32U, 9U, 0xFFF0U); // lb t1,-16(t0)
+    addMemoryWord(33U, 9U, 2U);      // lh t1,2(t0)
+    addMemoryWord(34U, 9U, 3U);      // lwl t1,3(t0)
+    addMemoryWord(35U, 9U, 4U);      // lw t1,4(t0)
+    addMemoryWord(36U, 9U, 5U);      // lbu t1,5(t0)
+    addMemoryWord(37U, 9U, 6U);      // lhu t1,6(t0)
+    addMemoryWord(38U, 9U, 7U);      // lwr t1,7(t0)
+    addMemoryWord(40U, 9U, 8U);      // sb t1,8(t0)
+    addMemoryWord(41U, 9U, 10U);    // sh t1,10(t0)
+    addMemoryWord(42U, 9U, 11U);    // swl t1,11(t0)
+    addMemoryWord(43U, 9U, 12U);    // sw t1,12(t0)
+    addMemoryWord(46U, 9U, 15U);    // swr t1,15(t0)
+    addMemoryWord(50U, 9U, 16U);    // lwc2 t1,16(t0)
+    addMemoryWord(58U, 9U, 20U);    // swc2 t1,20(t0)
+    const auto memoryAccessIR = buildGoolIR(memoryAccessSource);
+    assert(memoryAccessIR.instructions.size() == 14U);
+    const auto& lbAccess = memoryAccessIR.instructions[0].nativeEffects.memoryAccess;
+    assert(lbAccess.decoded && lbAccess.baseRegister == 8U && lbAccess.signedOffset == -16);
+    assert(lbAccess.accessBytes == 1U && lbAccess.signExtendsLoad && !lbAccess.unalignedWordMerge);
+    const auto& lhAccess = memoryAccessIR.instructions[1].nativeEffects.memoryAccess;
+    assert(lhAccess.decoded && lhAccess.accessBytes == 2U && lhAccess.signExtendsLoad);
+    const auto& lwlAccess = memoryAccessIR.instructions[2].nativeEffects.memoryAccess;
+    assert(lwlAccess.decoded && lwlAccess.accessBytes == 4U && lwlAccess.unalignedWordMerge);
+    const auto& lwAccess = memoryAccessIR.instructions[3].nativeEffects.memoryAccess;
+    assert(lwAccess.decoded && lwAccess.accessBytes == 4U && !lwAccess.unalignedWordMerge);
+    const auto& lbuAccess = memoryAccessIR.instructions[4].nativeEffects.memoryAccess;
+    assert(lbuAccess.decoded && lbuAccess.accessBytes == 1U && !lbuAccess.signExtendsLoad);
+    const auto& lhuAccess = memoryAccessIR.instructions[5].nativeEffects.memoryAccess;
+    assert(lhuAccess.decoded && lhuAccess.accessBytes == 2U && !lhuAccess.signExtendsLoad);
+    assert(memoryAccessIR.instructions[6].nativeEffects.memoryAccess.unalignedWordMerge);
+    assert(memoryAccessIR.instructions[7].nativeEffects.memoryAccess.accessBytes == 1U);
+    assert(memoryAccessIR.instructions[8].nativeEffects.memoryAccess.accessBytes == 2U);
+    assert(memoryAccessIR.instructions[9].nativeEffects.memoryAccess.unalignedWordMerge);
+    assert(memoryAccessIR.instructions[10].nativeEffects.memoryAccess.accessBytes == 4U);
+    assert(memoryAccessIR.instructions[11].nativeEffects.memoryAccess.unalignedWordMerge);
+    assert(memoryAccessIR.instructions[12].nativeEffects.memoryAccess.accessBytes == 4U);
+    assert(memoryAccessIR.instructions[13].nativeEffects.memoryAccess.accessBytes == 4U);
+    for (const auto& instruction : memoryAccessIR.instructions) {
+        assert(instruction.nativeEffects.memoryAccess.decoded);
+        assert(instruction.nativeEffects.memoryAccess.baseRegister == 8U);
+    }
+
     // A validated branch marks exactly its following instruction as the
     // architectural delay slot; a final branch with no following word has no slot.
     NsfGool delaySlotSource;

@@ -79,6 +79,15 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
         if (reg != 0U) effects.gprWriteHasLoadDelay = true;
     };
     const auto readRsRt = [&]() { read(fields.rs); read(fields.rt); };
+    const auto setMemoryAccess = [&effects, &fields](std::uint8_t bytes,
+            bool signExtendsLoad = false, bool unalignedWordMerge = false) {
+        effects.memoryAccess.decoded = true;
+        effects.memoryAccess.baseRegister = fields.rs;
+        effects.memoryAccess.signedOffset = fields.signedImmediate;
+        effects.memoryAccess.accessBytes = bytes;
+        effects.memoryAccess.signExtendsLoad = signExtendsLoad;
+        effects.memoryAccess.unalignedWordMerge = unalignedWordMerge;
+    };
     const auto markControlTransfer = [&effects]() {
         effects.controlTransfer = true;
         effects.controlTransferHasDelaySlot = true;
@@ -508,20 +517,38 @@ GoolIRMipsEffects analyzeMipsEffects(const GoolIRMipsFields& fields) {
                 read(fields.rt); // merge with the old destination value
             writeLoad(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Read;
+            switch (fields.primaryOpcode) {
+            case 32U: setMemoryAccess(1U, true); break;  // lb
+            case 33U: setMemoryAccess(2U, true); break;  // lh
+            case 34U: case 38U: setMemoryAccess(4U, false, true); break; // lwl/lwr
+            case 35U: setMemoryAccess(4U); break;        // lw
+            case 36U: setMemoryAccess(1U); break;        // lbu
+            case 37U: setMemoryAccess(2U); break;        // lhu
+            default: break;
+            }
             break;
         case 40U: case 41U: case 42U: case 43U: case 46U: // stores
             readRsRt();
             effects.memory = GoolIRMipsMemoryEffect::Write;
+            switch (fields.primaryOpcode) {
+            case 40U: setMemoryAccess(1U); break; // sb
+            case 41U: setMemoryAccess(2U); break; // sh
+            case 42U: case 46U: setMemoryAccess(4U, false, true); break; // swl/swr
+            case 43U: setMemoryAccess(4U); break; // sw
+            default: break;
+            }
             break;
         case 50U: // LWC2 rt, offset(rs): load a word into GTE data register rt
             read(fields.rs);
             writeCop2Data(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Read;
+            setMemoryAccess(4U);
             break;
         case 58U: // SWC2 rt, offset(rs): store GTE data register rt
             read(fields.rs);
             readCop2Data(fields.rt);
             effects.memory = GoolIRMipsMemoryEffect::Write;
+            setMemoryAccess(4U);
             break;
         default: return effects;
         }
