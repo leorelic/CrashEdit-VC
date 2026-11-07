@@ -1604,6 +1604,37 @@ int main() {
     assert(loopOutput.text.find("goto L") == std::string::npos);
     assert(loopOutput.text.find("@0x0614") != std::string::npos);
 
+    // A post-test loop with a conditional backward branch is rendered as do/while.
+    GoolIRProgram doLoopProgram;
+    auto appendDoLoopInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                       std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 47U ? "NOP" : "UNKNOWN";
+        item.operands = std::move(operands);
+        doLoopProgram.instructions.push_back(std::move(item));
+    };
+    const GoolIROperand doLoopField{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->counter"};
+    const auto doLoopDisp = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    appendDoLoopInstruction(47, 0x620);
+    appendDoLoopInstruction(4, 0x624, {doLoopField,
+        GoolIROperand{'R', 12, 3, 3, GoolIROperandKind::Value, "3"}});
+    appendDoLoopInstruction(52, 0x628, {doLoopDisp(-3),
+        GoolIROperand{'V', 4, 0, 0, GoolIROperandKind::Value, "0"}, doLoopField});
+    appendDoLoopInstruction(47, 0x62C);
+    const auto doLoopOutput = decompileGoolIR(doLoopProgram);
+    assert(doLoopOutput.text.find("do {") != std::string::npos);
+    assert(doLoopOutput.text.find("} while (self->counter == 3);") != std::string::npos);
+    assert(doLoopOutput.text.find("goto L") == std::string::npos);
+    assert(doLoopOutput.text.find("@0x0628") != std::string::npos);
+
     // Routine discovery is shared across GOOL objects: local Code hooks
     // establish entry points, while RET prevents traversal into the next routine.
     NsfGool routineSource;
