@@ -1302,11 +1302,12 @@ GoolIRDecompilation decompileGoolIRRoutine(
                     originalInstruction.nativeBranchTargetInstruction);
                 if (compactTarget == compactIndex.end()) continue;
                 const auto oldAnnotation = "(instruction " +
-                    std::to_string(compactTarget->second) + ", " +
-                    labelName(compactTarget->second) + ")";
+                    std::to_string(compactTarget->second) +
+                    "); target-label=" + labelName(compactTarget->second);
                 const auto newAnnotation = "(instruction " +
                     std::to_string(originalInstruction.nativeBranchTargetInstruction) +
-                    ", " + labelName(originalInstruction.nativeBranchTargetInstruction) + ")";
+                    "); target-label=" +
+                    labelName(originalInstruction.nativeBranchTargetInstruction);
                 std::size_t annotationPosition = 0;
                 while ((annotationPosition = structured.text.find(
                     oldAnnotation, annotationPosition)) != std::string::npos) {
