@@ -14,5 +14,6 @@ private:
  std::string text_;
  InputState inputState_{nullptr,0,0,0};
  bool initialized_=false;
+ float fontScale_=1.0f;
 };
 }

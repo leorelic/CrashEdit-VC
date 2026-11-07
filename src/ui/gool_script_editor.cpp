@@ -63,8 +63,9 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  inputState_.editor=this;
  const std::string child=std::string(id?id:"GoolEditor")+"Scroll";
  if(size.x<=0)size.x=ImGui::GetContentRegionAvail().x;if(size.y<=0)size.y=ImGui::GetContentRegionAvail().y;
- const bool visible=ImGui::BeginChild(child.c_str(),size,true,ImGuiWindowFlags_HorizontalScrollbar);bool changed=false;
+ const bool visible=ImGui::BeginChild(child.c_str(),size,true);bool changed=false;
  if(visible){
+  ImGui::SetWindowFontScale(fontScale_);
   const ImGuiStyle& style=ImGui::GetStyle();const float lh=ImGui::GetTextLineHeight(),gutter=48.0f;
   const auto lines=linesOf(text_);const float h=std::max(size.y,static_cast<float>(lines.size())*lh+style.FramePadding.y*2+8);
   const ImVec2 origin=ImGui::GetCursorScreenPos();const float w=std::max(80.0f,ImGui::GetContentRegionAvail().x-gutter);
@@ -80,6 +81,14 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   if(readOnly)flags|=ImGuiInputTextFlags_ReadOnly;
   changed=ImGui::InputTextMultiline(id?id:"##GoolCode",text_.data(),text_.capacity()+1,ImVec2(w,std::max(1.0f,h-style.FramePadding.y*2)),flags,inputCallback,&inputState_);
   const ImVec2 mn=ImGui::GetItemRectMin(),mx=ImGui::GetItemRectMax();const bool active=ImGui::IsItemActive();
+  if(active&&ImGui::GetIO().KeyCtrl){
+   const bool zoomIn=ImGui::IsKeyPressed(ImGuiKey_Equal,false)&&ImGui::GetIO().KeyShift;
+   const bool zoomOut=ImGui::IsKeyPressed(ImGuiKey_Minus,false);
+   const bool keypadIn=ImGui::IsKeyPressed(ImGuiKey_KeypadAdd,false);
+   const bool keypadOut=ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract,false);
+   if(zoomIn||keypadIn)fontScale_=std::min(2.0f,fontScale_+0.1f);
+   else if(zoomOut||keypadOut)fontScale_=std::max(0.6f,fontScale_-0.1f);
+  }
   ImGui::PopStyleColor(5);ImGui::PopStyleVar(2);
   drawSource(mn,mx,lh,style.FramePadding.y+1,active);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
