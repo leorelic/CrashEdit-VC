@@ -243,6 +243,42 @@ int main() {
     assert(!effectIR.instructions[0].isControlTransferDelaySlot);
     assert(!effectIR.instructions[4].isControlTransferDelaySlot);
 
+    // Keep the precise HI/LO operation distinct from its coarse dependency
+    // flags so later source reconstruction can distinguish signed arithmetic.
+    NsfGool hiLoSource;
+    hiLoSource.version = NsfGoolVersion::Version2;
+    const auto addHiLoWord = [&hiLoSource](std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        hiLoSource.instructions.push_back(instruction);
+    };
+    addHiLoWord((8U << 21U) | (9U << 16U) | 24U); // mult
+    addHiLoWord((8U << 21U) | (9U << 16U) | 25U); // multu
+    addHiLoWord((8U << 21U) | (9U << 16U) | 26U); // div
+    addHiLoWord((8U << 21U) | (9U << 16U) | 27U); // divu
+    addHiLoWord((16U << 11U) | 16U); // mfhi t0
+    addHiLoWord((8U << 21U) | 17U); // mthi t0
+    addHiLoWord((18U << 11U) | 18U); // mflo t0
+    addHiLoWord((8U << 21U) | 19U); // mtlo t0
+    const auto hiLoIR = buildGoolIR(hiLoSource);
+    assert(hiLoIR.instructions.size() == 8);
+    const auto& hiLoInstructions = hiLoIR.instructions;
+    assert(hiLoInstructions[0].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MultiplySigned);
+    assert(hiLoInstructions[1].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MultiplyUnsigned);
+    assert(hiLoInstructions[2].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::DivideSigned);
+    assert(hiLoInstructions[3].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::DivideUnsigned);
+    assert(hiLoInstructions[4].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MoveFromHi);
+    assert(hiLoInstructions[5].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MoveToHi);
+    assert(hiLoInstructions[6].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MoveFromLo);
+    assert(hiLoInstructions[7].nativeEffects.hiLoOperation == GoolIRMipsHiLoOperation::MoveToLo);
+    assert(hiLoInstructions[0].nativeEffects.writesHi && hiLoInstructions[0].nativeEffects.writesLo);
+    assert(hiLoInstructions[2].nativeEffects.writesHi && hiLoInstructions[2].nativeEffects.writesLo);
+    assert(hiLoInstructions[4].nativeEffects.readsHi && !hiLoInstructions[4].nativeEffects.writesHi);
+    assert(hiLoInstructions[5].nativeEffects.writesHi && !hiLoInstructions[5].nativeEffects.readsHi);
+    assert(hiLoInstructions[6].nativeEffects.readsLo && !hiLoInstructions[6].nativeEffects.writesLo);
+    assert(hiLoInstructions[7].nativeEffects.writesLo && !hiLoInstructions[7].nativeEffects.readsLo);
+
     // R3000A permits an immediately adjacent complementary LWL/LWR pair to
     // merge through the ordinary load-delay slot; the second load still has
     // its own delay before a subsequent consumer.

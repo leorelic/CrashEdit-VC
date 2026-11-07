@@ -25,6 +25,10 @@ struct GoolIROperand {
 
 enum class GoolIRMipsFormat : std::uint8_t { Unknown, Register, Immediate, Jump };
 enum class GoolIRMipsMemoryEffect : std::uint8_t { Unknown, None, Read, Write, ReadWrite };
+enum class GoolIRMipsHiLoOperation : std::uint8_t {
+    None, MoveFromHi, MoveToHi, MoveFromLo, MoveToLo,
+    MultiplySigned, MultiplyUnsigned, DivideSigned, DivideUnsigned
+};
 
 struct GoolIRMipsMemoryAccess {
     bool decoded = false;
@@ -45,6 +49,8 @@ struct GoolIRMipsEffects {
     bool writesHi = false;
     bool readsLo = false;
     bool writesLo = false;
+    // Identifies the specific R3000A HI/LO operation independently of its effects.
+    GoolIRMipsHiLoOperation hiLoOperation = GoolIRMipsHiLoOperation::None;
     // Coprocessor 0 register effects are tracked separately from GPRs.
     std::uint32_t coprocessor0ReadMask = 0;
     std::uint32_t coprocessor0WriteMask = 0;
