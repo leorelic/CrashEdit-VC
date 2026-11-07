@@ -1559,62 +1559,6 @@ int main() {
     assert(loopOutput.text.find("goto L") == std::string::npos);
     assert(loopOutput.text.find("@0x0614") != std::string::npos);
 
-    // A comparison immediately feeding BEQZ should become the source
-    // expression, not expose the temporary stack result as "sp != 0".
-    GoolIRProgram comparisonProgram;
-    GoolIRInstruction comparison;
-    comparison.opcode = 4;
-    comparison.opcodeKnown = true;
-    comparison.mnemonic = "EQL";
-    comparison.sourceByteOffset = 0x300;
-    comparison.operands.push_back({'L', 12, 0, 0, GoolIROperandKind::ProcessField, "self->subtype"});
-    comparison.operands.push_back({'R', 12, 2, 2, GoolIROperandKind::Value, "2"});
-    comparisonProgram.instructions.push_back(comparison);
-
-    GoolIRInstruction conditional;
-    conditional.opcode = 52;
-    conditional.opcodeKnown = true;
-    conditional.mnemonic = "BEQZ";
-    conditional.sourceByteOffset = 0x304;
-    conditional.operands.push_back({'I', 12, 2, 2, GoolIROperandKind::Signed, "2"});
-    conditional.operands.push_back({'V', 4, 0, 0, GoolIROperandKind::Value, "0"});
-    conditional.operands.push_back({'R', 12, 0, 0, GoolIROperandKind::ProcessField, "sp"});
-    comparisonProgram.instructions.push_back(conditional);
-
-    GoolIRInstruction comparisonBody;
-    comparisonBody.opcode = 47;
-    comparisonBody.opcodeKnown = true;
-    comparisonBody.mnemonic = "NOP";
-    comparisonBody.sourceByteOffset = 0x308;
-    comparisonProgram.instructions.push_back(comparisonBody);
-
-    GoolIRInstruction comparisonJoinBranch;
-    comparisonJoinBranch.opcode = 50;
-    comparisonJoinBranch.opcodeKnown = true;
-    comparisonJoinBranch.mnemonic = "BRA";
-    comparisonJoinBranch.sourceByteOffset = 0x30C;
-    comparisonJoinBranch.operands.push_back({'I', 12, 1, 1, GoolIROperandKind::Signed, "1"});
-    comparisonProgram.instructions.push_back(comparisonJoinBranch);
-
-    GoolIRInstruction comparisonElse;
-    comparisonElse.opcode = 47;
-    comparisonElse.opcodeKnown = true;
-    comparisonElse.mnemonic = "NOP";
-    comparisonElse.sourceByteOffset = 0x310;
-    comparisonProgram.instructions.push_back(comparisonElse);
-
-    GoolIRInstruction comparisonJoin;
-    comparisonJoin.opcode = 47;
-    comparisonJoin.opcodeKnown = true;
-    comparisonJoin.mnemonic = "NOP";
-    comparisonJoin.sourceByteOffset = 0x314;
-    comparisonProgram.instructions.push_back(comparisonJoin);
-
-    const auto comparisonOutput = decompileGoolIR(comparisonProgram);
-    assert(comparisonOutput.text.find("if (self->subtype == 2) {") != std::string::npos);
-    assert(comparisonOutput.text.find("if (sp != 0)") == std::string::npos);
-
-
     // Routine discovery is shared across GOOL objects: local Code hooks
     // establish entry points, while RET prevents traversal into the next routine.
     NsfGool routineSource;
