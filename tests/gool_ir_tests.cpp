@@ -1633,7 +1633,7 @@ int main() {
     appendNestedLoopInstruction(47, 0x650);
     appendNestedLoopInstruction(50, 0x654, {nestedLoopDisplacement(-3)});
     appendNestedLoopInstruction(47, 0x658);
-    appendNestedLoopInstruction(50, 0x65C, {nestedLoopDisplacement(-6)});
+    appendNestedLoopInstruction(50, 0x65C, {nestedLoopDisplacement(-7)});
     appendNestedLoopInstruction(47, 0x660);
     const auto nestedLoopOutput = decompileGoolIR(nestedLoopProgram);
     assert(nestedLoopOutput.text.find("while (self->counter == 9) {") != std::string::npos);
