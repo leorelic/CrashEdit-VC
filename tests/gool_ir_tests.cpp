@@ -2079,7 +2079,7 @@ int main() {
     chainedExpressionSource.version = NsfGoolVersion::Version2;
     NsfGoolInstruction stackAssignment;
     stackAssignment.opcode = 17U;
-    stackAssignment.operandBits = (0xB05U << 12U) | 0x805U; // stack[5] = 5
+    stackAssignment.operandBits = (0x805U << 12U) | 0x805U; // stack[5] = 5
     stackAssignment.byteOffset = 0;
     chainedExpressionSource.instructions.push_back(stackAssignment);
     NsfGoolInstruction chainedAdd;
