@@ -511,12 +511,13 @@ void EditorUI::drawGoolScriptEditor(){
  static std::size_t hiddenAnnotations=0;
  static int displayedChunk=-1,displayedEntry=-1;
  static std::size_t displayedRoutine=static_cast<std::size_t>(-1);
- if(!scratchEditor.GetText().size())scratchEditor.SetText(
+ static bool scratchEditorInitialized=false;
+ if(!scratchEditorInitialized){scratchEditor.SetText(
   "event Update:\n"
   "    if health <= 0:\n"
   "        transition Dead\n"
   "    else:\n"
-  "        call UpdateMovement\n");
+  "        call UpdateMovement\n");scratchEditorInitialized=true;}
 
  if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
   ImGui::TextDisabled("GOOL authoring workspace");

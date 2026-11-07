@@ -12,7 +12,7 @@ private:
  static int inputCallback(ImGuiInputTextCallbackData* data);
  void drawSource(const ImVec2& inputMin,const ImVec2& inputMax,float lineHeight,float textOffsetY,bool focused);
  std::string text_;
- InputState inputState_{this,0,0,0};
+ InputState inputState_{nullptr,0,0,0};
  bool initialized_=false;
 };
 }

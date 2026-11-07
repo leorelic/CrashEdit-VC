@@ -60,6 +60,7 @@ int GoolScriptEditor::inputCallback(ImGuiInputTextCallbackData* d){
  st->cursor=d->CursorPos;st->selectionStart=d->SelectionStart;st->selectionEnd=d->SelectionEnd;return 0;
 }
 bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
+ inputState_.editor=this;
  const std::string child=std::string(id?id:"GoolEditor")+"Scroll";
  if(size.x<=0)size.x=ImGui::GetContentRegionAvail().x;if(size.y<=0)size.y=ImGui::GetContentRegionAvail().y;
  const bool visible=ImGui::BeginChild(child.c_str(),size,true,ImGuiWindowFlags_HorizontalScrollbar);bool changed=false;
