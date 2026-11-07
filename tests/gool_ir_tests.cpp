@@ -1604,6 +1604,42 @@ int main() {
     assert(loopOutput.text.find("goto L") == std::string::npos);
     assert(loopOutput.text.find("@0x0614") != std::string::npos);
 
+    // Nested pre-test loops are reconstructed only when every nested branch
+    // remains inside its enclosing loop region.
+    GoolIRProgram nestedLoopProgram;
+    const auto nestedLoopField = GoolIROperand{'L', 12, 0, 0,
+        GoolIROperandKind::ProcessField, "self->counter"};
+    const auto nestedLoopDisplacement = [](std::int32_t value) {
+        return GoolIROperand{'I', 12, static_cast<std::uint32_t>(value), value,
+            GoolIROperandKind::Signed, std::to_string(value)};
+    };
+    const auto appendNestedLoopInstruction = [&](std::uint8_t opcode, std::uint32_t offset,
+                                                  std::vector<GoolIROperand> operands = {}) {
+        GoolIRInstruction item;
+        item.opcode = opcode;
+        item.opcodeKnown = true;
+        item.sourceByteOffset = offset;
+        item.mnemonic = opcode == 4U ? "EQL" : opcode == 52U ? "BEQZ" :
+                        opcode == 50U ? "BRA" : "NOP";
+        item.operands = std::move(operands);
+        nestedLoopProgram.instructions.push_back(std::move(item));
+    };
+    appendNestedLoopInstruction(4, 0x640, {nestedLoopField,
+        GoolIROperand{'R', 12, 9, 9, GoolIROperandKind::Value, "9"}});
+    appendNestedLoopInstruction(52, 0x644, {nestedLoopDisplacement(6)});
+    appendNestedLoopInstruction(4, 0x648, {nestedLoopField,
+        GoolIROperand{'R', 12, 3, 3, GoolIROperandKind::Value, "3"}});
+    appendNestedLoopInstruction(52, 0x64C, {nestedLoopDisplacement(2)});
+    appendNestedLoopInstruction(47, 0x650);
+    appendNestedLoopInstruction(50, 0x654, {nestedLoopDisplacement(-3)});
+    appendNestedLoopInstruction(47, 0x658);
+    appendNestedLoopInstruction(50, 0x65C, {nestedLoopDisplacement(-6)});
+    appendNestedLoopInstruction(47, 0x660);
+    const auto nestedLoopOutput = decompileGoolIR(nestedLoopProgram);
+    assert(nestedLoopOutput.text.find("while (self->counter == 9) {") != std::string::npos);
+    assert(nestedLoopOutput.text.find("        while (self->counter == 3) {") != std::string::npos);
+    assert(nestedLoopOutput.text.find("goto L") == std::string::npos);
+
     // An external branch into a pre-test loop must retain its target label
     // when the loop is rendered structurally.
     GoolIRProgram externallyEnteredLoop = loopProgram;

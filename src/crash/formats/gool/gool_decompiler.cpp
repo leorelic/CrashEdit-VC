@@ -529,14 +529,59 @@ GoolIRDecompilation decompileGoolIR(
             for (std::size_t body = header + 1; body < back; ++body) {
                 const auto& bodyInstruction = program.instructions[body];
                 if (bodyInstruction.nativeMips || !bodyInstruction.opcodeKnown ||
-                    (bodyInstruction.opcode >= 50U && bodyInstruction.opcode <= 55U)) {
+                    (bodyInstruction.opcode >= 53U && bodyInstruction.opcode <= 55U)) {
                     unsafeBody = true;
                     break;
+                }
+                // Nested conditionals and loops are safe to retain when every
+                // branch they contain stays inside this candidate loop body.
+                if (bodyInstruction.opcode >= 50U && bodyInstruction.opcode <= 52U) {
+                    const auto* nestedDisplacement = findOperand(bodyInstruction, 'I');
+                    if (!nestedDisplacement) { unsafeBody = true; break; }
+                    const auto nestedTarget = static_cast<std::int64_t>(body) + 1 +
+                        nestedDisplacement->value;
+                    if (nestedTarget < static_cast<std::int64_t>(header + 1) ||
+                        nestedTarget >= static_cast<std::int64_t>(back)) {
+                        unsafeBody = true;
+                        break;
+                    }
                 }
                 if (labels.find(body) != labels.end()) {
-                    unsafeBody = true;
-                    break;
+                    bool externalEntry = false;
+                    for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+                        const auto& incoming = program.instructions[source];
+                        if (incoming.nativeMips || !incoming.opcodeKnown ||
+                            incoming.opcode < 50U || incoming.opcode > 52U)
+                            continue;
+                        const auto* incomingDisplacement = findOperand(incoming, 'I');
+                        if (!incomingDisplacement) continue;
+                        const auto target = static_cast<std::int64_t>(source) + 1 +
+                            incomingDisplacement->value;
+                        if (target == static_cast<std::int64_t>(body) &&
+                            (source < header + 1 || source >= back)) {
+                            externalEntry = true;
+                            break;
+                        }
+                    }
+                    if (externalEntry) { unsafeBody = true; break; }
                 }
+                for (const auto& operation : program.controlOperations) {
+                    if (operation.kind == GoolIRControlOperationKind::Call &&
+                        !operation.external && operation.targetInstructionValid &&
+                        operation.targetInstruction == body) {
+                        unsafeBody = true;
+                        break;
+                    }
+                }
+                if (unsafeBody) break;
+                for (const auto& hook : program.hookDispatches) {
+                    if (hook.resolution == GoolIRHookResolution::Local &&
+                        hook.instructionOffset == body) {
+                        unsafeBody = true;
+                        break;
+                    }
+                }
+                if (unsafeBody) break;
             }
             if (unsafeBody) continue;
 
@@ -628,15 +673,39 @@ GoolIRDecompilation decompileGoolIR(
         for (std::size_t body = header; body < back; ++body) {
             const auto& item = program.instructions[body];
             if (item.nativeMips || !item.opcodeKnown ||
-                (body != back - 1 && item.opcode >= 50U && item.opcode <= 55U) ||
-                structuredIfs.find(body) != structuredIfs.end() ||
-                structuredLoops.find(body) != structuredLoops.end()) {
+                (body != back - 1 && item.opcode >= 53U && item.opcode <= 55U)) {
                 unsafeBody = true;
                 break;
             }
+            if (body != back - 1 && item.opcode >= 50U && item.opcode <= 52U) {
+                const auto* nestedDisplacement = findOperand(item, 'I');
+                if (!nestedDisplacement) { unsafeBody = true; break; }
+                const auto nestedTarget = static_cast<std::int64_t>(body) + 1 +
+                    nestedDisplacement->value;
+                if (nestedTarget < static_cast<std::int64_t>(header) ||
+                    nestedTarget >= static_cast<std::int64_t>(back)) {
+                    unsafeBody = true;
+                    break;
+                }
+            }
             if (body != header && labels.find(body) != labels.end()) {
-                unsafeBody = true;
-                break;
+                bool externalEntry = false;
+                for (std::size_t source = 0; source < program.instructions.size(); ++source) {
+                    const auto& incoming = program.instructions[source];
+                    if (incoming.nativeMips || !incoming.opcodeKnown ||
+                        incoming.opcode < 50U || incoming.opcode > 52U)
+                        continue;
+                    const auto* incomingDisplacement = findOperand(incoming, 'I');
+                    if (!incomingDisplacement) continue;
+                    const auto target = static_cast<std::int64_t>(source) + 1 +
+                        incomingDisplacement->value;
+                    if (target == static_cast<std::int64_t>(body) &&
+                        (source < header || source >= back)) {
+                        externalEntry = true;
+                        break;
+                    }
+                }
+                if (externalEntry) { unsafeBody = true; break; }
             }
             for (const auto& operation : program.controlOperations) {
                 if (operation.kind == GoolIRControlOperationKind::Call &&

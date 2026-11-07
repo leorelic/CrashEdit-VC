@@ -90,7 +90,8 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 - [x] Reconstruct simple pre-test loops when a conditional exit and a single backward branch prove the loop region; reject interior entries and additional control flow.
 - [x] Reconstruct nested if/else regions when all interior branch entries originate within the proven parent body; preserve fallback for external entries, calls, and hooks.
 - [x] Reconstruct straight-line post-test loops as `do/while` when a conditional backward branch targets the proven body entry; reject interior entries and nested control flow.
-- [ ] Extend structured control-flow reconstruction to nested loops and more complex loop bodies, with explicit fallback when region boundaries or branch conditions cannot be proven.
+- [x] Reconstruct nested pre-test loops and branch-containing loop bodies when all nested branch targets and entries remain inside the proven loop region; retain explicit branches/fallback for unsafe or unresolved regions.
+- [ ] Extend structured control-flow reconstruction to more complex loop exits, irreducible regions, and native MIPS control-flow edges without hiding unresolved paths.
 - [x] Apply the IR/decompiler to the first 20-word real Crash 2 sample region: DispC's Code hook at instruction 0; record its decoded words, descriptor-3 state transition, following RET, and unresolved execution question in `docs/DISPC_INITIAL_ROUTINE.md`.
 - [ ] Apply the decompiler to real Crash 2 routines, beginning with the `BoxsC` Code hook at instruction 558; use the resulting output to identify missing semantics rather than inventing high-level behavior.
 - [ ] Validate routine discovery against additional real GOOL objects and local-call patterns; investigate ambiguous/shared code and entry points not represented by local Code hooks or local calls.
