@@ -27,38 +27,18 @@ static void glfwError(int c,const char*d){Diagnostics::log(DiagnosticLevel::Erro
 static EditorUI* editorUiForDrop=nullptr;
 static void glfwDropFiles(GLFWwindow*,int count,const char** paths){if(editorUiForDrop)editorUiForDrop->handleDroppedFiles(count,paths);}
 
+static std::filesystem::path executableDirectory();
 static ImFont* loadUiFont() {
- // Prefer each platform's familiar UI sans-serif font. The default ImGui
- // bitmap font remains a safe fallback on machines without these files.
-#ifdef _WIN32
- const std::array<const char*, 3> candidates = {
-  "C:/Windows/Fonts/segoeui.ttf",
-  "C:/Windows/Fonts/arial.ttf",
-  "C:/Windows/Fonts/tahoma.ttf"
- };
-#elif defined(__APPLE__)
- const std::array<const char*, 3> candidates = {
-  "/System/Library/Fonts/Supplemental/Arial.ttf",
-  "/Library/Fonts/Arial.ttf",
-  "/System/Library/Fonts/Supplemental/Verdana.ttf"
- };
-#else
- const std::array<const char*, 3> candidates = {
-  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-  "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
- };
-#endif
- for (const char* candidate : candidates) {
-  std::error_code ec;
-  if (std::filesystem::is_regular_file(candidate, ec)) {
-   if (ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(candidate, 28.0f)) {
-    Diagnostics::log(DiagnosticLevel::Info,std::string("UI font loaded: ")+candidate);
-    return font;
-   }
+ const auto bundledFont=executableDirectory()/"fonts"/"JetBrainsMono-Regular.ttf";
+ std::error_code ec;
+ if(std::filesystem::is_regular_file(bundledFont,ec)){
+  if(ImFont* font=ImGui::GetIO().Fonts->AddFontFromFileTTF(bundledFont.string().c_str(),28.0f)){
+   Diagnostics::log(DiagnosticLevel::Info,"JetBrains Mono loaded as the modern UI font.");
+   return font;
   }
  }
- Diagnostics::log(DiagnosticLevel::Warning,"No platform UI font found; using Dear ImGui default font.");
+ Diagnostics::log(DiagnosticLevel::Warning,
+  "Bundled JetBrains Mono font unavailable; modern UI font will use the ImGui default fallback.");
  return ImGui::GetIO().Fonts->AddFontDefault();
 }
 
