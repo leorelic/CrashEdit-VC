@@ -440,8 +440,9 @@ void EditorUI::drawGoolScriptEditor(){
   ImGui::Text("Indentation diagnostics  ·  %zu error(s)",analysis.diagnostics.size());
   if(analysis.diagnostics.empty()){
    ImGui::TextDisabled("No indentation errors detected.");
-  }else if(ImGui::BeginChild("GoolScriptProblems",ImVec2(0,0),false,
-      ImGuiWindowFlags_HorizontalScrollbar)){
+  }else{
+   ImGui::BeginChild("GoolScriptProblems",ImVec2(0,0),false,
+       ImGuiWindowFlags_HorizontalScrollbar);
    for(const auto& diagnostic:analysis.diagnostics){
     ImGui::PushID(static_cast<int>(diagnostic.line));
     ImGui::TextColored(ImVec4(1.0f,0.42f,0.36f,1.0f),
