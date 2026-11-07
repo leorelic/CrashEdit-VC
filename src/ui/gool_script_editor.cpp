@@ -90,7 +90,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  ImGui::EndChild();return changed;
 }
 void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,float lh,float off,bool focused){
- ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);const ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
+ ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
  const ImVec2 base(mn.x+6,mn.y+off);const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
  const int a=std::clamp(inputState_.selectionStart,0,static_cast<int>(text_.size())),b=std::clamp(inputState_.selectionEnd,0,static_cast<int>(text_.size()));const int sa=std::min(a,b),sb=std::max(a,b);
  std::size_t offset=0;
