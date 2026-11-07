@@ -76,23 +76,23 @@ int main() {
     assert(empty.lineCount == 1U);
 
     const auto validLexical = analyzeGoolScript(
-        "event Update:\\n"
-        "    call Print(\\\"text with ) and # inside\\\") # comment [\\n");
+        "event Update:\n"
+        "    call Print(\"text with ) and # inside\") # comment [\n");
     assert(validLexical.valid());
 
-    const auto unterminatedString = analyzeGoolScript("call Print(\\\"unfinished\\n");
+    const auto unterminatedString = analyzeGoolScript("call Print(\"unfinished\n");
     bool foundStringError = false;
     for (const auto& diagnostic : unterminatedString.diagnostics)
         if (diagnostic.code == "GS200") foundStringError = true;
     assert(foundStringError);
 
-    const auto mismatchedDelimiter = analyzeGoolScript("call Print(value]\\n");
+    const auto mismatchedDelimiter = analyzeGoolScript("call Print(value]\n");
     bool foundMismatch = false;
     for (const auto& diagnostic : mismatchedDelimiter.diagnostics)
         if (diagnostic.code == "GS201") foundMismatch = true;
     assert(foundMismatch);
 
-    const auto unclosedDelimiter = analyzeGoolScript("call Print(value\\n");
+    const auto unclosedDelimiter = analyzeGoolScript("call Print(value\n");
     bool foundUnclosed = false;
     for (const auto& diagnostic : unclosedDelimiter.diagnostics)
         if (diagnostic.code == "GS202") foundUnclosed = true;
