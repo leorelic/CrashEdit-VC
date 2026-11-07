@@ -42,6 +42,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [ ] Complete the R3000A decoder audit, including remaining instruction encodings and control-flow edge cases.
 - [ ] Audit the PlayStation COP2/GTE instruction space: command words, command flags, register transfers, and load/store forms.
 - [ ] Decode supported GTE instructions while preserving raw words and clearly identifying unknown or reserved encodings.
+- [x] Resolve validated native MIPS PC-relative branch byte targets from PC+4 and signed word offsets; map only unique, exact native instruction boundaries, while preserving valid but unresolved byte offsets.
 - [ ] Connect native MIPS/GTE instructions back to their position and role in the surrounding GOOL stream.
 
 ## 3. Blueprint graph usability and navigation

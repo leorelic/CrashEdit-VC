@@ -2,6 +2,9 @@
 #include "crash/formats/gool/gool_control_flow.hpp"
 #include <algorithm>
 #include <utility>
+#include <unordered_map>
+#include <unordered_set>
+#include <limits>
 #include "crash/formats/gool/gool_opcodes.hpp"
 
 namespace CrashEdit::Crash {
@@ -656,6 +659,51 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             }
         }
         result.instructions.push_back(std::move(ir));
+    }
+
+    // Resolve native PC-relative branch destinations against the GOOL stream.
+    // R3000A branches use PC+4 plus the sign-extended word displacement. Keep
+    // the computed byte offset even when no instruction boundary matches it.
+    std::unordered_map<std::size_t, std::size_t> nativeInstructionAtOffset;
+    std::unordered_set<std::size_t> duplicateNativeOffsets;
+    for (std::size_t i = 0; i < result.instructions.size(); ++i) {
+        const auto& candidate = result.instructions[i];
+        if (!candidate.nativeMips) continue;
+        const auto [it, inserted] = nativeInstructionAtOffset.emplace(candidate.sourceByteOffset, i);
+        if (!inserted) duplicateNativeOffsets.insert(candidate.sourceByteOffset);
+    }
+    for (auto& ir : result.instructions) {
+        if (!ir.nativeMips || !ir.nativeEffects.known ||
+            !ir.nativeEffects.controlTransferHasDelaySlot) continue;
+        const auto operation = ir.nativeEffects.controlOperation;
+        const bool pcRelativeBranch =
+            operation == GoolIRMipsControlOperation::BranchEqual ||
+            operation == GoolIRMipsControlOperation::BranchNotEqual ||
+            operation == GoolIRMipsControlOperation::BranchLessThanZero ||
+            operation == GoolIRMipsControlOperation::BranchGreaterEqualZero ||
+            operation == GoolIRMipsControlOperation::BranchLessThanZeroAndLink ||
+            operation == GoolIRMipsControlOperation::BranchGreaterEqualZeroAndLink ||
+            operation == GoolIRMipsControlOperation::BranchLessOrEqualZero ||
+            operation == GoolIRMipsControlOperation::BranchGreaterThanZero ||
+            operation == GoolIRMipsControlOperation::BranchCoprocessor0False ||
+            operation == GoolIRMipsControlOperation::BranchCoprocessor0True ||
+            operation == GoolIRMipsControlOperation::BranchCoprocessor2False ||
+            operation == GoolIRMipsControlOperation::BranchCoprocessor2True;
+        if (!pcRelativeBranch || ir.sourceByteOffset % 4U != 0U) continue;
+        if (ir.sourceByteOffset > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max() - 4))
+            continue;
+        const auto target = static_cast<std::int64_t>(ir.sourceByteOffset) + 4 +
+            static_cast<std::int64_t>(ir.nativeFields.signedImmediate) * 4;
+        if (target < 0 || static_cast<std::uint64_t>(target) >
+                static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) continue;
+        ir.nativeBranchTargetByteOffset = static_cast<std::size_t>(target);
+        ir.nativeBranchTargetByteOffsetValid = true;
+        const auto found = nativeInstructionAtOffset.find(ir.nativeBranchTargetByteOffset);
+        if (found != nativeInstructionAtOffset.end() &&
+            duplicateNativeOffsets.find(ir.nativeBranchTargetByteOffset) == duplicateNativeOffsets.end()) {
+            ir.nativeBranchTargetInstruction = found->second;
+            ir.nativeBranchTargetInstructionValid = true;
+        }
     }
 
     // Track the PlayStation GTE's two-instruction LWC2/SWC2 access delay

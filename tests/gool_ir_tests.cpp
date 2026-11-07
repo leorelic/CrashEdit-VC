@@ -254,6 +254,67 @@ int main() {
         assert(effects.controlOperation == expectedMipsControl[i]);
     }
 
+    // Resolve PC-relative native branch targets using the instruction's
+    // PC+4 base, and only bind an instruction index for a unique stream offset.
+    NsfGool nativeBranchTargets;
+    nativeBranchTargets.version = NsfGoolVersion::Version2;
+    const auto addBranchAt = [&nativeBranchTargets](std::size_t offset, std::uint32_t word) {
+        NsfGoolInstruction instruction;
+        instruction.isMips = true;
+        instruction.word = word;
+        instruction.byteOffset = offset;
+        nativeBranchTargets.instructions.push_back(instruction);
+    };
+    addBranchAt(0x100U, (4U << 26U) | (8U << 21U) | (9U << 16U) | 2U); // beq -> 0x10C
+    addBranchAt(0x104U, 0U); // delay slot
+    addBranchAt(0x108U, 0U); // fallthrough
+    addBranchAt(0x10CU, 0U); // target
+    addBranchAt(0x110U, (5U << 26U) | (8U << 21U) | (9U << 16U) | 0xFFFDU); // bne -> 0x104
+    addBranchAt(0x114U, 0U); // delay slot
+    addBranchAt(0x118U, (4U << 26U) | (8U << 21U) | (9U << 16U) | 0x7FFFU); // valid offset, absent target
+    addBranchAt(0x11CU, 0U);
+    const auto nativeBranchTargetIR = buildGoolIR(nativeBranchTargets);
+    assert(nativeBranchTargetIR.instructions.size() == 8);
+    assert(nativeBranchTargetIR.instructions[0].nativeBranchTargetByteOffsetValid);
+    assert(nativeBranchTargetIR.instructions[0].nativeBranchTargetByteOffset == 0x10CU);
+    assert(nativeBranchTargetIR.instructions[0].nativeBranchTargetInstructionValid);
+    assert(nativeBranchTargetIR.instructions[0].nativeBranchTargetInstruction == 3U);
+    assert(nativeBranchTargetIR.instructions[4].nativeBranchTargetByteOffsetValid);
+    assert(nativeBranchTargetIR.instructions[4].nativeBranchTargetByteOffset == 0x104U);
+    assert(nativeBranchTargetIR.instructions[4].nativeBranchTargetInstructionValid);
+    assert(nativeBranchTargetIR.instructions[4].nativeBranchTargetInstruction == 1U);
+    assert(nativeBranchTargetIR.instructions[6].nativeBranchTargetByteOffsetValid);
+    assert(!nativeBranchTargetIR.instructions[6].nativeBranchTargetInstructionValid);
+    assert(!nativeBranchTargetIR.instructions[1].nativeBranchTargetByteOffsetValid);
+
+    // Negative target arithmetic and duplicate instruction offsets must never
+    // produce a falsely resolved instruction index.
+    NsfGool invalidNativeBranchTargets;
+    invalidNativeBranchTargets.version = NsfGoolVersion::Version2;
+    NsfGoolInstruction underflowBranch;
+    underflowBranch.isMips = true;
+    underflowBranch.word = (4U << 26U) | (8U << 21U) | (9U << 16U) | 0xFFFEU;
+    underflowBranch.byteOffset = 0U;
+    invalidNativeBranchTargets.instructions.push_back(underflowBranch);
+    NsfGoolInstruction duplicateA;
+    duplicateA.isMips = true; duplicateA.word = 0U; duplicateA.byteOffset = 0x20U;
+    invalidNativeBranchTargets.instructions.push_back(duplicateA);
+    NsfGoolInstruction duplicateBranch;
+    duplicateBranch.isMips = true;
+    duplicateBranch.word = (4U << 26U) | (8U << 21U) | (9U << 16U) | 6U;
+    duplicateBranch.byteOffset = 0x24U; // target 0x40
+    invalidNativeBranchTargets.instructions.push_back(duplicateBranch);
+    NsfGoolInstruction duplicateB;
+    duplicateB.isMips = true; duplicateB.word = 0U; duplicateB.byteOffset = 0x40U;
+    invalidNativeBranchTargets.instructions.push_back(duplicateB);
+    NsfGoolInstruction duplicateC = duplicateB;
+    invalidNativeBranchTargets.instructions.push_back(duplicateC);
+    const auto invalidNativeBranchIR = buildGoolIR(invalidNativeBranchTargets);
+    assert(!invalidNativeBranchIR.instructions[0].nativeBranchTargetByteOffsetValid);
+    assert(invalidNativeBranchIR.instructions[2].nativeBranchTargetByteOffsetValid);
+    assert(invalidNativeBranchIR.instructions[2].nativeBranchTargetByteOffset == 0x40U);
+    assert(!invalidNativeBranchIR.instructions[2].nativeBranchTargetInstructionValid);
+
     // Conservative R3000A register and memory effects are tracked independently
     // from mnemonic text, with unsupported encodings left explicitly unknown.
     NsfGool effectSource;

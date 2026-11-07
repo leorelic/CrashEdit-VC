@@ -125,6 +125,12 @@ struct GoolIRInstruction {
     bool nativeFieldsDecoded = false;
     GoolIRMipsFields nativeFields;
     GoolIRMipsEffects nativeEffects;
+    // Resolved only for PC-relative branch encodings. The byte offset can be
+    // valid even when it does not identify an instruction in this GOOL stream.
+    std::size_t nativeBranchTargetByteOffset = 0;
+    bool nativeBranchTargetByteOffsetValid = false;
+    std::size_t nativeBranchTargetInstruction = 0;
+    bool nativeBranchTargetInstructionValid = false;
     // True when this instruction is the sequential instruction after a
     // validated R3000A control transfer (and therefore executes in its delay slot).
     bool isControlTransferDelaySlot = false;
