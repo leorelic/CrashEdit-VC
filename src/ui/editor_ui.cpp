@@ -398,6 +398,8 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
   TextEditor::LanguageDefinition value;
   value.mName="GOOL Script";
   value.mAutoIndentation=true;
+  // TextEditor uppercases identifiers before keyword lookup when case sensitivity is disabled.
+  value.mCaseSensitive=true;
   value.mSingleLineComment="#";
   value.mKeywords={
    "event","state","routine","if","else","while","for","in","break","continue",
@@ -405,6 +407,7 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
    "native","unknown","let","var","const"
   };
   value.mTokenRegexStrings={
+   {"0[xX][0-9A-Fa-f_]+",TextEditor::PaletteIndex::Number},
    {"[0-9]+(\\.[0-9]+)?",TextEditor::PaletteIndex::Number},
    {"\"([^\"\\\\]|\\\\.)*\"",TextEditor::PaletteIndex::String},
    {"'([^'\\\\]|\\\\.)*'",TextEditor::PaletteIndex::CharLiteral},
@@ -418,15 +421,17 @@ static const TextEditor::LanguageDefinition& goolScriptLanguageDefinition(){
 
 static TextEditor::Palette goolScriptEditorPalette(){
  auto palette=TextEditor::GetDarkPalette();
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Default)]=IM_COL32(218,222,230,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Keyword)]=IM_COL32(198,150,235,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Number)]=IM_COL32(160,205,160,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::String)]=IM_COL32(224,184,132,255);
+ // Retain the near-black editor surface with a brighter, high-contrast code palette.
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Background)]=IM_COL32(24,26,31,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Default)]=IM_COL32(225,228,235,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Keyword)]=IM_COL32(205,160,245,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Number)]=IM_COL32(181,210,145,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::String)]=IM_COL32(235,190,135,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::CharLiteral)]=IM_COL32(224,184,132,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Punctuation)]=IM_COL32(180,190,205,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Identifier)]=IM_COL32(210,216,226,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::KnownIdentifier)]=IM_COL32(130,190,225,255);
- palette[static_cast<unsigned>(TextEditor::PaletteIndex::Comment)]=IM_COL32(125,145,160,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Punctuation)]=IM_COL32(195,202,215,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Identifier)]=IM_COL32(225,228,235,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::KnownIdentifier)]=IM_COL32(130,195,240,255);
+ palette[static_cast<unsigned>(TextEditor::PaletteIndex::Comment)]=IM_COL32(135,150,170,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::LineNumber)]=IM_COL32(105,118,135,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFill)]=IM_COL32(43,51,64,255);
  palette[static_cast<unsigned>(TextEditor::PaletteIndex::CurrentLineFillInactive)]=IM_COL32(37,43,53,255);
