@@ -548,7 +548,7 @@ GoolIRDecompilation decompileGoolIR(
                         // exit is a structured break candidate. Other exits
                         // remain explicit branches and are not folded here.
                         candidateLoopExitBranches.push_back(body);
-                        if ((body == 0U) == false &&
+                        if (body > 0U &&
                             !comparisonCondition(program, body).empty())
                             candidateLoopExitConditionProducers.push_back(body - 1U);
                     } else if (nestedTarget < static_cast<std::int64_t>(header + 1) ||
@@ -889,12 +889,12 @@ GoolIRDecompilation decompileGoolIR(
             if (loopExitBranches.find(index) != loopExitBranches.end()) {
                 const auto condition = comparisonCondition(program, index);
                 if (instruction.opcode == 50U) {
-                    line << "break";
+                    line << "break;";
                 } else if (!condition.empty()) {
-                    line << "if (" << condition << ") break";
+                    line << "if (" << condition << ") break;";
                 } else {
                     line << "if (" << fieldText(instruction)
-                         << (instruction.opcode == 51U ? " != 0" : " == 0") << ") break";
+                         << (instruction.opcode == 51U ? " != 0" : " == 0") << ") break;";
                 }
             } else {
             const auto* displacement = findOperand(instruction, 'I');
