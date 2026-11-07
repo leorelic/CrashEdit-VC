@@ -753,8 +753,11 @@ GoolIRProgram buildGoolIR(const NsfGool& source) {
             previous.sourceByteOffset % 4U != 0U ||
             previous.sourceByteOffset > std::numeric_limits<std::size_t>::max() - 4U ||
             previous.sourceByteOffset + 4U != current.sourceByteOffset) continue;
-        if (previous.nativeEffects.controlTransferHasDelaySlot)
+        if (previous.nativeEffects.controlTransferHasDelaySlot) {
             current.isControlTransferDelaySlot = true;
+            current.nativeDelaySlotOwnerInstruction = i - 1U;
+            current.nativeDelaySlotOwnerInstructionValid = true;
+        }
         if (previous.nativeEffects.gprWriteHasLoadDelay && current.nativeEffects.known) {
             const auto& previousFields = previous.nativeFields;
             const auto& currentFields = current.nativeFields;

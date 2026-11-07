@@ -561,6 +561,9 @@ int main() {
     assert(delaySlotIR.instructions.size() == 2);
     assert(!delaySlotIR.instructions[0].isControlTransferDelaySlot);
     assert(delaySlotIR.instructions[1].isControlTransferDelaySlot);
+    assert(!delaySlotIR.instructions[0].nativeDelaySlotOwnerInstructionValid);
+    assert(delaySlotIR.instructions[1].nativeDelaySlotOwnerInstructionValid);
+    assert(delaySlotIR.instructions[1].nativeDelaySlotOwnerInstruction == 0U);
 
     NsfGool terminalBranchSource;
     terminalBranchSource.version = NsfGoolVersion::Version2;

@@ -137,6 +137,9 @@ struct GoolIRInstruction {
     // True when this instruction is the sequential instruction after a
     // validated R3000A control transfer (and therefore executes in its delay slot).
     bool isControlTransferDelaySlot = false;
+    // Exact GOOL IR instruction that owns this native MIPS delay slot.
+    std::size_t nativeDelaySlotOwnerInstruction = 0;
+    bool nativeDelaySlotOwnerInstructionValid = false;
     // GPRs read here that were written by the immediately preceding delayed load.
     std::uint32_t gprReadInLoadDelaySlotMask = 0;
     // Registers merged by an immediately adjacent LWL/LWR pair. This is the
