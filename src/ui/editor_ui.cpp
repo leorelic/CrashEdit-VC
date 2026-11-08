@@ -2605,6 +2605,7 @@ void EditorUI::drawAnimationViewer(){
     if(entry.valid&&entry.type==2&&entry.eid==eid&&entry.model.decoded)return &entry.model;
   return nullptr;
  };
+ struct AnimationPoint{float x,y,z;};
  auto transformVertex=[](const Crash::NsfAnimationVertex&v,const Crash::NsfAnimationFrame&frame,const Crash::NsfModel*model){
   constexpr float fallbackScale=1.0f/128.0f;
   constexpr float modelScale=3200.0f*128.0f;
@@ -2613,7 +2614,7 @@ void EditorUI::drawAnimationViewer(){
   const float sz=model?static_cast<float>(model->scaleZ)/modelScale:fallbackScale;
   // CrashEdit-RE's animation path swaps Y/Z, adds the frame translation,
   // then applies the linked model's per-axis scale.
-  return ImVec3(
+  return AnimationPoint(
    (static_cast<float>(v.x)+static_cast<float>(frame.xOffset)/4.0f)*sx,
    (static_cast<float>(v.z)+static_cast<float>(frame.yOffset)/4.0f)*sy,
    (static_cast<float>(v.y)+static_cast<float>(frame.zOffset)/4.0f)*sz
@@ -2657,20 +2658,20 @@ void EditorUI::drawAnimationViewer(){
  }else{
   // Match the original viewer's CorePositions: frame offsets and linked model
   // scales are applied to every frame before calculating the camera bounds.
-  ImVec3 boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
+  AnimationPoint boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
   bool haveBounds=false;
   for(const auto&candidate:animation.frames){
    if(!candidate.verticesDecoded)continue;
    const auto*candidateModel=findModel(candidate.modelEid);
    for(const auto&v:candidate.vertices){
-    const ImVec3 p=transformVertex(v,candidate,candidateModel);
+    const AnimationPoint p=transformVertex(v,candidate,candidateModel);
     boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
     boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
     haveBounds=true;
    }
   }
-  if(!haveBounds){boundsMin=ImVec3(-1,-1,-1);boundsMax=ImVec3(1,1,1);}
-  const ImVec3 center((boundsMin.x+boundsMax.x)*0.5f,(boundsMin.y+boundsMax.y)*0.5f,(boundsMin.z+boundsMax.z)*0.5f);
+  if(!haveBounds){boundsMin=AnimationPoint{-1,-1,-1};boundsMax=AnimationPoint{1,1,1};}
+  const AnimationPoint center((boundsMin.x+boundsMax.x)*0.5f,(boundsMin.y+boundsMax.y)*0.5f,(boundsMin.z+boundsMax.z)*0.5f);
   const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
   const float radius=std::max(0.25f,std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f);
   if(!animationCameraInitialized_){
@@ -2743,7 +2744,7 @@ void EditorUI::drawAnimationViewer(){
    std::vector<ImVec2> projected(frame.vertices.size());
    std::vector<bool> visible(frame.vertices.size(),false);
    for(std::size_t i=0;i<frame.vertices.size();++i){
-    const ImVec3 p=transformVertex(frame.vertices[i],frame,model);
+    const AnimationPoint p=transformVertex(frame.vertices[i],frame,model);
     projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;
    }
    for(const auto&tri:model->triangles){
