@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<3){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=3;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
@@ -336,7 +336,7 @@ void EditorUI::draw(){
    }
   }
  }
- drawViewport();drawAnimationViewer();drawBottom();
+ drawAnimationTimeline();drawViewport();drawAnimationViewer();if(animationFrameEditorOpen_)drawAnimationFrameEditor();drawBottom();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
  else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
  if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
@@ -2583,9 +2583,131 @@ void EditorUI::drawGoolBlueprintGraph(){
   }ImGui::End();focusGoolDataPool_=false;
 }
 
+void EditorUI::drawAnimationTimeline(){
+ const Crash::NsfEntry*animationEntry=nullptr;
+ if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
+  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+  if(chunk.type==0&&animationViewerEntry_>=0&&static_cast<std::size_t>(animationViewerEntry_)<chunk.entries.size()){
+   const auto&entry=chunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+   if(entry.valid&&entry.type==1&&entry.animation.decoded)animationEntry=&entry;
+  }
+ }
+ bool animationHalfSpeed=false;
+ if(animationEntry){
+  const auto&frames=animationEntry->animation.frames;
+  if(!frames.empty()){
+   const int lastFrame=static_cast<int>(frames.size()-1U);
+   for(const auto&chunk:nsf_.chunks()){
+    if(!chunk.entryTableValid)continue;
+    for(const auto&entry:chunk.entries){
+     if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
+     for(const auto&group:entry.gool.frameGroups){
+      if(group.type==1U&&group.eid==animationEntry->eid){animationHalfSpeed=group.interpolated;break;}
+     }
+     if(animationHalfSpeed)break;
+    }
+    if(animationHalfSpeed)break;
+   }
+   if(!animationPlaying_)animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
+   else if(animationPlaybackFrame_>=static_cast<double>(frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(frames.size()));
+   if(animationPlaying_&&frames.size()>1U){
+    const double gameFps=editorPreferences.palRegion?25.0:30.0;
+    const double fullSpeedFps=editorPreferences.palRegion?50.0:60.0;
+    const double frameRate=editorPreferences.animationRefreshRateMode?fullSpeedFps:gameFps;
+    const double frameInterval=1.0/frameRate;
+    animationFrameTimer_+=std::max(0.0f,ImGui::GetIO().DeltaTime);
+    const auto elapsedTicks=static_cast<std::size_t>(animationFrameTimer_/frameInterval);
+    if(elapsedTicks>0U){
+     animationFrameTimer_-=static_cast<float>(static_cast<double>(elapsedTicks)*frameInterval);
+     const double frameStep=animationHalfSpeed?0.5:1.0;
+     animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks)*frameStep,static_cast<double>(frames.size()));
+    }
+   }
+   animationFrame_=std::clamp(static_cast<int>(std::floor(animationPlaybackFrame_)),0,lastFrame);
+  }
+ }
+ if(!ImGui::Begin("Animation Timeline")){ImGui::End();return;}
+ if(!animationEntry||animationEntry->animation.frames.empty()){
+  ImGui::TextDisabled("Select a decoded Type 1 Animation entry in the Resource Hierarchy to use the timeline.");
+  ImGui::End();return;
+ }
+ const auto&frames=animationEntry->animation.frames;
+ const int lastFrame=static_cast<int>(frames.size()-1U);
+ ImGui::Text("%s",Crash::eidToEName(animationEntry->eid).c_str());
+ ImGui::SameLine();ImGui::TextDisabled("%zu frames",frames.size());
+ ImGui::SameLine();
+ if(ImGui::SmallButton(animationPlaying_?"Pause":"Play")){animationPlaying_=!animationPlaying_;animationFrameTimer_=0.0f;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton("|<")){animationPlaying_=false;animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton("<")){animationPlaying_=false;animationFrame_=std::max(0,animationFrame_-1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton(">")){animationPlaying_=false;animationFrame_=std::min(lastFrame,animationFrame_+1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton(">|")){animationPlaying_=false;animationFrame_=lastFrame;animationPlaybackFrame_=static_cast<double>(lastFrame);animationFrameTimer_=0.0f;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton("Edit")){animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;}
+ ImGui::SameLine();
+ ImGui::Text("Frame %d / %d",animationFrame_+1,lastFrame+1);
+ const double fractionalFrame=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
+ if(fractionalFrame>0.001){ImGui::SameLine();ImGui::TextDisabled("Subframe %.2f",fractionalFrame);}
+ ImGui::SetNextItemWidth(-1.0f);
+ if(ImGui::SliderInt("##AnimationFrameSlider",&animationFrame_,0,lastFrame,"Frame %d")){
+  animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;
+ }
+ ImGui::TextDisabled("Scrub the track below or use the frame controls for exact frame selection.");
+ const float trackWidth=std::max(1.0f,ImGui::GetContentRegionAvail().x);
+ ImGui::InvisibleButton("##AnimationTimelineTrack",ImVec2(trackWidth,34.0f),ImGuiButtonFlags_MouseButtonLeft);
+ const ImVec2 trackMin=ImGui::GetItemRectMin(),trackMax=ImGui::GetItemRectMax();
+ if(ImGui::IsItemActive()&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+  const float t=std::clamp((ImGui::GetIO().MousePos.x-trackMin.x)/std::max(1.0f,trackMax.x-trackMin.x),0.0f,0.999999f);
+  animationFrame_=std::clamp(static_cast<int>(t*static_cast<float>(frames.size())),0,lastFrame);
+  animationPlaybackFrame_=static_cast<double>(animationFrame_);animationPlaying_=false;animationFrameTimer_=0.0f;
+ }
+ ImDrawList*timelineDraw=ImGui::GetWindowDrawList();
+ timelineDraw->AddRectFilled(trackMin,trackMax,IM_COL32(24,29,37,255),4.0f);
+ const int markerStride=std::max(1,static_cast<int>((frames.size()+499U)/500U));
+ for(int i=0;i<static_cast<int>(frames.size());i+=markerStride){
+  const float x0=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(i)/static_cast<float>(frames.size()));
+  const float x1=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(std::min<int>(i+markerStride,static_cast<int>(frames.size())))/static_cast<float>(frames.size()));
+  const bool selected=animationFrame_>=i&&animationFrame_<i+markerStride;
+  timelineDraw->AddRectFilled(ImVec2(x0+1.0f,trackMin.y+3.0f),ImVec2(std::max(x0+2.0f,x1-1.0f),trackMax.y-3.0f),selected?IM_COL32(69,133,196,255):IM_COL32(53,63,77,255),2.0f);
+ }
+ const float playheadX=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(animationFrame_)+0.5f)/static_cast<float>(frames.size());
+ timelineDraw->AddLine(ImVec2(playheadX,trackMin.y),ImVec2(playheadX,trackMax.y),IM_COL32(245,210,112,255),2.0f);
+ ImGui::End();
+}
+
+void EditorUI::drawAnimationFrameEditor(){
+ if(animationFrameEditorFocus_){ImGui::SetNextWindowFocus();animationFrameEditorFocus_=false;}
+ if(!ImGui::Begin("Animation Frame Editor",&animationFrameEditorOpen_)){ImGui::End();return;}
+ const Crash::NsfEntry*animationEntry=nullptr;
+ if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
+  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+  if(chunk.type==0&&animationViewerEntry_>=0&&static_cast<std::size_t>(animationViewerEntry_)<chunk.entries.size()){
+   const auto&entry=chunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+   if(entry.valid&&entry.type==1&&entry.animation.decoded)animationEntry=&entry;
+  }
+ }
+ if(!animationEntry||animationEntry->animation.frames.empty())ImGui::TextDisabled("Select an animation to edit its frames.");
+ else{
+  const auto&frames=animationEntry->animation.frames;
+  const int frameIndex=std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U));
+  const auto&frame=frames[static_cast<std::size_t>(frameIndex)];
+  const std::uint32_t modelEid=animationEntry->animation.isCrash3?frame.linkedModelEid:frame.modelEid;
+  ImGui::Text("Animation: %s",Crash::eidToEName(animationEntry->eid).c_str());
+  ImGui::Text("Frame: %d / %zu",frameIndex+1,frames.size());
+  if(Crash::isValidEid(modelEid))ImGui::Text("Model EID: %s (%08X)",Crash::eidToEName(modelEid).c_str(),modelEid);
+  else ImGui::Text("Model EID: %08X",modelEid);
+  ImGui::Separator();
+  ImGui::TextDisabled("Frame editing is the next milestone. This tab is already linked to the timeline selection.");
+ }
+ ImGui::End();
+}
+
 void EditorUI::drawAnimationViewer(){
  if(animationDockId_!=0)ImGui::SetNextWindowDockID(animationDockId_,ImGuiCond_FirstUseEver);
- if(!ImGui::Begin("3D Animation Viewer")){ImGui::End();return;}
+ if(!ImGui::Begin("3D Animation Editor")){ImGui::End();return;}
  const Crash::NsfEntry*animationEntry=nullptr;
  if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
@@ -2628,17 +2750,7 @@ void EditorUI::drawAnimationViewer(){
  if(!animationPlaying_)animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
  else if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
- ImGui::Text("%s | %zu frames",Crash::eidToEName(animationEntry->eid).c_str(),animation.frames.size());
- ImGui::SameLine();
- if(ImGui::SmallButton(animationPlaying_?"Pause":"Play")){animationPlaying_=!animationPlaying_;animationFrameTimer_=0.0f;}
- ImGui::SameLine();
- if(ImGui::SmallButton("|<")){animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;}
- ImGui::SameLine();
- if(ImGui::SmallButton("<")){animationFrame_=std::max(0,animationFrame_-1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
- ImGui::SameLine();
- if(ImGui::SmallButton(">")){animationFrame_=std::min(lastFrame,animationFrame_+1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
- ImGui::SameLine();
- if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,lastFrame)){animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}}else ImGui::TextDisabled("Frame 1 / 1");
+ // Playback controls and the clock are owned by Animation Timeline.
  bool animationHalfSpeed=false;
  for(const auto&chunk:nsf_.chunks()){
   if(!chunk.entryTableValid)continue;
@@ -2650,20 +2762,6 @@ void EditorUI::drawAnimationViewer(){
    if(animationHalfSpeed)break;
   }
   if(animationHalfSpeed)break;
- }
- if(animationPlaying_&&animation.frames.size()>1U){
-  const double gameFps=editorPreferences.palRegion?25.0:30.0;
-  const double fullSpeedFps=editorPreferences.palRegion?50.0:60.0;
-  const double frameRate=editorPreferences.animationRefreshRateMode?fullSpeedFps:gameFps;
-  const double frameInterval=1.0/frameRate;
-  animationFrameTimer_+=std::max(0.0f,ImGui::GetIO().DeltaTime);
-  const auto elapsedTicks=static_cast<std::size_t>(animationFrameTimer_/frameInterval);
-  if(elapsedTicks>0U){
-   animationFrameTimer_-=static_cast<float>(static_cast<double>(elapsedTicks)*frameInterval);
-   const double frameStep=animationHalfSpeed?0.5:1.0;
-   animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks)*frameStep,static_cast<double>(animation.frames.size()));
-  }
-  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
  // The GOOL frame-group flag controls source-frame cadence independently of
  // this visual interpolation toggle. Blend only when the playback position is fractional.
