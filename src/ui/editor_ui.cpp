@@ -2648,6 +2648,7 @@ void EditorUI::drawAnimationViewer(){
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
+ ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
  ImGui::SetCursorScreenPos(toolbarMin);
  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6.0f,4.0f));
@@ -2669,7 +2670,6 @@ void EditorUI::drawAnimationViewer(){
  }
  const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
- ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
  ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
