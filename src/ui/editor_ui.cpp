@@ -401,7 +401,15 @@ void EditorUI::draw(){
  // otherwise steal focus when they are first submitted).
  if(showAnimationWorkspace)drawAnimationTimeline();
  if(showAnimationWorkspace&&animationEditorFocus_){
-  ImGui::SetWindowFocus("3D Animation Editor");
+  // Select the editor's tab in its central dock node after every other
+  // window (especially the bottom Animation Timeline) has been submitted.
+  // The generic focus request alone can leave the bottom dock tab selected
+  // when the animation workspace is created for the first time.
+  if(ImGuiWindow* animationEditor=ImGui::FindWindowByName("3D Animation Editor")){
+   if(animationEditor->DockNode)
+    animationEditor->DockNode->SelectedTabId=animationEditor->ID;
+   ImGui::FocusWindow(animationEditor);
+  }
   animationEditorFocus_=false;
  }
  ImGui::End();
@@ -2770,7 +2778,6 @@ void EditorUI::drawAnimationFrameEditor(){
 
 void EditorUI::drawAnimationViewer(){
  if(animationDockId_!=0)ImGui::SetNextWindowDockID(animationDockId_,ImGuiCond_FirstUseEver);
- if(animationEditorFocus_){ImGui::SetNextWindowFocus();animationEditorFocus_=false;}
  if(!ImGui::Begin("3D Animation Editor")){ImGui::End();return;}
  const Crash::NsfEntry*animationEntry=nullptr;
  if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
