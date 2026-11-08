@@ -81,6 +81,19 @@ void setPaletteColor(TextEditor::Palette& palette, TextEditor::Color color, ImU3
 GoolScriptEditor::GoolScriptEditor() {
     editor_.SetLanguage(goolScriptLanguage());
 
+    editor_.SetTextContextMenuCallback([this](TextEditor::PopupData&) {
+        const bool hasSelection = editor_.CurrentCursorHasSelection();
+        if (ImGui::MenuItem("Cut", "Ctrl+X", false, hasSelection && !readOnly_)) {
+            editor_.Cut();
+        }
+        if (ImGui::MenuItem("Copy", "Ctrl+C", false, hasSelection)) {
+            editor_.Copy();
+        }
+        if (ImGui::MenuItem("Paste", "Ctrl+V", false, !readOnly_)) {
+            editor_.Paste();
+        }
+    });
+
     auto palette = TextEditor::GetDarkPalette();
     setPaletteColor(palette, TextEditor::Color::text, IM_COL32(222, 226, 234, 255));
     setPaletteColor(palette, TextEditor::Color::keyword, IM_COL32(198, 157, 242, 255));
@@ -122,6 +135,7 @@ std::string GoolScriptEditor::GetText() const {
 }
 
 bool GoolScriptEditor::Render(const char* id, ImVec2 size, bool readOnly) {
+    readOnly_ = readOnly;
     editor_.SetReadOnlyEnabled(readOnly);
 
     const ImGuiIO& io = ImGui::GetIO();

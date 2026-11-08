@@ -16,6 +16,7 @@ public:
 
 private:
     TextEditor editor_;
+    bool readOnly_ = false;
     float fontScale_ = 1.0f;
 };
 

@@ -1273,7 +1273,7 @@ void TextEditor::handleKeyboardInputs() {
 		else if (cursors.currentCursorHasSelection() && ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_D)) { selectAllOccurrences(true); }
 
 		// clipboard operations
-		else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) { cut(); }
+		else if (!config.readOnly && ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) { cut(); }
 		else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Delete)) { cut(); }
 
 		else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C)) { copy(); }
