@@ -1785,6 +1785,8 @@ void EditorUI::drawSearchWindow(){
  if(!ImGui::Begin("Search Entries",&searchWindow_)){ImGui::End();return;}
  ImGui::TextDisabled("Find an NSF entry and jump directly to it in the Resource Hierarchy.");
  auto entryTypeLabel=[](std::uint32_t type){
+  if(type==1)return std::string("Animation (1)");
+  if(type==2)return std::string("Model (2)");
   if(type==7)return std::string("Zone (7)");
   if(type==3)return std::string("Scenery (3)");
   if(type==11)return std::string("GOOL (11)");
@@ -1834,7 +1836,7 @@ void EditorUI::drawSearchWindow(){
     const bool typeMatch=searchTypeFilter_!=-2&&(searchTypeFilter_<0||entry.type==static_cast<std::uint32_t>(searchTypeFilter_));
     if(!typeMatch)continue;
     const std::string eidName=Crash::eidToEName(entry.eid);
-    const std::string typeName=entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
+    const std::string typeName=entry.type==1?"Animation":entry.type==2?"Model":entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
     char eidHex[16];std::snprintf(eidHex,sizeof(eidHex),"%08X",entry.eid);
     const std::string searchable=eidName+" "+eidHex+" 0x"+eidHex+" "+typeName+" "+std::to_string(entry.type)+" "+std::to_string(ei)+" "+std::to_string(ci);
     if(!containsInsensitive(searchable,query))continue;
@@ -1845,7 +1847,7 @@ void EditorUI::drawSearchWindow(){
     ImGui::TableSetColumnIndex(1);ImGui::Text("%03zu",ei);
     ImGui::TableSetColumnIndex(2);
     const bool selected=selectedChunk_==static_cast<int>(ci)&&selectedEntry_==static_cast<int>(ei);
-    const std::string label=eidName+" ("+std::string(eidHex)+")";
+    const std::string label=typeName+" ("+eidName+") ["+eidHex+"]";
     if(ImGui::Selectable(label.c_str(),selected,ImGuiSelectableFlags_SpanAllColumns)){
      selectedChunk_=static_cast<int>(ci);selectedEntry_=static_cast<int>(ei);selectedEntity_=-1;selectedSpawn_=-1;
      openSelectedHierarchy_=true;

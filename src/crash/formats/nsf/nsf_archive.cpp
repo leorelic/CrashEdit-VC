@@ -244,7 +244,7 @@ static bool decodeModelPolygons(NsfModel&model){
  auto fail=[&](const char*m){model.polygonError=m;return false;};
  const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand> cmd(count);std::vector<std::int32_t> vtx;vtx.reserve(count);
  std::unordered_map<std::uint8_t,std::int32_t> keys;
- const std::int32_t special=static_cast<std::int32_t>(model.vertexCount-model.positions.size());
+ const std::int32_t special=model.compressed?static_cast<std::int32_t>(model.vertexCount-model.positions.size()):0;
  std::int32_t v=model.compressed?-special:0;
  for(std::size_t i=0;i<count;++i){const auto raw=model.polygonWords[i];if(raw==0xffffffffU)break;
   if((raw&0xffff0000U)==0){cmd[i].color1=static_cast<std::uint8_t>((raw>>2U)&0x7fU);cmd[i].color2=static_cast<std::uint8_t>((raw>>9U)&0x7fU);continue;}
