@@ -68,7 +68,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   const float frameFontScale=fontScale_;
   ImGui::SetWindowFontScale(frameFontScale);
   const ImGuiStyle& style=ImGui::GetStyle();
-  const float editorFontSize=ImGui::GetFontSize()*frameFontScale;
+  const float editorFontSize=ImGui::GetFontSize();
   const float documentLineHeight=editorFontSize,gutter=48.0f;
   const auto lines=linesOf(text_);
   const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
