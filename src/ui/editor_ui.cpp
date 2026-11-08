@@ -681,7 +681,7 @@ void EditorUI::drawMenu(){
  }
  if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
- if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::Separator();ImGui::EndMenu();}
+ if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
   if(ImGui::MenuItem("Traditional GOOL Inspection",nullptr,&editorPreferences.traditionalGoolInspection)){activeGoolChunk_=-1;activeGoolEntry_=-1;ImGui::MarkIniSettingsDirty();}
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Use the original GOOL inspection windows instead of the Script Editor and Blueprint workspace.");
