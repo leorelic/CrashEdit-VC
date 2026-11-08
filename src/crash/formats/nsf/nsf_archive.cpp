@@ -195,6 +195,98 @@ bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,Ns
  }
  return true;
 }
+
+static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfItem&item,bool crash3,NsfAnimationFrame&out){
+ out.rawOffset=item.offset;out.rawSize=item.size;
+ const std::size_t fixedHeader=crash3?28U:24U;
+ auto fail=[&](const char*message){out.error=message;return false;};
+ if(!has(bytes,item.offset,item.size)||item.size<fixedHeader)return fail("Animation frame header is truncated.");
+ const std::size_t p=item.offset;
+ out.xOffset=static_cast<std::int16_t>(u16(bytes,p));
+ out.yOffset=static_cast<std::int16_t>(u16(bytes,p+2U));
+ out.zOffset=static_cast<std::int16_t>(u16(bytes,p+4U));
+ out.unknown=static_cast<std::int16_t>(u16(bytes,p+6U));
+ if(crash3){
+  out.modelEid=u32(bytes,p+8U);
+  if(u32(bytes,p+12U)!=0U)return fail("Crash 3 animation frame reserved field is non-zero.");
+  out.vertexCount=u32(bytes,p+16U);out.collisionCount=u32(bytes,p+20U);out.headerSize=u32(bytes,p+24U);
+ }else{
+  out.vertexCount=u32(bytes,p+8U);out.collisionCount=u32(bytes,p+12U);out.modelEid=u32(bytes,p+16U);out.headerSize=u32(bytes,p+20U);
+ }
+ constexpr std::uint32_t maxVertices=16384U,maxCollisions=4096U;
+ if(out.vertexCount>maxVertices||out.collisionCount>maxCollisions)return fail("Animation frame contains unreasonable vertex or collision counts.");
+ if(out.collisionCount>(item.size-fixedHeader)/0x28U)return fail("Animation collision records exceed the frame item.");
+ const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(out.collisionCount)*0x28U;
+ if(out.headerSize<fakeHeader||out.headerSize>item.size)return fail("Animation frame header-size boundary is invalid.");
+ const std::size_t specialBytes=static_cast<std::size_t>(out.headerSize)-fakeHeader;
+ if(specialBytes%3U!=0U)return fail("Animation special-vertex data is not a whole number of vertices.");
+ out.specialVertexCount=specialBytes/3U;
+ if(out.specialVertexCount>out.vertexCount)return fail("Animation frame has more special vertices than total vertices.");
+ const std::size_t temporalBytes=item.size-fakeHeader;
+ if(temporalBytes%4U!=0U)return fail("Animation temporal bitstream is not 32-bit aligned.");
+ out.collisions.reserve(out.collisionCount);
+ for(std::uint32_t i=0;i<out.collisionCount;++i){
+  NsfAnimationCollision collision{};
+  for(std::size_t n=0;n<10U;++n)collision.values[n]=i32(bytes,p+fixedHeader+static_cast<std::size_t>(i)*0x28U+n*4U);
+  out.collisions.push_back(collision);
+ }
+ out.specialVertices.reserve(out.specialVertexCount);
+ for(std::size_t i=0;i<out.specialVertexCount;++i){
+  const std::size_t q=p+fakeHeader+i*3U;
+  out.specialVertices.push_back({bytes[q],bytes[q+1U],bytes[q+2U]});
+ }
+ out.temporalWords.reserve(temporalBytes/4U);
+ for(std::size_t q=p+fakeHeader;q<p+item.size;q+=4U)out.temporalWords.push_back(u32(bytes,q));
+ return true;
+}
+static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entry,NsfModel&out){
+ auto fail=[&](const char*message){out.error=message;return false;};
+ if(entry.items.size()!=5U&&entry.items.size()!=6U)return fail("Model entry must contain five or six items.");
+ const auto&info=entry.items[0];
+ if(info.size<0x50U||!has(bytes,info.offset,info.size))return fail("Model info item must contain at least 0x50 bytes.");
+ const std::size_t h=info.offset;
+ const std::uint32_t polygonCount=u32(bytes,h+0x2cU),textureCount=u32(bytes,h+0x34U);
+ out.vertexCount=u32(bytes,h+0x38U);
+ const std::uint32_t colorCount=u32(bytes,h+0x3cU),pageCount=u32(bytes,h+0x40U);
+ out.polygonWordCount=u32(bytes,h+0x44U);
+ const std::uint32_t extendedCount=u32(bytes,h+0x48U),positionBase=u32(bytes,h+0x4cU);
+ constexpr std::uint32_t maxElements=16384U;
+ if(polygonCount>maxElements||textureCount>maxElements||out.vertexCount>maxElements||colorCount>maxElements||out.polygonWordCount>maxElements||extendedCount>maxElements||pageCount>8U)
+  return fail("Model info contains unreasonable element counts.");
+ if(positionBase>out.vertexCount)return fail("Model compressed-position base exceeds the model vertex count.");
+ const std::uint32_t positionCount=out.vertexCount-positionBase;
+ if(entry.items.size()==6U&&positionCount>maxElements)return fail("Model compressed-position count is unreasonable.");
+ const std::size_t expected[]={info.size,static_cast<std::size_t>(out.polygonWordCount)*4U,static_cast<std::size_t>(colorCount)*4U,static_cast<std::size_t>(textureCount)*12U,static_cast<std::size_t>(extendedCount)*4U,static_cast<std::size_t>(positionCount)*4U};
+ for(std::size_t i=0;i<5U;++i)if(entry.items[i].size!=expected[i]||!has(bytes,entry.items[i].offset,entry.items[i].size))return fail("Model item size does not match its header counts.");
+ if(entry.items.size()==6U&&(entry.items[5].size!=expected[5]||!has(bytes,entry.items[5].offset,entry.items[5].size)))return fail("Model compressed-position item size does not match its header count.");
+ out.header.assign(bytes.begin()+static_cast<std::ptrdiff_t>(info.offset),bytes.begin()+static_cast<std::ptrdiff_t>(info.offset+info.size));
+ out.scaleX=i32(bytes,h);out.scaleY=i32(bytes,h+4U);out.scaleZ=i32(bytes,h+8U);
+ for(std::uint32_t i=0;i<pageCount;++i)out.texturePageEids.push_back(u32(bytes,h+0x0cU+static_cast<std::size_t>(i)*4U));
+ const auto&polygons=entry.items[1];
+ for(std::size_t p=polygons.offset;p<polygons.offset+polygons.size;p+=4U)out.polygonWords.push_back(u32(bytes,p));
+ const auto&colors=entry.items[2];
+ for(std::uint32_t i=0;i<colorCount;++i){const std::size_t p=colors.offset+static_cast<std::size_t>(i)*4U;out.colors.push_back({bytes[p],bytes[p+1U],bytes[p+2U],bytes[p+3U]});}
+ const auto&textures=entry.items[3];
+ for(std::uint32_t i=0;i<textureCount;++i){
+  const std::size_t p=textures.offset+static_cast<std::size_t>(i)*12U;const std::uint8_t b2=bytes[p+2U],b6=bytes[p+6U],b7=bytes[p+7U];
+  out.textures.push_back({bytes[p],bytes[p+1U],bytes[p+4U],bytes[p+5U],bytes[p+8U],bytes[p+9U],bytes[p+10U],bytes[p+11U],
+   static_cast<std::uint8_t>(b2&0xfU),static_cast<std::uint8_t>((b2>>4U)&0xfU),bytes[p+3U],
+   static_cast<std::uint8_t>(((b6>>7U)|((b7&1U)<<1U))&3U),static_cast<std::uint8_t>((b6>>5U)&3U),
+   static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
+ }
+ const auto&extended=entry.items[4];
+ for(std::uint32_t i=0;i<extendedCount;++i)out.extendedTextureWords.push_back(u32(bytes,extended.offset+static_cast<std::size_t>(i)*4U));
+ if(entry.items.size()==6U){
+  const auto&positions=entry.items[5];out.positions.reserve(positionCount);out.compressed=true;
+  for(std::uint32_t i=0;i<positionCount;++i){
+   const std::uint32_t raw=u32(bytes,positions.offset+static_cast<std::size_t>(i)*4U);
+   out.positions.push_back({static_cast<std::uint8_t>((raw>>25U)&0x7fU),static_cast<std::uint8_t>(raw>>17U),static_cast<std::uint8_t>(raw>>9U),
+    static_cast<std::uint8_t>((raw>>6U)&7U),static_cast<std::uint8_t>((raw>>3U)&7U),static_cast<std::uint8_t>(raw&7U),raw});
+  }
+ }
+ out.decoded=true;return true;
+}
+
 void NsfArchive::decodeZones(bool crash3Retail){
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==3){NsfScenery scenery;if(!parseScenery(chunk.bytes,entry,crash3Retail,scenery)&&scenery.error.empty())scenery.error="Scenery could not be decoded.";entry.scenery=std::move(scenery);}
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==7){
@@ -214,6 +306,34 @@ void NsfArchive::decodeZones(bool crash3Retail){
   for(std::size_t i=2;i<entry.items.size();++i){NsfEntity entity;if(!parseEntity(b,entry.items[i],i-2,entity)&&entity.error.empty())entity.error="Entity could not be decoded.";z.entities.push_back(std::move(entity));}
   if(static_cast<std::size_t>(z.cameraCount)>z.entities.size()){z.error="Zone camera count exceeds the number of entity items.";entry.zone=std::move(z);continue;}
   z.decoded=true;entry.zone=std::move(z);
+ }
+}
+
+
+void NsfArchive::decodeAnimationModels(bool crash3){
+ for(auto&chunk:chunks_){
+  if(chunk.type!=0||!chunk.entryTableValid)continue;
+  for(auto&entry:chunk.entries){
+   if(!entry.valid)continue;
+   if(entry.type==2U){
+    NsfModel model;
+    if(!parseModel(chunk.bytes,entry,model)&&model.error.empty())model.error="Model could not be decoded.";
+    entry.model=std::move(model);
+   }else if(entry.type==1U){
+    NsfAnimation animation;animation.isCrash3=crash3;
+    bool valid=true;
+    for(const auto&item:entry.items){
+     NsfAnimationFrame frame;
+     if(!parseAnimationFrame(chunk.bytes,item,crash3,frame)){
+      animation.error="Frame "+std::to_string(animation.frames.size())+": "+frame.error;
+      valid=false;animation.frames.push_back(std::move(frame));break;
+     }
+     animation.frames.push_back(std::move(frame));
+    }
+    animation.decoded=valid;
+    entry.animation=std::move(animation);
+   }
+  }
  }
 }
 

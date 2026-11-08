@@ -114,11 +114,48 @@ struct NsfGool {
  std::string frameGroupError;
  std::string error;
 };
+struct NsfAnimationCollision {
+ std::int32_t values[10]{};
+};
+struct NsfAnimationFrame {
+ std::int16_t xOffset=0,yOffset=0,zOffset=0,unknown=0;
+ std::uint32_t modelEid=0,vertexCount=0,collisionCount=0,headerSize=0;
+ std::size_t specialVertexCount=0;
+ std::vector<std::array<std::uint8_t,3>> specialVertices;
+ std::vector<NsfAnimationCollision> collisions;
+ std::vector<std::uint32_t> temporalWords;
+ std::size_t rawOffset=0,rawSize=0;
+ std::string error;
+};
+struct NsfAnimation {
+ bool decoded=false,isCrash3=false;
+ std::vector<NsfAnimationFrame> frames;
+ std::string error;
+};
+struct NsfModelPosition {
+ std::uint8_t x=0,z=0,y=0,xBits=0,zBits=0,yBits=0;
+ std::uint32_t raw=0;
+};
+struct NsfModelTexture {
+ std::uint8_t u1=0,v1=0,u2=0,v2=0,u3=0,v3=0,u4=0,v4=0;
+ std::uint8_t clutX=0,clutY1=0,clutY2=0,colorMode=0,blendMode=0,segment=0,page=0;
+};
+struct NsfModel {
+ bool decoded=false,compressed=false;
+ std::vector<std::uint8_t> header;
+ std::int32_t scaleX=0,scaleY=0,scaleZ=0;
+ std::vector<std::uint32_t> texturePageEids,polygonWords,extendedTextureWords;
+ std::vector<NsfSceneryColor> colors;
+ std::vector<NsfModelTexture> textures;
+ std::vector<NsfModelPosition> positions;
+ std::uint32_t vertexCount=0,polygonWordCount=0;
+ std::string error;
+};
 struct NsfEntry {
  std::uint32_t eid=0, type=0, itemCount=0;
  std::size_t offset=0, size=0;
  bool valid=false; std::string error;
- std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery; NsfGool gool;
+ std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery; NsfGool gool; NsfAnimation animation; NsfModel model;
 };
 struct NsfEntryLocation { std::size_t chunkIndex=0, entryIndex=0; };
 struct NsfChunk {
@@ -134,7 +171,7 @@ public:
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
  std::vector<NsfEntryLocation> findEntriesByEid(std::uint32_t eid) const;
  std::size_t compressedChunkCount()const noexcept;
- void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version);
+ void decodeZones(bool crash3Retail); void decodeGools(NsfGoolVersion version); void decodeAnimationModels(bool crash3);
  bool setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIndex,std::size_t entityIndex,std::uint16_t propertyId,std::size_t valueIndex,std::int32_t value);
  bool setGoolStateDescriptor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t descriptorIndex,const NsfGoolStateDescriptor& descriptor);
  bool setGoolDataPoolWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t wordIndex,std::uint32_t value);

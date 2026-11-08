@@ -95,4 +95,46 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(scenery.textures.size()==1&&scenery.textures[0].u1==1&&scenery.textures[0].v4==10&&scenery.textures[0].clutX==3&&scenery.textures[0].clutY1==4&&scenery.textures[0].clutY2==4);
  assert(scenery.colors.size()==1&&scenery.colors[0].r==11&&scenery.colors[0].g==22&&scenery.colors[0].b==33&&scenery.colors[0].extra==44);
  assert(scenery.animatedTextures.size()==1&&scenery.animatedTextures[0]==0xabcdef01);
+
+ // Crash 2 Type 2 model: all five base items plus the optional compressed-position item.
+ std::vector<std::uint8_t> modelChunk(65536);p16(modelChunk,0,0x1234);p16(modelChunk,2,0);p32(modelChunk,4,4);p32(modelChunk,8,1);
+ constexpr std::size_t modelEntry=24,modelItemCount=6,modelTable=16+modelItemCount*4;
+ const std::size_t modelItemSizes[]={0x50,4,4,12,4,4};
+ std::size_t modelEntrySize=modelTable;for(auto n:modelItemSizes)modelEntrySize+=n;
+ p32(modelChunk,16,modelEntry);p32(modelChunk,20,modelEntry+modelEntrySize);
+ p32(modelChunk,modelEntry,0x0100ffff);p32(modelChunk,modelEntry+4,0x0200007b);p32(modelChunk,modelEntry+8,2);p32(modelChunk,modelEntry+12,modelItemCount);
+ std::size_t modelOffset=modelTable;
+ for(std::size_t i=0;i<modelItemCount;++i){p32(modelChunk,modelEntry+16+i*4,static_cast<std::uint32_t>(modelOffset));modelOffset+=modelItemSizes[i];}
+ p32(modelChunk,modelEntry+16+modelItemCount*4,static_cast<std::uint32_t>(modelEntrySize));
+ const std::size_t modelInfo=modelEntry+modelTable;
+ p32(modelChunk,modelInfo,100);p32(modelChunk,modelInfo+4,200);p32(modelChunk,modelInfo+8,300);p32(modelChunk,modelInfo+12,0x0200007b);
+ p32(modelChunk,modelInfo+0x2c,1);p32(modelChunk,modelInfo+0x34,1);p32(modelChunk,modelInfo+0x38,1);p32(modelChunk,modelInfo+0x3c,1);p32(modelChunk,modelInfo+0x40,1);p32(modelChunk,modelInfo+0x44,1);p32(modelChunk,modelInfo+0x48,1);p32(modelChunk,modelInfo+0x4c,0);
+ const std::size_t modelPoly=modelInfo+0x50,modelColor=modelPoly+4,modelTexture=modelColor+4,modelExtended=modelTexture+12,modelPosition=modelExtended+4;
+ p32(modelChunk,modelPoly,0x12345678);modelChunk[modelColor]=10;modelChunk[modelColor+1]=20;modelChunk[modelColor+2]=30;modelChunk[modelColor+3]=40;
+ modelChunk[modelTexture]=1;modelChunk[modelTexture+1]=2;modelChunk[modelTexture+2]=0x43;modelChunk[modelTexture+3]=4;modelChunk[modelTexture+4]=5;modelChunk[modelTexture+5]=6;modelChunk[modelTexture+6]=0xa7;modelChunk[modelTexture+7]=0x05;modelChunk[modelTexture+8]=7;modelChunk[modelTexture+9]=8;modelChunk[modelTexture+10]=9;modelChunk[modelTexture+11]=10;
+ p32(modelChunk,modelExtended,0xabcdef01);p32(modelChunk,modelPosition,0x12345678);
+ assert(a.loadBytes(modelChunk,e));a.decodeAnimationModels(false);const auto&model=a.chunks()[0].entries[0].model;
+ assert(model.decoded&&model.compressed&&model.scaleX==100&&model.scaleY==200&&model.scaleZ==300);
+ assert(model.texturePageEids.size()==1&&model.texturePageEids[0]==0x0200007bU);
+ assert(model.polygonWords.size()==1&&model.polygonWords[0]==0x12345678U);
+ assert(model.colors.size()==1&&model.colors[0].r==10&&model.colors[0].extra==40);
+ assert(model.textures.size()==1&&model.textures[0].u1==1&&model.textures[0].v4==10&&model.textures[0].clutX==3);
+ assert(model.extendedTextureWords.size()==1&&model.extendedTextureWords[0]==0xabcdef01U);
+ assert(model.positions.size()==1&&model.positions[0].raw==0x12345678U);
+ // Crash 2 Type 1 animation: one bounded frame with a direct Model EID.
+ std::vector<std::uint8_t> animationChunk(65536);p16(animationChunk,0,0x1234);p16(animationChunk,2,0);p32(animationChunk,4,5);p32(animationChunk,8,1);
+ constexpr std::size_t animationEntry=24,animationItemCount=1,animationTable=16+animationItemCount*4,animationFrameSize=24;
+ const std::size_t animationEntrySize=animationTable+animationFrameSize;
+ p32(animationChunk,16,animationEntry);p32(animationChunk,20,animationEntry+animationEntrySize);
+ p32(animationChunk,animationEntry,0x0100ffff);p32(animationChunk,animationEntry+4,0x0200007b);p32(animationChunk,animationEntry+8,1);p32(animationChunk,animationEntry+12,animationItemCount);
+ p32(animationChunk,animationEntry+16,static_cast<std::uint32_t>(animationTable));p32(animationChunk,animationEntry+20,static_cast<std::uint32_t>(animationEntrySize));
+ const std::size_t animationFrame=animationEntry+animationTable;
+ p16(animationChunk,animationFrame,1);p16(animationChunk,animationFrame+2,2);p16(animationChunk,animationFrame+4,3);p16(animationChunk,animationFrame+6,4);
+ p32(animationChunk,animationFrame+8,0);p32(animationChunk,animationFrame+12,0);p32(animationChunk,animationFrame+16,0x0200007b);p32(animationChunk,animationFrame+20,24);
+ assert(a.loadBytes(animationChunk,e));a.decodeAnimationModels(false);const auto&animation=a.chunks()[0].entries[0].animation;
+ assert(animation.decoded&&animation.frames.size()==1&&animation.frames[0].modelEid==0x0200007bU);
+ assert(animation.frames[0].xOffset==1&&animation.frames[0].yOffset==2&&animation.frames[0].zOffset==3);
+ // Malformed frame header-size is rejected without reading beyond its item.
+ p32(animationChunk,animationFrame+20,0xffffffffU);
+ assert(a.loadBytes(animationChunk,e));a.decodeAnimationModels(false);assert(!a.chunks()[0].entries[0].animation.decoded);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
