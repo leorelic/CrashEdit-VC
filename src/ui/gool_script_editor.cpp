@@ -97,7 +97,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
    else if(zoomOut||keypadOut)fontScale_=std::max(0.6f,fontScale_-0.1f);
   }
   ImGui::PopStyleColor(6);ImGui::PopStyleVar(2);
-  drawSource(mn,mx,lh,style.FramePadding.y+1,active);
+  drawSource(mn,mx,lh,style.FramePadding.y+1);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
   const auto activeLine=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor))).first;
   for(std::size_t i=0;i<lines.size();++i){char n[24];std::snprintf(n,sizeof(n),"%zu",i+1);const ImVec2 m=ImGui::CalcTextSize(n);dl->AddText(ImVec2(g1.x-m.x-9,mn.y+style.FramePadding.y+1+static_cast<float>(i)*lh),i==activeLine?ActiveLineNumber:LineNumber,n);}
@@ -105,7 +105,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  }
  ImGui::EndChild();return changed;
 }
-void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,float lh,float off,bool focused){
+void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,float lh,float off){
  ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
  const ImVec2 base(mn.x+6,mn.y+off);const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
  std::size_t offset=0;
