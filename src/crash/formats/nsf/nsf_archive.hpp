@@ -191,6 +191,8 @@ public:
  bool setGoolFrameGroupEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint32_t eid);
  bool setGoolFrameGroupFrameCount(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint16_t frameCount);
  bool setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,bool interpolated);
+ bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
+ bool setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;
