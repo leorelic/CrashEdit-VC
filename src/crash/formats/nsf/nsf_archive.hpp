@@ -93,12 +93,13 @@ struct NsfGoolStateReference {
 struct NsfGoolFrameGroup {
  std::uint16_t type=0;
  std::int16_t frameCount=0;
- std::uint32_t eid=0,modelEid=0;
+ std::uint32_t eid=0;
  std::size_t byteOffset=0, byteSize=0;
- std::size_t eidFieldOffset=4,interpolatedFieldOffset=8;
  std::uint32_t partCount=0;
  std::int32_t font=0;
  bool interpolated=false;
+ std::uint32_t modelEid=0;
+ std::size_t eidFieldOffset=4,interpolatedFieldOffset=8;
 };
 struct NsfGool {
  bool decoded=false;
