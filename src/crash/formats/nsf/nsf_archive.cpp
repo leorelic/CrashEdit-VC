@@ -245,13 +245,13 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
  const auto&info=entry.items[0];
  if(info.size<0x50U||!has(bytes,info.offset,info.size))return fail("Model info item must contain at least 0x50 bytes.");
  const std::size_t h=info.offset;
- const std::uint32_t polygonCount=u32(bytes,h+0x2cU),textureCount=u32(bytes,h+0x34U);
+ const std::uint32_t polygonWordCount=u32(bytes,h+0x2cU),textureCount=u32(bytes,h+0x34U);
  out.vertexCount=u32(bytes,h+0x38U);
  const std::uint32_t colorCount=u32(bytes,h+0x3cU),pageCount=u32(bytes,h+0x40U);
- out.polygonWordCount=u32(bytes,h+0x44U);
+ out.polygonWordCount=polygonWordCount;out.polygonCount=u32(bytes,h+0x44U);
  const std::uint32_t extendedCount=u32(bytes,h+0x48U),positionBase=u32(bytes,h+0x4cU);
  constexpr std::uint32_t maxElements=16384U;
- if(polygonCount>maxElements||textureCount>maxElements||out.vertexCount>maxElements||colorCount>maxElements||out.polygonWordCount>maxElements||extendedCount>maxElements||pageCount>8U)
+ if(out.polygonWordCount>maxElements||out.polygonCount>maxElements||textureCount>maxElements||out.vertexCount>maxElements||colorCount>maxElements||extendedCount>maxElements||pageCount>8U)
   return fail("Model info contains unreasonable element counts.");
  if(positionBase>out.vertexCount)return fail("Model compressed-position base exceeds the model vertex count.");
  const std::uint32_t positionCount=out.vertexCount-positionBase;

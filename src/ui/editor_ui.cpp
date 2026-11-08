@@ -272,7 +272,7 @@ void EditorUI::handleDroppedFiles(int count,const char** paths){
  status_="No NSF file found in the dropped files.";
 }
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
- Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
+ Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3)archive.decodeAnimationModels(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
  auto sidecar=findNsdSidecar(file);Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
@@ -1782,10 +1782,13 @@ void EditorUI::drawSearchWindow(){
  for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
   for(const auto&entry:chunk.entries)if(entry.valid&&std::find(availableTypes.begin(),availableTypes.end(),entry.type)==availableTypes.end())availableTypes.push_back(entry.type);
  std::sort(availableTypes.begin(),availableTypes.end());
- const std::string currentType=searchTypeFilter_<0?"All entry types":entryTypeLabel(static_cast<std::uint32_t>(searchTypeFilter_));
- ImGui::SetNextItemWidth(210.0f);
+ bool hasTextureChunks=false;
+ for(const auto&chunk:nsf_.chunks())if(chunk.type==1){hasTextureChunks=true;break;}
+ const std::string currentType=searchTypeFilter_==-2?"Texture chunks (chunk type 1)":searchTypeFilter_<0?"All resource categories":entryTypeLabel(static_cast<std::uint32_t>(searchTypeFilter_));
+ ImGui::SetNextItemWidth(230.0f);
  if(ImGui::BeginCombo("Entry type",currentType.c_str())){
-  if(ImGui::Selectable("All entry types",searchTypeFilter_<0))searchTypeFilter_=-1;
+  if(ImGui::Selectable("All resource categories",searchTypeFilter_==-1))searchTypeFilter_=-1;
+  if(hasTextureChunks&&ImGui::Selectable("Texture chunks (chunk type 1)",searchTypeFilter_==-2))searchTypeFilter_=-2;
   for(const auto type:availableTypes){
    const std::string label=entryTypeLabel(type);
    if(ImGui::Selectable(label.c_str(),searchTypeFilter_==static_cast<int>(type)))searchTypeFilter_=static_cast<int>(type);
@@ -1816,7 +1819,7 @@ void EditorUI::drawSearchWindow(){
     const auto&entry=chunk.entries[ei];
     ++totalCount;
     if(!entry.valid)continue;
-    const bool typeMatch=searchTypeFilter_<0||entry.type==static_cast<std::uint32_t>(searchTypeFilter_);
+    const bool typeMatch=searchTypeFilter_!=-2&&(searchTypeFilter_<0||entry.type==static_cast<std::uint32_t>(searchTypeFilter_));
     if(!typeMatch)continue;
     const std::string eidName=Crash::eidToEName(entry.eid);
     const std::string typeName=entry.type==7?"Zone":entry.type==3?"Scenery":entry.type==11?"GOOL":"Type "+std::to_string(entry.type);
@@ -1841,6 +1844,30 @@ void EditorUI::drawSearchWindow(){
     ImGui::TableSetColumnIndex(4);ImGui::Text("%u",entry.itemCount);
     ImGui::PopID();ImGui::PopID();
    }
+  }
+  for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+   const auto&chunk=nsf_.chunks()[ci];
+   if(chunk.type!=1||(searchTypeFilter_!=-1&&searchTypeFilter_!=-2))continue;
+   ++totalCount;
+   char chunkHex[16];std::snprintf(chunkHex,sizeof(chunkHex),"%08X",static_cast<unsigned>(chunk.chunkId));
+   const std::string searchable="Texture chunk "+std::string(chunkHex)+" "+std::to_string(ci);
+   if(!containsInsensitive(searchable,query))continue;
+   ++matchCount;
+   ImGui::TableNextRow();
+   ImGui::PushID(static_cast<int>(ci));ImGui::PushID(-2);
+   ImGui::TableSetColumnIndex(0);ImGui::Text("%03zu",ci);
+   ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("—");
+   ImGui::TableSetColumnIndex(2);
+   const bool selected=selectedChunk_==static_cast<int>(ci)&&selectedEntry_==-1;
+   const std::string label="Texture chunk ("+std::string(chunkHex)+")";
+   if(ImGui::Selectable(label.c_str(),selected,ImGuiSelectableFlags_SpanAllColumns)){
+    selectedChunk_=static_cast<int>(ci);selectedEntry_=-1;selectedEntity_=-1;selectedSpawn_=-1;
+    openSelectedHierarchy_=true;
+    status_="Located texture chunk "+std::string(chunkHex)+".";
+   }
+   ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("Texture");
+   ImGui::TableSetColumnIndex(4);ImGui::TextUnformatted("Chunk");
+   ImGui::PopID();ImGui::PopID();
   }
   ImGui::EndTable();
  }

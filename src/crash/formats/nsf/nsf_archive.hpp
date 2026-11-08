@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -148,7 +149,7 @@ struct NsfModel {
  std::vector<NsfSceneryColor> colors;
  std::vector<NsfModelTexture> textures;
  std::vector<NsfModelPosition> positions;
- std::uint32_t vertexCount=0,polygonWordCount=0;
+ std::uint32_t vertexCount=0,polygonWordCount=0,polygonCount=0;
  std::string error;
 };
 struct NsfEntry {
