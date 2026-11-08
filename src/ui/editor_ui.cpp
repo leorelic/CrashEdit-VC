@@ -339,10 +339,12 @@ void EditorUI::draw(){
   }
  }
  showAnimationWorkspace=selectedAnimationResource||selectedModelResource;
+ if(!showAnimationWorkspace)animationWorkspaceWasVisible_=false;
  if(showAnimationWorkspace){
   const bool modelMode=selectedModelResource!=nullptr;
   const std::uint32_t modelEid=modelMode?selectedModelResource->eid:0U;
-  const bool selectionChanged=animationSelectionChunk_!=selectedChunk_||animationSelectionEntry_!=selectedEntry_;
+  const bool selectionChanged=!animationWorkspaceWasVisible_||animationSelectionChunk_!=selectedChunk_||animationSelectionEntry_!=selectedEntry_;
+  animationWorkspaceWasVisible_=true;
   if(selectionChanged||animationSelectionModel_!=modelMode||animationSelectedModelEid_!=modelEid){
    animationSelectionChunk_=selectedChunk_;animationSelectionEntry_=selectedEntry_;
    animationSelectionModel_=modelMode;animationSelectedModelEid_=modelEid;
