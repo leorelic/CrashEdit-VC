@@ -18,7 +18,7 @@ private:
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
- bool animationSelectionModel_=false,animationEditorFocus_=false;
+ bool animationSelectionModel_=false,animationEditorFocus_=false,animationWorkspaceWasVisible_=false;
  int animationSelectionChunk_=-1,animationSelectionEntry_=-1;
  std::uint32_t animationSelectedModelEid_=0;
  bool showGoolDataPool_=false,showGoolStateMap_=false,showGoolStateDescriptions_=false,showGoolFrameGroups_=false,focusGoolDataPool_=false,showGoolBlueprintInstructions_=true;
