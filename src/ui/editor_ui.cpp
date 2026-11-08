@@ -2605,7 +2605,7 @@ void EditorUI::drawAnimationViewer(){
     if(entry.valid&&entry.type==2&&entry.eid==eid&&entry.model.decoded)return &entry.model;
   return nullptr;
  };
- struct AnimationPoint{float x,y,z;};
+ struct AnimationPoint{float x,y,z;AnimationPoint(float px,float py,float pz):x(px),y(py),z(pz){}};
  auto transformVertex=[](const Crash::NsfAnimationVertex&v,const Crash::NsfAnimationFrame&frame,const Crash::NsfModel*model){
   constexpr float fallbackScale=1.0f/128.0f;
   constexpr float modelScale=3200.0f*128.0f;
