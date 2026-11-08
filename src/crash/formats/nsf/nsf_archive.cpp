@@ -728,6 +728,27 @@ bool NsfArchive::setAnimationFrameCollisionValue(std::size_t chunkIndex,std::siz
  frame.collisions[collisionIndex].values[valueIndex]=value;
  return true;
 }
+bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value){
+ if(chunkIndex>=chunks_.size()||axis>=3U)return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=1||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ auto& frame=entry.animation.frames[frameIndex];
+ if(vertexIndex>=frame.specialVertices.size()||vertexIndex>=frame.specialVertexCount)return false;
+ const std::size_t fixedHeader=entry.animation.isCrash3?28U:24U;
+ const std::size_t relative=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U+vertexIndex*3U+axis;
+ if(relative>=frame.rawSize||!has(chunk.bytes,frame.rawOffset+relative,1U))return false;
+ chunk.bytes[frame.rawOffset+relative]=value;
+ frame.specialVertices[vertexIndex][axis]=value;
+ if(frame.verticesDecoded&&vertexIndex<frame.vertices.size()){
+  auto& decoded=frame.vertices[vertexIndex];
+  if(axis==0U)decoded.x=value;
+  else if(axis==1U)decoded.y=value;
+  else decoded.z=value;
+ }
+ return true;
+}
 std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
  std::vector<NsfEntryLocation> matches;
  for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){
