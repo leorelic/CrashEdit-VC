@@ -41,7 +41,7 @@ struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
- bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=true;
+ bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=false;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
@@ -137,7 +137,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
  else if(std::sscanf(line,"PALRegion=%d",&value)==1)editorPreferences.palRegion=value!=0;
- else if(std::sscanf(line,"AnimationRefreshRateMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
+ else if(std::sscanf(line,"AnimationPlaybackMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -146,7 +146,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationRefreshRateMode=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationPlaybackMode=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
  p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
@@ -2643,23 +2643,6 @@ void EditorUI::drawAnimationViewer(){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
   const double refreshHz=editorPreferences.palRegion?50.0:60.0;
   double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
-  // CrashEdit-RE applies an additional half-speed clock to animations whose
-  // GOOL vertex frame group is marked Interpolated. This is animation metadata,
-  // not the viewer's visual interpolation toggle.
-  bool gameHalfSpeed=false;
-  bool foundGameFrameGroup=false;
-  for(const auto&chunk:nsf_.chunks()){
-   if(!chunk.entryTableValid)continue;
-   for(const auto&entry:chunk.entries){
-    if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
-    for(const auto&group:entry.gool.frameGroups){
-     if(group.eid==animationEntry->eid){gameHalfSpeed=group.interpolated;foundGameFrameGroup=true;break;}
-    }
-    if(foundGameFrameGroup)break;
-   }
-   if(foundGameFrameGroup)break;
-  }
-  if(gameHalfSpeed)frameRate*=0.5;
   animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate;
   if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
