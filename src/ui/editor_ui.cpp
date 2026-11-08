@@ -2897,8 +2897,10 @@ void EditorUI::drawAnimationViewer(){
       auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page?getTexture(textureKey):0);GL::Uniform1i(has,page?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
       GL::DepthMask(1);drawPass(3);
       GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0x0302U,0x0303U);drawPass(0);
-      GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,1U,1U);drawPass(2);
-      GL::BlendEquation(0x8006U);drawPass(1);
+      // PS1 blend mode 1 is additive; mode 2 is subtractive. Keep the
+      // equations aligned with the original CrashEdit blend-mode mapping.
+      GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,1U,1U);drawPass(2);
+      GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,1U,1U);drawPass(1);
       GL::DepthMask(1);GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
      }
      GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
