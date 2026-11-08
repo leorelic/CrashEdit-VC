@@ -34,6 +34,7 @@
 #include <commdlg.h>
 #endif
 namespace CrashEdit {
+static void usePremultipliedAnimationImageBlend(ImDrawList*,const ImDrawCmd*){GL::BlendFunc(1U,0x0303U);}
 struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::size_t gpuDrawCalls=0,gpuUploadBytes=0,cachedTextureCount=0,cachedTextureBytes=0; };
 static RendererDiagnostics rendererDiagnostics;
 struct EditorPreferences {
@@ -2772,7 +2773,10 @@ void EditorUI::drawAnimationViewer(){
    project(planeX+planeExtent,groundY,planeZ+planeExtent),
    project(planeX-planeExtent,groundY,planeZ+planeExtent)
   };
-  // The hardware image is opaque, so draw the ground plane inside its depth-tested framebuffer rather than behind the ImGui image.
+  // The ground plane and grid are a separate viewport background layer. They are
+  // drawn before the transparent model framebuffer and never enter its depth buffer.
+  const bool floorVisible=floorCorners[0].x>-99999.0f&&floorCorners[1].x>-99999.0f&&floorCorners[2].x>-99999.0f&&floorCorners[3].x>-99999.0f;
+  if(floorVisible)dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(20,23,28,255));
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
    CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
    constexpr float nearDepth=0.1f;
@@ -2833,19 +2837,6 @@ void EditorUI::drawAnimationViewer(){
       using BatchKey=std::pair<TextureKey,int>;
       std::map<BatchKey,std::vector<Vertex>> batches;
       std::map<std::uint32_t,const std::vector<std::uint8_t>*> pageLookup;
-      std::vector<Vertex> floorVertices;
-      floorVertices.reserve(6);
-      const float floorPoints[4][2]={{planeX-planeExtent,planeZ-planeExtent},{planeX+planeExtent,planeZ-planeExtent},{planeX+planeExtent,planeZ+planeExtent},{planeX-planeExtent,planeZ+planeExtent}};
-      const int floorOrder[6]={0,1,2,0,2,3};
-      for(int index:floorOrder){
-       const auto cam=toCamera(floorPoints[index][0],groundY,floorPoints[index][1]);
-       if(cam.depth<=0.1f){floorVertices.clear();break;}
-       const auto screen=projectCamera(cam);
-       const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;
-       constexpr float nearP=.05f,farP=200.0f;
-       const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
-       floorVertices.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,20.0f/255.0f,23.0f/255.0f,28.0f/255.0f,1.0f,0.0f,0.0f});
-      }
       for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536U){
        const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8U)|(std::uint32_t(chunk.bytes[6])<<16U)|(std::uint32_t(chunk.bytes[7])<<24U);
        pageLookup.emplace(pageId,&chunk.bytes);
@@ -2904,16 +2895,11 @@ void EditorUI::drawAnimationViewer(){
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
-      GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);GL::ClearColor(0,0,0,1);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
+      GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
       auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page?getTexture(textureKey):0);GL::Uniform1i(has,page?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
       GL::DepthMask(1);
-      if(!floorVertices.empty()){
-       GL::Uniform1i(blendMask,3);GL::Uniform1i(has,0);GL::Uniform1i(blendMode,3);GL::BindTexture(0x0DE1U,0);
-       GL::BufferData(0x8892U,GL::SizePtr(floorVertices.size()*sizeof(Vertex)),floorVertices.data(),0x88E8U);
-       GL::DrawArrays(0x0004U,0,int(floorVertices.size()));
-      }
       drawPass(3);
-      GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);drawPass(0);
+      GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);drawPass(0);
       // PS1 blend mode 1 is additive; mode 2 is subtractive. Keep the
       // equations aligned with the original CrashEdit blend-mode mapping.
       GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(2);
@@ -2921,7 +2907,7 @@ void EditorUI::drawAnimationViewer(){
       GL::DepthMask(1);GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
      }
      GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
-     if(rendered)dl->AddImage((ImTextureID)(std::intptr_t)gpu.color,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));
+     if(rendered){dl->AddCallback(usePremultipliedAnimationImageBlend,nullptr);dl->AddImage((ImTextureID)(std::intptr_t)gpu.color,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));dl->AddCallback(ImDrawCallback_ResetRenderState,nullptr);}
     }
     if(!rendered)dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(255,170,100,255),"Hardware renderer unavailable; choose Wireframe in viewport settings.");
    }
