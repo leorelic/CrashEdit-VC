@@ -332,7 +332,7 @@ void EditorUI::draw(){
   if(selectedChunk.type==0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<selectedChunk.entries.size()){
    const auto&selected=selectedChunk.entries[static_cast<std::size_t>(selectedEntry_)];
    if(selected.valid&&selected.type==1&&selected.animation.decoded&&(animationViewerChunk_!=selectedChunk_||animationViewerEntry_!=selectedEntry_)){
-    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;animationFrame_=0;animationPlaybackFrame_=0.0;animationPlaying_=false;animationCameraInitialized_=false;
+    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
    }
   }
  }
@@ -2592,7 +2592,7 @@ void EditorUI::drawAnimationTimeline(){
    if(entry.valid&&entry.type==1&&entry.animation.decoded)animationEntry=&entry;
   }
  }
- bool animationHalfSpeed=false;
+ animationHalfSpeed_=false;
  if(animationEntry){
   const auto&frames=animationEntry->animation.frames;
   if(!frames.empty()){
@@ -2602,11 +2602,11 @@ void EditorUI::drawAnimationTimeline(){
     for(const auto&entry:chunk.entries){
      if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
      for(const auto&group:entry.gool.frameGroups){
-      if(group.type==1U&&group.eid==animationEntry->eid){animationHalfSpeed=group.interpolated;break;}
+      if(group.type==1U&&group.eid==animationEntry->eid){animationHalfSpeed_=group.interpolated;break;}
      }
-     if(animationHalfSpeed)break;
+     if(animationHalfSpeed_)break;
     }
-    if(animationHalfSpeed)break;
+    if(animationHalfSpeed_)break;
    }
    if(!animationPlaying_)animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
    else if(animationPlaybackFrame_>=static_cast<double>(frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(frames.size()));
@@ -2619,7 +2619,7 @@ void EditorUI::drawAnimationTimeline(){
     const auto elapsedTicks=static_cast<std::size_t>(animationFrameTimer_/frameInterval);
     if(elapsedTicks>0U){
      animationFrameTimer_-=static_cast<float>(static_cast<double>(elapsedTicks)*frameInterval);
-     const double frameStep=animationHalfSpeed?0.5:1.0;
+     const double frameStep=animationHalfSpeed_?0.5:1.0;
      animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks)*frameStep,static_cast<double>(frames.size()));
     }
    }
@@ -2651,10 +2651,12 @@ void EditorUI::drawAnimationTimeline(){
  ImGui::Text("Frame %d / %d",animationFrame_+1,lastFrame+1);
  const double fractionalFrame=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
  if(fractionalFrame>0.001){ImGui::SameLine();ImGui::TextDisabled("Subframe %.2f",fractionalFrame);}
- ImGui::SetNextItemWidth(-1.0f);
- if(ImGui::SliderInt("##AnimationFrameSlider",&animationFrame_,0,lastFrame,"Frame %d")){
-  animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;
- }
+ if(frames.size()>1U){
+  ImGui::SetNextItemWidth(-1.0f);
+  if(ImGui::SliderInt("##AnimationFrameSlider",&animationFrame_,0,lastFrame,"Frame %d")){
+   animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;
+  }
+ }else ImGui::TextDisabled("Frame 1 / 1");
  ImGui::TextDisabled("Scrub the track below or use the frame controls for exact frame selection.");
  const float trackWidth=std::max(1.0f,ImGui::GetContentRegionAvail().x);
  ImGui::InvisibleButton("##AnimationTimelineTrack",ImVec2(trackWidth,34.0f),ImGuiButtonFlags_MouseButtonLeft);
@@ -2751,18 +2753,7 @@ void EditorUI::drawAnimationViewer(){
  else if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  // Playback controls and the clock are owned by Animation Timeline.
- bool animationHalfSpeed=false;
- for(const auto&chunk:nsf_.chunks()){
-  if(!chunk.entryTableValid)continue;
-  for(const auto&entry:chunk.entries){
-   if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
-   for(const auto&group:entry.gool.frameGroups){
-    if(group.type==1U&&group.eid==animationEntry->eid){animationHalfSpeed=group.interpolated;break;}
-   }
-   if(animationHalfSpeed)break;
-  }
-  if(animationHalfSpeed)break;
- }
+ const bool animationHalfSpeed=animationHalfSpeed_;
  // The GOOL frame-group flag controls source-frame cadence independently of
  // this visual interpolation toggle. Blend only when the playback position is fractional.
  const double poseFramePosition=animationPlaybackFrame_+(animationInterpolate_&&animationPlaying_&&!animationHalfSpeed?0.5:0.0);
