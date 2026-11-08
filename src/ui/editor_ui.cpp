@@ -41,7 +41,7 @@ struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
- bool traditionalGoolInspection=false;
+ bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=false;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
@@ -136,6 +136,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
+ else if(std::sscanf(line,"PALRegion=%d",&value)==1)editorPreferences.palRegion=value!=0;
+ else if(std::sscanf(line,"AnimationRefreshRateMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -144,8 +146,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationRefreshRateMode=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -330,7 +332,7 @@ void EditorUI::draw(){
   if(selectedChunk.type==0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<selectedChunk.entries.size()){
    const auto&selected=selectedChunk.entries[static_cast<std::size_t>(selectedEntry_)];
    if(selected.valid&&selected.type==1&&selected.animation.decoded&&(animationViewerChunk_!=selectedChunk_||animationViewerEntry_!=selectedEntry_)){
-    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;animationFrame_=0;animationPlaying_=false;animationCameraInitialized_=false;
+    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;animationFrame_=0;animationPlaybackFrame_=0.0;animationPlaying_=false;animationCameraInitialized_=false;
    }
   }
  }
@@ -797,7 +799,7 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}
  ImGui::EndMenuBar();
 }
-void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::EndChild();}
+void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::SameLine();ImGui::SetNextItemWidth(82.0f);int regionChoice=editorPreferences.palRegion?1:0;const char*regionNames[]={"NTSC","PAL"};if(ImGui::Combo("##NSFRegion",&regionChoice,regionNames,2)){editorPreferences.palRegion=regionChoice==1;animationFrameTimer_=0.0f;}ImGui::EndChild();}
 void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
  auto resourceDefaultFilename=[&](int kind,int chunkIndex,int entryIndex,int itemIndex){
   std::string name=kind==0?"chunk_"+std::to_string(chunkIndex):kind==1?"entry_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex):"item_"+std::to_string(chunkIndex)+"_"+std::to_string(entryIndex)+"_"+std::to_string(itemIndex);
@@ -2642,7 +2644,10 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SameLine();
  if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,lastFrame)){animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}}else ImGui::TextDisabled("Frame 1 / 1");
  if(animationPlaying_&&animation.frames.size()>1U){
-  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*30.0*(frameGroupInterpolated?0.5:1.0);
+  const double gameFps=editorPreferences.palRegion?25.0:30.0;
+  const double refreshHz=editorPreferences.palRegion?50.0:60.0;
+  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz*0.5:gameFps;
+  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate*(frameGroupInterpolated?0.5:1.0);
   if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
@@ -2691,6 +2696,12 @@ void EditorUI::drawAnimationViewer(){
  if(ImGui::BeginPopup("AnimationViewportOptions")){
   ImGui::TextUnformatted("Rendering");
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
+  ImGui::Separator();
+  ImGui::TextUnformatted("Playback timing");
+  const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
+  const char*refreshSpeedLabel=editorPreferences.palRegion?"Refresh rate (50 Hz)":"Refresh rate (60 Hz)";
+  if(ImGui::MenuItem(gameSpeedLabel,nullptr,!editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=false;
+  if(ImGui::MenuItem(refreshSpeedLabel,nullptr,editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=true;
   if(ImGui::MenuItem("Textured (Hardware)",nullptr,!animationWireframe_))animationWireframe_=false;
   if(ImGui::MenuItem("Wireframe",nullptr,animationWireframe_))animationWireframe_=true;
   ImGui::Separator();
