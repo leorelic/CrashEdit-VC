@@ -65,8 +65,11 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  if(size.x<=0)size.x=ImGui::GetContentRegionAvail().x;if(size.y<=0)size.y=ImGui::GetContentRegionAvail().y;
  const bool visible=ImGui::BeginChild(child.c_str(),size,true);bool changed=false;
  if(visible){
-  ImGui::SetWindowFontScale(fontScale_);
-  const ImGuiStyle& style=ImGui::GetStyle();const float documentLineHeight=ImGui::GetFontSize(),gutter=48.0f;
+  const float frameFontScale=fontScale_;
+  ImGui::SetWindowFontScale(frameFontScale);
+  const ImGuiStyle& style=ImGui::GetStyle();
+  const float editorFontSize=ImGui::GetFont()->FontSize*frameFontScale;
+  const float documentLineHeight=editorFontSize,gutter=48.0f;
   const auto lines=linesOf(text_);
   const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
   // Size the input widget to its document, not the viewport. The outer child
@@ -100,18 +103,18 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   // InputTextMultiline advances each unwrapped source line by the active ImGui font size.
   // Read it after submitting the widget so the overlay follows the font scale actually used
   // for this frame, including the frame in which a zoom shortcut is pressed.
-  const float renderedLineHeight=ImGui::GetFontSize();
+  const float renderedLineHeight=editorFontSize;
   const ImVec2 textOrigin(mn.x+6.0f,mn.y+style.FramePadding.y);
   drawSource(mn,mx,textOrigin,renderedLineHeight);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
   const auto activeLine=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor))).first;
-  for(std::size_t i=0;i<lines.size();++i){char n[24];std::snprintf(n,sizeof(n),"%zu",i+1);const ImVec2 m=ImGui::CalcTextSize(n);dl->AddText(ImVec2(g1.x-m.x-9,textOrigin.y+static_cast<float>(i)*renderedLineHeight),i==activeLine?ActiveLineNumber:LineNumber,n);}
+  for(std::size_t i=0;i<lines.size();++i){char n[24];std::snprintf(n,sizeof(n),"%zu",i+1);const ImVec2 m=ImGui::GetFont()->CalcTextSizeA(editorFontSize,FLT_MAX,0,n);dl->AddText(ImVec2(g1.x-m.x-9,textOrigin.y+static_cast<float>(i)*renderedLineHeight),i==activeLine?ActiveLineNumber:LineNumber,n);}
   dl->PopClipRect();
  }
  ImGui::EndChild();return changed;
 }
 void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,const ImVec2& textOrigin,float lineHeight){
- ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
+ ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=lineHeight;
  const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
  std::size_t offset=0;
  for(std::size_t li=0;li<lines.size();++li){auto line=lines[li];const float y=textOrigin.y+static_cast<float>(li)*lineHeight;if(li==activeLine)dl->AddRectFilled(ImVec2(mn.x,y),ImVec2(mx.x,y+lineHeight),CurrentLine);
