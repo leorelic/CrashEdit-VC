@@ -396,8 +396,14 @@ void EditorUI::draw(){
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
- // Keep Animation Timeline last in the dock submission order.
+ // Keep Animation Timeline last in the dock submission order, then explicitly
+ // restore focus to the main animation editor (new bottom-dock windows can
+ // otherwise steal focus when they are first submitted).
  if(showAnimationWorkspace)drawAnimationTimeline();
+ if(showAnimationWorkspace&&animationEditorFocus_){
+  ImGui::SetWindowFocus("3D Animation Editor");
+  animationEditorFocus_=false;
+ }
  ImGui::End();
  drawSearchWindow();
  if(!restoredLastNsfPath_){
@@ -2839,7 +2845,7 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SameLine();
  if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Selected Model EID: %s",Crash::eidToEName(linkedModelEid).c_str());
  else ImGui::TextDisabled("Selected Model EID: %08X",linkedModelEid);
- if(animationSelectionModel_){
+ {
   ImGui::SameLine();
   std::string currentAnimationLabel="No linked animation";
   if(animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
@@ -2850,7 +2856,7 @@ void EditorUI::drawAnimationViewer(){
    }
   }
   ImGui::SetNextItemWidth(230.0f);
-  if(ImGui::BeginCombo("##ModelLinkedAnimation",currentAnimationLabel.c_str())){
+  if(Crash::isValidEid(linkedModelEid)&&ImGui::BeginCombo("##ModelLinkedAnimation",currentAnimationLabel.c_str())){
    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
     const auto&candidateChunk=nsf_.chunks()[ci];if(candidateChunk.type!=0||!candidateChunk.entryTableValid)continue;
     for(std::size_t ei=0;ei<candidateChunk.entries.size();++ei){
@@ -2859,7 +2865,7 @@ void EditorUI::drawAnimationViewer(){
      bool usesSelectedModel=false;
      for(const auto&candidateFrame:candidate.animation.frames){
       const std::uint32_t candidateModelEid=candidate.animation.isCrash3?candidateFrame.linkedModelEid:candidateFrame.modelEid;
-      if(candidateModelEid==animationSelectedModelEid_){usesSelectedModel=true;break;}
+      if(candidateModelEid==linkedModelEid){usesSelectedModel=true;break;}
      }
      if(!usesSelectedModel)continue;
      const bool selected=animationViewerChunk_==static_cast<int>(ci)&&animationViewerEntry_==static_cast<int>(ei);
