@@ -2646,7 +2646,7 @@ void EditorUI::drawAnimationViewer(){
  if(animationPlaying_&&animation.frames.size()>1U){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
   const double refreshHz=editorPreferences.palRegion?50.0:60.0;
-  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz*0.5:gameFps;
+  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
   animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate*(frameGroupInterpolated?0.5:1.0);
   if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
@@ -2659,7 +2659,7 @@ void EditorUI::drawAnimationViewer(){
   displayPositions.reserve(frame.vertices.size());
   for(const auto&vertex:frame.vertices)displayPositions.push_back(transformVertex(vertex,frame,model));
   const double fraction=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
-  if(animationInterpolate_&&editorPreferences.animationRefreshRateMode&&fraction>0.0&&animation.frames.size()>1U){
+  if(animationInterpolate_&&fraction>0.0&&animation.frames.size()>1U){
    const auto&nextFrame=animation.frames[(static_cast<std::size_t>(animationFrame_)+1U)%animation.frames.size()];
    const std::uint32_t nextModelEid=animation.isCrash3?nextFrame.linkedModelEid:nextFrame.modelEid;
    if(nextFrame.verticesDecoded&&nextFrame.vertices.size()==frame.vertices.size()&&nextModelEid==linkedModelEid){
