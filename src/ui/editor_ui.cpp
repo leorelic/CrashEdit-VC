@@ -2791,7 +2791,7 @@ void EditorUI::drawAnimationFrameEditor(){
   if(!animationEntry->animation.isCrash3){
    std::uint32_t editableModelEid=frame.modelEid;
    ImGui::SetNextItemWidth(220.0f);
-   if(ImGui::InputScalar("Model EID",&ImGuiDataType_U32,&editableModelEid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal)){
+   if(ImGui::InputScalar("Model EID",ImGuiDataType_U32,&editableModelEid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal)){
     if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
    }
   }else{
