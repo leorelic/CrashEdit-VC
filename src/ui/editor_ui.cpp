@@ -2877,7 +2877,7 @@ void EditorUI::drawAnimationViewer(){
        const std::vector<std::uint8_t>*page=nullptr;
        if(tex&&tex->page<model->texturePageEids.size()){const auto found=pageLookup.find(model->texturePageEids[tex->page]);if(found!=pageLookup.end())page=found->second;}
        const int mode=tex?std::clamp<int>(tex->colorMode,0,2):0,clutX=tex?std::clamp<int>(tex->clutX,0,15):0,clutY=tex?std::clamp<int>((tex->clutY2<<2U)|((tex->clutY1>>2U)&3U),0,127):0;
-       float ux[3]{},uy[3]{};const int uvOrder[3]=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?2:0),uvOrder1=1,uvOrder2=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?0:2);if(tex){const int off=(1<<(2-mode))*64*tex->segment;const float u[3]={float(tex->u1)+off,float(tex->u2)+off,float(tex->u3)+off},v[3]={float(tex->v1),float(tex->v2),float(tex->v3)};const int uv[3]={uvOrder,uvOrder1,uvOrder2};for(int k=0;k<3;++k){ux[k]=u[uv[k]];uy[k]=v[uv[k]];}}
+       float ux[3]{},uy[3]{};const int uvOrder=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?2:0),uvOrder1=1,uvOrder2=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?0:2);if(tex){const int off=(1<<(2-mode))*64*tex->segment;const float u[3]={float(tex->u1)+off,float(tex->u2)+off,float(tex->u3)+off},v[3]={float(tex->v1),float(tex->v2),float(tex->v3)};const int uv[3]={uvOrder,uvOrder1,uvOrder2};for(int k=0;k<3;++k){ux[k]=u[uv[k]];uy[k]=v[uv[k]];}}
        bool triangleVisible=true;
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
        if(!triangleVisible)continue;
