@@ -2659,7 +2659,7 @@ void EditorUI::drawAnimationViewer(){
   displayPositions.reserve(frame.vertices.size());
   for(const auto&vertex:frame.vertices)displayPositions.push_back(transformVertex(vertex,frame,model));
   const double fraction=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
-  if(animationInterpolate_&&fraction>0.0&&animation.frames.size()>1U){
+  if(animationInterpolate_&&editorPreferences.animationRefreshRateMode&&fraction>0.0&&animation.frames.size()>1U){
    const auto&nextFrame=animation.frames[(static_cast<std::size_t>(animationFrame_)+1U)%animation.frames.size()];
    const std::uint32_t nextModelEid=animation.isCrash3?nextFrame.linkedModelEid:nextFrame.modelEid;
    if(nextFrame.verticesDecoded&&nextFrame.vertices.size()==frame.vertices.size()&&nextModelEid==linkedModelEid){
@@ -2698,8 +2698,8 @@ void EditorUI::drawAnimationViewer(){
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
   ImGui::Separator();
   ImGui::TextUnformatted("Playback timing");
-  const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
-  const char*refreshSpeedLabel=editorPreferences.palRegion?"Refresh rate (50 Hz)":"Refresh rate (60 Hz)";
+  const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS, stepped)":"Game speed (30 FPS, stepped)";
+  const char*refreshSpeedLabel=editorPreferences.palRegion?"Refresh rate (50 Hz, interpolated)":"Refresh rate (60 Hz, interpolated)";
   if(ImGui::MenuItem(gameSpeedLabel,nullptr,!editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=false;
   if(ImGui::MenuItem(refreshSpeedLabel,nullptr,editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=true;
   if(ImGui::MenuItem("Textured (Hardware)",nullptr,!animationWireframe_))animationWireframe_=false;
