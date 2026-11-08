@@ -39,6 +39,7 @@ struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
+ bool traditionalGoolInspection=false;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100;
  std::string lastNsfPath;
@@ -131,6 +132,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
+ else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -139,8 +141,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -317,9 +319,12 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<2){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=2;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();drawViewport();drawBottom();drawGoolDataWindows();drawGoolInspector();drawGoolGraph();drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
+ drawHierarchy();drawViewport();drawBottom();
+ if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
+ else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
+ if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
@@ -464,13 +469,6 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
 
 
 void EditorUI::drawGoolScriptEditor(){
- if(!showGoolScriptEditor_)return;
- const ImGuiViewport* viewport=ImGui::GetMainViewport();
- const ImVec2 workSize=viewport->WorkSize;
- ImGui::SetNextWindowSizeConstraints(ImVec2(700.0f,480.0f),workSize);
- ImGui::SetNextWindowSize(ImVec2(std::min(1120.0f,workSize.x*0.92f),
-   std::min(760.0f,workSize.y*0.88f)),ImGuiCond_FirstUseEver);
- ImGui::SetNextWindowPos(viewport->GetCenter(),ImGuiCond_FirstUseEver,ImVec2(0.5f,0.5f));
 
  const Crash::NsfGool* selectedGool=nullptr;
  std::uint32_t selectedEid=0;
@@ -503,6 +501,18 @@ void EditorUI::drawGoolScriptEditor(){
   activeRoutine=0;programReady=false;
  }
 
+ if(!selectedGool)return;
+ const ImGuiViewport* viewport=ImGui::GetMainViewport();
+ const ImVec2 workSize=viewport->WorkSize;
+ ImGui::SetNextWindowSizeConstraints(ImVec2(700.0f,480.0f),workSize);
+ ImGui::SetNextWindowSize(ImVec2(std::min(1120.0f,workSize.x*0.92f),
+   std::min(760.0f,workSize.y*0.88f)),ImGuiCond_FirstUseEver);
+ ImGui::SetNextWindowPos(viewport->GetCenter(),ImGuiCond_FirstUseEver,ImVec2(0.5f,0.5f));
+ static bool scriptDockInitialized=false;
+ if(!scriptDockInitialized){
+  if(ImGuiWindow* viewer=ImGui::FindWindowByName("3D Zone Editor"))
+   if(viewer->DockNode){ImGui::SetNextWindowDockID(viewer->DockNode->ID,ImGuiCond_Always);scriptDockInitialized=true;}
+ }
  static GoolScriptEditor selectedEditor;
  static GoolScriptEditor scratchEditor;
  static std::string selectedEditorText;
@@ -519,7 +529,7 @@ void EditorUI::drawGoolScriptEditor(){
   "    else:\n"
   "        call UpdateMovement\n");scratchEditorInitialized=true;}
 
- if(ImGui::Begin("GOOL Script Editor",&showGoolScriptEditor_)){
+ if(ImGui::Begin("GOOL Script Editor")){
   ImGui::TextDisabled("GOOL authoring workspace");
   ImGui::SameLine();
   if(ImGui::SmallButton(showGoolScriptNavigator_?"Hide Navigator":"Show Navigator"))
@@ -671,8 +681,10 @@ void EditorUI::drawMenu(){
  }
  if(ImGui::BeginMenu("Edit")){ImGui::MenuItem("Undo","Ctrl+Z",false,false);ImGui::MenuItem("Redo","Ctrl+Y",false,false);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
- if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::Separator();ImGui::MenuItem("GOOL Script Editor",nullptr,&showGoolScriptEditor_);ImGui::EndMenu();}
+ if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::Separator();ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
+  if(ImGui::MenuItem("Traditional GOOL Inspection",nullptr,&editorPreferences.traditionalGoolInspection)){activeGoolChunk_=-1;activeGoolEntry_=-1;ImGui::MarkIniSettingsDirty();}
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("Use the original GOOL inspection windows instead of the Script Editor and Blueprint workspace.");
   if(ImGui::MenuItem("Create .bak backups during save",nullptr,&editorPreferences.createBakBackup))ImGui::MarkIniSettingsDirty();
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Before saving, copy the previous NSF and NSD to matching .bak files.");
   if(ImGui::MenuItem("Create dated backups during save",nullptr,&editorPreferences.createDatedBackup))ImGui::MarkIniSettingsDirty();
@@ -2126,8 +2138,8 @@ void EditorUI::drawGoolBlueprintGraph(){
  if(!selectedEntry||!gool)return;
  static bool dockInitialized=false;
  if(!dockInitialized){
-  if(ImGuiWindow* inspector=ImGui::FindWindowByName("GOOL Inspector"))
-   if(inspector->DockNode){ImGui::SetNextWindowDockID(inspector->DockNode->ID,ImGuiCond_FirstUseEver);dockInitialized=true;}
+  if(ImGuiWindow* viewer=ImGui::FindWindowByName("3D Zone Editor"))
+   if(viewer->DockNode){ImGui::SetNextWindowDockID(viewer->DockNode->ID,ImGuiCond_Always);dockInitialized=true;}
  }
  ImGui::Begin("GOOL Blueprint");
  ImGui::Text("%s  ·  %zu instructions",Crash::eidToEName(selectedEntry->eid).c_str(),gool->instructions.size());
