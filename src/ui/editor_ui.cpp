@@ -2625,7 +2625,8 @@ void EditorUI::drawAnimationViewer(){
   );
  };
  const int lastFrame=static_cast<int>(animation.frames.size()-1U);
- animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
+ if(!animationPlaying_)animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
+ else if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  bool frameGroupInterpolated=false;
  for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
@@ -2646,8 +2647,8 @@ void EditorUI::drawAnimationViewer(){
  if(animationPlaying_&&animation.frames.size()>1U){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
   const double refreshHz=editorPreferences.palRegion?50.0:60.0;
-  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz*0.5:gameFps;
-  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate*(frameGroupInterpolated?0.5:1.0);
+  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
+  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate;
   if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
