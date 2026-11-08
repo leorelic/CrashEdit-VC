@@ -41,7 +41,7 @@ struct EditorPreferences {
  int uiScaling=100;
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
- bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=false;
+ bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=true;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
