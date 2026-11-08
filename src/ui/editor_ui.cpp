@@ -2792,10 +2792,10 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::SameLine();editShort("Z Offset",2U,frame.zOffset);
   editShort("Unknown",3U,frame.unknown);
   if(!animationEntry->animation.isCrash3){
-   if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid){
+   if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid||animationFrameModelEnameAnimationEid_!=animationEntry->eid||animationFrameModelEnameFrame_!=frameIndex){
     const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
     std::snprintf(animationFrameModelEname_,sizeof(animationFrameModelEname_),"%s",decodedModelEname.c_str());
-    animationFrameModelEid_=frame.modelEid;animationFrameModelEnameInitialized_=true;
+    animationFrameModelEid_=frame.modelEid;animationFrameModelEnameAnimationEid_=animationEntry->eid;animationFrameModelEnameFrame_=frameIndex;animationFrameModelEnameInitialized_=true;
    }
    ImGui::TextUnformatted("Model EID");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
    if(ImGui::InputText("##ModelEID",animationFrameModelEname_,sizeof(animationFrameModelEname_),ImGuiInputTextFlags_CharsNoBlank)){
