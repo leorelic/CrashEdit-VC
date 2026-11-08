@@ -25,7 +25,8 @@ private:
  std::vector<std::array<char,6>> frameGroupEidBuffers_;
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
- float animationYaw_=0.0f,animationPitch_=0.22f,animationDistance_=3.0f,animationFrameTimer_=0.0f;
+ float animationYaw_=0.0f,animationPitch_=0.261799f,animationDistance_=3.0f,animationFrameTimer_=0.0f;
+ float animationTargetX_=0.0f,animationTargetY_=0.0f,animationTargetZ_=0.0f;
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
  bool animationPlaying_=false,animationCameraInitialized_=false;

@@ -2628,46 +2628,109 @@ void EditorUI::drawAnimationViewer(){
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
- ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight);
+ ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
- dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(20,25,33,255));dl->PushClipRect(canvasMin,canvasMax,true);
- if(hovered&&ImGui::GetIO().MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_*std::pow(0.88f,ImGui::GetIO().MouseWheel),0.15f,100000.0f);
- if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
-  const ImVec2 delta=ImGui::GetIO().MouseDelta;animationYaw_+=delta.x*0.008f;animationPitch_=std::clamp(animationPitch_+delta.y*0.008f,-1.45f,1.45f);
- }
- if(!frame.verticesDecoded||!model||!model->polygonsDecoded||model->triangles.empty()){
-  const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":!model?"No linked Model was found.":model&&!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
+ dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));dl->PushClipRect(canvasMin,canvasMax,true);
+ if(!frame.verticesDecoded||frame.vertices.empty()){
+  const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
  }else{
   float minX=std::numeric_limits<float>::max(),minY=minX,minZ=minX,maxX=-minX,maxY=-minX,maxZ=-minX;
   for(const auto&v:frame.vertices){minX=std::min(minX,static_cast<float>(v.x));minY=std::min(minY,static_cast<float>(v.y));minZ=std::min(minZ,static_cast<float>(v.z));maxX=std::max(maxX,static_cast<float>(v.x));maxY=std::max(maxY,static_cast<float>(v.y));maxZ=std::max(maxZ,static_cast<float>(v.z));}
   const float cx=(minX+maxX)*0.5f,cy=(minY+maxY)*0.5f,cz=(minZ+maxZ)*0.5f;
   const float radius=std::max(1.0f,std::sqrt((maxX-minX)*(maxX-minX)+(maxY-minY)*(maxY-minY)+(maxZ-minZ)*(maxZ-minZ))*0.5f);
-  if(!animationCameraInitialized_){animationDistance_=radius*3.2f;animationCameraInitialized_=true;}
-  const float focal=std::min(canvasSize.x,canvasSize.y)*0.9f;
-  const float sy=std::sin(animationYaw_),cyaw=std::cos(animationYaw_),sp=std::sin(animationPitch_),cp=std::cos(animationPitch_);
-  std::vector<ImVec2> projected(frame.vertices.size());std::vector<bool> visible(frame.vertices.size(),false);
-  for(std::size_t i=0;i<frame.vertices.size();++i){
-   const auto&v=frame.vertices[i];const float dx=static_cast<float>(v.x)-cx,dy=static_cast<float>(v.y)-cy,dz=static_cast<float>(v.z)-cz;
-   const float rx=dx*cyaw-dz*sy,rz=dx*sy+dz*cyaw;
-   const float ry=dy*cp-rz*sp,depth=animationDistance_+dy*sp+rz*cp;
-   if(depth<=0.01f)continue;
-   const float perspective=focal/depth;
-   projected[i]=ImVec2(canvasMin.x+canvasSize.x*0.5f+rx*perspective,canvasMin.y+canvasSize.y*0.5f-ry*perspective);
-   visible[i]=true;
+  float groundY=minY;
+  for(const auto&otherFrame:animation.frames)if(otherFrame.verticesDecoded)
+   for(const auto&v:otherFrame.vertices)groundY=std::min(groundY,static_cast<float>(v.y));
+  if(!animationCameraInitialized_){
+   animationTargetX_=cx;animationTargetY_=cy;animationTargetZ_=cz;
+   animationYaw_=0.0f;animationPitch_=0.261799f;
+   animationDistance_=std::clamp(radius*2.8f,2.0f,200000.0f);
+   animationCameraInitialized_=true;
   }
-  for(const auto&tri:model->triangles){
-   if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
-   const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),c=static_cast<std::size_t>(tri.c);
-   if(!visible[a]||!visible[b]||!visible[c])continue;
-   ImU32 color=IM_COL32(165,190,220,235);
-   if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
-   dl->AddLine(projected[a],projected[b],color,1.25f);dl->AddLine(projected[b],projected[c],color,1.25f);dl->AddLine(projected[c],projected[a],color,1.25f);
+  const ImGuiIO&io=ImGui::GetIO();
+  if(hovered&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.2f,200000.0f);
+  if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+   animationYaw_-=io.MouseDelta.x*0.005f;
+   animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
+  }
+  if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+   const float pan=animationDistance_*0.0018f;
+   const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
+   animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
+   animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
+  }
+  if(hovered&&ImGui::IsKeyDown(ImGuiKey_R))animationCameraInitialized_=false;
+  if(hovered){
+   const float moveSpeed=(2.0f*float(editorPreferences.sceneMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
+   const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
+   const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
+   if(shift){
+    if(ImGui::IsKeyDown(ImGuiKey_W))animationTargetZ_+=moveSpeed;
+    if(ImGui::IsKeyDown(ImGuiKey_S))animationTargetZ_-=moveSpeed;
+    if(ImGui::IsKeyDown(ImGuiKey_A))animationTargetX_+=moveSpeed;
+    if(ImGui::IsKeyDown(ImGuiKey_D))animationTargetX_-=moveSpeed;
+   }else{
+    if(ImGui::IsKeyDown(ImGuiKey_W)){animationTargetX_-=syaw*moveSpeed;animationTargetZ_-=cyaw*moveSpeed;}
+    if(ImGui::IsKeyDown(ImGuiKey_S)){animationTargetX_+=syaw*moveSpeed;animationTargetZ_+=cyaw*moveSpeed;}
+    if(ImGui::IsKeyDown(ImGuiKey_A)){animationTargetX_-=cyaw*moveSpeed;animationTargetZ_+=syaw*moveSpeed;}
+    if(ImGui::IsKeyDown(ImGuiKey_D)){animationTargetX_+=cyaw*moveSpeed;animationTargetZ_-=syaw*moveSpeed;}
+   }
+   if(ImGui::IsKeyDown(ImGuiKey_E))animationTargetY_+=moveSpeed;
+   if(ImGui::IsKeyDown(ImGuiKey_Q))animationTargetY_-=moveSpeed;
+  }
+  auto project=[&](float x,float y,float z){
+   x-=animationTargetX_;y-=animationTargetY_;z-=animationTargetZ_;
+   const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_),cp=std::cos(animationPitch_),sp=std::sin(animationPitch_);
+   const float rx=x*cyaw-z*syaw,rz=x*syaw+z*cyaw;
+   const float py=y*cp-rz*sp,pz=y*sp+rz*cp;
+   const float depth=animationDistance_-pz;
+   const float focal=canvasSize.y*0.5f/std::tan(0.785398163f*0.5f);
+   if(depth<=0.05f)return ImVec2(-100000.0f,-100000.0f);
+   return ImVec2(canvasMin.x+canvasSize.x*0.5f+rx*focal/depth,canvasMin.y+canvasSize.y*0.5f-py*focal/depth);
+  };
+  // A stable floor is shared by every frame in this animation, so it does not
+  // jump when the animated model's feet move between frames.
+  const float planeExtent=std::max(radius*5.0f,8.0f),gridStep=std::max(radius*0.25f,1.0f);
+  const ImVec2 floorCorners[4]={
+   project(animationTargetX_-planeExtent,groundY,animationTargetZ_-planeExtent),
+   project(animationTargetX_+planeExtent,groundY,animationTargetZ_-planeExtent),
+   project(animationTargetX_+planeExtent,groundY,animationTargetZ_+planeExtent),
+   project(animationTargetX_-planeExtent,groundY,animationTargetZ_+planeExtent)
+  };
+  dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(18,21,26,255));
+  for(int i=-10;i<=10;++i){
+   const float offset=gridStep*static_cast<float>(i);
+   const ImU32 gridColor=i==0?IM_COL32(92,104,118,180):IM_COL32(55,62,72,150);
+   const float width=i==0?1.5f:1.0f;
+   dl->AddLine(project(animationTargetX_+offset,groundY,animationTargetZ_-planeExtent),project(animationTargetX_+offset,groundY,animationTargetZ_+planeExtent),gridColor,width);
+   dl->AddLine(project(animationTargetX_-planeExtent,groundY,animationTargetZ_+offset),project(animationTargetX_+planeExtent,groundY,animationTargetZ_+offset),gridColor,width);
+  }
+  if(model&&model->polygonsDecoded&&!model->triangles.empty()){
+   std::vector<ImVec2> projected(frame.vertices.size());
+   std::vector<bool> visible(frame.vertices.size(),false);
+   for(std::size_t i=0;i<frame.vertices.size();++i){
+    const auto&v=frame.vertices[i];const ImVec2 p=project(static_cast<float>(v.x),static_cast<float>(v.y),static_cast<float>(v.z));
+    projected[i]=p;visible[i]=p.x>-99999.0f;
+   }
+   for(const auto&tri:model->triangles){
+    if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
+    const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),d=static_cast<std::size_t>(tri.c);
+    if(!visible[a]||!visible[b]||!visible[d])continue;
+    ImU32 color=IM_COL32(165,190,220,235);
+    if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
+    dl->AddLine(projected[a],projected[b],color,1.25f);
+    dl->AddLine(projected[b],projected[d],color,1.25f);
+    dl->AddLine(projected[d],projected[a],color,1.25f);
+   }
+  }else{
+   const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
+   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
   }
  }
  dl->PopClipRect();
- ImGui::TextDisabled("Left drag: orbit | Wheel: zoom | Camera is independent from the Zone Editor.");
+ ImGui::TextDisabled("Left drag: orbit | Right drag: pan | Wheel: zoom | WASD: move | Q/E: down/up | Shift: world-aligned | R: reset camera");
  ImGui::End();
 }
 
