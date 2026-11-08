@@ -692,6 +692,10 @@ void EditorUI::drawGoolScriptEditor(){
       const ImVec2 selectedEditorAvail=ImGui::GetContentRegionAvail();
       const float selectedEditorHeight=std::max(120.0f,selectedEditorAvail.y-42.0f);
       selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,selectedEditorHeight),true);
+      if(const std::string clickedWord=selectedEditor.TakeCtrlClickedWord();!clickedWord.empty()){
+       activeGoolDocumentationTopic=documentationTopicForToken(clickedWord);
+       documentationTabActive=true;
+      }
       if(fontCount>1.0f)ImGui::PopFont();
      }
     }else{
