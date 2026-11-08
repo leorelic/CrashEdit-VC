@@ -1320,7 +1320,7 @@ void EditorUI::drawViewport(){
       ++faceCount;
      }
      GL::Viewport(0,0,targetWidth,targetHeight);if(editorPreferences.depthBufferEnabled)GL::Enable(0x0B71U);else GL::Disable(0x0B71U);GL::DepthFunc(0x0201U);
-     GL::Enable(0x0BE2U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+     GL::Enable(0x0BE2U);GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);
      GL::ClearColor(0.078f,0.098f,0.13f,1.0f);GL::Clear(0x00004000U|0x00000100U);
      GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);
      GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);
@@ -1365,7 +1365,7 @@ void EditorUI::drawViewport(){
      // Match CrashEdit's four PS1 scenery blend passes: solid, trans,
      // subtractive, then additive. Non-solid passes preserve source polygon order.
      GL::BlendEquation(0x8006U);
-     GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+     GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);
      GL::Uniform1i(blendMaskLocation,3);
      for(bool skyPass:{true,false}){
       GL::DepthMask(skyPass?0:1);
@@ -1386,7 +1386,7 @@ void EditorUI::drawViewport(){
      auto drawBlendPass=[&](int blendMode,unsigned int equation,unsigned int sourceFactor,unsigned int destinationFactor){
       GL::DepthMask(0);
       GL::BlendEquation(equation);
-      GL::BlendFuncSeparate(sourceFactor,destinationFactor,sourceFactor,destinationFactor);
+      GL::BlendFuncSeparate(sourceFactor,destinationFactor,0U,1U);
       GL::Uniform1i(blendMaskLocation,blendMode);
       for(bool skyPass:{true,false})for(const auto&face:faces){
        if(face.sky!=skyPass||!face.page||face.blendMode!=blendMode)continue;
@@ -1441,7 +1441,7 @@ void EditorUI::drawViewport(){
       GL::DepthFunc(0x0203U);
       GL::DepthMask(0);
       GL::BlendEquation(0x8006U);
-      GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+      GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);
       GL::Uniform1i(blendMaskLocation,3);GL::Uniform1i(hasTextureLocation,0);GL::Uniform1i(blendModeLocation,3);
       const std::size_t guideBytes=guideVertices.size()*sizeof(GpuVertex);gpuUploadBytes+=guideBytes;
       GL::BufferData(0x8892U,static_cast<GL::SizePtr>(guideBytes),guideVertices.data(),0x88E8U);
@@ -2893,14 +2893,14 @@ void EditorUI::drawAnimationViewer(){
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
-      GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
+      GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);GL::ClearColor(0,0,0,1);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
       auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page?getTexture(textureKey):0);GL::Uniform1i(has,page?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
       GL::DepthMask(1);drawPass(3);
-      GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0x0302U,0x0303U);drawPass(0);
+      GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,0U,1U);drawPass(0);
       // PS1 blend mode 1 is additive; mode 2 is subtractive. Keep the
       // equations aligned with the original CrashEdit blend-mode mapping.
-      GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,1U,1U);drawPass(2);
-      GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,1U,1U);drawPass(1);
+      GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(2);
+      GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(1);
       GL::DepthMask(1);GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
      }
      GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
