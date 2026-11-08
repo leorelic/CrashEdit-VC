@@ -2883,7 +2883,7 @@ void EditorUI::drawAnimationViewer(){
        bool triangleVisible=true;
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
        if(!triangleVisible)continue;
-       const int blendMode=tex?(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3):3;
+       const int blendMode=(!tex||!page)?3:(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3);
        const TextureKey textureKey{page,mode,clutX,clutY};
        auto&out=batches[BatchKey{textureKey,blendMode}];
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
