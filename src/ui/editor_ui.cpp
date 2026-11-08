@@ -2642,7 +2642,23 @@ void EditorUI::drawAnimationViewer(){
  if(animationPlaying_&&animation.frames.size()>1U){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
   const double refreshHz=editorPreferences.palRegion?50.0:60.0;
-  const double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
+  double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
+  // CrashEdit-RE applies an additional half-speed clock to animations whose
+  // GOOL vertex frame group is marked Interpolated. This is animation metadata,
+  // not the viewer's visual interpolation toggle.
+  bool gameHalfSpeed=false;
+  for(const auto&chunk:nsf_.chunks()){
+   if(!chunk.entryTableValid)continue;
+   for(const auto&entry:chunk.entries){
+    if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
+    for(const auto&group:entry.gool.frameGroups){
+     if(group.eid==animationEntry->eid){gameHalfSpeed=group.interpolated;break;}
+    }
+    if(gameHalfSpeed)break;
+   }
+   if(gameHalfSpeed)break;
+  }
+  if(gameHalfSpeed)frameRate*=0.5;
   animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate;
   if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
