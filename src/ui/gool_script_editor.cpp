@@ -33,7 +33,7 @@ std::vector<Token> lex(std::string_view s){
  while(i<s.size()){
   const auto c=static_cast<unsigned char>(s[i]);const auto a=i;Kind k=Kind::Plain;
   if(c=='#'){out.push_back({i,s.size(),Kind::Comment});break;}
-  if(c=='"'||c=='\\''){const char q=static_cast<char>(c);++i;while(i<s.size()){if(s[i]=='\\'&&i+1<s.size()){i+=2;continue;}if(s[i++]==q)break;}k=Kind::String;}
+  if(c=='"'||c=='\''){const char q=static_cast<char>(c);++i;while(i<s.size()){if(s[i]=='\\'&&i+1<s.size()){i+=2;continue;}if(s[i++]==q)break;}k=Kind::String;}
   else if(std::isdigit(c)){if(c=='0'&&i+1<s.size()&&(s[i+1]=='x'||s[i+1]=='X')){i+=2;while(i<s.size()&&(std::isxdigit(static_cast<unsigned char>(s[i]))||s[i]=='_'))++i;}else{while(i<s.size()&&std::isdigit(static_cast<unsigned char>(s[i])))++i;if(i<s.size()&&s[i]=='.'){++i;while(i<s.size()&&std::isdigit(static_cast<unsigned char>(s[i])))++i;}}k=Kind::Number;}
   else if(identStart(c)){++i;while(i<s.size()&&identPart(static_cast<unsigned char>(s[i])))++i;k=classify(s.substr(a,i-a));}
   else if(std::ispunct(c)){++i;if(i<s.size()&&std::strchr("=<>!&|+-*/%",static_cast<char>(c))&&s[i]=='=')++i;k=Kind::Punctuation;}
@@ -44,12 +44,12 @@ std::vector<Token> lex(std::string_view s){
 }
 std::pair<std::size_t,std::size_t> lineColumn(std::string_view s,std::size_t pos){
  pos=std::min(pos,s.size());std::size_t line=0,col=0;
- for(std::size_t i=0;i<pos;++i){if(s[i]=='\\n'){++line;col=0;}else if(s[i]!='\\r')++col;}
+ for(std::size_t i=0;i<pos;++i){if(s[i]=='\n'){++line;col=0;}else if(s[i]!='\r')++col;}
  return {line,col};
 }
 std::vector<std::string_view> linesOf(std::string_view s){
  std::vector<std::string_view> v;std::size_t a=0;
- while(a<=s.size()){auto e=s.find('\\n',a);auto b=e==std::string_view::npos?s.size():e;if(b>a&&s[b-1]=='\\r')--b;v.emplace_back(s.data()+a,b-a);if(e==std::string_view::npos)break;a=e+1;}
+ while(a<=s.size()){auto e=s.find('\n',a);auto b=e==std::string_view::npos?s.size():e;if(b>a&&s[b-1]=='\r')--b;v.emplace_back(s.data()+a,b-a);if(e==std::string_view::npos)break;a=e+1;}
  return v;
 }
 }
@@ -66,11 +66,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  const bool visible=ImGui::BeginChild(child.c_str(),size,true);bool changed=false;
  if(visible){
   ImGui::SetWindowFontScale(fontScale_);
-  const ImGuiStyle& style=ImGui::GetStyle();
-  // GetFontSize is the active, window-scaled glyph size. Use it as the
-  // shared line advance for the gutter and syntax/current-line overlay so
-  // both grow and shrink with Ctrl +/- exactly like InputTextMultiline.
-  const float lh=ImGui::GetFontSize(),gutter=48.0f;
+  const ImGuiStyle& style=ImGui::GetStyle();const float lh=ImGui::GetFontSize(),gutter=48.0f;
   const auto lines=linesOf(text_);
   const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
   // Size the input widget to its document, not the viewport. The outer child
