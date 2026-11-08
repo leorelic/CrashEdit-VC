@@ -34,7 +34,7 @@
 #include <commdlg.h>
 #endif
 namespace CrashEdit {
-static void usePremultipliedAnimationImageBlend(ImDrawList*,const ImDrawCmd*){GL::BlendFunc(1U,0x0303U);}
+static void usePremultipliedAnimationImageBlend(const ImDrawList*,const ImDrawCmd*){GL::BlendFunc(1U,0x0303U);}
 struct RendererDiagnostics { double sceneBuildMs=0.0,gpuSubmitCpuMs=0.0; std::size_t gpuDrawCalls=0,gpuUploadBytes=0,cachedTextureCount=0,cachedTextureBytes=0; };
 static RendererDiagnostics rendererDiagnostics;
 struct EditorPreferences {
