@@ -2,6 +2,13 @@
 
 This roadmap tracks the progression from reliable GOOL inspection toward readable decompilation and, eventually, safe editing and recompilation. Items are staged deliberately: later authoring features depend on understanding the instruction set and validating the underlying representation first.
 
+## Current editor/workspace status — 2026-11-08
+
+- The dedicated **GOOL Script Editor** workspace is implemented beside the 3D Zone Viewer. It includes a read-only, routine-oriented decompilation view and an editable scratch-script surface with indentation diagnostics. The selected GOOL decompilation is not yet directly editable or recompilable.
+- The **GOOL Blueprint** workspace is available as an execution-flow visualization foundation; full visual authoring is still future work.
+- **Experimental → Traditional GOOL Inspection** is an opt-in compatibility mode (off by default). It restores the legacy GOOL inspection windows in place of Script Editor and Blueprint. The obsolete embedded **GOOL Script** tab has been removed from the traditional Inspector; source-like viewing belongs in the dedicated Script Editor.
+- The editor component foundation is complete (syntax coloring, zoom, line/current-line presentation, editing shortcuts, and reliable code-area interaction). This is a UI milestone, not completion of the GOOL language, compiler, or round-trip workflow.
+
 ## 1. Inspection and format understanding
 
 - [x] Parse and inspect GOOL headers, instructions, data pools, state maps, state descriptors, and frame groups.
@@ -108,8 +115,8 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 
 ## 5. Editing and recompilation
 
-- [x] Add a read-only GOOL Script decompilation preview to the Inspector, with instruction-range controls and a shortcut to the first resolved local Code hook.
-- [ ] Design a readable GOOL Script Editor for manual source-like editing.
+- [x] Add a dedicated GOOL Script Editor workspace with a routine-oriented, read-only decompilation view and a separate editable scratch-script surface with indentation diagnostics; selected GOOL source editing and recompilation remain future work.
+- [x] Establish the dedicated GOOL Script Editor UI and shared-IR decompilation presentation; [ ] implement editing of selected GOOL source and connect it to validated recompilation.
 - [ ] Develop Blueprint into a visual authoring interface, allowing users to understand and eventually edit execution flow visually.
 - [ ] Keep the Script Editor and Blueprint backed by the same structured GOOL representation so changes remain consistent between views.
 - [ ] Add validation and diagnostics before allowing modified GOOL data to be written.
@@ -154,7 +161,7 @@ The long-term GOOL workflow should provide three complementary ways to understan
 2. **GOOL Blueprint** — currently a visual explanation of execution flow and relationships; eventually a visual authoring interface.
 3. **GOOL Script** — a readable source-like representation, eventually with manual editing.
 
-These are different views of the same underlying GOOL model, not separate implementations of the format. The Inspector remains useful for precise technical inspection; Blueprint emphasizes visual structure and approachable authoring; GOOL Script emphasizes readability and text-based authoring.
+These are different views of the same underlying GOOL model, not separate implementations of the format. The Inspector remains useful for precise technical inspection; Blueprint emphasizes visual structure and approachable authoring; GOOL Script emphasizes readability and text-based authoring. Traditional GOOL Inspection is a compatibility preference that restores the legacy inspection windows and hides the newer Script/Blueprint workspace; it does not create a fourth authoring layer.
 
 - [x] Model GTE data-register aliases in COP2 transfers: IRGB reads and ORGB reads depend on IR1–IR3, IRGB writes update IR1–IR3, and LZCS writes update LZCR; cover register and memory transfer forms.
 - [x] Model the SXYP screen-coordinate FIFO alias in COP2 transfers: reads mirror SXY2, while writes shift SXY0–SXY2; cover register and memory transfer forms.
