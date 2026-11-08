@@ -2778,8 +2778,9 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::Text("Frame Properties");
   ImGui::TextDisabled("Values are written directly to the NSF as they are changed.");
   auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
-   int value=current;ImGui::SetNextItemWidth(150.0f);
-   if(ImGui::InputInt(label,&value,1,16)){
+   int value=current;
+   ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+   if(ImGui::InputInt("##FrameField",&value,1,16)){
     if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
     else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
    }
@@ -2789,10 +2790,15 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::SameLine();editShort("Z Offset",2U,frame.zOffset);
   editShort("Unknown",3U,frame.unknown);
   if(!animationEntry->animation.isCrash3){
-   std::uint32_t editableModelEid=frame.modelEid;
-   ImGui::SetNextItemWidth(220.0f);
-   if(ImGui::InputScalar("Model EID",ImGuiDataType_U32,&editableModelEid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal)){
-    if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
+   char editableModelEname[6]{};
+   const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
+   std::snprintf(editableModelEname,sizeof(editableModelEname),"%s",decodedModelEname.c_str());
+   ImGui::TextUnformatted("Model EID");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+   if(ImGui::InputText("##ModelEID",editableModelEname,sizeof(editableModelEname),ImGuiInputTextFlags_CharsNoBlank)){
+    try{
+     const std::uint32_t editableModelEid=Crash::eNameToEid(editableModelEname);
+     if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
+    }catch(const std::exception&){status_="Model EID must be a valid five-character decoded EID name." ;}
    }
   }else{
    ImGui::TextDisabled("Crash 3 linked-model selection is supplied by GOOL frame groups; the raw frame model field is not edited here.");
@@ -2810,22 +2816,20 @@ void EditorUI::drawAnimationFrameEditor(){
    const auto&collision=frame.collisions[ci];
    char title[64];std::snprintf(title,sizeof(title),"Collision %zu",ci+1U);
    if(ImGui::CollapsingHeader(title,ImGuiTreeNodeFlags_DefaultOpen)){
-    int u=collision.values[0];ImGui::SetNextItemWidth(150.0f);
-    if(ImGui::InputInt("U",&u)){
+    int u=collision.values[0];ImGui::TextUnformatted("U");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+    if(ImGui::InputInt("##CollisionU",&u)){
      if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,0U,u))status_="Could not write the collision U value.";
     }
     const char*rowNames[]={"Offset","Point 1","Point 2"};
     for(std::size_t row=0;row<3U;++row){
      ImGui::PushID(static_cast<int>(row));
      ImGui::Text("%s",rowNames[row]);
-     ImGui::SameLine();
      for(std::size_t axis=0;axis<3U;++axis){
-      if(axis>0U)ImGui::SameLine();
       const std::size_t valueIndex=1U+row*3U+axis;
       int value=collision.values[valueIndex];
       const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
-      ImGui::SetNextItemWidth(115.0f);
-      char label[8];std::snprintf(label,sizeof(label),"%s",axisName);
+      ImGui::TextUnformatted(axisName);ImGui::SameLine();ImGui::SetNextItemWidth(115.0f);
+      char label[24];std::snprintf(label,sizeof(label),"##Collision%s",axisName);
       if(ImGui::InputInt(label,&value)){
        if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,valueIndex,value))status_="Could not write a collision coordinate.";
       }
@@ -3256,7 +3260,6 @@ void EditorUI::drawAnimationViewer(){
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
    dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
   }
- }
  // Match CrashEdit-RE: collision bounds use their own 102400-unit scale and
  // are positioned from the frame collision offset, independently of model scale.
  if(animationCollisionViewer_&&!frame.collisions.empty()){
@@ -3293,6 +3296,8 @@ void EditorUI::drawAnimationViewer(){
    }
    for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
   }
+ }
+ 
  }
  dl->PopClipRect();
  ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
