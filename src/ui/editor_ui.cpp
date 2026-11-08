@@ -2750,28 +2750,117 @@ void EditorUI::drawAnimationTimeline(){
 }
 
 void EditorUI::drawAnimationFrameEditor(){
+ if(!animationFrameEditorOpen_)return;
  if(animationFrameEditorFocus_){ImGui::SetNextWindowFocus();animationFrameEditorFocus_=false;}
  if(!ImGui::Begin("Animation Frame Editor",&animationFrameEditorOpen_)){ImGui::End();return;}
+ const std::size_t chunkIndex=animationViewerChunk_>=0?static_cast<std::size_t>(animationViewerChunk_):nsf_.chunks().size();
+ const std::size_t entryIndex=animationViewerEntry_>=0?static_cast<std::size_t>(animationViewerEntry_):0U;
  const Crash::NsfEntry*animationEntry=nullptr;
- if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
-  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
-  if(chunk.type==0&&animationViewerEntry_>=0&&static_cast<std::size_t>(animationViewerEntry_)<chunk.entries.size()){
-   const auto&entry=chunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+ if(nsfValid_&&chunkIndex<nsf_.chunks().size()){
+  const auto&chunk=nsf_.chunks()[chunkIndex];
+  if(chunk.type==0&&entryIndex<chunk.entries.size()){
+   const auto&entry=chunk.entries[entryIndex];
    if(entry.valid&&entry.type==1&&entry.animation.decoded)animationEntry=&entry;
   }
  }
- if(!animationEntry||animationEntry->animation.frames.empty())ImGui::TextDisabled("Select an animation to edit its frames.");
- else{
+ if(!animationEntry||animationEntry->animation.frames.empty()){
+  ImGui::TextDisabled("Select an animation and choose a frame from its timeline.");
+ }else{
   const auto&frames=animationEntry->animation.frames;
   const int frameIndex=std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U));
   const auto&frame=frames[static_cast<std::size_t>(frameIndex)];
   const std::uint32_t modelEid=animationEntry->animation.isCrash3?frame.linkedModelEid:frame.modelEid;
   ImGui::Text("Animation: %s",Crash::eidToEName(animationEntry->eid).c_str());
-  ImGui::Text("Frame: %d / %zu",frameIndex+1,frames.size());
-  if(Crash::isValidEid(modelEid))ImGui::Text("Model EID: %s (%08X)",Crash::eidToEName(modelEid).c_str(),modelEid);
-  else ImGui::Text("Model EID: %08X",modelEid);
+  ImGui::SameLine();ImGui::TextDisabled("Frame %d / %zu",frameIndex+1,frames.size());
+  if(Crash::isValidEid(modelEid))ImGui::Text("Linked Model: %s (%08X)",Crash::eidToEName(modelEid).c_str(),modelEid);
+  else ImGui::Text("Linked Model: %08X",modelEid);
   ImGui::Separator();
-  ImGui::TextDisabled("Frame editing is the next milestone. This tab is already linked to the timeline selection.");
+  ImGui::Text("Frame Properties");
+  ImGui::TextDisabled("Values are written directly to the NSF as they are changed.");
+  auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
+   int value=current;ImGui::SetNextItemWidth(150.0f);
+   if(ImGui::InputInt(label,&value,1,16)){
+    if(value<INT16_MIN||value>INT16_MAX)status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
+    else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
+   }
+  };
+  editShort("X Offset",0U,frame.xOffset);
+  ImGui::SameLine();editShort("Y Offset",1U,frame.yOffset);
+  ImGui::SameLine();editShort("Z Offset",2U,frame.zOffset);
+  editShort("Unknown",3U,frame.unknown);
+  if(!animationEntry->animation.isCrash3){
+   std::uint32_t editableModelEid=frame.modelEid;
+   ImGui::SetNextItemWidth(220.0f);
+   if(ImGui::InputScalar("Model EID",&ImGuiDataType_U32,&editableModelEid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal)){
+    if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
+   }
+  }else{
+   ImGui::TextDisabled("Crash 3 linked-model selection is supplied by GOOL frame groups; the raw frame model field is not edited here.");
+  }
+  ImGui::Separator();
+  ImGui::Text("Frame Structure");
+  ImGui::Text("Vertices: %u    Collisions: %u",frame.vertexCount,frame.collisionCount);
+  ImGui::Text("Header Size: %u bytes    Special Vertices: %zu",frame.headerSize,frame.specialVertexCount);
+  ImGui::TextDisabled("Header size and special-vertex count are derived from the frame layout and are read-only for now.");
+  ImGui::Separator();
+  ImGui::Text("Collision Records");
+  if(frame.collisions.empty())ImGui::TextDisabled("This frame has no collision records.");
+  for(std::size_t ci=0;ci<frame.collisions.size();++ci){
+   ImGui::PushID(static_cast<int>(ci));
+   const auto&collision=frame.collisions[ci];
+   char title[64];std::snprintf(title,sizeof(title),"Collision %zu",ci+1U);
+   if(ImGui::CollapsingHeader(title,ImGuiTreeNodeFlags_DefaultOpen)){
+    int u=collision.values[0];ImGui::SetNextItemWidth(150.0f);
+    if(ImGui::InputInt("U",&u)){
+     if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,0U,u))status_="Could not write the collision U value.";
+    }
+    const char*rowNames[]={"Offset","Point 1","Point 2"};
+    for(std::size_t row=0;row<3U;++row){
+     ImGui::PushID(static_cast<int>(row));
+     ImGui::Text("%s",rowNames[row]);
+     ImGui::SameLine();
+     for(std::size_t axis=0;axis<3U;++axis){
+      if(axis>0U)ImGui::SameLine();
+      const std::size_t valueIndex=1U+row*3U+axis;
+      int value=collision.values[valueIndex];
+      const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
+      ImGui::SetNextItemWidth(115.0f);
+      char label[8];std::snprintf(label,sizeof(label),"%s",axisName);
+      if(ImGui::InputInt(label,&value)){
+       if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,valueIndex,value))status_="Could not write a collision coordinate.";
+      }
+     }
+     ImGui::PopID();
+    }
+   }
+   ImGui::PopID();
+  }
+  ImGui::Separator();
+  ImGui::Text("Decoded Vertices");
+  if(!frame.verticesDecoded)ImGui::TextDisabled("Vertices are not decoded: %s",frame.vertexError.c_str());
+  else{
+   ImGui::TextDisabled("%zu vertices decoded. Packed temporal vertices remain read-only until their encoder is implemented.",frame.vertices.size());
+   const std::size_t showCount=std::min<std::size_t>(frame.vertices.size(),static_cast<std::size_t>(std::max(0,static_cast<int>(frame.specialVertexCount))));
+   if(showCount>0U&&ImGui::BeginTable("##SpecialVertices",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY,ImVec2(0.0f,220.0f))){
+    ImGui::TableSetupColumn("Index");ImGui::TableSetupColumn("X");ImGui::TableSetupColumn("Y");ImGui::TableSetupColumn("Z");ImGui::TableHeadersRow();
+    for(std::size_t vi=0;vi<showCount;++vi){
+     ImGui::PushID(static_cast<int>(vi));ImGui::TableNextRow();
+     ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",vi);
+     for(std::size_t axis=0;axis<3U;++axis){
+      ImGui::TableSetColumnIndex(static_cast<int>(axis+1U));
+      int value=frame.specialVertices[vi][axis];
+      const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
+      ImGui::SetNextItemWidth(-1.0f);
+      if(ImGui::InputInt(axisName,&value,1,8)){
+       if(value<0||value>255)status_="Special vertex coordinates must be between 0 and 255.";
+       else status_="Special vertex editing is not enabled yet; packed vertex data is being preserved.";
+      }
+     }
+     ImGui::PopID();
+    }
+    ImGui::EndTable();
+   }
+  }
  }
  ImGui::End();
 }
