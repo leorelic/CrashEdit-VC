@@ -81,8 +81,9 @@ if(CRASHEDIT_BUILD_APP)
         src/crash/formats/nsd/nsd_file.cpp
         src/ui/editor_ui.cpp
         src/ui/gool_script_editor.cpp
+        third_party/ImGuiColorTextEdit/TextEditor.cpp
     )
-    target_include_directories(CrashEdit PRIVATE src)
+    target_include_directories(CrashEdit PRIVATE src third_party/ImGuiColorTextEdit)
     target_link_libraries(CrashEdit PRIVATE crashedit_imgui glfw OpenGL::GL)
     if(WIN32)
         target_link_libraries(CrashEdit PRIVATE comdlg32)
