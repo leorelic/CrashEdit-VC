@@ -641,7 +641,8 @@ bool NsfArchive::setGoolFrameGroupEid(std::size_t chunkIndex,std::size_t entryIn
  auto& entry=chunk.entries[entryIndex];
  if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
  const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
- if(group.byteOffset>item.size||group.byteSize<8U||8U>item.size-group.byteOffset)return false;
+ if(group.byteOffset>item.size||group.byteSize>item.size-group.byteOffset||
+    group.eidFieldOffset>group.byteSize||4U>group.byteSize-group.eidFieldOffset)return false;
  const std::size_t offset=item.offset+group.byteOffset+group.eidFieldOffset;
  if(!has(chunk.bytes,offset,4U))return false;
  for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(eid>>(8U*i));
@@ -670,7 +671,8 @@ bool NsfArchive::setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_
  auto& entry=chunk.entries[entryIndex];
  if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
  const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
- if(group.type!=1U||group.byteOffset>item.size||group.byteSize<12U||12U>item.size-group.byteOffset)return false;
+ if(group.type!=1U||group.byteOffset>item.size||group.byteSize>item.size-group.byteOffset||
+    group.interpolatedFieldOffset>group.byteSize||4U>group.byteSize-group.interpolatedFieldOffset)return false;
  const std::size_t offset=item.offset+group.byteOffset+group.interpolatedFieldOffset;
  if(!has(chunk.bytes,offset,4U))return false;
  const std::uint32_t value=interpolated?1U:0U;
