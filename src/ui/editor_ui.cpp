@@ -2794,21 +2794,63 @@ void EditorUI::drawAnimationViewer(){
    drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,width);
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
-   std::vector<ImVec2> projected(frame.vertices.size());
-   std::vector<bool> visible(frame.vertices.size(),false);
-   for(std::size_t i=0;i<frame.vertices.size();++i){
-    const AnimationPoint p=transformVertex(frame.vertices[i],frame,model);
-    projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;
-   }
-   for(const auto&tri:model->triangles){
-    if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
-    const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),c=static_cast<std::size_t>(tri.c);
-    if(!visible[a]||!visible[b]||!visible[c])continue;
-    ImU32 color=IM_COL32(165,190,220,235);
-    if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
-    dl->AddLine(projected[a],projected[b],color,1.25f);
-    dl->AddLine(projected[b],projected[c],color,1.25f);
-    dl->AddLine(projected[c],projected[a],color,1.25f);
+   if(animationWireframe_){
+    std::vector<ImVec2> projected(frame.vertices.size());
+    std::vector<bool> visible(frame.vertices.size(),false);
+    for(std::size_t i=0;i<frame.vertices.size();++i){const auto p=transformVertex(frame.vertices[i],frame,model);projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;}
+    for(const auto&tri:model->triangles){
+     if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
+     const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),c=static_cast<std::size_t>(tri.c);
+     if(!visible[a]||!visible[b]||!visible[c])continue;
+     ImU32 color=IM_COL32(165,190,220,235);
+     if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
+     dl->AddLine(projected[a],projected[b],color,1.25f);dl->AddLine(projected[b],projected[c],color,1.25f);dl->AddLine(projected[c],projected[a],color,1.25f);
+    }
+   }else{
+    struct Vertex{float x,y,z,w,r,g,b,a,u,v;};
+    struct Gpu{unsigned int program=0,vao=0,vbo=0,fbo=0,color=0,depth=0;int width=0,height=0;bool ready=false;std::map<std::tuple<const std::vector<std::uint8_t>*,int,int,int>,unsigned int> textures;std::string path;};
+    static Gpu gpu;
+    auto shader=[](unsigned int type,const char*source){unsigned int id=GL::CreateShader(type);if(!id)return 0U;GL::ShaderSource(id,1,&source,nullptr);GL::CompileShader(id);int ok=0;GL::GetShaderiv(id,0x8B81U,&ok);if(!ok){GL::DeleteShader(id);return 0U;}return id;};
+    if(!gpu.ready){
+     static const char*vsSource="#version 150\nin vec4 aPosition;in vec4 aColor;in vec2 aUV;out vec4 vColor;out vec2 vUV;void main(){gl_Position=aPosition;vColor=aColor;vUV=aUV;}";
+     static const char*fsSource="#version 150\nin vec4 vColor;in vec2 vUV;out vec4 fragColor;uniform sampler2D uTexture;uniform int uHasTexture;void main(){vec4 t=uHasTexture!=0?texture(uTexture,vUV):vec4(1.0);if(t.a<=0.0)discard;fragColor=vec4(min(vColor.rgb*t.rgb*2.0,vec3(1.0)),vColor.a*t.a);}";
+     unsigned int vs=shader(0x8B31U,vsSource),fs=shader(0x8B30U,fsSource);
+     if(vs&&fs){gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::BindAttribLocation(gpu.program,0,"aPosition");GL::BindAttribLocation(gpu.program,1,"aColor");GL::BindAttribLocation(gpu.program,2,"aUV");GL::LinkProgram(gpu.program);int ok=0;GL::GetProgramiv(gpu.program,0x8B82U,&ok);gpu.ready=ok!=0;}
+     if(vs)GL::DeleteShader(vs);if(fs)GL::DeleteShader(fs);
+     if(gpu.ready){GL::GenVertexArrays(1,&gpu.vao);GL::GenBuffers(1,&gpu.vbo);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::EnableVertexAttribArray(0);GL::VertexAttribPointer(0,4,0x1406U,0,sizeof(Vertex),nullptr);GL::EnableVertexAttribArray(1);GL::VertexAttribPointer(1,4,0x1406U,0,sizeof(Vertex),reinterpret_cast<const void*>(4*sizeof(float)));GL::EnableVertexAttribArray(2);GL::VertexAttribPointer(2,2,0x1406U,0,sizeof(Vertex),reinterpret_cast<const void*>(8*sizeof(float)));GL::BindVertexArray(0);}
+    }
+    bool rendered=false;
+    if(gpu.ready){
+     const auto&io=ImGui::GetIO();const int w=std::max(1,int(std::round(canvasSize.x*io.DisplayFramebufferScale.x))),h=std::max(1,int(std::round(canvasSize.y*io.DisplayFramebufferScale.y)));
+     int oldFbo=0,oldViewport[4]{},oldTexture=0,oldRenderbuffer=0,oldActive=0,oldDepthMask=1;
+     GL::GetIntegerv(0x8CA6U,&oldFbo);GL::GetIntegerv(0x0BA2U,oldViewport);GL::GetIntegerv(0x84E0U,&oldActive);GL::ActiveTexture(0x84C0U);GL::GetIntegerv(0x8069U,&oldTexture);GL::GetIntegerv(0x8CA7U,&oldRenderbuffer);GL::GetIntegerv(0x0B72U,&oldDepthMask);
+     if(gpu.path!=nsfPath_.string()){for(const auto&t:gpu.textures)GL::DeleteTextures(1,&t.second);gpu.textures.clear();gpu.path=nsfPath_.string();}
+     if(!gpu.fbo){GL::GenFramebuffers(1,&gpu.fbo);GL::GenTextures(1,&gpu.color);GL::GenRenderbuffers(1,&gpu.depth);}
+     if(gpu.width!=w||gpu.height!=h){gpu.width=w;gpu.height=h;GL::BindTexture(0x0DE1U,gpu.color);GL::TexParameteri(0x0DE1U,0x2801U,0x2601);GL::TexParameteri(0x0DE1U,0x2800U,0x2601);GL::TexImage2D(0x0DE1U,0,0x8058,w,h,0,0x1908U,0x1401U,nullptr);GL::BindRenderbuffer(0x8D41U,gpu.depth);GL::RenderbufferStorage(0x8D41U,0x81A6U,w,h);GL::BindFramebuffer(0x8D40U,gpu.fbo);GL::FramebufferTexture2D(0x8D40U,0x8CE0U,0x0DE1U,gpu.color,0);GL::FramebufferRenderbuffer(0x8D40U,0x8D00U,0x8D41U,gpu.depth);}
+     GL::BindFramebuffer(0x8D40U,gpu.fbo);
+     if(GL::CheckFramebufferStatus(0x8D40U)==0x8CD5U){
+      using Key=std::tuple<const std::vector<std::uint8_t>*,int,int,int>;
+      std::map<Key,std::vector<Vertex>> batches;
+      for(const auto&tri:model->triangles){
+       const int vi[3]={tri.a,tri.b,tri.c},ci[3]={tri.colorA,tri.colorB,tri.colorC};
+       if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
+       const Crash::NsfModelTexture*tex=nullptr;if(tri.textureIndex>0&&std::size_t(tri.textureIndex-1U)<model->textures.size())tex=&model->textures[tri.textureIndex-1U];
+       const std::vector<std::uint8_t>*page=nullptr;
+       if(tex&&tex->page<model->texturePageEids.size()){const auto eid=model->texturePageEids[tex->page];for(const auto&ch:nsf_.chunks())if(ch.type==1&&ch.bytes.size()>=65536U){const std::uint32_t id=std::uint32_t(ch.bytes[4])|(std::uint32_t(ch.bytes[5])<<8U)|(std::uint32_t(ch.bytes[6])<<16U)|(std::uint32_t(ch.bytes[7])<<24U);if(id==eid){page=&ch.bytes;break;}}}
+       const int mode=tex?std::clamp<int>(tex->colorMode,0,2):0,clutX=tex?std::clamp<int>(tex->clutX,0,15):0,clutY=tex?std::clamp<int>((tex->clutY2<<2U)|((tex->clutY1>>2U)&3U),0,127):0;
+       float ux[3]{},uy[3]{};if(tex){const int off=(1<<(2-mode))*64*tex->segment;const float u[3]={float(tex->u2)+off,float(tex->u1)+off,float(tex->u3)+off},v[3]={float(tex->v2),float(tex->v1),float(tex->v3)};for(int k=0;k<3;++k){ux[k]=u[k];uy[k]=v[k];}}
+       auto&out=batches[Key{page,mode,clutX,clutY}];
+       for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);const auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f)continue;const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
+      }
+      auto getTexture=[&](const Key&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
+      GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::Enable(0x0BE2U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture");
+      for(const auto&batch:batches){const auto*page=std::get<0>(batch.first);GL::BindTexture(0x0DE1U,page?getTexture(batch.first):0);GL::Uniform1i(has,page?1:0);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}
+      GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
+     }
+     GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
+     if(rendered)dl->AddImage((ImTextureID)(std::intptr_t)gpu.color,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));
+    }
+    if(!rendered)dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(255,170,100,255),"Hardware renderer unavailable; choose Wireframe in viewport settings.");
    }
   }else{
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
