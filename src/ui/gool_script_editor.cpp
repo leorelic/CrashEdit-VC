@@ -82,6 +82,8 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   ImGui::PushStyleColor(ImGuiCol_FrameBgActive,IM_COL32(24,27,33,0));
   ImGui::PushStyleColor(ImGuiCol_Text,IM_COL32(0,0,0,0));
   ImGui::PushStyleColor(ImGuiCol_Border,IM_COL32(0,0,0,0));
+  // Hide ImGui's native selection fill; draw the aligned syntax-editor selection ourselves.
+  ImGui::PushStyleColor(ImGuiCol_TextSelectedBg,IM_COL32(0,0,0,0));
   ImGuiInputTextFlags flags=ImGuiInputTextFlags_CallbackResize|ImGuiInputTextFlags_CallbackAlways|ImGuiInputTextFlags_AllowTabInput|ImGuiInputTextFlags_NoHorizontalScroll;
   if(readOnly)flags|=ImGuiInputTextFlags_ReadOnly;
   changed=ImGui::InputTextMultiline(id?id:"##GoolCode",text_.data(),text_.capacity()+1,ImVec2(w,std::max(1.0f,h-style.FramePadding.y*2)),flags,inputCallback,&inputState_);
@@ -94,7 +96,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
    if(zoomIn||keypadIn)fontScale_=std::min(2.0f,fontScale_+0.1f);
    else if(zoomOut||keypadOut)fontScale_=std::max(0.6f,fontScale_-0.1f);
   }
-  ImGui::PopStyleColor(5);ImGui::PopStyleVar(2);
+  ImGui::PopStyleColor(6);ImGui::PopStyleVar(2);
   drawSource(mn,mx,lh,style.FramePadding.y+1,active);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
   const auto activeLine=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor))).first;
