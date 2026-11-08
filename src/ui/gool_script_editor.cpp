@@ -82,8 +82,6 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
   ImGui::PushStyleColor(ImGuiCol_FrameBgActive,IM_COL32(24,27,33,0));
   ImGui::PushStyleColor(ImGuiCol_Text,IM_COL32(0,0,0,0));
   ImGui::PushStyleColor(ImGuiCol_Border,IM_COL32(0,0,0,0));
-  // Use ImGui's native selection geometry; the custom text overlay only colors glyphs.
-  ImGui::PushStyleColor(ImGuiCol_TextSelectedBg,Selection);
   ImGuiInputTextFlags flags=ImGuiInputTextFlags_CallbackResize|ImGuiInputTextFlags_CallbackAlways|ImGuiInputTextFlags_AllowTabInput|ImGuiInputTextFlags_NoHorizontalScroll;
   if(readOnly)flags|=ImGuiInputTextFlags_ReadOnly;
   changed=ImGui::InputTextMultiline(id?id:"##GoolCode",text_.data(),text_.capacity()+1,ImVec2(w,std::max(1.0f,h-style.FramePadding.y*2)),flags,inputCallback,&inputState_);
@@ -96,7 +94,7 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
    if(zoomIn||keypadIn)fontScale_=std::min(2.0f,fontScale_+0.1f);
    else if(zoomOut||keypadOut)fontScale_=std::max(0.6f,fontScale_-0.1f);
   }
-  ImGui::PopStyleColor(6);ImGui::PopStyleVar(2);
+  ImGui::PopStyleColor(5);ImGui::PopStyleVar(2);
   drawSource(mn,mx,lh,style.FramePadding.y+1,active);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
   const auto activeLine=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor))).first;
@@ -108,10 +106,11 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
 void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,float lh,float off,bool focused){
  ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
  const ImVec2 base(mn.x+6,mn.y+off);const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
+ const int a=std::clamp(inputState_.selectionStart,0,static_cast<int>(text_.size())),b=std::clamp(inputState_.selectionEnd,0,static_cast<int>(text_.size()));const int sa=std::min(a,b),sb=std::max(a,b);
  std::size_t offset=0;
  for(std::size_t li=0;li<lines.size();++li){auto line=lines[li];const float y=base.y+static_cast<float>(li)*lh;if(li==activeLine)dl->AddRectFilled(ImVec2(mn.x,y-1),ImVec2(mx.x,y+lh),CurrentLine);
   const std::size_t end=offset+line.size();
-
+  if(sb>sa&&static_cast<std::size_t>(sb)>offset&&static_cast<std::size_t>(sa)<end){const auto x0=std::max(offset,static_cast<std::size_t>(sa))-offset,x1=std::min(end,static_cast<std::size_t>(sb))-offset;const float left=font->CalcTextSizeA(fs,FLT_MAX,0,line.data(),line.data()+x0).x;const float width=font->CalcTextSizeA(fs,FLT_MAX,0,line.data()+x0,line.data()+x1).x;dl->AddRectFilled(ImVec2(base.x+left,y),ImVec2(base.x+left+width,y+lh),Selection);}
   for(const auto& t:lex(line)){const float x=font->CalcTextSizeA(fs,FLT_MAX,0,line.data(),line.data()+t.begin).x;dl->AddText(font,fs,ImVec2(base.x+x,y),color(t.kind),line.data()+t.begin,line.data()+t.end);}
   if(li==activeLine&&focused&&std::fmod(ImGui::GetTime(),1.0)<0.55){const auto col=std::min(cur.second,line.size());const float x=font->CalcTextSizeA(fs,FLT_MAX,0,line.data(),line.data()+col).x;dl->AddLine(ImVec2(base.x+x,y-1),ImVec2(base.x+x,y+lh-2),Caret,1.4f);}
   offset=end+1;
