@@ -2622,25 +2622,52 @@ void EditorUI::drawAnimationViewer(){
    (static_cast<float>(v.y)+static_cast<float>(frame.zOffset)/4.0f)*sz
   );
  };
- animationFrame_=std::clamp(animationFrame_,0,static_cast<int>(animation.frames.size()-1U));
+ const int lastFrame=static_cast<int>(animation.frames.size()-1U);
+ animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
+ animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
+ bool frameGroupInterpolated=false;
+ for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
+  for(const auto&entry:chunk.entries)if(entry.valid&&entry.type==11&&entry.gool.frameGroupsDecoded)
+   for(const auto&group:entry.gool.frameGroups)
+    if(group.type==1U&&group.eid==animationEntry->eid&&group.interpolated)frameGroupInterpolated=true;
  ImGui::Text("%s | %zu frames",Crash::eidToEName(animationEntry->eid).c_str(),animation.frames.size());
  ImGui::SameLine();
  if(ImGui::SmallButton(animationPlaying_?"Pause":"Play")){animationPlaying_=!animationPlaying_;animationFrameTimer_=0.0f;}
  ImGui::SameLine();
- if(ImGui::SmallButton("|<")){animationFrame_=0;animationFrameTimer_=0.0f;}
+ if(ImGui::SmallButton("|<")){animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;}
  ImGui::SameLine();
- if(ImGui::SmallButton("<")){animationFrame_=std::max(0,animationFrame_-1);animationFrameTimer_=0.0f;}
+ if(ImGui::SmallButton("<")){animationFrame_=std::max(0,animationFrame_-1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
  ImGui::SameLine();
- if(ImGui::SmallButton(">")){animationFrame_=std::min(static_cast<int>(animation.frames.size()-1U),animationFrame_+1);animationFrameTimer_=0.0f;}
+ if(ImGui::SmallButton(">")){animationFrame_=std::min(lastFrame,animationFrame_+1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
  ImGui::SameLine();
- if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,static_cast<int>(animation.frames.size()-1U)))animationFrameTimer_=0.0f;}else ImGui::TextDisabled("Frame 1 / 1");
- if(animationPlaying_){
-  animationFrameTimer_+=ImGui::GetIO().DeltaTime;
-  while(animationFrameTimer_>=0.1f){animationFrameTimer_-=0.1f;animationFrame_=(animationFrame_+1)%static_cast<int>(animation.frames.size());}
+ if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,lastFrame)){animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}}else ImGui::TextDisabled("Frame 1 / 1");
+ if(animationPlaying_&&animation.frames.size()>1U){
+  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*30.0*(frameGroupInterpolated?0.5:1.0);
+  if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
+  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
  const auto&frame=animation.frames[static_cast<std::size_t>(animationFrame_)];
  const std::uint32_t linkedModelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  const Crash::NsfModel*model=findModel(linkedModelEid);
+ std::vector<AnimationPoint> displayPositions;
+ if(frame.verticesDecoded){
+  displayPositions.reserve(frame.vertices.size());
+  for(const auto&vertex:frame.vertices)displayPositions.push_back(transformVertex(vertex,frame,model));
+  const double fraction=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
+  if(animationInterpolate_&&fraction>0.0&&animation.frames.size()>1U){
+   const auto&nextFrame=animation.frames[(static_cast<std::size_t>(animationFrame_)+1U)%animation.frames.size()];
+   const std::uint32_t nextModelEid=animation.isCrash3?nextFrame.linkedModelEid:nextFrame.modelEid;
+   if(nextFrame.verticesDecoded&&nextFrame.vertices.size()==frame.vertices.size()&&nextModelEid==linkedModelEid){
+    for(std::size_t i=0;i<displayPositions.size();++i){
+     const auto next=transformVertex(nextFrame.vertices[i],nextFrame,model);
+     auto&current=displayPositions[i];
+     current.x+=static_cast<float>((next.x-current.x)*fraction);
+     current.y+=static_cast<float>((next.y-current.y)*fraction);
+     current.z+=static_cast<float>((next.z-current.z)*fraction);
+    }
+   }
+  }
+ }
  ImGui::SameLine();
  if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(linkedModelEid).c_str());
  else ImGui::TextDisabled("Model EID: %08X",linkedModelEid);
@@ -2663,6 +2690,7 @@ void EditorUI::drawAnimationViewer(){
  if(toolbarButton)ImGui::OpenPopup("AnimationViewportOptions");
  if(ImGui::BeginPopup("AnimationViewportOptions")){
   ImGui::TextUnformatted("Rendering");
+  if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
   if(ImGui::MenuItem("Textured (Hardware)",nullptr,!animationWireframe_))animationWireframe_=false;
   if(ImGui::MenuItem("Wireframe",nullptr,animationWireframe_))animationWireframe_=true;
   ImGui::Separator();
@@ -2801,7 +2829,7 @@ void EditorUI::drawAnimationViewer(){
    if(animationWireframe_){
     std::vector<ImVec2> projected(frame.vertices.size());
     std::vector<bool> visible(frame.vertices.size(),false);
-    for(std::size_t i=0;i<frame.vertices.size();++i){const auto p=transformVertex(frame.vertices[i],frame,model);projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;}
+    for(std::size_t i=0;i<frame.vertices.size();++i){const auto p=displayPositions[i];projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;}
     for(const auto&tri:model->triangles){
      if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
      const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),c=static_cast<std::size_t>(tri.c);
@@ -2887,12 +2915,12 @@ void EditorUI::drawAnimationViewer(){
        const int mode=tex?std::clamp<int>(tex->colorMode,0,2):0,clutX=tex?std::clamp<int>(tex->clutX,0,15):0,clutY=tex?std::clamp<int>((tex->clutY2<<2U)|((tex->clutY1>>2U)&3U),0,127):0;
        float ux[3]{},uy[3]{};const int uvOrder=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?2:0),uvOrder1=1,uvOrder2=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?0:2);if(tex){const int off=(1<<(2-mode))*64*tex->segment;int x1=int(tex->u1)+off,x2=int(tex->u2)+off,x3=int(tex->u3)+off;int y1=tex->v1,y2=tex->v2,y3=tex->v3;if(x1>x2||x1>x3)++x1;if(x2>x1||x2>x3)++x2;if(x3>x2||x3>x1)++x3;if(y1>y2||y1>y3)++y1;if(y2>y1||y2>y3)++y2;if(y3>y2||y3>y1)++y3;const float u[3]={float(x1),float(x2),float(x3)},v[3]={float(y1),float(y2),float(y3)};const int uv[3]={uvOrder,uvOrder1,uvOrder2};for(int k=0;k<3;++k){ux[k]=u[uv[k]];uy[k]=v[uv[k]];}}
        bool triangleVisible=true;
-       for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
+       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
        if(!triangleVisible)continue;
        const int blendMode=(!tex||!page)?3:(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3);
        const TextureKey textureKey{page,mode,clutX,clutY};
        auto&out=batches[BatchKey{textureKey,blendMode}];
-       for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
+       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
       GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
