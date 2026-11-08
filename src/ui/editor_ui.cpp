@@ -2647,16 +2647,17 @@ void EditorUI::drawAnimationViewer(){
   // GOOL vertex frame group is marked Interpolated. This is animation metadata,
   // not the viewer's visual interpolation toggle.
   bool gameHalfSpeed=false;
+  bool foundGameFrameGroup=false;
   for(const auto&chunk:nsf_.chunks()){
    if(!chunk.entryTableValid)continue;
    for(const auto&entry:chunk.entries){
     if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
     for(const auto&group:entry.gool.frameGroups){
-     if(group.eid==animationEntry->eid){gameHalfSpeed=group.interpolated;break;}
+     if(group.eid==animationEntry->eid){gameHalfSpeed=group.interpolated;foundGameFrameGroup=true;break;}
     }
-    if(gameHalfSpeed)break;
+    if(foundGameFrameGroup)break;
    }
-   if(gameHalfSpeed)break;
+   if(foundGameFrameGroup)break;
   }
   if(gameHalfSpeed)frameRate*=0.5;
   animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate;
