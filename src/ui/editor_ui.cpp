@@ -385,7 +385,7 @@ void EditorUI::draw(){
   }
  }
  drawViewport();
- if(showAnimationWorkspace){drawAnimationViewer();drawAnimationTimeline();}
+ if(showAnimationWorkspace)drawAnimationViewer();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
  drawBottom();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
@@ -394,8 +394,8 @@ void EditorUI::draw(){
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
- // Animation tools are submitted only while an Animation or Model resource is selected.
-
+ // Keep Animation Timeline last in the dock submission order.
+ if(showAnimationWorkspace)drawAnimationTimeline();
  ImGui::End();
  drawSearchWindow();
  if(!restoredLastNsfPath_){
