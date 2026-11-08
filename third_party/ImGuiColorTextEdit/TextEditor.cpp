@@ -1419,10 +1419,14 @@ void TextEditor::handleMouseInteractions() {
 	const auto mousePos = ImGui::GetMousePos() - cursorScreenPos;
 	const auto absoluteMousePos = ImGui::GetMousePos() - ImGui::GetWindowPos();
 
+	// Treat the complete gutter (from the line-number column through the
+	// spacing before the text) as clickable. The rendered digits remain in
+	// lineNumberLeftOffset..lineNumberRightOffset, but a narrow digit-only
+	// hitbox is unnecessarily easy to miss at different editor zoom levels.
 	const auto overLineNumbers =
 		config.showLineNumbers &&
-		(absoluteMousePos.x > lineNumberLeftOffset) &&
-		(absoluteMousePos.x < lineNumberRightOffset);
+		(absoluteMousePos.x >= lineNumberLeftOffset) &&
+		(absoluteMousePos.x < textLeftOffset);
 
 	const auto overText =
 		mousePos.x - ImGui::GetScrollX() > textLeftOffset &&
@@ -1550,8 +1554,16 @@ void TextEditor::handleMouseInteractions() {
 			selectingText = overText || overLineNumbers;
 			const auto doubleClick = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 			const auto now = static_cast<float>(ImGui::GetTime());
-			const auto tripleClick = !doubleClick && lastClickTime != -1.0f && (now - lastClickTime) < io.MouseDoubleClickTime;
-			lastClickTime = tripleClick ? -1.0f : now;
+
+			// A line-selecting triple click is only valid after an actual
+			// double click. The previous test treated any second click that
+			// ImGui did not classify as a double click as a triple click,
+			// which made an ordinary single click occasionally select a line.
+			const auto tripleClick =
+				!doubleClick &&
+				lastClickTime >= 0.0f &&
+				(now - lastClickTime) < io.MouseDoubleClickTime;
+			lastClickTime = doubleClick ? now : -1.0f;
 
 			if (tripleClick) {
 				// left mouse button triple click
