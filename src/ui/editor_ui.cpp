@@ -2639,6 +2639,18 @@ void EditorUI::drawAnimationViewer(){
  if(ImGui::SmallButton(">")){animationFrame_=std::min(lastFrame,animationFrame_+1);animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}
  ImGui::SameLine();
  if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,lastFrame)){animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}}else ImGui::TextDisabled("Frame 1 / 1");
+ bool animationHalfSpeed=false;
+ for(const auto&chunk:nsf_.chunks()){
+  if(!chunk.entryTableValid)continue;
+  for(const auto&entry:chunk.entries){
+   if(!entry.valid||!entry.gool.frameGroupsDecoded)continue;
+   for(const auto&group:entry.gool.frameGroups){
+    if(group.type==1U&&group.eid==animationEntry->eid){animationHalfSpeed=group.interpolated;break;}
+   }
+   if(animationHalfSpeed)break;
+  }
+  if(animationHalfSpeed)break;
+ }
  if(animationPlaying_&&animation.frames.size()>1U){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
   const double fullSpeedFps=editorPreferences.palRegion?50.0:60.0;
@@ -2648,14 +2660,14 @@ void EditorUI::drawAnimationViewer(){
   const auto elapsedTicks=static_cast<std::size_t>(animationFrameTimer_/frameInterval);
   if(elapsedTicks>0U){
    animationFrameTimer_-=static_cast<float>(static_cast<double>(elapsedTicks)*frameInterval);
-   animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks),static_cast<double>(animation.frames.size()));
+   const double frameStep=animationHalfSpeed?0.5:1.0;
+   animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks)*frameStep,static_cast<double>(animation.frames.size()));
   }
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
- // Generate one pose per selected playback tick. When interpolation is enabled,
- // sample halfway between adjacent source frames; do not evaluate a new blend on
- // every monitor redraw, which would make the animation appear to run at refresh rate.
- const double poseFramePosition=animationPlaybackFrame_+(animationInterpolate_&&animationPlaying_?0.5:0.0);
+ // The GOOL frame-group flag controls source-frame cadence independently of
+ // this visual interpolation toggle. Blend only when the playback position is fractional.
+ const double poseFramePosition=animationPlaybackFrame_;
  const int poseFrameIndex=static_cast<int>(std::floor(poseFramePosition))%static_cast<int>(animation.frames.size());
  const auto&frame=animation.frames[static_cast<std::size_t>(poseFrameIndex)];
  const std::uint32_t linkedModelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
