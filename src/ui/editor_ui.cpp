@@ -2674,10 +2674,13 @@ void EditorUI::drawAnimationViewer(){
   const AnimationPoint center((boundsMin.x+boundsMax.x)*0.5f,(boundsMin.y+boundsMax.y)*0.5f,(boundsMin.z+boundsMax.z)*0.5f);
   const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
   const float radius=std::max(0.25f,std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f);
-  if(!animationCameraInitialized_){
+  if(!animationCameraInitialized_||animationCameraEntryEid_!=animationEntry->eid){
    animationTargetX_=center.x;animationTargetY_=center.y;animationTargetZ_=center.z;
    animationYaw_=0.0f;animationPitch_=0.261799f;
-   animationDistance_=std::clamp(radius*1.6f,1.0f,200000.0f);
+   // Match CrashEdit-RE's reset-camera behavior: frame all CorePositions,
+   // center on their bounds, and keep enough distance for the full model.
+   animationDistance_=std::clamp(radius*3.2f,0.75f,200000.0f);
+   animationCameraEntryEid_=animationEntry->eid;
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
@@ -2711,34 +2714,60 @@ void EditorUI::drawAnimationViewer(){
    if(ImGui::IsKeyDown(ImGuiKey_E))animationTargetY_+=moveSpeed;
    if(ImGui::IsKeyDown(ImGuiKey_Q))animationTargetY_-=moveSpeed;
   }
-  auto project=[&](float x,float y,float z){
+  struct CameraPoint{float x,y,depth;};
+  const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
+  const float cp=std::cos(animationPitch_),sp=std::sin(animationPitch_);
+  const float focal=std::min(canvasSize.x,canvasSize.y)*0.5f/std::tan(0.785398163f*0.5f);
+  auto toCamera=[&](float x,float y,float z){
    x-=animationTargetX_;y-=animationTargetY_;z-=animationTargetZ_;
-   const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_),cp=std::cos(animationPitch_),sp=std::sin(animationPitch_);
    const float rx=x*cyaw-z*syaw,rz=x*syaw+z*cyaw;
    const float py=y*cp-rz*sp,pz=y*sp+rz*cp;
-   const float depth=animationDistance_-pz;
-   const float focal=canvasSize.y*0.5f/std::tan(0.785398163f*0.5f);
-   if(depth<=0.05f)return ImVec2(-100000.0f,-100000.0f);
-   return ImVec2(canvasMin.x+canvasSize.x*0.5f+rx*focal/depth,canvasMin.y+canvasSize.y*0.5f-py*focal/depth);
+   return CameraPoint{rx,py,animationDistance_-pz};
   };
-  // A world-space floor at Y=0, like the original animation viewer's grid.
-  // Its center and elevation do not inherit the animated frame's translation.
-  const float planeExtent=std::max(4.0f,radius*4.0f);
+  auto projectCamera=[&](const CameraPoint&p){
+   return ImVec2(canvasMin.x+canvasSize.x*0.5f+p.x*focal/p.depth,
+                 canvasMin.y+canvasSize.y*0.5f-p.y*focal/p.depth);
+  };
+  auto project=[&](float x,float y,float z){
+   const CameraPoint p=toCamera(x,y,z);
+   if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
+   return projectCamera(p);
+  };
+  // Keep the ground grid fixed in model space, directly below the complete
+  // animation bounds. Clip each segment against the camera near plane before
+  // perspective division so rotating close to the floor cannot fling lines
+  // across the viewport.
+  const float groundY=boundsMin.y-std::max(0.02f,radius*0.015f);
+  const float planeExtent=std::max(2.0f,radius*2.5f);
+  const float planeX=center.x,planeZ=center.z;
   const ImVec2 floorCorners[4]={
-   project(-planeExtent,0.0f,-planeExtent),project(planeExtent,0.0f,-planeExtent),
-   project(planeExtent,0.0f,planeExtent),project(-planeExtent,0.0f,planeExtent)
+   project(planeX-planeExtent,groundY,planeZ-planeExtent),
+   project(planeX+planeExtent,groundY,planeZ-planeExtent),
+   project(planeX+planeExtent,groundY,planeZ+planeExtent),
+   project(planeX-planeExtent,groundY,planeZ+planeExtent)
   };
-  bool floorVisible=true;for(const auto&p:floorCorners)if(p.x<=-99999.0f)floorVisible=false;
+  bool floorVisible=true;
+  for(const auto&p:floorCorners)if(p.x<=-99999.0f)floorVisible=false;
   if(floorVisible)dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(20,23,28,255));
-  const int gridLines=std::clamp(static_cast<int>(std::ceil(planeExtent)),4,32);
+  auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
+   CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
+   constexpr float nearDepth=0.1f;
+   if(a.depth<=nearDepth&&b.depth<=nearDepth)return;
+   if(a.depth<=nearDepth||b.depth<=nearDepth){
+    const float t=(nearDepth-a.depth)/(b.depth-a.depth);
+    CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
+    if(a.depth<=nearDepth)a=clipped;else b=clipped;
+   }
+   dl->AddLine(projectCamera(a),projectCamera(b),color,width);
+  };
+  const int gridLines=16;
+  const float gridStep=planeExtent/static_cast<float>(gridLines);
   for(int i=-gridLines;i<=gridLines;++i){
-   const float offset=static_cast<float>(i);
+   const float offset=static_cast<float>(i)*gridStep;
    const ImU32 gridColor=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
    const float width=i==0?1.5f:1.0f;
-   const ImVec2 a=project(offset,0.0f,-planeExtent),b=project(offset,0.0f,planeExtent);
-   const ImVec2 c=project(-planeExtent,0.0f,offset),d=project(planeExtent,0.0f,offset);
-   if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,gridColor,width);
-   if(c.x>-99999.0f&&d.x>-99999.0f)dl->AddLine(c,d,gridColor,width);
+   drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,width);
+   drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,width);
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
    std::vector<ImVec2> projected(frame.vertices.size());

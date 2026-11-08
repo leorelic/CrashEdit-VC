@@ -29,7 +29,7 @@ private:
  float animationTargetX_=0.0f,animationTargetY_=0.0f,animationTargetZ_=0.0f;
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
- bool animationPlaying_=false,animationCameraInitialized_=false;
+ int animationCameraEntryEid_=-1;\n bool animationPlaying_=false,animationCameraInitialized_=false;
  bool sceneCameraInitialized_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
