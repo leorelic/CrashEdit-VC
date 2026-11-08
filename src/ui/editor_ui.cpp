@@ -274,7 +274,7 @@ void EditorUI::handleDroppedFiles(int count,const char** paths){
  status_="No NSF file found in the dropped files.";
 }
 bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
- Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3)archive.decodeAnimationModels(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));
+ Crash::NsfArchive archive;if(!archive.load(file,error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to load NSF: "+error);return false;}if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3BetaMAY14||pendingVersion_==GameVersion::Crash3)archive.decodeZones(pendingVersion_==GameVersion::Crash3);archive.decodeGools(nsfGoolVersion(pendingVersion_));if(pendingVersion_==GameVersion::Crash2||pendingVersion_==GameVersion::Crash3)archive.decodeAnimationModels(pendingVersion_==GameVersion::Crash3);
  auto sidecar=findNsdSidecar(file);Crash::NsdFile level;std::string nsdError;
  bool haveNsd=level.load(sidecar,nsdVariant(pendingVersion_),nsdError);
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
@@ -2638,10 +2638,11 @@ void EditorUI::drawAnimationViewer(){
   while(animationFrameTimer_>=0.1f){animationFrameTimer_-=0.1f;animationFrame_=(animationFrame_+1)%static_cast<int>(animation.frames.size());}
  }
  const auto&frame=animation.frames[static_cast<std::size_t>(animationFrame_)];
- const Crash::NsfModel*model=findModel(frame.modelEid);
+ const std::uint32_t linkedModelEid=frame.linkedModelEid?frame.linkedModelEid:frame.modelEid;
+ const Crash::NsfModel*model=findModel(linkedModelEid);
  ImGui::SameLine();
- if(Crash::isValidEid(frame.modelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(frame.modelEid).c_str());
- else ImGui::TextDisabled("Model EID: %08X",frame.modelEid);
+ if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(linkedModelEid).c_str());
+ else ImGui::TextDisabled("Model EID: %08X",linkedModelEid);
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
  else if(!model)ImGui::TextDisabled("Linked Model resource is not present in this NSF.");
@@ -2686,7 +2687,7 @@ void EditorUI::drawAnimationViewer(){
   bool haveBounds=false;
   for(const auto&candidate:animation.frames){
    if(!candidate.verticesDecoded)continue;
-   const auto*candidateModel=findModel(candidate.modelEid);
+   const auto*candidateModel=findModel(candidate.linkedModelEid?candidate.linkedModelEid:candidate.modelEid);
    for(const auto&v:candidate.vertices){
     const AnimationPoint p=transformVertex(v,candidate,candidateModel);
     boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);

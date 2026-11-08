@@ -13,7 +13,7 @@ static bool has(const std::vector<std::uint8_t>&d,std::size_t p,std::size_t n){r
 static void checksum(std::vector<std::uint8_t>&d){std::uint32_t c=0x12345678;for(std::size_t i=0;i<NsfChunkSize;++i){if(i<12||i>=16)c+=d[i];c=(c<<3)|(c>>29);}for(int i=0;i<4;++i)d[12+i]=std::uint8_t(c>>(8*i));}
 
 static std::size_t align4(std::size_t n){return (n+3U)&~std::size_t(3U);}
-static bool parseGoolFrameGroups(const std::vector<std::uint8_t>&bytes,const NsfItem&item,NsfGool&gool){
+static bool parseGoolFrameGroups(const std::vector<std::uint8_t>&bytes,const NsfItem&item,NsfGool&gool,NsfGoolVersion version){
  const std::size_t end=item.offset+item.size;
  if(!has(bytes,item.offset,item.size)){gool.frameGroupError="Frame-group item exceeds its chunk.";return false;}
  std::size_t p=item.offset;
@@ -25,8 +25,15 @@ static bool parseGoolFrameGroups(const std::vector<std::uint8_t>&bytes,const Nsf
   NsfGoolFrameGroup group;group.type=type;group.frameCount=count;group.byteOffset=p-item.offset;
   std::size_t size=0;
   if(type==1U){
-   if(end-p<12U){gool.frameGroupError="Truncated Crash 2 vertex-group header.";return false;}
-   group.eid=u32(bytes,p+4);group.interpolated=u32(bytes,p+8)!=0;size=12U;
+   if(version==NsfGoolVersion::Version3){
+    if(end-p<20U){gool.frameGroupError="Truncated Crash 3 vertex-group header.";return false;}
+    group.interpolated=u32(bytes,p+4U)!=0;group.partCount=u32(bytes,p+8U);
+    group.modelEid=u32(bytes,p+12U);group.eid=u32(bytes,p+16U);
+    group.eidFieldOffset=16U;group.interpolatedFieldOffset=4U;size=20U;
+   }else{
+    if(end-p<12U){gool.frameGroupError="Truncated Crash 2 vertex-group header.";return false;}
+    group.eid=u32(bytes,p+4U);group.interpolated=u32(bytes,p+8U)!=0;size=12U;
+   }
   }else if(type==2U||type==3U){
    if(end-p<8U){gool.frameGroupError="Truncated sprite/font-group header.";return false;}
    group.eid=u32(bytes,p+4);const std::size_t stride=type==2U?16U:20U;
@@ -384,6 +391,14 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
 }
 
 void NsfArchive::decodeAnimationModels(bool crash3){
+ auto findAnimationModel=[&](std::uint32_t animationEid,std::size_t frameIndex,std::size_t frameCount)->std::uint32_t{
+  std::vector<std::uint32_t> models;
+  for(const auto&goolChunk:chunks_)if(goolChunk.type==0&&goolChunk.entryTableValid)
+   for(const auto&goolEntry:goolChunk.entries)if(goolEntry.valid&&goolEntry.type==11&&goolEntry.gool.decoded&&goolEntry.gool.frameGroupsDecoded)
+    for(const auto&group:goolEntry.gool.frameGroups)if(group.type==1U&&group.eid==animationEid&&isValidEid(group.modelEid)&&std::find(models.begin(),models.end(),group.modelEid)==models.end())models.push_back(group.modelEid);
+  if(models.empty())return 0U;
+  return models.size()==frameCount?models[frameIndex%models.size()]:models.front();
+ };
  for(auto&chunk:chunks_){
   if(chunk.type!=0||!chunk.entryTableValid)continue;
   for(auto&entry:chunk.entries){
@@ -409,10 +424,13 @@ void NsfArchive::decodeAnimationModels(bool crash3){
   }
  }
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==1){
-  for(auto&frame:entry.animation.frames){
+  for(std::size_t frameIndex=0;frameIndex<entry.animation.frames.size();++frameIndex){
+   auto&frame=entry.animation.frames[frameIndex];
+   frame.linkedModelEid=crash3?findAnimationModel(entry.eid,frameIndex,entry.animation.frames.size()):frame.modelEid;
    const NsfModel*linked=nullptr;
-   for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)for(const auto&modelEntry:modelChunk.entries)
-    if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.modelEid&&modelEntry.model.decoded){linked=&modelEntry.model;break;}
+   for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
+    for(const auto&modelEntry:modelChunk.entries)
+     if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){linked=&modelEntry.model;break;}
    frame.modelResolved=linked!=nullptr;
    if(!decodeAnimationVertices(frame,linked,crash3)&&entry.animation.error.empty())entry.animation.error=frame.vertexError;
   }
@@ -449,7 +467,7 @@ void NsfArchive::decodeGools(NsfGoolVersion version){
      const std::size_t q=descriptors.offset+p;
      gool.stateDescriptors.push_back({i32(chunk.bytes,q),i32(chunk.bytes,q+4),static_cast<std::int16_t>(u16(chunk.bytes,q+8)),static_cast<std::int16_t>(u16(chunk.bytes,q+10)),static_cast<std::int16_t>(u16(chunk.bytes,q+12)),static_cast<std::int16_t>(u16(chunk.bytes,q+14))});
     }
-    if(entry.items.size()==6){gool.frameGroupBytes=entry.items[5].size;parseGoolFrameGroups(chunk.bytes,entry.items[5],gool);}
+    if(entry.items.size()==6){gool.frameGroupBytes=entry.items[5].size;parseGoolFrameGroups(chunk.bytes,entry.items[5],gool,version);}
    }else if(gool.format==0){
     if(entry.items.size()!=3){fail("GOOL format 0 must contain exactly 3 items.");continue;}
    }else{fail("Unsupported GOOL format value "+std::to_string(gool.format)+".");continue;}
@@ -624,7 +642,7 @@ bool NsfArchive::setGoolFrameGroupEid(std::size_t chunkIndex,std::size_t entryIn
  if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
  const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
  if(group.byteOffset>item.size||group.byteSize<8U||8U>item.size-group.byteOffset)return false;
- const std::size_t offset=item.offset+group.byteOffset+4U;
+ const std::size_t offset=item.offset+group.byteOffset+group.eidFieldOffset;
  if(!has(chunk.bytes,offset,4U))return false;
  for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(eid>>(8U*i));
  entry.gool.frameGroups[groupIndex].eid=eid;
@@ -653,7 +671,7 @@ bool NsfArchive::setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_
  if(!entry.valid||entry.type!=11||!entry.gool.decoded||!entry.gool.frameGroupsDecoded||entry.items.size()<6||groupIndex>=entry.gool.frameGroups.size())return false;
  const auto& item=entry.items[5];const auto& group=entry.gool.frameGroups[groupIndex];
  if(group.type!=1U||group.byteOffset>item.size||group.byteSize<12U||12U>item.size-group.byteOffset)return false;
- const std::size_t offset=item.offset+group.byteOffset+8U;
+ const std::size_t offset=item.offset+group.byteOffset+group.interpolatedFieldOffset;
  if(!has(chunk.bytes,offset,4U))return false;
  const std::uint32_t value=interpolated?1U:0U;
  for(unsigned i=0;i<4;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(value>>(8U*i));

@@ -93,8 +93,9 @@ struct NsfGoolStateReference {
 struct NsfGoolFrameGroup {
  std::uint16_t type=0;
  std::int16_t frameCount=0;
- std::uint32_t eid=0;
+ std::uint32_t eid=0,modelEid=0;
  std::size_t byteOffset=0, byteSize=0;
+ std::size_t eidFieldOffset=4,interpolatedFieldOffset=8;
  std::uint32_t partCount=0;
  std::int32_t font=0;
  bool interpolated=false;
@@ -121,7 +122,7 @@ struct NsfAnimationCollision {
 struct NsfAnimationVertex { std::int32_t x=0,y=0,z=0; };
 struct NsfAnimationFrame {
  std::int16_t xOffset=0,yOffset=0,zOffset=0,unknown=0;
- std::uint32_t modelEid=0,unknown2=0,reserved=0,vertexCount=0,collisionCount=0,headerSize=0;
+ std::uint32_t modelEid=0,linkedModelEid=0,unknown2=0,reserved=0,vertexCount=0,collisionCount=0,headerSize=0;
  std::size_t specialVertexCount=0;
  std::vector<std::array<std::uint8_t,3>> specialVertices;
  std::vector<NsfAnimationCollision> collisions;
