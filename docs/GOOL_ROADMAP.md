@@ -9,6 +9,14 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - **Experimental → Traditional GOOL Inspection** is an opt-in compatibility mode (off by default). It restores the legacy GOOL inspection windows in place of Script Editor and Blueprint. The obsolete embedded **GOOL Script** tab has been removed from the traditional Inspector; source-like viewing belongs in the dedicated Script Editor.
 - The editor component foundation is complete (syntax coloring, zoom, line/current-line presentation, editing shortcuts, and reliable code-area interaction). This is a UI milestone, not completion of the GOOL language, compiler, or round-trip workflow.
 
+## GOOL decompilation checkpoint — 2026-11-08
+
+The current decompiler foundation is saved as a working baseline. It discovers routines from supported local Code hooks and local calls, emits source-like expressions for verified operations, reconstructs conservative if/else and loop patterns, represents verified calls/returns/state transitions, retains native MIPS as native instructions, and preserves unknown GOOL/native words instead of inventing meanings. Native MIPS branch destinations and selected reaching-definition information are also carried into analysis.
+
+This is a **readability and analysis checkpoint**, not semantic completion or a claim that arbitrary GOOL objects decompile correctly. Current real-sample regression coverage is still narrow (notably the existing DispC fixture); broader Crash 2 object validation remains necessary.
+
+**Next research priority:** build an evidence-backed inventory of every unknown or only partially understood item encountered in real Crash 2 GOOL data. Track raw encoding, location/object, current decoder output, candidate interpretation, evidence/source, confidence, and regression fixture. Separate unknown GOOL opcodes/operand roles, object/process fields, state/hook references, and native MIPS/GTE cases. Only promote an item to a known semantic interpretation after it is supported by evidence and tests. Keep unknown values loss-preserved meanwhile.
+
 ## 1. Inspection and format understanding
 
 - [x] Parse and inspect GOOL headers, instructions, data pools, state maps, state descriptors, and frame groups.
@@ -17,6 +25,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 - [x] Build basic-block control-flow analysis with branch destinations and diagnostics.
 - [x] Add a visual Blueprint view of basic blocks and execution relationships.
 - [ ] Continue auditing instruction execution semantics against the original CrashEdit source and real Crash 2 samples, including opcode-specific side effects and stack behavior.
+- [ ] Create and maintain an evidence-backed inventory of unknown/partially understood GOOL opcodes, operand roles, object/process fields, state/hook references, and native MIPS/GTE cases; add confirmed meanings only with regression coverage.
 - [x] Add initial per-instruction operand access analysis from encoded reference roles, with explicit unknown handling for unsupported GOOL, native MIPS, and unaudited process-field roles.
 - [x] Add an initial control-flow-aware reaching-definitions pass for stable stack, argument, and object references; unknown/native instructions and engine call/event opcodes break propagation, while call targets and dynamic state-transition paths remain outside this first pass.
 - [ ] Extend data-flow analysis with validated value propagation, call/return context, and state-transition/event relationships without guessing at undocumented opcode behavior.

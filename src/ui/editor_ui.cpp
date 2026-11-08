@@ -574,6 +574,15 @@ void EditorUI::drawGoolScriptEditor(){
     ImGui::TextDisabled("IR preview · read-only");
     ImGui::Separator();
     if(selectedGool){
+     ImGui::SetNextItemOpen(false,ImGuiCond_Once);
+     if(ImGui::CollapsingHeader("How to read this decompilation")){
+      ImGui::TextWrapped("Routine information is shown above the code: the entry location, how the routine was discovered, and its instruction/shared-instruction counts.");
+      ImGui::BulletText("Labels (Lxxxxx) name branch destinations. Structured if/else and loop blocks are reconstructed only when their control flow is proven safe.");
+      ImGui::BulletText("Ordinary lines are source-like operations. Lines beginning with mips are native PlayStation CPU instructions, not GOOL script commands.");
+      ImGui::BulletText("Unknown GOOL instructions remain visible as raw .gool_word values; undecoded native instructions remain as .mips_word values. Their meaning is intentionally not guessed.");
+      ImGui::BulletText("The byte offset and original 32-bit word are retained by the underlying decompiler output, but low-level comments are hidden in this readable view. The Inspector remains available for detailed raw inspection.");
+      ImGui::BulletText("The status below the editor reports analysis diagnostics and how many low-level annotations were hidden. Diagnostics identify incomplete or uncertain analysis; they are not proof that the original game data is invalid.");
+     }
      if(!program.routines.empty()){
       if(activeRoutine>=program.routines.size())activeRoutine=0;
       const auto& routine=program.routines[activeRoutine];
