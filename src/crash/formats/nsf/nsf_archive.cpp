@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <fstream>
 #include <limits>
+#include <unordered_map>
 namespace CrashEdit::Crash {
 static std::uint16_t u16(const std::vector<std::uint8_t>&d,std::size_t p){return std::uint16_t(d[p])|std::uint16_t(std::uint16_t(d[p+1])<<8);}
 static std::uint32_t u32(const std::vector<std::uint8_t>&d,std::size_t p){return std::uint32_t(d[p])|(std::uint32_t(d[p+1])<<8)|(std::uint32_t(d[p+2])<<16)|(std::uint32_t(d[p+3])<<24);}
@@ -207,7 +208,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  out.zOffset=static_cast<std::int16_t>(u16(bytes,p+4U));
  out.unknown=static_cast<std::int16_t>(u16(bytes,p+6U));
  if(crash3){
-  out.unknown2=u32(bytes,p+8U);out.reserved=u32(bytes,p+12U);
+  out.modelEid=u32(bytes,p+8U);out.reserved=u32(bytes,p+12U);
   out.vertexCount=u32(bytes,p+16U);out.collisionCount=u32(bytes,p+20U);out.headerSize=u32(bytes,p+24U);
  }else{
   out.vertexCount=u32(bytes,p+8U);out.collisionCount=u32(bytes,p+12U);out.modelEid=u32(bytes,p+16U);out.headerSize=u32(bytes,p+20U);
@@ -238,6 +239,31 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  for(std::size_t q=p+fakeHeader;q<p+item.size;q+=4U)out.temporalWords.push_back(u32(bytes,q));
  return true;
 }
+struct ModelPolyCommand {bool triangle=false;std::uint8_t color1=0,color2=0,texture=0,key=0,type=0,triType=0,triSubtype=0;bool animated=false,flag=false;};
+static bool decodeModelPolygons(NsfModel&model){
+ auto fail=[&](const char*m){model.error=m;return false;};
+ const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand> cmd(count);std::vector<std::int32_t> vtx;vtx.reserve(count);
+ std::unordered_map<std::uint8_t,std::int32_t> keys;
+ const std::int32_t special=static_cast<std::int32_t>(model.vertexCount-model.positions.size());
+ std::int32_t v=model.compressed?-special:0;
+ for(std::size_t i=0;i<count;++i){const auto raw=model.polygonWords[i];if(raw==0xffffffffU)break;
+  if((raw&0xffff0000U)==0){cmd[i].color1=static_cast<std::uint8_t>((raw>>2U)&0x7fU);cmd[i].color2=static_cast<std::uint8_t>((raw>>9U)&0x7fU);continue;}
+  auto&x=cmd[i];x.triangle=true;x.texture=static_cast<std::uint8_t>(raw);x.animated=((raw>>8U)&1U)!=0;x.color1=static_cast<std::uint8_t>((raw>>9U)&0x7fU);x.key=static_cast<std::uint8_t>(raw>>16U);x.type=static_cast<std::uint8_t>((raw>>26U)&1U);x.flag=((raw>>27U)&1U)!=0;const auto tri=static_cast<std::uint8_t>(raw>>28U);x.triSubtype=tri&3U;x.triType=(tri>>2U)&3U;
+  if(x.type==0){if(x.key!=0x57U)keys[x.key]=v;vtx.push_back(v++);}else{auto it=keys.find(x.key);if(it==keys.end())return fail("Model polygon stream duplicates an undefined vertex key.");vtx.push_back(it->second);}
+ }
+ std::int32_t lastCC=-1,lastAA=-1,lastValid=-3,lastNonBB=-1,lastColor=-1;std::size_t cur=0;
+ auto triangleColor=[&](std::size_t i)->int{return i<cmd.size()&&cmd[i].triangle?cmd[i].color1:-1;};
+ auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x){if(a<0||b<0||c<0||static_cast<std::uint32_t>(a)>=model.vertexCount||static_cast<std::uint32_t>(b)>=model.vertexCount||static_cast<std::uint32_t>(c)>=model.vertexCount||ca<0||cb<0||cc<0)return false;model.triangles.push_back({a,b,c,static_cast<std::uint8_t>(ca),static_cast<std::uint8_t>(cb),static_cast<std::uint8_t>(cc),x.texture,x.triType,x.triSubtype,x.animated,x.flag});return true;};
+ for(std::size_t i=0;i<count;++i){if(model.polygonWords[i]==0xffffffffU)break;const auto&x=cmd[i];if(!x.triangle){lastColor=static_cast<std::int32_t>(i);continue;}if(cur>=vtx.size())return fail("Model polygon stream is inconsistent.");
+  if(x.triType==0){if(cur<2)return fail("Model strip starts before three vertices.");const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);int c2=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color2:lastColor+2==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-2);if(!emit(vtx[cur],vtx[cur-1],vtx[cur-2],x.color1,c1,c2,x))return fail("Model strip triangle references invalid geometry.");lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
+  }else if(x.triType==1){int ci=-1;if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColor(static_cast<std::size_t>(lastNonBB-2));else if(lastColor==lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color1;else if(lastColor==lastNonBB-1&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;else if(lastColor>lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);if(cur<1)return fail("Connected triangle lacks preceding vertex.");const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];if(!emit(vtx[cur],vtx[cur-1],third,x.color1,c1,ci,x))return fail("Connected triangle references invalid geometry.");
+  }else if(x.triType==2){if(i+2<count&&lastValid+2<static_cast<int>(i)){if(cur+2>=vtx.size())return fail("Fan triangle exceeds vertex stream.");if(!emit(vtx[cur],vtx[cur+1],vtx[cur+2],x.color1,triangleColor(i+1),triangleColor(i+2),x))return fail("Fan triangle references invalid geometry.");lastValid=static_cast<int>(i);}lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);}
+  ++cur;
+ }
+ if(model.polygonCount&&model.triangles.size()!=model.polygonCount)model.error="Decoded polygon count differs from model header count.";
+ return true;
+}
+
 static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entry,NsfModel&out){
  auto fail=[&](const char*message){out.error=message;return false;};
  if(entry.items.size()!=5U&&entry.items.size()!=6U)return fail("Model entry must contain five or six items.");
@@ -283,6 +309,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
     static_cast<std::uint8_t>((raw>>6U)&7U),static_cast<std::uint8_t>((raw>>3U)&7U),static_cast<std::uint8_t>(raw&7U),raw});
   }
  }
+ if(!decodeModelPolygons(out))return false;
  out.decoded=true;return true;
 }
 

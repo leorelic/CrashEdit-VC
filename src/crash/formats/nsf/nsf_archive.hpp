@@ -141,6 +141,11 @@ struct NsfModelTexture {
  std::uint8_t u1=0,v1=0,u2=0,v2=0,u3=0,v3=0,u4=0,v4=0;
  std::uint8_t clutX=0,clutY1=0,clutY2=0,colorMode=0,blendMode=0,segment=0,page=0;
 };
+struct NsfModelTriangle {
+ std::int32_t a=0,b=0,c=0;
+ std::uint8_t colorA=0,colorB=0,colorC=0,textureIndex=0,triangleType=0,triangleSubtype=0;
+ bool animated=false,flag=false;
+};
 struct NsfModel {
  bool decoded=false,compressed=false;
  std::vector<std::uint8_t> header;
@@ -148,6 +153,7 @@ struct NsfModel {
  std::vector<std::uint32_t> texturePageEids,polygonWords,extendedTextureWords;
  std::vector<NsfSceneryColor> colors;
  std::vector<NsfModelTexture> textures;
+ std::vector<NsfModelTriangle> triangles;
  std::vector<NsfModelPosition> positions;
  std::uint32_t vertexCount=0,polygonWordCount=0,polygonCount=0;
  std::string error;

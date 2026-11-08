@@ -137,4 +137,23 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // Malformed frame header-size is rejected without reading beyond its item.
  p32(animationChunk,animationFrame+20,0xffffffffU);
  assert(a.loadBytes(animationChunk,e));a.decodeAnimationModels(false);assert(!a.chunks()[0].entries[0].animation.decoded);
+
+ // Three-vertex fan command reconstructs one model triangle.
+ std::vector<std::uint8_t> triangleChunk(65536);p16(triangleChunk,0,0x1234);p16(triangleChunk,2,0);p32(triangleChunk,4,4);p32(triangleChunk,8,1);
+ constexpr std::size_t triEntry=24,triItems=5,triTable=16+triItems*4;const std::size_t triSizes[]={0x50,12,0,0,0};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
+ p32(triangleChunk,16,triEntry);p32(triangleChunk,20,triEntry+triSize);p32(triangleChunk,triEntry,0x0100ffff);p32(triangleChunk,triEntry+4,0x0200007b);p32(triangleChunk,triEntry+8,2);p32(triangleChunk,triEntry+12,triItems);
+ std::size_t triOffset=triTable;for(std::size_t i=0;i<triItems;++i){p32(triangleChunk,triEntry+16+i*4,triOffset);triOffset+=triSizes[i];}p32(triangleChunk,triEntry+16+triItems*4,static_cast<std::uint32_t>(triSize));
+ const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50;p32(triangleChunk,triInfo+0x2c,3);p32(triangleChunk,triInfo+0x38,3);p32(triangleChunk,triInfo+0x44,1);
+ for(std::uint32_t i=0;i<3;++i)p32(triangleChunk,triPoly+i*4,0x80000000U|((i+1U)<<16U)|(10U+i));
+ assert(a.loadBytes(triangleChunk,e));a.decodeAnimationModels(false);const auto&triModel=a.chunks()[0].entries[0].model;assert(triModel.decoded&&triModel.triangles.size()==1);
+ assert(triModel.triangles[0].a==0&&triModel.triangles[0].b==1&&triModel.triangles[0].c==2);
+ assert(triModel.triangles[0].colorA==10&&triModel.triangles[0].colorB==11&&triModel.triangles[0].colorC==12);
+ // Crash 3 animation stores the linked Model EID at +8, with a reserved word at +12.
+ std::vector<std::uint8_t> c3Animation(65536);p16(c3Animation,0,0x1234);p16(c3Animation,2,0);p32(c3Animation,4,5);p32(c3Animation,8,1);
+ constexpr std::size_t c3Entry=24,c3Frame=44,c3EntrySize=56;p32(c3Animation,16,c3Entry);p32(c3Animation,20,c3Entry+c3EntrySize);
+ p32(c3Animation,c3Entry,0x0100ffff);p32(c3Animation,c3Entry+4,0x0200007b);p32(c3Animation,c3Entry+8,1);p32(c3Animation,c3Entry+12,1);
+ p32(c3Animation,c3Entry+16,20);p32(c3Animation,c3Entry+20,c3EntrySize);
+ p16(c3Animation,c3Frame,1);p16(c3Animation,c3Frame+2,2);p16(c3Animation,c3Frame+4,3);p16(c3Animation,c3Frame+6,4);
+ p32(c3Animation,c3Frame+8,0x0200007b);p32(c3Animation,c3Frame+12,0);p32(c3Animation,c3Frame+16,0);p32(c3Animation,c3Frame+20,0);p32(c3Animation,c3Frame+24,28);
+ assert(a.loadBytes(c3Animation,e));a.decodeAnimationModels(true);const auto&c3=a.chunks()[0].entries[0].animation;assert(c3.decoded&&c3.frames[0].modelEid==0x0200007bU);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
