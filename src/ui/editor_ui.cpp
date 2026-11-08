@@ -2641,22 +2641,32 @@ void EditorUI::drawAnimationViewer(){
  if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,lastFrame)){animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;}}else ImGui::TextDisabled("Frame 1 / 1");
  if(animationPlaying_&&animation.frames.size()>1U){
   const double gameFps=editorPreferences.palRegion?25.0:30.0;
-  const double refreshHz=editorPreferences.palRegion?50.0:60.0;
-  double frameRate=editorPreferences.animationRefreshRateMode?refreshHz:gameFps;
-  animationPlaybackFrame_+=static_cast<double>(ImGui::GetIO().DeltaTime)*frameRate;
-  if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
+  const double fullSpeedFps=editorPreferences.palRegion?50.0:60.0;
+  const double frameRate=editorPreferences.animationRefreshRateMode?fullSpeedFps:gameFps;
+  const double frameInterval=1.0/frameRate;
+  animationFrameTimer_+=std::max(0.0f,ImGui::GetIO().DeltaTime);
+  const auto elapsedTicks=static_cast<std::size_t>(animationFrameTimer_/frameInterval);
+  if(elapsedTicks>0U){
+   animationFrameTimer_-=static_cast<float>(static_cast<double>(elapsedTicks)*frameInterval);
+   animationPlaybackFrame_=std::fmod(animationPlaybackFrame_+static_cast<double>(elapsedTicks),static_cast<double>(animation.frames.size()));
+  }
   animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
  }
- const auto&frame=animation.frames[static_cast<std::size_t>(animationFrame_)];
+ // Generate one pose per selected playback tick. When interpolation is enabled,
+ // sample halfway between adjacent source frames; do not evaluate a new blend on
+ // every monitor redraw, which would make the animation appear to run at refresh rate.
+ const double poseFramePosition=animationPlaybackFrame_+(animationInterpolate_&&animationPlaying_?0.5:0.0);
+ const int poseFrameIndex=static_cast<int>(std::floor(poseFramePosition))%static_cast<int>(animation.frames.size());
+ const auto&frame=animation.frames[static_cast<std::size_t>(poseFrameIndex)];
  const std::uint32_t linkedModelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  const Crash::NsfModel*model=findModel(linkedModelEid);
  std::vector<AnimationPoint> displayPositions;
  if(frame.verticesDecoded){
   displayPositions.reserve(frame.vertices.size());
   for(const auto&vertex:frame.vertices)displayPositions.push_back(transformVertex(vertex,frame,model));
-  const double fraction=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
-  if(animationInterpolate_&&fraction>0.0&&animation.frames.size()>1U){
-   const auto&nextFrame=animation.frames[(static_cast<std::size_t>(animationFrame_)+1U)%animation.frames.size()];
+  const double fraction=poseFramePosition-std::floor(poseFramePosition);
+  if(animationInterpolate_&&animationPlaying_&&fraction>0.0&&animation.frames.size()>1U){
+   const auto&nextFrame=animation.frames[(static_cast<std::size_t>(poseFrameIndex)+1U)%animation.frames.size()];
    const std::uint32_t nextModelEid=animation.isCrash3?nextFrame.linkedModelEid:nextFrame.modelEid;
    if(nextFrame.verticesDecoded&&nextFrame.vertices.size()==frame.vertices.size()&&nextModelEid==linkedModelEid){
     for(std::size_t i=0;i<displayPositions.size();++i){
@@ -2695,7 +2705,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::Separator();
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
-  const char*refreshSpeedLabel=editorPreferences.palRegion?"Refresh rate (50 Hz)":"Refresh rate (60 Hz)";
+  const char*refreshSpeedLabel=editorPreferences.palRegion?"Full Speed (50 FPS)":"Full Speed (60 FPS)";
   if(ImGui::MenuItem(gameSpeedLabel,nullptr,!editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=false;
   if(ImGui::MenuItem(refreshSpeedLabel,nullptr,editorPreferences.animationRefreshRateMode))editorPreferences.animationRefreshRateMode=true;
   if(ImGui::MenuItem("Textured (Hardware)",nullptr,!animationWireframe_))animationWireframe_=false;
