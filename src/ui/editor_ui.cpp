@@ -2780,7 +2780,7 @@ void EditorUI::drawAnimationFrameEditor(){
   auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
    int value=current;ImGui::SetNextItemWidth(150.0f);
    if(ImGui::InputInt(label,&value,1,16)){
-    if(value<INT16_MIN||value>INT16_MAX)status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
+    if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
     else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
    }
   };
