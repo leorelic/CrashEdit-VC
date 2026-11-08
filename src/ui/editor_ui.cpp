@@ -2780,24 +2780,29 @@ void EditorUI::drawAnimationFrameEditor(){
   auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
    int value=current;
    ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
-   if(ImGui::InputInt("##FrameField",&value,1,16)){
+   ImGui::PushID(static_cast<int>(field));
+   if(ImGui::InputInt("##Value",&value,1,16)){
     if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
     else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
    }
+   ImGui::PopID();
   };
   editShort("X Offset",0U,frame.xOffset);
   ImGui::SameLine();editShort("Y Offset",1U,frame.yOffset);
   ImGui::SameLine();editShort("Z Offset",2U,frame.zOffset);
   editShort("Unknown",3U,frame.unknown);
   if(!animationEntry->animation.isCrash3){
-   char editableModelEname[6]{};
-   const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
-   std::snprintf(editableModelEname,sizeof(editableModelEname),"%s",decodedModelEname.c_str());
+   if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid){
+    const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
+    std::snprintf(animationFrameModelEname_,sizeof(animationFrameModelEname_),"%s",decodedModelEname.c_str());
+    animationFrameModelEid_=frame.modelEid;animationFrameModelEnameInitialized_=true;
+   }
    ImGui::TextUnformatted("Model EID");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
-   if(ImGui::InputText("##ModelEID",editableModelEname,sizeof(editableModelEname),ImGuiInputTextFlags_CharsNoBlank)){
+   if(ImGui::InputText("##ModelEID",animationFrameModelEname_,sizeof(animationFrameModelEname_),ImGuiInputTextFlags_CharsNoBlank)){
     try{
-     const std::uint32_t editableModelEid=Crash::eNameToEid(editableModelEname);
+     const std::uint32_t editableModelEid=Crash::eNameToEid(animationFrameModelEname_);
      if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
+     else animationFrameModelEid_=editableModelEid;
     }catch(const std::exception&){status_="Model EID must be a valid five-character decoded EID name." ;}
    }
   }else{
