@@ -66,13 +66,13 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
  const bool visible=ImGui::BeginChild(child.c_str(),size,true);bool changed=false;
  if(visible){
   ImGui::SetWindowFontScale(fontScale_);
-  const ImGuiStyle& style=ImGui::GetStyle();const float lh=ImGui::GetFontSize(),gutter=48.0f;
+  const ImGuiStyle& style=ImGui::GetStyle();const float documentLineHeight=ImGui::GetFontSize(),gutter=48.0f;
   const auto lines=linesOf(text_);
   const ImVec2 contentAvail=ImGui::GetContentRegionAvail();
   // Size the input widget to its document, not the viewport. The outer child
   // owns scrolling; a viewport-sized input widget can otherwise create a second bar.
   // Four spare lines absorb InputTextMultiline's internal line-height rounding.
-  const float h=static_cast<float>(lines.size())*lh+style.FramePadding.y*2+lh*4.0f;
+  const float h=static_cast<float>(lines.size())*documentLineHeight+style.FramePadding.y*2+documentLineHeight*4.0f;
   const ImVec2 origin=ImGui::GetCursorScreenPos();const float w=std::max(80.0f,contentAvail.x-gutter);
   ImGui::SetCursorScreenPos(ImVec2(origin.x+gutter,origin.y));
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6,style.FramePadding.y));
@@ -97,21 +97,26 @@ bool GoolScriptEditor::Render(const char* id,ImVec2 size,bool readOnly){
    else if(zoomOut||keypadOut)fontScale_=std::max(0.6f,fontScale_-0.1f);
   }
   ImGui::PopStyleColor(6);ImGui::PopStyleVar(2);
-  drawSource(mn,mx,lh,style.FramePadding.y+1);
+  // InputTextMultiline advances each unwrapped source line by the active ImGui font size.
+  // Read it after submitting the widget so the overlay follows the font scale actually used
+  // for this frame, including the frame in which a zoom shortcut is pressed.
+  const float renderedLineHeight=ImGui::GetFontSize();
+  const ImVec2 textOrigin(mn.x+6.0f,mn.y+style.FramePadding.y);
+  drawSource(mn,mx,textOrigin,renderedLineHeight);
   ImDrawList* dl=ImGui::GetWindowDrawList();const ImVec2 g0(origin.x,mn.y),g1(origin.x+gutter,mx.y);dl->PushClipRect(g0,g1,true);dl->AddRectFilled(g0,g1,IM_COL32(27,30,37,255));
   const auto activeLine=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor))).first;
-  for(std::size_t i=0;i<lines.size();++i){char n[24];std::snprintf(n,sizeof(n),"%zu",i+1);const ImVec2 m=ImGui::CalcTextSize(n);dl->AddText(ImVec2(g1.x-m.x-9,mn.y+style.FramePadding.y+1+static_cast<float>(i)*lh),i==activeLine?ActiveLineNumber:LineNumber,n);}
+  for(std::size_t i=0;i<lines.size();++i){char n[24];std::snprintf(n,sizeof(n),"%zu",i+1);const ImVec2 m=ImGui::CalcTextSize(n);dl->AddText(ImVec2(g1.x-m.x-9,textOrigin.y+static_cast<float>(i)*renderedLineHeight),i==activeLine?ActiveLineNumber:LineNumber,n);}
   dl->PopClipRect();
  }
  ImGui::EndChild();return changed;
 }
-void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,float lh,float off){
+void GoolScriptEditor::drawSource(const ImVec2& mn,const ImVec2& mx,const ImVec2& textOrigin,float lineHeight){
  ImDrawList* dl=ImGui::GetWindowDrawList();dl->PushClipRect(mn,mx,true);ImFont* font=ImGui::GetFont();const float fs=ImGui::GetFontSize();
- const ImVec2 base(mn.x+6,mn.y+off);const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
+ const auto lines=linesOf(text_);const auto cur=lineColumn(text_,static_cast<std::size_t>(std::max(0,inputState_.cursor)));const auto activeLine=cur.first;
  std::size_t offset=0;
- for(std::size_t li=0;li<lines.size();++li){auto line=lines[li];const float y=base.y+static_cast<float>(li)*lh;if(li==activeLine)dl->AddRectFilled(ImVec2(mn.x,y-1),ImVec2(mx.x,y+lh),CurrentLine);
+ for(std::size_t li=0;li<lines.size();++li){auto line=lines[li];const float y=textOrigin.y+static_cast<float>(li)*lineHeight;if(li==activeLine)dl->AddRectFilled(ImVec2(mn.x,y),ImVec2(mx.x,y+lineHeight),CurrentLine);
   const std::size_t end=offset+line.size();
-  for(const auto& t:lex(line)){const float x=font->CalcTextSizeA(fs,FLT_MAX,0,line.data(),line.data()+t.begin).x;dl->AddText(font,fs,ImVec2(base.x+x,y),color(t.kind),line.data()+t.begin,line.data()+t.end);}
+  for(const auto& t:lex(line)){const float x=font->CalcTextSizeA(fs,FLT_MAX,0,line.data(),line.data()+t.begin).x;dl->AddText(font,fs,ImVec2(textOrigin.x+x,y),color(t.kind),line.data()+t.begin,line.data()+t.end);}
   offset=end+1;
  }
  dl->PopClipRect();
