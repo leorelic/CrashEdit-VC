@@ -2853,7 +2853,7 @@ void EditorUI::drawAnimationFrameEditor(){
       ImGui::SetNextItemWidth(-1.0f);
       if(ImGui::InputInt(axisName,&value,1,8)){
        if(value<0||value>255)status_="Special vertex coordinates must be between 0 and 255.";
-       else status_="Special vertex editing is not enabled yet; packed vertex data is being preserved.";
+       else if(!nsf_.setAnimationFrameSpecialVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis,static_cast<std::uint8_t>(value)))status_="Could not write the special vertex coordinate.";
       }
      }
      ImGui::PopID();
