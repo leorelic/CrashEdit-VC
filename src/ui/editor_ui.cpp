@@ -42,7 +42,7 @@ struct EditorPreferences {
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
  bool traditionalGoolInspection=false;
  int dockLayoutVersion=0;
- int sceneMoveSpeed=100;
+ int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
 };
 static EditorPreferences editorPreferences;
@@ -131,6 +131,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"DepthBufferEnabled=%d",&value)==1)editorPreferences.depthBufferEnabled=value!=0;
  else if(std::sscanf(line,"ShowRendererDiagnostics=%d",&value)==1)editorPreferences.rendererDiagnosticsVisible=value!=0;
  else if(std::sscanf(line,"SceneMoveSpeed=%d",&value)==1)editorPreferences.sceneMoveSpeed=std::clamp(value,100,300);
+  else if(std::sscanf(line,"AnimationMoveSpeed=%d",&value)==1)editorPreferences.animationMoveSpeed=std::clamp(value,25,400);
  else if(std::sscanf(line,"ShowProperties=%d",&value)==1)editorPreferences.showProperties=value!=0;
  else if(std::sscanf(line,"ShowConsole=%d",&value)==1)editorPreferences.showConsole=value!=0;
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
@@ -142,8 +143,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -405,7 +406,7 @@ void EditorUI::draw(){
  }
  if(about_){ImGui::OpenPopup("About CrashEdit");about_=false;}if(ImGui::BeginPopupModal("About CrashEdit",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){ImGui::Text("CrashEdit — cross-platform rewrite");ImGui::Text("C++20 / Dear ImGui / GLFW / OpenGL");if(ImGui::Button("Close"))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
  static EditorPreferences previousPreferences=editorPreferences;
- if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
+ if(previousPreferences.uiScaling!=editorPreferences.uiScaling||previousPreferences.useModernFont!=editorPreferences.useModernFont||previousPreferences.softwareRendering!=editorPreferences.softwareRendering||previousPreferences.depthBufferEnabled!=editorPreferences.depthBufferEnabled||previousPreferences.rendererDiagnosticsVisible!=editorPreferences.rendererDiagnosticsVisible||previousPreferences.sceneMoveSpeed!=editorPreferences.sceneMoveSpeed||previousPreferences.animationMoveSpeed!=editorPreferences.animationMoveSpeed||previousPreferences.showProperties!=editorPreferences.showProperties||previousPreferences.showConsole!=editorPreferences.showConsole){ImGui::MarkIniSettingsDirty();previousPreferences=editorPreferences;}
 }
 
 
@@ -2647,7 +2648,30 @@ void EditorUI::drawAnimationViewer(){
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
+ const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
+ ImGui::SetCursorScreenPos(toolbarMin);
+ ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6.0f,4.0f));
+ ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,3.0f);
+ const bool toolbarButton=ImGui::InvisibleButton("##AnimationViewportToolbarMenu",ImVec2(28.0f,26.0f));
+ const ImVec2 toolbarMax=ImGui::GetItemRectMax();
+ const bool toolbarHovered=ImGui::IsItemHovered();
+ if(toolbarHovered)ImGui::SetTooltip("Animation viewport settings");
+ if(toolbarButton)ImGui::OpenPopup("AnimationViewportOptions");
+ if(ImGui::BeginPopup("AnimationViewportOptions")){
+  ImGui::TextUnformatted("Rendering");
+  if(ImGui::MenuItem("Textured (Hardware)",nullptr,!animationWireframe_))animationWireframe_=false;
+  if(ImGui::MenuItem("Wireframe",nullptr,animationWireframe_))animationWireframe_=true;
+  ImGui::Separator();
+  ImGui::TextUnformatted("Camera movement speed");
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
+  ImGui::EndPopup();
+ }
+ const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ ImGui::PopStyleVar(2);
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
+ ImGui::SetCursorScreenPos(canvasMin);
+ ImGui::SetNextItemAllowOverlap();
  ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
@@ -2684,20 +2708,20 @@ void EditorUI::drawAnimationViewer(){
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
-  if(hovered&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
-  if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  if(hovered&&!viewportToolbarOwnsMouse&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
+  if(active&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
   }
-  if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+  if(active&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
    const float pan=animationDistance_*0.0018f;
    const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(hovered&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
-  if(hovered){
-   const float moveSpeed=(2.0f*float(editorPreferences.sceneMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
+  if(hovered&&!viewportToolbarOwnsMouse&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
+  if(hovered&&!viewportToolbarOwnsMouse){
+   const float moveSpeed=(2.0f*float(editorPreferences.animationMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
    const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
    const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
    if(shift){
@@ -2792,6 +2816,11 @@ void EditorUI::drawAnimationViewer(){
   }
  }
  dl->PopClipRect();
+ ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
+ toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
+ const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
+ const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
  ImGui::TextDisabled("Left drag: orbit | Right drag: pan | Wheel: zoom | WASD: move | Q/E: down/up | Shift: world-aligned | R: reset camera");
  ImGui::End();
 }
