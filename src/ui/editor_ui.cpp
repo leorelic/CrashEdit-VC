@@ -468,6 +468,70 @@ static std::string formatGoolIRForScriptView(const std::string& source,std::size
 }
 
 
+namespace {
+struct GoolDocumentationTopic { const char* title; const char* summary; const char* details; const char* example; };
+static const std::array<GoolDocumentationTopic,9> goolDocumentationTopics={{
+ {"GOOL Script overview","A readable, best-effort view of the selected GOOL entry.",
+  "This reference explains the notation used by the decompiler. The Selected GOOL tab is read-only: it does not edit original GOOL data or recompile source. An operation is shown as source-like syntax only when its meaning is supported by current analysis. Use the Inspector to verify low-level data.",
+  "Selected GOOL  →  routine listing  →  source-like preview"},
+ {"Routines and labels","Routines are discovered entry points; labels identify instruction destinations.",
+  "A routine is a region reached through supported entry sources such as local Code hooks or local calls. Lxxxxx labels identify instruction positions and branch destinations. Routine boundaries and shared-instruction counts are analysis results, not proof that every runtime entry has been discovered.",
+  "L00012:\n    if condition:\n        goto L00020"},
+ {"Conditions and loops","Structured blocks appear only when the control-flow shape can be proven.",
+  "The decompiler may reconstruct if/else, while, do/while, and proven loop exits. If branches are ambiguous, cross routine boundaries, or form unsupported control flow, it keeps explicit labels and branches instead of inventing a high-level structure.",
+  "if condition:\n    action()\nelse:\n    fallback()"},
+ {"Calls, returns and transitions","Known control operations are rendered with readable control-flow notation.",
+  "Calls and returns describe routine control flow. State transitions describe a change to a GOOL state descriptor when the descriptor can be resolved. Unresolved destinations remain explicit diagnostics or references; readable spelling does not mean every runtime side effect is understood.",
+  "call RoutineName\nreturn\ntransition StateName"},
+ {"Native MIPS","A mips line is a PlayStation CPU instruction embedded in the GOOL stream.",
+  "Native MIPS is not a GOOL Script command. The decompiler preserves assembly where supported and records branch destinations when they resolve to exact instruction boundaries. Unsupported or malformed encodings remain represented as raw words.",
+  "mips: addu $v0, $a0, $a1"},
+ {"Unknown instructions","Unknown operations are retained rather than assigned speculative meanings.",
+  "A .gool_word line preserves the original 32-bit GOOL instruction when its semantics are not currently modeled. A .mips_word line preserves a native instruction that could not be decoded. These markers are intentional. Consult the Inspector and evidence-backed opcode audit; do not replace them with guessed behavior.",
+  ".gool_word 0x........\n.mips_word 0x........"},
+ {"Offsets and raw words","The readable view hides low-level annotations to keep code uncluttered.",
+  "The underlying IR/decompiler retains original instruction positions, byte offsets, and raw 32-bit words, along with source relationships. The compact script view suppresses these comments. Use the GOOL Inspector to compare a readable statement with its exact encoded instruction and operands.",
+  "@ byte offset  ·  raw= original 32-bit word"},
+ {"Diagnostics","Diagnostics describe gaps or uncertainty in analysis, not necessarily bad game data.",
+  "A diagnostic can report an unresolved target, unsupported instruction, invalid reference, or control-flow edge that cannot safely be structured. It means the tool could not prove an interpretation. It does not automatically mean the original NSF is corrupt, and an empty diagnostic list does not prove complete semantic understanding.",
+  "IR diagnostics: 2  ·  low-level annotations hidden: 14"},
+ {"Operations and semantics","An opcode gets source-like notation only after its behavior is established.",
+  "The project is building an evidence-backed inventory of GOOL opcodes, operand roles, object/process fields, state and hook references, and native MIPS/GTE behavior. Names and examples in the current preview are not a finalized language specification. Unknown and partially understood operations stay low-level until verified.",
+  "Known operation  →  verified IR meaning  →  readable form"}
+}};
+static int activeGoolDocumentationTopic=0;
+static bool documentationTabActive=false;
+static int documentationTopicForToken(std::string token){
+ std::transform(token.begin(),token.end(),token.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+ if(token=="if"||token=="else"||token=="while"||token=="do"||token=="break"||token=="goto"||token=="continue")return 2;
+ if(token=="call"||token=="return"||token=="transition"||token=="state")return 3;
+ if(token=="mips"||token=="mips_word")return 4;
+ if(token=="gool_word"||token=="unknown")return 5;
+ if(token=="routine"||token=="event"||(!token.empty()&&token.front()=='l'&&std::all_of(token.begin()+1,token.end(),[](unsigned char ch){return std::isdigit(ch)!=0;})))return 1;
+ if(token=="raw"||token=="offset"||token=="byte")return 6;
+ if(token=="diagnostic"||token=="diagnostics")return 7;
+ return 8;
+}
+static void drawGoolDocumentationPage(){
+ if(activeGoolDocumentationTopic<0||activeGoolDocumentationTopic>=static_cast<int>(goolDocumentationTopics.size()))activeGoolDocumentationTopic=0;
+ const auto& topic=goolDocumentationTopics[static_cast<std::size_t>(activeGoolDocumentationTopic)];
+ ImGui::TextDisabled("GOOL Script reference");
+ ImGui::Separator();
+ ImGui::Text("%s",topic.title);
+ ImGui::TextWrapped("%s",topic.summary);
+ ImGui::Spacing();
+ ImGui::Separator();
+ ImGui::TextWrapped("%s",topic.details);
+ ImGui::Spacing();
+ ImGui::TextDisabled("Example / notation");
+ ImGui::BeginChild("GoolDocumentationExample",ImVec2(0.0f,72.0f),true);
+ ImGui::TextWrapped("%s",topic.example);
+ ImGui::EndChild();
+ ImGui::Spacing();
+ ImGui::TextDisabled("Tip: Ctrl+Click a supported term in the Selected GOOL view to open its documentation topic.");
+}
+} // namespace
+
 void EditorUI::drawGoolScriptEditor(){
 
  const Crash::NsfGool* selectedGool=nullptr;
@@ -539,25 +603,32 @@ void EditorUI::drawGoolScriptEditor(){
   const ImVec2 available=ImGui::GetContentRegionAvail();
   if(showGoolScriptNavigator_){
    ImGui::BeginChild("GoolScriptNavigator",ImVec2(190.0f,available.y),true);
-   ImGui::TextUnformatted("Document");
-   ImGui::Separator();
-   if(selectedGool)ImGui::Text("%s",selectedName.c_str());
-   else ImGui::TextDisabled("No GOOL selected");
-   if(selectedGool){
-    ImGui::TextDisabled("EID  %08X",selectedEid);
-    ImGui::TextDisabled("%zu instructions",program.instructions.size());
-    ImGui::TextDisabled("%zu routines",program.routines.size());
-   }
-   ImGui::Spacing();
-   ImGui::TextUnformatted("Outline");
-   ImGui::TextDisabled("Events");
-   ImGui::TextDisabled("States");
-   ImGui::TextDisabled("Routines");
-   if(selectedGool){
-    for(std::size_t i=0;i<program.routines.size();++i){
-     char label[64];std::snprintf(label,sizeof(label),"Routine %zu  ·  L%05zu",i,
-       program.routines[i].entryInstruction);
-     if(ImGui::Selectable(label,activeRoutine==i))activeRoutine=i;
+   if(documentationTabActive){
+    ImGui::TextUnformatted("Documentation");
+    ImGui::Separator();
+    for(std::size_t i=0;i<goolDocumentationTopics.size();++i)
+     if(ImGui::Selectable(goolDocumentationTopics[i].title,activeGoolDocumentationTopic==static_cast<int>(i)))
+      activeGoolDocumentationTopic=static_cast<int>(i);
+   }else{
+    ImGui::TextUnformatted("Document");
+    ImGui::Separator();
+    if(selectedGool)ImGui::Text("%s",selectedName.c_str());
+    else ImGui::TextDisabled("No GOOL selected");
+    if(selectedGool){
+     ImGui::TextDisabled("EID  %08X",selectedEid);
+     ImGui::TextDisabled("%zu instructions",program.instructions.size());
+     ImGui::TextDisabled("%zu routines",program.routines.size());
+    }
+    ImGui::Spacing();
+    ImGui::TextUnformatted("Outline");
+    ImGui::TextDisabled("Events");
+    ImGui::TextDisabled("States");
+    ImGui::TextDisabled("Routines");
+    if(selectedGool){
+     for(std::size_t i=0;i<program.routines.size();++i){
+      char label[64];std::snprintf(label,sizeof(label),"Routine %zu  ·  L%05zu",i,program.routines[i].entryInstruction);
+      if(ImGui::Selectable(label,activeRoutine==i))activeRoutine=i;
+     }
     }
    }
    ImGui::EndChild();
@@ -567,6 +638,7 @@ void EditorUI::drawGoolScriptEditor(){
   ImGui::BeginChild("GoolScriptEditorSurface",ImVec2(0.0f,available.y),false);
   if(ImGui::BeginTabBar("GoolScriptDocuments")){
    if(ImGui::BeginTabItem("Selected GOOL")){
+    documentationTabActive=false;
     ImGui::Text("%s",selectedGool?selectedName.c_str():"No GOOL selected");
     ImGui::SameLine();
     ImGui::TextDisabled("EID %08X",selectedEid);
@@ -574,15 +646,6 @@ void EditorUI::drawGoolScriptEditor(){
     ImGui::TextDisabled("IR preview · read-only");
     ImGui::Separator();
     if(selectedGool){
-     ImGui::SetNextItemOpen(false,ImGuiCond_Once);
-     if(ImGui::CollapsingHeader("How to read this decompilation")){
-      ImGui::TextWrapped("Routine information is shown above the code: the entry location, how the routine was discovered, and its instruction/shared-instruction counts.");
-      ImGui::BulletText("Labels (Lxxxxx) name branch destinations. Structured if/else and loop blocks are reconstructed only when their control flow is proven safe.");
-      ImGui::BulletText("Ordinary lines are source-like operations. Lines beginning with mips are native PlayStation CPU instructions, not GOOL script commands.");
-      ImGui::BulletText("Unknown GOOL instructions remain visible as raw .gool_word values; undecoded native instructions remain as .mips_word values. Their meaning is intentionally not guessed.");
-      ImGui::BulletText("The byte offset and original 32-bit word are retained by the underlying decompiler output, but low-level comments are hidden in this readable view. The Inspector remains available for detailed raw inspection.");
-      ImGui::BulletText("The status below the editor reports analysis diagnostics and how many low-level annotations were hidden. Diagnostics identify incomplete or uncertain analysis; they are not proof that the original game data is invalid.");
-     }
      if(!program.routines.empty()){
       if(activeRoutine>=program.routines.size())activeRoutine=0;
       const auto& routine=program.routines[activeRoutine];
@@ -609,6 +672,10 @@ void EditorUI::drawGoolScriptEditor(){
       const ImVec2 selectedEditorAvail=ImGui::GetContentRegionAvail();
       const float selectedEditorHeight=std::max(120.0f,selectedEditorAvail.y-42.0f);
       selectedEditor.Render("##SelectedGoolCode",ImVec2(0.0f,selectedEditorHeight),true);
+      if(const std::string clickedWord=selectedEditor.TakeCtrlClickedWord();!clickedWord.empty()){
+       activeGoolDocumentationTopic=documentationTopicForToken(clickedWord);
+       documentationTabActive=true;
+      }
       if(fontCount>1.0f)ImGui::PopFont();
       if(!decomp.diagnostics.empty()||hiddenAnnotations>0){
        ImGui::TextDisabled("%zu IR diagnostics  ·  %zu low-level annotations hidden from source view",
@@ -633,6 +700,7 @@ void EditorUI::drawGoolScriptEditor(){
     ImGui::EndTabItem();
    }
    if(ImGui::BeginTabItem("Scratch Script")){
+    documentationTabActive=false;
     ImGui::TextDisabled("Draft source · indentation checked as you type");
     const float diagnosticsHeight=112.0f;
     const ImVec2 editorAvail=ImGui::GetContentRegionAvail();
@@ -660,6 +728,11 @@ void EditorUI::drawGoolScriptEditor(){
      ImGui::PopID();
     }
     ImGui::EndChild();
+    ImGui::EndTabItem();
+   }
+   if(ImGui::BeginTabItem("Documentation",nullptr,documentationTabActive?ImGuiTabItemFlags_SetSelected:0)){
+    documentationTabActive=true;
+    drawGoolDocumentationPage();
     ImGui::EndTabItem();
    }
    ImGui::EndTabBar();

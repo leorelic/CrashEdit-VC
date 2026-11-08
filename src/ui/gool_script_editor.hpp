@@ -13,11 +13,13 @@ public:
     void SetText(const std::string& text);
     std::string GetText() const;
     bool Render(const char* id, ImVec2 size, bool readOnly = false);
+    std::string TakeCtrlClickedWord();
 
 private:
     TextEditor editor_;
     bool readOnly_ = false;
     float fontScale_ = 1.0f;
+    std::string ctrlClickedWord_;
 };
 
 } // namespace CrashEdit

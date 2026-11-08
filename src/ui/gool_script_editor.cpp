@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <utility>
 
 namespace CrashEdit {
 namespace {
@@ -134,6 +135,12 @@ std::string GoolScriptEditor::GetText() const {
     return editor_.GetText();
 }
 
+std::string GoolScriptEditor::TakeCtrlClickedWord() {
+    std::string word = std::move(ctrlClickedWord_);
+    ctrlClickedWord_.clear();
+    return word;
+}
+
 bool GoolScriptEditor::Render(const char* id, ImVec2 size, bool readOnly) {
     readOnly_ = readOnly;
     editor_.SetReadOnlyEnabled(readOnly);
@@ -151,6 +158,10 @@ bool GoolScriptEditor::Render(const char* id, ImVec2 size, bool readOnly) {
     const float baseFontSize = ImGui::GetFontSize();
     ImGui::PushFont(nullptr, baseFontSize * fontScale_);
     const bool changed = editor_.Render(id, size);
+    if (io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        editor_.IsMousePosOverTextArea(ImGui::GetMousePos())) {
+        ctrlClickedWord_ = editor_.GetWordAtMousePos(ImGui::GetMousePos());
+    }
     ImGui::PopFont();
     return changed;
 }
