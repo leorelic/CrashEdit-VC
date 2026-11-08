@@ -2598,6 +2598,27 @@ void EditorUI::drawAnimationViewer(){
  if(animation.frames.empty()){
   ImGui::TextDisabled("This animation contains no frames.");ImGui::End();return;
  }
+ auto findModel=[&](std::uint32_t eid)->const Crash::NsfModel*{
+  if(!Crash::isValidEid(eid))return nullptr;
+  for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
+   for(const auto&entry:chunk.entries)
+    if(entry.valid&&entry.type==2&&entry.eid==eid&&entry.model.decoded)return &entry.model;
+  return nullptr;
+ };
+ auto transformVertex=[](const Crash::NsfAnimationVertex&v,const Crash::NsfAnimationFrame&frame,const Crash::NsfModel*model){
+  constexpr float fallbackScale=1.0f/128.0f;
+  constexpr float modelScale=3200.0f*128.0f;
+  const float sx=model?static_cast<float>(model->scaleX)/modelScale:fallbackScale;
+  const float sy=model?static_cast<float>(model->scaleY)/modelScale:fallbackScale;
+  const float sz=model?static_cast<float>(model->scaleZ)/modelScale:fallbackScale;
+  // CrashEdit-RE's animation path swaps Y/Z, adds the frame translation,
+  // then applies the linked model's per-axis scale.
+  return ImVec3(
+   (static_cast<float>(v.x)+static_cast<float>(frame.xOffset)/4.0f)*sx,
+   (static_cast<float>(v.z)+static_cast<float>(frame.yOffset)/4.0f)*sy,
+   (static_cast<float>(v.y)+static_cast<float>(frame.zOffset)/4.0f)*sz
+  );
+ };
  animationFrame_=std::clamp(animationFrame_,0,static_cast<int>(animation.frames.size()-1U));
  ImGui::Text("%s | %zu frames",Crash::eidToEName(animationEntry->eid).c_str(),animation.frames.size());
  ImGui::SameLine();
@@ -2615,9 +2636,7 @@ void EditorUI::drawAnimationViewer(){
   while(animationFrameTimer_>=0.1f){animationFrameTimer_-=0.1f;animationFrame_=(animationFrame_+1)%static_cast<int>(animation.frames.size());}
  }
  const auto&frame=animation.frames[static_cast<std::size_t>(animationFrame_)];
- const Crash::NsfModel*model=nullptr;
- for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)for(const auto&entry:chunk.entries)
-  if(entry.valid&&entry.type==2&&entry.eid==frame.modelEid&&entry.model.decoded){model=&entry.model;break;}
+ const Crash::NsfModel*model=findModel(frame.modelEid);
  ImGui::SameLine();
  if(Crash::isValidEid(frame.modelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(frame.modelEid).c_str());
  else ImGui::TextDisabled("Model EID: %08X",frame.modelEid);
@@ -2636,21 +2655,32 @@ void EditorUI::drawAnimationViewer(){
   const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
  }else{
-  float minX=std::numeric_limits<float>::max(),minY=minX,minZ=minX,maxX=-minX,maxY=-minX,maxZ=-minX;
-  for(const auto&v:frame.vertices){minX=std::min(minX,static_cast<float>(v.x));minY=std::min(minY,static_cast<float>(v.y));minZ=std::min(minZ,static_cast<float>(v.z));maxX=std::max(maxX,static_cast<float>(v.x));maxY=std::max(maxY,static_cast<float>(v.y));maxZ=std::max(maxZ,static_cast<float>(v.z));}
-  const float cx=(minX+maxX)*0.5f,cy=(minY+maxY)*0.5f,cz=(minZ+maxZ)*0.5f;
-  const float radius=std::max(1.0f,std::sqrt((maxX-minX)*(maxX-minX)+(maxY-minY)*(maxY-minY)+(maxZ-minZ)*(maxZ-minZ))*0.5f);
-  float groundY=minY;
-  for(const auto&otherFrame:animation.frames)if(otherFrame.verticesDecoded)
-   for(const auto&v:otherFrame.vertices)groundY=std::min(groundY,static_cast<float>(v.y));
+  // Match the original viewer's CorePositions: frame offsets and linked model
+  // scales are applied to every frame before calculating the camera bounds.
+  ImVec3 boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
+  bool haveBounds=false;
+  for(const auto&candidate:animation.frames){
+   if(!candidate.verticesDecoded)continue;
+   const auto*candidateModel=findModel(candidate.modelEid);
+   for(const auto&v:candidate.vertices){
+    const ImVec3 p=transformVertex(v,candidate,candidateModel);
+    boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
+    boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
+    haveBounds=true;
+   }
+  }
+  if(!haveBounds){boundsMin=ImVec3(-1,-1,-1);boundsMax=ImVec3(1,1,1);}
+  const ImVec3 center((boundsMin.x+boundsMax.x)*0.5f,(boundsMin.y+boundsMax.y)*0.5f,(boundsMin.z+boundsMax.z)*0.5f);
+  const float dx=boundsMax.x-boundsMin.x,dy=boundsMax.y-boundsMin.y,dz=boundsMax.z-boundsMin.z;
+  const float radius=std::max(0.25f,std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f);
   if(!animationCameraInitialized_){
-   animationTargetX_=cx;animationTargetY_=cy;animationTargetZ_=cz;
+   animationTargetX_=center.x;animationTargetY_=center.y;animationTargetZ_=center.z;
    animationYaw_=0.0f;animationPitch_=0.261799f;
-   animationDistance_=std::clamp(radius*2.8f,2.0f,200000.0f);
+   animationDistance_=std::clamp(radius*1.6f,1.0f,200000.0f);
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
-  if(hovered&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.2f,200000.0f);
+  if(hovered&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
@@ -2661,7 +2691,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(hovered&&ImGui::IsKeyDown(ImGuiKey_R))animationCameraInitialized_=false;
+  if(hovered&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
   if(hovered){
    const float moveSpeed=(2.0f*float(editorPreferences.sceneMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
    const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
@@ -2675,7 +2705,7 @@ void EditorUI::drawAnimationViewer(){
     if(ImGui::IsKeyDown(ImGuiKey_W)){animationTargetX_-=syaw*moveSpeed;animationTargetZ_-=cyaw*moveSpeed;}
     if(ImGui::IsKeyDown(ImGuiKey_S)){animationTargetX_+=syaw*moveSpeed;animationTargetZ_+=cyaw*moveSpeed;}
     if(ImGui::IsKeyDown(ImGuiKey_A)){animationTargetX_-=cyaw*moveSpeed;animationTargetZ_+=syaw*moveSpeed;}
-    if(ImGui::IsKeyDown(ImGuiKey_D)){animationTargetX_+=cyaw*moveSpeed;animationTargetZ_-=syaw*moveSpeed;}
+    if(ImGui::IsKeyDown(ImGuiKey_D)){animationTargetX_+=cyaw*moveSpeed;animationTargetZ_-=cyaw*moveSpeed;}
    }
    if(ImGui::IsKeyDown(ImGuiKey_E))animationTargetY_+=moveSpeed;
    if(ImGui::IsKeyDown(ImGuiKey_Q))animationTargetY_-=moveSpeed;
@@ -2690,39 +2720,41 @@ void EditorUI::drawAnimationViewer(){
    if(depth<=0.05f)return ImVec2(-100000.0f,-100000.0f);
    return ImVec2(canvasMin.x+canvasSize.x*0.5f+rx*focal/depth,canvasMin.y+canvasSize.y*0.5f-py*focal/depth);
   };
-  // A stable floor is shared by every frame in this animation, so it does not
-  // jump when the animated model's feet move between frames.
-  const float planeExtent=std::max(radius*5.0f,8.0f),gridStep=std::max(radius*0.25f,1.0f);
+  // A world-space floor at Y=0, like the original animation viewer's grid.
+  // Its center and elevation do not inherit the animated frame's translation.
+  const float planeExtent=std::max(4.0f,radius*4.0f);
   const ImVec2 floorCorners[4]={
-   project(animationTargetX_-planeExtent,groundY,animationTargetZ_-planeExtent),
-   project(animationTargetX_+planeExtent,groundY,animationTargetZ_-planeExtent),
-   project(animationTargetX_+planeExtent,groundY,animationTargetZ_+planeExtent),
-   project(animationTargetX_-planeExtent,groundY,animationTargetZ_+planeExtent)
+   project(-planeExtent,0.0f,-planeExtent),project(planeExtent,0.0f,-planeExtent),
+   project(planeExtent,0.0f,planeExtent),project(-planeExtent,0.0f,planeExtent)
   };
-  dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(18,21,26,255));
-  for(int i=-10;i<=10;++i){
-   const float offset=gridStep*static_cast<float>(i);
-   const ImU32 gridColor=i==0?IM_COL32(92,104,118,180):IM_COL32(55,62,72,150);
+  bool floorVisible=true;for(const auto&p:floorCorners)if(p.x<=-99999.0f)floorVisible=false;
+  if(floorVisible)dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(20,23,28,255));
+  const int gridLines=std::clamp(static_cast<int>(std::ceil(planeExtent)),4,32);
+  for(int i=-gridLines;i<=gridLines;++i){
+   const float offset=static_cast<float>(i);
+   const ImU32 gridColor=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
    const float width=i==0?1.5f:1.0f;
-   dl->AddLine(project(animationTargetX_+offset,groundY,animationTargetZ_-planeExtent),project(animationTargetX_+offset,groundY,animationTargetZ_+planeExtent),gridColor,width);
-   dl->AddLine(project(animationTargetX_-planeExtent,groundY,animationTargetZ_+offset),project(animationTargetX_+planeExtent,groundY,animationTargetZ_+offset),gridColor,width);
+   const ImVec2 a=project(offset,0.0f,-planeExtent),b=project(offset,0.0f,planeExtent);
+   const ImVec2 c=project(-planeExtent,0.0f,offset),d=project(planeExtent,0.0f,offset);
+   if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,gridColor,width);
+   if(c.x>-99999.0f&&d.x>-99999.0f)dl->AddLine(c,d,gridColor,width);
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
    std::vector<ImVec2> projected(frame.vertices.size());
    std::vector<bool> visible(frame.vertices.size(),false);
    for(std::size_t i=0;i<frame.vertices.size();++i){
-    const auto&v=frame.vertices[i];const ImVec2 p=project(static_cast<float>(v.x),static_cast<float>(v.y),static_cast<float>(v.z));
-    projected[i]=p;visible[i]=p.x>-99999.0f;
+    const ImVec3 p=transformVertex(frame.vertices[i],frame,model);
+    projected[i]=project(p.x,p.y,p.z);visible[i]=projected[i].x>-99999.0f;
    }
    for(const auto&tri:model->triangles){
     if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=projected.size()||static_cast<std::size_t>(tri.b)>=projected.size()||static_cast<std::size_t>(tri.c)>=projected.size())continue;
-    const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),d=static_cast<std::size_t>(tri.c);
-    if(!visible[a]||!visible[b]||!visible[d])continue;
+    const auto a=static_cast<std::size_t>(tri.a),b=static_cast<std::size_t>(tri.b),c=static_cast<std::size_t>(tri.c);
+    if(!visible[a]||!visible[b]||!visible[c])continue;
     ImU32 color=IM_COL32(165,190,220,235);
     if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
     dl->AddLine(projected[a],projected[b],color,1.25f);
-    dl->AddLine(projected[b],projected[d],color,1.25f);
-    dl->AddLine(projected[d],projected[a],color,1.25f);
+    dl->AddLine(projected[b],projected[c],color,1.25f);
+    dl->AddLine(projected[c],projected[a],color,1.25f);
    }
   }else{
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
