@@ -2843,7 +2843,7 @@ void EditorUI::drawAnimationViewer(){
        const bool nocull=tri.triangleSubtype==0||tri.triangleSubtype==2;
        const bool flip=((tri.triangleType==2)^(tri.triangleSubtype==3))&&!nocull;
        const int order[3]={flip?2:0,1,flip?0:2};
-       const int baseVertices[3]={tri.a,tri.b,tri.c},baseColors[3]={tri.colorA,tri.colorB,tri.colorC};
+       const int frameVertexOffset=static_cast<int>(frame.specialVertexCount);const int baseVertices[3]={tri.a+frameVertexOffset,tri.b+frameVertexOffset,tri.c+frameVertexOffset},baseColors[3]={tri.colorA,tri.colorB,tri.colorC};
        const int vi[3]={baseVertices[order[0]],baseVertices[order[1]],baseVertices[order[2]]};
        const int ci[3]={baseColors[order[0]],baseColors[order[1]],baseColors[order[2]]};
        if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
