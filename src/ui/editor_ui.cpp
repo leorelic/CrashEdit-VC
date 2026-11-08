@@ -2997,6 +2997,7 @@ void EditorUI::drawAnimationViewer(){
  if(ImGui::BeginPopup("AnimationViewportOptions")){
   ImGui::TextUnformatted("Rendering");
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
+  ImGui::MenuItem("Collision Viewer",nullptr,&animationCollisionViewer_);
   ImGui::Separator();
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
@@ -3254,6 +3255,43 @@ void EditorUI::drawAnimationViewer(){
   }else{
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
    dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
+  }
+ }
+ // Match CrashEdit-RE: collision bounds use their own 102400-unit scale and
+ // are positioned from the frame collision offset, independently of model scale.
+ if(animationCollisionViewer_&&!frame.collisions.empty()){
+  constexpr float collisionScale=102400.0f;
+  const ImU32 collisionFill=IM_COL32(0,255,0,42);
+  const ImU32 collisionLine=IM_COL32(0,255,0,255);
+  const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
+  const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
+  auto drawCollisionLine=[&](CameraPoint a,CameraPoint b){
+   constexpr float nearDepth=0.1f;
+   if(a.depth<=nearDepth&&b.depth<=nearDepth)return;
+   if(a.depth<=nearDepth||b.depth<=nearDepth){
+    const float t=(nearDepth-a.depth)/(b.depth-a.depth);
+    const CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
+    if(a.depth<=nearDepth)a=clipped;else b=clipped;
+   }
+   dl->AddLine(projectCamera(a),projectCamera(b),collisionLine,1.75f);
+  };
+  for(const auto&collision:frame.collisions){
+   const float x1=(static_cast<float>(collision.values[4])+static_cast<float>(collision.values[1]))/collisionScale;
+   const float y1=(static_cast<float>(collision.values[5])+static_cast<float>(collision.values[2]))/collisionScale;
+   const float z1=(static_cast<float>(collision.values[6])+static_cast<float>(collision.values[3]))/collisionScale;
+   const float x2=(static_cast<float>(collision.values[7])+static_cast<float>(collision.values[1]))/collisionScale;
+   const float y2=(static_cast<float>(collision.values[8])+static_cast<float>(collision.values[2]))/collisionScale;
+   const float z2=(static_cast<float>(collision.values[9])+static_cast<float>(collision.values[3]))/collisionScale;
+   const CameraPoint corners[8]={
+    toCamera(x1,y1,z1),toCamera(x2,y1,z1),toCamera(x1,y2,z1),toCamera(x2,y2,z1),
+    toCamera(x1,y1,z2),toCamera(x2,y1,z2),toCamera(x1,y2,z2),toCamera(x2,y2,z2)
+   };
+   for(const auto&face:boxFaces){
+    bool visible=true;ImVec2 points[4];
+    for(int i=0;i<4;++i){const auto&corner=corners[face[i]];if(corner.depth<=0.1f){visible=false;break;}points[i]=projectCamera(corner);}
+    if(visible)dl->AddConvexPolyFilled(points,4,collisionFill);
+   }
+   for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
   }
  }
  dl->PopClipRect();
