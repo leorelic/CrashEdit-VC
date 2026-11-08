@@ -26,11 +26,12 @@ private:
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  float animationYaw_=0.0f,animationPitch_=0.261799f,animationDistance_=3.0f,animationFrameTimer_=0.0f;
+ double animationPlaybackFrame_=0.0;
  float animationTargetX_=0.0f,animationTargetY_=0.0f,animationTargetZ_=0.0f;
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
  int animationCameraEntryEid_=-1;
- bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false;
+ bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false,animationInterpolate_=true;
  bool sceneCameraInitialized_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
