@@ -336,6 +336,53 @@ void NsfArchive::decodeZones(bool crash3Retail){
 }
 
 
+
+static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model,bool crash3){
+ auto fail=[&](const char*message){frame.vertexError=message;return false;};
+ if(frame.vertexCount>16384U||frame.specialVertexCount>frame.vertexCount)return fail("Animation vertex count is invalid.");
+ frame.vertices.assign(frame.vertexCount,{});
+ for(std::size_t i=0;i<frame.specialVertexCount;++i){
+  const auto&v=frame.specialVertices[i];frame.vertices[i]={v[0],v[1],v[2]};
+ }
+ std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
+ for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
+ const std::size_t start=frame.specialVertexCount*24U;
+ if(model&&model->decoded&&model->compressed){
+  if(model->positions.size()>frame.vertices.size())return fail("Model compressed-position count exceeds animation frame vertices.");
+  std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
+  auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
+   if(bit>=bits.size())return false;
+   const bool negative=bits[bit++]!=0;value=negative?-(1<<width):0;
+   for(unsigned b=0;b<width;++b){if(bit>=bits.size())return false;value|=static_cast<std::int32_t>(bits[bit++])<<(width-1U-b);}
+   return true;
+  };
+  for(std::size_t i=0;i<model->positions.size();++i){
+   const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
+   std::int32_t dx=0,dz=0,dy=0;
+   if(!readSigned(p.xBits,dx)||!readSigned(p.zBits,dz)||!readSigned(p.yBits,dy))return fail("Animation compressed vertex bitstream is truncated.");
+   xAcc=(xAcc+dx+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
+   yAcc=(yAcc+dy+p.y)&0xff;
+   zAcc=(zAcc+dz+p.z)&0xff;
+   // Match the established CrashEdit frame decoder's position ordering.
+   if(i<frame.vertices.size())frame.vertices[i]={xAcc,yAcc,zAcc};
+  }
+ }else{
+  const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
+  if(bits.size()<required+start)return fail("Animation uncompressed vertex bitstream is truncated.");
+  std::vector<std::uint8_t> reordered(bits.size());
+  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+   for(std::size_t byte=0;byte<4U;++byte)
+    for(std::size_t bit=0;bit<8U;++bit)reordered[base+24U-byte*8U+bit]=bits[base+byte*8U+bit];
+  std::size_t bit=start;
+  auto readByte=[&](std::int32_t&value){value=0;for(unsigned b=0;b<8U;++b)value=(value<<1U)|reordered[bit++];};
+  for(std::size_t i=frame.specialVertexCount;i<frame.vertexCount;++i){
+   NsfAnimationVertex v{};readByte(v.x);readByte(v.y);readByte(v.z);frame.vertices[i]=v;
+  }
+ }
+ if(crash3)for(auto&v:frame.vertices){v.x*=8;v.y*=8;v.z*=8;}
+ frame.verticesDecoded=true;return true;
+}
+
 void NsfArchive::decodeAnimationModels(bool crash3){
  for(auto&chunk:chunks_){
   if(chunk.type!=0||!chunk.entryTableValid)continue;
@@ -359,6 +406,15 @@ void NsfArchive::decodeAnimationModels(bool crash3){
     animation.decoded=valid;
     entry.animation=std::move(animation);
    }
+  }
+ }
+ for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==1){
+  for(auto&frame:entry.animation.frames){
+   const NsfModel*linked=nullptr;
+   for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)for(const auto&modelEntry:modelChunk.entries)
+    if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.modelEid&&modelEntry.model.decoded){linked=&modelEntry.model;break;}
+   frame.modelResolved=linked!=nullptr;
+   if(!decodeAnimationVertices(frame,linked,crash3)&&entry.animation.error.empty())entry.animation.error=frame.vertexError;
   }
  }
 }

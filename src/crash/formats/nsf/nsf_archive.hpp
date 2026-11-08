@@ -118,12 +118,16 @@ struct NsfGool {
 struct NsfAnimationCollision {
  std::int32_t values[10]{};
 };
+struct NsfAnimationVertex { std::int32_t x=0,y=0,z=0; };
 struct NsfAnimationFrame {
  std::int16_t xOffset=0,yOffset=0,zOffset=0,unknown=0;
  std::uint32_t modelEid=0,unknown2=0,reserved=0,vertexCount=0,collisionCount=0,headerSize=0;
  std::size_t specialVertexCount=0;
  std::vector<std::array<std::uint8_t,3>> specialVertices;
  std::vector<NsfAnimationCollision> collisions;
+ std::vector<NsfAnimationVertex> vertices;
+ bool verticesDecoded=false,modelResolved=false;
+ std::string vertexError;
  std::vector<std::uint32_t> temporalWords;
  std::size_t rawOffset=0,rawSize=0;
  std::string error;

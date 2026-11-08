@@ -156,4 +156,14 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p16(c3Animation,c3Frame,1);p16(c3Animation,c3Frame+2,2);p16(c3Animation,c3Frame+4,3);p16(c3Animation,c3Frame+6,4);
  p32(c3Animation,c3Frame+8,0x0200007b);p32(c3Animation,c3Frame+12,0);p32(c3Animation,c3Frame+16,0);p32(c3Animation,c3Frame+20,0);p32(c3Animation,c3Frame+24,28);
  assert(a.loadBytes(c3Animation,e));a.decodeAnimationModels(true);const auto&c3=a.chunks()[0].entries[0].animation;assert(c3.decoded&&c3.frames[0].modelEid==0x0200007bU);
+
+ // Uncompressed animation frame expands its 24-bit vertex from the temporal stream.
+ std::vector<std::uint8_t> vertexAnimation(65536);p16(vertexAnimation,0,0x1234);p16(vertexAnimation,2,0);p32(vertexAnimation,4,5);p32(vertexAnimation,8,1);
+ constexpr std::size_t vaEntry=24,vaFrame=44,vaEntrySize=56;p32(vertexAnimation,16,vaEntry);p32(vertexAnimation,20,vaEntry+vaEntrySize);
+ p32(vertexAnimation,vaEntry,0x0100ffff);p32(vertexAnimation,vaEntry+4,0x0200007b);p32(vertexAnimation,vaEntry+8,1);p32(vertexAnimation,vaEntry+12,1);p32(vertexAnimation,vaEntry+16,20);p32(vertexAnimation,vaEntry+20,vaEntrySize);
+ p32(vertexAnimation,vaFrame+8,0x0200007b);p32(vertexAnimation,vaFrame+16,1);p32(vertexAnimation,vaFrame+20,0);p32(vertexAnimation,vaFrame+24,28);
+ // Bytes are reversed within the 32-bit temporal word by the original format decoder.
+ p32(vertexAnimation,vaFrame+28,0x03020100);
+ assert(a.loadBytes(vertexAnimation,e));a.decodeAnimationModels(true);const auto&va=a.chunks()[0].entries[0].animation;
+ assert(va.decoded&&va.frames[0].verticesDecoded&&va.frames[0].vertices.size()==1);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
