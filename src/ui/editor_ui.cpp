@@ -336,13 +336,15 @@ void EditorUI::draw(){
    }
   }
  }
- drawAnimationTimeline();drawViewport();drawAnimationViewer();if(animationFrameEditorOpen_)drawAnimationFrameEditor();drawBottom();
+ drawViewport();drawAnimationViewer();if(animationFrameEditorOpen_)drawAnimationFrameEditor();drawBottom();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
  else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
  if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
+ // Submit the timeline last so its tab is appended after the other docked tools.
+ drawAnimationTimeline();
  ImGui::End();
  drawSearchWindow();
  if(!restoredLastNsfPath_){
@@ -2651,32 +2653,32 @@ void EditorUI::drawAnimationTimeline(){
  ImGui::Text("Frame %d / %d",animationFrame_+1,lastFrame+1);
  const double fractionalFrame=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
  if(fractionalFrame>0.001){ImGui::SameLine();ImGui::TextDisabled("Subframe %.2f",fractionalFrame);}
- if(frames.size()>1U){
-  ImGui::SetNextItemWidth(-1.0f);
-  if(ImGui::SliderInt("##AnimationFrameSlider",&animationFrame_,0,lastFrame,"Frame %d")){
-   animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(animationFrame_);animationFrameTimer_=0.0f;
-  }
- }else ImGui::TextDisabled("Frame 1 / 1");
- ImGui::TextDisabled("Scrub the track below or use the frame controls for exact frame selection.");
+ ImGui::TextDisabled("Select a frame by clicking or dragging its marker.");
  const float trackWidth=std::max(1.0f,ImGui::GetContentRegionAvail().x);
- ImGui::InvisibleButton("##AnimationTimelineTrack",ImVec2(trackWidth,34.0f),ImGuiButtonFlags_MouseButtonLeft);
+ const float trackHeight=48.0f;
+ ImGui::InvisibleButton("##AnimationTimelineTrack",ImVec2(trackWidth,trackHeight),ImGuiButtonFlags_MouseButtonLeft);
  const ImVec2 trackMin=ImGui::GetItemRectMin(),trackMax=ImGui::GetItemRectMax();
+ const float sidePadding=std::min(12.0f,trackWidth*0.5f);
+ const float dotStart=trackMin.x+sidePadding,dotEnd=trackMax.x-sidePadding;
+ const float dotSpan=std::max(0.0f,dotEnd-dotStart);
  if(ImGui::IsItemActive()&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
-  const float t=std::clamp((ImGui::GetIO().MousePos.x-trackMin.x)/std::max(1.0f,trackMax.x-trackMin.x),0.0f,0.999999f);
-  animationFrame_=std::clamp(static_cast<int>(t*static_cast<float>(frames.size())),0,lastFrame);
+  const float t=dotSpan>0.0f?std::clamp((ImGui::GetIO().MousePos.x-dotStart)/dotSpan,0.0f,1.0f):0.0f;
+  animationFrame_=frames.size()>1U?std::clamp(static_cast<int>(std::lround(t*static_cast<float>(lastFrame))),0,lastFrame):0;
   animationPlaybackFrame_=static_cast<double>(animationFrame_);animationPlaying_=false;animationFrameTimer_=0.0f;
  }
  ImDrawList*timelineDraw=ImGui::GetWindowDrawList();
- timelineDraw->AddRectFilled(trackMin,trackMax,IM_COL32(24,29,37,255),4.0f);
- const int markerStride=std::max(1,static_cast<int>((frames.size()+499U)/500U));
- for(int i=0;i<static_cast<int>(frames.size());i+=markerStride){
-  const float x0=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(i)/static_cast<float>(frames.size()));
-  const float x1=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(std::min<int>(i+markerStride,static_cast<int>(frames.size())))/static_cast<float>(frames.size()));
-  const bool selected=animationFrame_>=i&&animationFrame_<i+markerStride;
-  timelineDraw->AddRectFilled(ImVec2(x0+1.0f,trackMin.y+3.0f),ImVec2(std::max(x0+2.0f,x1-1.0f),trackMax.y-3.0f),selected?IM_COL32(69,133,196,255):IM_COL32(53,63,77,255),2.0f);
+ const float centerY=(trackMin.y+trackMax.y)*0.5f;
+ timelineDraw->AddLine(ImVec2(dotStart,centerY),ImVec2(dotEnd,centerY),IM_COL32(75,86,103,255),2.0f);
+ const int dotStride=std::max(1,static_cast<int>((frames.size()+999U)/1000U));
+ for(int i=0;i<static_cast<int>(frames.size());i+=dotStride){
+  const float t=lastFrame>0?static_cast<float>(i)/static_cast<float>(lastFrame):0.5f;
+  const ImVec2 center(dotStart+dotSpan*t,centerY);
+  const bool selected=i==animationFrame_||(animationFrame_>=i&&animationFrame_<i+dotStride);
+  timelineDraw->AddCircleFilled(center,selected?6.0f:3.5f,selected?IM_COL32(105,174,245,255):IM_COL32(153,166,184,255),12);
+  if(selected)timelineDraw->AddCircle(center,9.0f,IM_COL32(105,174,245,150),16,1.5f);
  }
- const float playheadX=trackMin.x+(trackMax.x-trackMin.x)*(static_cast<float>(animationFrame_)+0.5f)/static_cast<float>(frames.size());
- timelineDraw->AddLine(ImVec2(playheadX,trackMin.y),ImVec2(playheadX,trackMax.y),IM_COL32(245,210,112,255),2.0f);
+ const float playheadX=dotStart+(lastFrame>0?dotSpan*static_cast<float>(animationFrame_)/static_cast<float>(lastFrame):dotSpan*0.5f);
+ timelineDraw->AddLine(ImVec2(playheadX,trackMin.y+3.0f),ImVec2(playheadX,trackMax.y-3.0f),IM_COL32(245,210,112,220),1.5f);
  ImGui::End();
 }
 
