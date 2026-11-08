@@ -2667,7 +2667,7 @@ void EditorUI::drawAnimationViewer(){
  }
  // The GOOL frame-group flag controls source-frame cadence independently of
  // this visual interpolation toggle. Blend only when the playback position is fractional.
- const double poseFramePosition=animationPlaybackFrame_;
+ const double poseFramePosition=animationPlaybackFrame_+(animationInterpolate_&&animationPlaying_&&!animationHalfSpeed?0.5:0.0);
  const int poseFrameIndex=static_cast<int>(std::floor(poseFramePosition))%static_cast<int>(animation.frames.size());
  const auto&frame=animation.frames[static_cast<std::size_t>(poseFrameIndex)];
  const std::uint32_t linkedModelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
