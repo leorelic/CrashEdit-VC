@@ -14,6 +14,7 @@
 #include <map>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -2606,8 +2607,7 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SameLine();
  if(ImGui::SmallButton(">")){animationFrame_=std::min(static_cast<int>(animation.frames.size()-1U),animationFrame_+1);animationFrameTimer_=0.0f;}
  ImGui::SameLine();
- ImGui::SetNextItemWidth(180.0f);
- if(ImGui::SliderInt("Frame",&animationFrame_,0,static_cast<int>(animation.frames.size()-1U)))animationFrameTimer_=0.0f;
+ if(animation.frames.size()>1U){ImGui::SetNextItemWidth(180.0f);if(ImGui::SliderInt("Frame",&animationFrame_,0,static_cast<int>(animation.frames.size()-1U)))animationFrameTimer_=0.0f;}else ImGui::TextDisabled("Frame 1 / 1");
  if(animationPlaying_){
   animationFrameTimer_+=ImGui::GetIO().DeltaTime;
   while(animationFrameTimer_>=0.1f){animationFrameTimer_-=0.1f;animationFrame_=(animationFrame_+1)%static_cast<int>(animation.frames.size());}
