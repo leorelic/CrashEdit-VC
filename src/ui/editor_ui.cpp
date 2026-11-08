@@ -2861,7 +2861,11 @@ void EditorUI::drawAnimationViewer(){
           if((anim&0x80000000U)!=0)textureId+=static_cast<int>((anim>>29U)&3U);
           else{
            const int latency=static_cast<int>((anim>>26U)&0x1fU),delay=static_cast<int>((anim>>19U)&0x7fU),mask=static_cast<int>((anim>>12U)&0x7fU);
-           textureId+=(animationFrame_/2/(1+latency)+delay)&mask;
+           // CrashEdit uses Render.RealCurrentFrame / 2 for animated model
+           // textures. That is a 30 Hz real-time clock, independent of the
+           // animation's selected/playback frame index.
+           const int textureFrame=static_cast<int>(std::floor(ImGui::GetTime()*30.0));
+           textureId+=(textureFrame/(1+latency)+delay)&mask;
            if((anim&(1U<<11U))!=0){
             ++textureId;
             if(textureId<0||static_cast<std::size_t>(textureId)>=model->extendedTextureWords.size())textureValid=false;
