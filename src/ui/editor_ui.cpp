@@ -2628,11 +2628,6 @@ void EditorUI::drawAnimationViewer(){
  if(!animationPlaying_)animationPlaybackFrame_=std::clamp(animationPlaybackFrame_,0.0,static_cast<double>(lastFrame));
  else if(animationPlaybackFrame_>=static_cast<double>(animation.frames.size()))animationPlaybackFrame_=std::fmod(animationPlaybackFrame_,static_cast<double>(animation.frames.size()));
  animationFrame_=static_cast<int>(std::floor(animationPlaybackFrame_));
- bool frameGroupInterpolated=false;
- for(const auto&chunk:nsf_.chunks())if(chunk.type==0&&chunk.entryTableValid)
-  for(const auto&entry:chunk.entries)if(entry.valid&&entry.type==11&&entry.gool.frameGroupsDecoded)
-   for(const auto&group:entry.gool.frameGroups)
-    if(group.type==1U&&group.eid==animationEntry->eid&&group.interpolated)frameGroupInterpolated=true;
  ImGui::Text("%s | %zu frames",Crash::eidToEName(animationEntry->eid).c_str(),animation.frames.size());
  ImGui::SameLine();
  if(ImGui::SmallButton(animationPlaying_?"Pause":"Play")){animationPlaying_=!animationPlaying_;animationFrameTimer_=0.0f;}
