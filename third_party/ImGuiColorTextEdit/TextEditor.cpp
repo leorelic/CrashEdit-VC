@@ -1419,14 +1419,10 @@ void TextEditor::handleMouseInteractions() {
 	const auto mousePos = ImGui::GetMousePos() - cursorScreenPos;
 	const auto absoluteMousePos = ImGui::GetMousePos() - ImGui::GetWindowPos();
 
-	// Treat the complete gutter (from the line-number column through the
-	// spacing before the text) as clickable. The rendered digits remain in
-	// lineNumberLeftOffset..lineNumberRightOffset, but a narrow digit-only
-	// hitbox is unnecessarily easy to miss at different editor zoom levels.
-	const auto overLineNumbers =
-		config.showLineNumbers &&
-		(absoluteMousePos.x >= lineNumberLeftOffset) &&
-		(absoluteMousePos.x < textLeftOffset);
+	// Keep the line-number gutter display-only. Its click target is
+	// unreliable across zoom levels, so all editing interactions happen
+	// directly in the code area.
+	constexpr bool overLineNumbers = false;
 
 	const auto overText =
 		mousePos.x - ImGui::GetScrollX() > textLeftOffset &&
