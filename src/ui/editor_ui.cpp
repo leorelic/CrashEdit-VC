@@ -2638,13 +2638,14 @@ void EditorUI::drawAnimationViewer(){
   while(animationFrameTimer_>=0.1f){animationFrameTimer_-=0.1f;animationFrame_=(animationFrame_+1)%static_cast<int>(animation.frames.size());}
  }
  const auto&frame=animation.frames[static_cast<std::size_t>(animationFrame_)];
- const std::uint32_t linkedModelEid=frame.linkedModelEid?frame.linkedModelEid:frame.modelEid;
+ const std::uint32_t linkedModelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  const Crash::NsfModel*model=findModel(linkedModelEid);
  ImGui::SameLine();
  if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(linkedModelEid).c_str());
  else ImGui::TextDisabled("Model EID: %08X",linkedModelEid);
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
+ else if(!model&&animation.isCrash3&&!Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("No matching GOOL VertexGroup3 links this animation to a Model.");
  else if(!model)ImGui::TextDisabled("Linked Model resource is not present in this NSF.");
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
@@ -2687,7 +2688,7 @@ void EditorUI::drawAnimationViewer(){
   bool haveBounds=false;
   for(const auto&candidate:animation.frames){
    if(!candidate.verticesDecoded)continue;
-   const auto*candidateModel=findModel(candidate.linkedModelEid?candidate.linkedModelEid:candidate.modelEid);
+   const auto*candidateModel=findModel(animation.isCrash3?candidate.linkedModelEid:candidate.modelEid);
    for(const auto&v:candidate.vertices){
     const AnimationPoint p=transformVertex(v,candidate,candidateModel);
     boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
