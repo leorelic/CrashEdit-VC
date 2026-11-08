@@ -120,7 +120,7 @@ struct NsfAnimationCollision {
 };
 struct NsfAnimationFrame {
  std::int16_t xOffset=0,yOffset=0,zOffset=0,unknown=0;
- std::uint32_t modelEid=0,vertexCount=0,collisionCount=0,headerSize=0;
+ std::uint32_t modelEid=0,unknown2=0,reserved=0,vertexCount=0,collisionCount=0,headerSize=0;
  std::size_t specialVertexCount=0;
  std::vector<std::array<std::uint8_t,3>> specialVertices;
  std::vector<NsfAnimationCollision> collisions;

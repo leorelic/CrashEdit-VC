@@ -207,8 +207,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  out.zOffset=static_cast<std::int16_t>(u16(bytes,p+4U));
  out.unknown=static_cast<std::int16_t>(u16(bytes,p+6U));
  if(crash3){
-  out.modelEid=u32(bytes,p+8U);
-  if(u32(bytes,p+12U)!=0U)return fail("Crash 3 animation frame reserved field is non-zero.");
+  out.unknown2=u32(bytes,p+8U);out.reserved=u32(bytes,p+12U);
   out.vertexCount=u32(bytes,p+16U);out.collisionCount=u32(bytes,p+20U);out.headerSize=u32(bytes,p+24U);
  }else{
   out.vertexCount=u32(bytes,p+8U);out.collisionCount=u32(bytes,p+12U);out.modelEid=u32(bytes,p+16U);out.headerSize=u32(bytes,p+20U);
@@ -233,7 +232,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  out.specialVertices.reserve(out.specialVertexCount);
  for(std::size_t i=0;i<out.specialVertexCount;++i){
   const std::size_t q=p+fakeHeader+i*3U;
-  out.specialVertices.push_back({bytes[q],bytes[q+1U],bytes[q+2U]});
+  out.specialVertices.push_back(std::array<std::uint8_t,3>{bytes[q],bytes[q+1U],bytes[q+2U]});
  }
  out.temporalWords.reserve(temporalBytes/4U);
  for(std::size_t q=p+fakeHeader;q<p+item.size;q+=4U)out.temporalWords.push_back(u32(bytes,q));
