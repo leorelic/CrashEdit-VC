@@ -2837,13 +2837,46 @@ void EditorUI::drawAnimationViewer(){
        pageLookup.emplace(pageId,&chunk.bytes);
       }
       for(const auto&tri:model->triangles){
-       const int vi[3]={tri.a,tri.b,tri.c},ci[3]={tri.colorA,tri.colorB,tri.colorC};
+       const bool nocull=tri.triangleSubtype==0||tri.triangleSubtype==2;
+       const bool flip=((tri.triangleType==2)^(tri.triangleSubtype==3))&&!nocull;
+       const int order[3]={flip?2:0,1,flip?0:2};
+       const int baseVertices[3]={tri.a,tri.b,tri.c},baseColors[3]={tri.colorA,tri.colorB,tri.colorC};
+       const int vi[3]={baseVertices[order[0]],baseVertices[order[1]],baseVertices[order[2]]};
+       const int ci[3]={baseColors[order[0]],baseColors[order[1]],baseColors[order[2]]};
        if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
-       const Crash::NsfModelTexture*tex=nullptr;if(tri.textureIndex>0&&std::size_t(tri.textureIndex-1U)<model->textures.size())tex=&model->textures[tri.textureIndex-1U];
+       const Crash::NsfModelTexture*tex=nullptr;
+       int textureId=static_cast<int>(tri.textureIndex)-1;
+       bool textureValid=true;
+       if(tri.animated){
+        ++textureId;
+        if(textureId<0||static_cast<std::size_t>(textureId)>=model->extendedTextureWords.size())textureValid=false;
+        else{
+         std::uint32_t anim=model->extendedTextureWords[static_cast<std::size_t>(textureId)];
+         const int offset=static_cast<int>(anim&0x7ffU);
+         if(offset!=0){
+          textureId=offset-1;
+          if((anim&0x80000000U)!=0)textureId+=static_cast<int>((anim>>29U)&3U);
+          else{
+           const int latency=static_cast<int>((anim>>26U)&0x1fU),delay=static_cast<int>((anim>>19U)&0x7fU),mask=static_cast<int>((anim>>12U)&0x7fU);
+           textureId+=(animationFrame_/2/(1+latency)+delay)&mask;
+           if((anim&(1U<<11U))!=0){
+            ++textureId;
+            if(textureId<0||static_cast<std::size_t>(textureId)>=model->extendedTextureWords.size())textureValid=false;
+            else{anim=model->extendedTextureWords[static_cast<std::size_t>(textureId)];textureId=static_cast<int>(anim&0x7ffU)-1+static_cast<int>((anim>>29U)&3U);}
+           }
+          }
+         }else textureId=-1;
+        }
+       }
+       if(textureValid&&textureId>=0){
+        if(static_cast<std::size_t>(textureId)>=model->textures.size())textureValid=false;
+        else tex=&model->textures[static_cast<std::size_t>(textureId)];
+       }
+       if(!textureValid)continue;
        const std::vector<std::uint8_t>*page=nullptr;
        if(tex&&tex->page<model->texturePageEids.size()){const auto found=pageLookup.find(model->texturePageEids[tex->page]);if(found!=pageLookup.end())page=found->second;}
        const int mode=tex?std::clamp<int>(tex->colorMode,0,2):0,clutX=tex?std::clamp<int>(tex->clutX,0,15):0,clutY=tex?std::clamp<int>((tex->clutY2<<2U)|((tex->clutY1>>2U)&3U),0,127):0;
-       float ux[3]{},uy[3]{};if(tex){const int off=(1<<(2-mode))*64*tex->segment;const float u[3]={float(tex->u2)+off,float(tex->u1)+off,float(tex->u3)+off},v[3]={float(tex->v2),float(tex->v1),float(tex->v3)};for(int k=0;k<3;++k){ux[k]=u[k];uy[k]=v[k];}auto adjust=[](float*values){if(values[0]>values[1]||values[0]>values[2])values[0]+=1.0f;if(values[1]>values[0]||values[1]>values[2])values[1]+=1.0f;if(values[2]>values[1]||values[2]>values[0])values[2]+=1.0f;};adjust(ux);adjust(uy);}
+       float ux[3]{},uy[3]{};const int uvOrder[3]=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?2:0),uvOrder1=1,uvOrder2=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?0:2);if(tex){const int off=(1<<(2-mode))*64*tex->segment;const float u[3]={float(tex->u1)+off,float(tex->u2)+off,float(tex->u3)+off},v[3]={float(tex->v1),float(tex->v2),float(tex->v3)};const int uv[3]={uvOrder,uvOrder1,uvOrder2};for(int k=0;k<3;++k){ux[k]=u[uv[k]];uy[k]=v[uv[k]];}}
        bool triangleVisible=true;
        for(int k=0;k<3;++k){const auto p=transformVertex(frame.vertices[std::size_t(vi[k])],frame,model);if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
        if(!triangleVisible)continue;
