@@ -10,7 +10,7 @@ public:
 private:
  struct InputState { GoolScriptEditor* editor=nullptr; int cursor=0,selectionStart=0,selectionEnd=0; };
  static int inputCallback(ImGuiInputTextCallbackData* data);
- void drawSource(const ImVec2& inputMin,const ImVec2& inputMax,float lineHeight,float textOffsetY);
+ void drawSource(const ImVec2& inputMin,const ImVec2& inputMax,const ImVec2& textOrigin,float lineHeight);
  std::string text_;
  InputState inputState_{nullptr,0,0,0};
  bool initialized_=false;
