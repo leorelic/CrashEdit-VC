@@ -327,24 +327,75 @@ void EditorUI::draw(){
  if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<3){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=3;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
+ bool showAnimationWorkspace=false;
+ const Crash::NsfEntry*selectedAnimationResource=nullptr;
+ const Crash::NsfEntry*selectedModelResource=nullptr;
  if(nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()){
   const auto&selectedChunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
   if(selectedChunk.type==0&&selectedEntry_>=0&&static_cast<std::size_t>(selectedEntry_)<selectedChunk.entries.size()){
    const auto&selected=selectedChunk.entries[static_cast<std::size_t>(selectedEntry_)];
-   if(selected.valid&&selected.type==1&&selected.animation.decoded&&(animationViewerChunk_!=selectedChunk_||animationViewerEntry_!=selectedEntry_)){
-    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
-   }
+   if(selected.valid&&selected.type==1&&selected.animation.decoded)selectedAnimationResource=&selected;
+   else if(selected.valid&&selected.type==2&&selected.model.decoded)selectedModelResource=&selected;
   }
  }
- drawViewport();drawAnimationViewer();if(animationFrameEditorOpen_)drawAnimationFrameEditor();drawBottom();
+ showAnimationWorkspace=selectedAnimationResource||selectedModelResource;
+ if(showAnimationWorkspace){
+  const bool modelMode=selectedModelResource!=nullptr;
+  const std::uint32_t modelEid=modelMode?selectedModelResource->eid:0U;
+  const bool selectionChanged=animationSelectionChunk_!=selectedChunk_||animationSelectionEntry_!=selectedEntry_;
+  if(selectionChanged||animationSelectionModel_!=modelMode||animationSelectedModelEid_!=modelEid){
+   animationSelectionChunk_=selectedChunk_;animationSelectionEntry_=selectedEntry_;
+   animationSelectionModel_=modelMode;animationSelectedModelEid_=modelEid;
+   animationEditorFocus_=true;
+  }
+  auto animationUsesModel=[](const Crash::NsfEntry&entry,std::uint32_t eid){
+   if(!entry.valid||entry.type!=1||!entry.animation.decoded)return false;
+   for(const auto&frame:entry.animation.frames){
+    const std::uint32_t linked=entry.animation.isCrash3?frame.linkedModelEid:frame.modelEid;
+    if(linked==eid)return true;
+   }
+   return false;
+  };
+  bool currentAnimationValid=false;
+  if(animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
+   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+   if(chunk.type==0&&animationViewerEntry_>=0&&static_cast<std::size_t>(animationViewerEntry_)<chunk.entries.size()){
+    const auto&entry=chunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+    currentAnimationValid=entry.valid&&entry.type==1&&entry.animation.decoded&&
+     (!modelMode||animationUsesModel(entry,modelEid));
+   }
+  }
+  if(!modelMode){
+   if(animationViewerChunk_!=selectedChunk_||animationViewerEntry_!=selectedEntry_){
+    animationViewerChunk_=selectedChunk_;animationViewerEntry_=selectedEntry_;
+    animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;
+    animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
+   }
+  }else if(!currentAnimationValid){
+   int firstChunk=-1,firstEntry=-1;
+   for(std::size_t ci=0;ci<nsf_.chunks().size()&&firstChunk<0;++ci){
+    const auto&chunk=nsf_.chunks()[ci];if(chunk.type!=0||!chunk.entryTableValid)continue;
+    for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+     if(animationUsesModel(chunk.entries[ei],modelEid)){firstChunk=static_cast<int>(ci);firstEntry=static_cast<int>(ei);break;}
+    }
+   }
+   animationViewerChunk_=firstChunk;animationViewerEntry_=firstEntry;
+   animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;
+   animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
+  }
+ }
+ drawViewport();
+ if(showAnimationWorkspace){drawAnimationViewer();drawAnimationTimeline();}
+ if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
+ drawBottom();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
  else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
  if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
  const bool textureChunkSelected=nsfValid_&&selectedChunk_>=0&&static_cast<std::size_t>(selectedChunk_)<nsf_.chunks().size()&&nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)].type==1;
  if(textureChunkSelected){drawTextureViewer();drawClutEditor();}
  drawResourceActionDialog();
- // Submit the timeline last so its tab is appended after the other docked tools.
- drawAnimationTimeline();
+ // Animation tools are submitted only while an Animation or Model resource is selected.
+
  ImGui::End();
  drawSearchWindow();
  if(!restoredLastNsfPath_){
@@ -2711,6 +2762,7 @@ void EditorUI::drawAnimationFrameEditor(){
 
 void EditorUI::drawAnimationViewer(){
  if(animationDockId_!=0)ImGui::SetNextWindowDockID(animationDockId_,ImGuiCond_FirstUseEver);
+ if(animationEditorFocus_){ImGui::SetNextWindowFocus();animationEditorFocus_=false;}
  if(!ImGui::Begin("3D Animation Editor")){ImGui::End();return;}
  const Crash::NsfEntry*animationEntry=nullptr;
  if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
@@ -2783,8 +2835,44 @@ void EditorUI::drawAnimationViewer(){
   }
  }
  ImGui::SameLine();
- if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Model: %s",Crash::eidToEName(linkedModelEid).c_str());
- else ImGui::TextDisabled("Model EID: %08X",linkedModelEid);
+ if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Selected Model EID: %s",Crash::eidToEName(linkedModelEid).c_str());
+ else ImGui::TextDisabled("Selected Model EID: %08X",linkedModelEid);
+ if(animationSelectionModel_){
+  ImGui::SameLine();
+  std::string currentAnimationLabel="No linked animation";
+  if(animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
+   const auto&currentChunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+   if(currentChunk.type==0&&animationViewerEntry_>=0&&static_cast<std::size_t>(animationViewerEntry_)<currentChunk.entries.size()){
+    const auto&currentEntry=currentChunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+    if(currentEntry.valid&&currentEntry.type==1)currentAnimationLabel=Crash::eidToEName(currentEntry.eid);
+   }
+  }
+  ImGui::SetNextItemWidth(230.0f);
+  if(ImGui::BeginCombo("##ModelLinkedAnimation",currentAnimationLabel.c_str())){
+   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+    const auto&candidateChunk=nsf_.chunks()[ci];if(candidateChunk.type!=0||!candidateChunk.entryTableValid)continue;
+    for(std::size_t ei=0;ei<candidateChunk.entries.size();++ei){
+     const auto&candidate=candidateChunk.entries[ei];
+     if(!candidate.valid||candidate.type!=1||!candidate.animation.decoded)continue;
+     bool usesSelectedModel=false;
+     for(const auto&candidateFrame:candidate.animation.frames){
+      const std::uint32_t candidateModelEid=candidate.animation.isCrash3?candidateFrame.linkedModelEid:candidateFrame.modelEid;
+      if(candidateModelEid==animationSelectedModelEid_){usesSelectedModel=true;break;}
+     }
+     if(!usesSelectedModel)continue;
+     const bool selected=animationViewerChunk_==static_cast<int>(ci)&&animationViewerEntry_==static_cast<int>(ei);
+     const std::string label=Crash::eidToEName(candidate.eid)+"  ["+std::to_string(ci)+":"+std::to_string(ei)+"]";
+     if(ImGui::Selectable(label.c_str(),selected)){
+      animationViewerChunk_=static_cast<int>(ci);animationViewerEntry_=static_cast<int>(ei);
+      animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;
+      animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
+     }
+     if(selected)ImGui::SetItemDefaultFocus();
+    }
+   }
+   ImGui::EndCombo();
+  }
+ }
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
  else if(!model&&animation.isCrash3&&!Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("No matching GOOL VertexGroup3 links this animation to a Model.");
