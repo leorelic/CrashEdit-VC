@@ -151,7 +151,7 @@ struct NsfModelTriangle {
  bool animated=false,flag=false;
 };
 struct NsfModel {
- bool decoded=false,compressed=false;
+ bool decoded=false,compressed=false,polygonsDecoded=false;
  std::vector<std::uint8_t> header;
  std::int32_t scaleX=0,scaleY=0,scaleZ=0;
  std::vector<std::uint32_t> texturePageEids,polygonWords,extendedTextureWords;
@@ -160,7 +160,7 @@ struct NsfModel {
  std::vector<NsfModelTriangle> triangles;
  std::vector<NsfModelPosition> positions;
  std::uint32_t vertexCount=0,polygonWordCount=0,polygonCount=0;
- std::string error;
+ std::string polygonError,error;
 };
 struct NsfEntry {
  std::uint32_t eid=0, type=0, itemCount=0;

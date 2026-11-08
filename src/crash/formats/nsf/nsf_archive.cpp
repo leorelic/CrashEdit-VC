@@ -241,7 +241,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
 }
 struct ModelPolyCommand {bool triangle=false;std::uint8_t color1=0,color2=0,texture=0,key=0,type=0,triType=0,triSubtype=0;bool animated=false,flag=false;};
 static bool decodeModelPolygons(NsfModel&model){
- auto fail=[&](const char*m){model.error=m;return false;};
+ auto fail=[&](const char*m){model.polygonError=m;return false;};
  const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand> cmd(count);std::vector<std::int32_t> vtx;vtx.reserve(count);
  std::unordered_map<std::uint8_t,std::int32_t> keys;
  const std::int32_t special=static_cast<std::int32_t>(model.vertexCount-model.positions.size());
@@ -253,14 +253,14 @@ static bool decodeModelPolygons(NsfModel&model){
  }
  std::int32_t lastCC=-1,lastAA=-1,lastValid=-3,lastNonBB=-1,lastColor=-1;std::size_t cur=0;
  auto triangleColor=[&](std::size_t i)->int{return i<cmd.size()&&cmd[i].triangle?cmd[i].color1:-1;};
- auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x){if(a<0||b<0||c<0||static_cast<std::uint32_t>(a)>=model.vertexCount||static_cast<std::uint32_t>(b)>=model.vertexCount||static_cast<std::uint32_t>(c)>=model.vertexCount||ca<0||cb<0||cc<0)return false;model.triangles.push_back({a,b,c,static_cast<std::uint8_t>(ca),static_cast<std::uint8_t>(cb),static_cast<std::uint8_t>(cc),x.texture,x.triType,x.triSubtype,x.animated,x.flag});return true;};
+ auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x){a+=special;b+=special;c+=special;if(a<0||b<0||c<0||static_cast<std::uint32_t>(a)>=model.vertexCount||static_cast<std::uint32_t>(b)>=model.vertexCount||static_cast<std::uint32_t>(c)>=model.vertexCount||ca<0||cb<0||cc<0)return false;model.triangles.push_back({a,b,c,static_cast<std::uint8_t>(ca),static_cast<std::uint8_t>(cb),static_cast<std::uint8_t>(cc),x.texture,x.triType,x.triSubtype,x.animated,x.flag});return true;};
  for(std::size_t i=0;i<count;++i){if(model.polygonWords[i]==0xffffffffU)break;const auto&x=cmd[i];if(!x.triangle){lastColor=static_cast<std::int32_t>(i);continue;}if(cur>=vtx.size())return fail("Model polygon stream is inconsistent.");
   if(x.triType==0){if(cur<2)return fail("Model strip starts before three vertices.");const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);int c2=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color2:lastColor+2==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-2);if(!emit(vtx[cur],vtx[cur-1],vtx[cur-2],x.color1,c1,c2,x))return fail("Model strip triangle references invalid geometry.");lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
   }else if(x.triType==1){int ci=-1;if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColor(static_cast<std::size_t>(lastNonBB-2));else if(lastColor==lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color1;else if(lastColor==lastNonBB-1&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;else if(lastColor>lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);if(cur<1)return fail("Connected triangle lacks preceding vertex.");const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];if(!emit(vtx[cur],vtx[cur-1],third,x.color1,c1,ci,x))return fail("Connected triangle references invalid geometry.");
   }else if(x.triType==2){if(i+2<count&&lastValid+2<static_cast<int>(i)){if(cur+2>=vtx.size())return fail("Fan triangle exceeds vertex stream.");if(!emit(vtx[cur],vtx[cur+1],vtx[cur+2],x.color1,triangleColor(i+1),triangleColor(i+2),x))return fail("Fan triangle references invalid geometry.");lastValid=static_cast<int>(i);}lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);}
   ++cur;
  }
- if(model.polygonCount&&model.triangles.size()!=model.polygonCount)model.error="Decoded polygon count differs from model header count.";
+ if(model.polygonCount&&model.triangles.size()!=model.polygonCount)model.polygonError="Decoded polygon count differs from model header count.";
  return true;
 }
 
@@ -309,7 +309,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
     static_cast<std::uint8_t>((raw>>6U)&7U),static_cast<std::uint8_t>((raw>>3U)&7U),static_cast<std::uint8_t>(raw&7U),raw});
   }
  }
- if(!decodeModelPolygons(out))return false;
+ out.polygonsDecoded=decodeModelPolygons(out);
  out.decoded=true;return true;
 }
 
