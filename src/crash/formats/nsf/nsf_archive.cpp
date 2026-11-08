@@ -680,6 +680,54 @@ bool NsfArchive::setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_
  entry.gool.frameGroups[groupIndex].interpolated=interpolated;
  return true;
 }
+bool NsfArchive::setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value){
+ if(chunkIndex>=chunks_.size())return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=1||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ auto& animation=entry.animation;
+ auto& frame=animation.frames[frameIndex];
+ const std::size_t fixedHeader=animation.isCrash3?28U:24U;
+ const std::size_t offset=frame.rawOffset;
+ if(frame.rawSize<fixedHeader||!has(chunk.bytes,offset,frame.rawSize))return false;
+ std::size_t fieldOffset=0;
+ switch(field){
+  case 0: fieldOffset=0U; if(value<INT16_MIN||value>INT16_MAX)return false; frame.xOffset=static_cast<std::int16_t>(value); break;
+  case 1: fieldOffset=2U; if(value<INT16_MIN||value>INT16_MAX)return false; frame.yOffset=static_cast<std::int16_t>(value); break;
+  case 2: fieldOffset=4U; if(value<INT16_MIN||value>INT16_MAX)return false; frame.zOffset=static_cast<std::int16_t>(value); break;
+  case 3: fieldOffset=6U; if(value<INT16_MIN||value>INT16_MAX)return false; frame.unknown=static_cast<std::int16_t>(value); break;
+  case 4:
+   if(animation.isCrash3||value<0)return false;
+   fieldOffset=16U;frame.modelEid=static_cast<std::uint32_t>(value);break;
+  default:return false;
+ }
+ if(fieldOffset+2U>fixedHeader)return false;
+ if(field==4U){
+  for(unsigned i=0;i<4U;++i)chunk.bytes[offset+fieldOffset+i]=static_cast<std::uint8_t>(static_cast<std::uint32_t>(value)>>(i*8U));
+ }else{
+  const auto v=static_cast<std::uint16_t>(static_cast<std::int16_t>(value));
+  chunk.bytes[offset+fieldOffset]=static_cast<std::uint8_t>(v);
+  chunk.bytes[offset+fieldOffset+1U]=static_cast<std::uint8_t>(v>>8U);
+ }
+ return true;
+}
+bool NsfArchive::setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value){
+ if(chunkIndex>=chunks_.size()||valueIndex>=10U)return false;
+ auto& chunk=chunks_[chunkIndex];
+ if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto& entry=chunk.entries[entryIndex];
+ if(!entry.valid||entry.type!=1||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ auto& frame=entry.animation.frames[frameIndex];
+ if(collisionIndex>=frame.collisions.size())return false;
+ const std::size_t fixedHeader=entry.animation.isCrash3?28U:24U;
+ const std::size_t relative=fixedHeader+collisionIndex*0x28U+valueIndex*4U;
+ if(relative>frame.rawSize||4U>frame.rawSize-relative||!has(chunk.bytes,frame.rawOffset+relative,4U))return false;
+ const std::uint32_t raw=static_cast<std::uint32_t>(value);
+ for(unsigned i=0;i<4U;++i)chunk.bytes[frame.rawOffset+relative+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ frame.collisions[collisionIndex].values[valueIndex]=value;
+ return true;
+}
 std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
  std::vector<NsfEntryLocation> matches;
  for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){
