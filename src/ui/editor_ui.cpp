@@ -2813,6 +2813,8 @@ void EditorUI::drawAnimationFrameEditor(){
    }
    ImGui::EndTable();
   }
+  if(animationEntry->animation.isCrash3)
+   ImGui::TextDisabled("Crash 3 linked-model selection is supplied by GOOL frame groups; the raw frame model field is not edited here.");
   ImGui::Separator();
   ImGui::Text("Frame Structure");
   ImGui::Text("Vertices: %u    Collisions: %u",frame.vertexCount,frame.collisionCount);
