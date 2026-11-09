@@ -188,8 +188,22 @@ This completes the current Animation Editor vertex-inspection milestone. It does
 
 ## Model Editor research — source-confirmed findings
 
-The original CrashEdit deprecate branch separates animated positions from model topology. Crash 2 Animation frames reference a Model EID; the Model entry supplies the polygon stream, color records, texture descriptors, texture-page references, and optional compressed-position metadata. The Animation frame supplies the pose-specific vertex data. This means the Model Editor is the next foundational phase and a likely source of the missing context for safe animation geometry editing.
+The CrashEdit-RE source in airumu/CrashEdit, branch t/net9, separates animated positions from model topology. Crash 2 Animation frames reference a Model EID; the Model entry supplies the polygon stream, color records, texture descriptors, texture-page references, and optional compressed-position metadata. The Animation frame supplies the pose-specific vertex data. This means the Model Editor is the next foundational phase and a likely source of the missing context for safe animation geometry editing.
 
 The original Model loader expects five items, or six when compressed-position metadata is present. The detailed phased plan, field notes, and validation requirements are in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md).
 
 **Important implementation constraint:** do not treat the polygon command stream as a conventional index buffer. Its words encode both triangle commands and color-pair commands; original/duplicate vertex keys and multiple topology modes must be interpreted in stream order. Preserve raw words and unknown bitfields while building a validated decoded representation.
+
+
+## Research-source correction — CrashEdit-RE baseline
+
+**Correction (2026-11-09):** the previous Model research pass incorrectly cited cbhacks/CrashEdit and its deprecate branch. Those are not the project's comparison baseline. Disregard claims in that pass as authoritative until checked against CrashEdit-RE. The correct reference used for the current re-audit is [airumu/CrashEdit, branch t/net9](https://github.com/airumu/CrashEdit/tree/t/net9), the CrashEdit: Re fork. Future source comparisons for Model, Animation, renderer behavior, and editor features must use CrashEdit-RE and the appropriate t/net branch, not cbhacks legacy source.
+
+The t/net9 source confirms the following Model implementation details:
+- ModelEntryLoader obtains the serialized polygon-command count from Info offset 0x2C, color count from 0x3C, texture descriptor count from 0x34, extended-texture count from 0x48, and vertex/special-vertex counts from 0x38 / 0x4C. It expects five items, or six when compressed-position records exist.
+- There is an unresolved source-level inconsistency worth auditing: ModelEntry.PolyCount reads Info offset 0x44, while ModelEntryLoader uses 0x2C as the count of item-1 polygon command words. Do not assume 0x44 is the item-1 command count without tracing its consumers.
+- The polygon stream is decoded in two passes by ModelEntry.ConvertIndices(). ModelTriangle and ModelColor are distinct command structures; 0xFFFFFFFF is the footer. Original/duplicate position keys are mapped in the first pass; triangle types 0, 1 and 2 are reconstructed in the second pass with stateful per-corner color selection.
+- ModelPosition is a 4-byte packed record containing X/Z/Y base values and X/Z/Y bit widths. Frame.MakeVertices(model) consumes compressed temporal bits in X-Z-Y order, sign-extends the components, accumulates/wraps coordinates to 8 bits, and uses the Model's special-vertex count to skip the directly stored prefix.
+- The CrashEdit-RE ModelBox has General, Polygons, Colors, Textures, Extended Textures and (for compressed models) Positions pages. The model's polygon page exposes both the raw command stream and reconstructed triangles. The ModelBox removes its separate Vertices page for Model entries; that page is for Scenery.
+
+These are **source-confirmed for t/net9**, not yet sample-confirmed against multiple Crash 2 NSF files and not proof that the native implementation already matches every edge case.
