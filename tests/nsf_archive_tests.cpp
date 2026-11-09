@@ -7,7 +7,7 @@
 #include <vector>
 static void p16(std::vector<std::uint8_t>&b,std::size_t p,std::uint16_t v){b[p]=std::uint8_t(v);b[p+1]=std::uint8_t(v>>8);}
 static void p32(std::vector<std::uint8_t>&b,std::size_t p,std::uint32_t v){for(int i=0;i<4;++i)b[p+i]=std::uint8_t(v>>(8*i));}
-int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="1000Z");assert(eNameToEid("1000Z")==0x0200007BU);assert(isValidEid(0x0200007BU));assert(eidToEName(0x6396347FU)=="NONE!");std::vector<std::uint8_t>b(65536);p16(b,0,0x1234);p16(b,2,0x42);p32(b,4,0x12345678);CrashEdit::Crash::NsfArchive a;std::string e;assert(a.loadBytes(b,e));assert(a.chunks().size()==1);assert(a.chunks()[0].type==0x42);assert(a.chunks()[0].chunkId==0x12345678);std::vector<std::uint8_t>bad={0x34,0x12,0};assert(!a.loadBytes(bad,e));// Normal entry chunk: one entry containing two items. The item offset table has three offsets.
+int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="1000Z");assert(eNameToEid("1000Z")==0x0200007BU);assert(isValidEid(0x0200007BU));assert(eidToEName(0x6396347FU)=="NONE!");std::vector<std::uint8_t>b(65536);p16(b,0,0x1234);p16(b,2,0x42);p32(b,4,0x12345678);CrashEdit::NsfArchive a;std::string e;assert(a.loadBytes(b,e));assert(a.chunks().size()==1);assert(a.chunks()[0].type==0x42);assert(a.chunks()[0].chunkId==0x12345678);std::vector<std::uint8_t>bad={0x34,0x12,0};assert(!a.loadBytes(bad,e));// Normal entry chunk: one entry containing two items. The item offset table has three offsets.
  std::vector<std::uint8_t> normal(65536);p16(normal,0,0x1234);p16(normal,2,0);p32(normal,4,3);p32(normal,8,1);
  p32(normal,16,24);p32(normal,20,60);
  p32(normal,24,0x0100FFFF);p32(normal,28,0xAABBCCDD);p32(normal,32,7);p32(normal,36,2);
@@ -151,16 +151,16 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(triModel.triangles[0].a==0&&triModel.triangles[0].b==1&&triModel.triangles[0].c==2);
  assert(triModel.triangles[0].colorA==10&&triModel.triangles[0].colorB==11&&triModel.triangles[0].colorC==12);
  assert(triModel.extendedTextures.size()==1&&triModel.texturePageEids.size()==1);
- Crash::NsfSceneryColor editedColor{210,120,35,7};assert(a.setModelColor(0,0,10,editedColor));
- Crash::NsfModelTexture editedTexture{};editedTexture.u1=8;editedTexture.v1=9;editedTexture.u2=10;editedTexture.v2=11;editedTexture.colorMode=1;editedTexture.page=0;
+ NsfSceneryColor editedColor{210,120,35,7};assert(a.setModelColor(0,0,10,editedColor));
+ NsfModelTexture editedTexture{};editedTexture.u1=8;editedTexture.v1=9;editedTexture.u2=10;editedTexture.v2=11;editedTexture.colorMode=1;editedTexture.page=0;
  assert(a.setModelTexture(0,0,0,editedTexture));assert(a.setModelScale(0,0,0,777));assert(a.setModelTexturePageEid(0,0,0,0x4cd8206fU));
  assert(a.setModelExtendedTextureWord(0,0,0,0x00001001U));assert(a.setModelTriangleTexture(0,0,0,0,true));assert(a.setModelTriangleColorIndex(0,0,0,1,12));
- bool textureValid=false;assert(Crash::resolveNsfModelTextureIndex(a.chunks()[0].entries[0].model,0,true,0,textureValid)==0&&textureValid);
- Crash::NsfModel lodModel;lodModel.textures.resize(4);lodModel.extendedTextureWords.push_back(0x80000001U|(2U<<29U)|(1U<<27U));
- bool lodValid=false;assert(Crash::resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,0)==2&&lodValid);
- lodValid=false;assert(Crash::resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,1)==1&&lodValid);
+ bool textureValid=false;assert(resolveNsfModelTextureIndex(a.chunks()[0].entries[0].model,0,true,0,textureValid)==0&&textureValid);
+ NsfModel lodModel;lodModel.textures.resize(4);lodModel.extendedTextureWords.push_back(0x80000001U|(2U<<29U)|(1U<<27U));
+ bool lodValid=false;assert(resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,0)==2&&lodValid);
+ lodValid=false;assert(resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,1)==1&&lodValid);
 
- std::vector<std::uint8_t> editedNsf;assert(a.saveUncompressedBytes(editedNsf,e));Crash::NsfArchive roundTrip;assert(roundTrip.loadBytes(editedNsf,e));roundTrip.decodeAnimationModels(false);
+ std::vector<std::uint8_t> editedNsf;assert(a.saveUncompressedBytes(editedNsf,e));NsfArchive roundTrip;assert(roundTrip.loadBytes(editedNsf,e));roundTrip.decodeAnimationModels(false);
  const auto&roundModel=roundTrip.chunks()[0].entries[0].model;assert(roundModel.scaleX==777);assert(roundModel.colors[10].r==210&&roundModel.colors[10].g==120&&roundModel.colors[10].b==35);
  assert(roundModel.textures[0].u1==8&&roundModel.textures[0].v1==9&&roundModel.textures[0].page==0);
  assert(roundModel.texturePageEids[0]==0x4cd8206fU&&roundModel.extendedTextureWords[0]==0x00001001U);
@@ -185,7 +185,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(va.decoded&&va.frames[0].verticesDecoded&&va.frames[0].vertices.size()==1);
  assert(va.frames[0].vertices[0].x==0&&va.frames[0].vertices[0].y==8&&va.frames[0].vertices[0].z==16);
  assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
- std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));Crash::NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
+ std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
 
  // Compressed Model positions use signed, variable-width X-Z-Y deltas.
@@ -203,11 +203,11 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(compressedAnimationChunk,caEntry,0x0100ffff);p32(compressedAnimationChunk,caEntry+4,0x0200007b);p32(compressedAnimationChunk,caEntry+8,1);p32(compressedAnimationChunk,caEntry+12,1);p32(compressedAnimationChunk,caEntry+16,20);p32(compressedAnimationChunk,caEntry+20,caEntrySize);
  p32(compressedAnimationChunk,caFrame+8,3);p32(compressedAnimationChunk,caFrame+12,0);p32(compressedAnimationChunk,caFrame+16,0x0200007b);p32(compressedAnimationChunk,caFrame+20,24);
  std::vector<std::uint8_t> compressedArchiveBytes;compressedArchiveBytes.reserve(131072);compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedModelChunk.begin(),compressedModelChunk.end());compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
- Crash::NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
+ NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
  assert(compressedArchive.chunks().size()==2&&compressedArchive.chunks()[0].entries[0].model.compressed);
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
- std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));Crash::NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
+ std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
  assert(compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
