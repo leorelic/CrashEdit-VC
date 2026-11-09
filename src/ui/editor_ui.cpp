@@ -2836,6 +2836,14 @@ void EditorUI::drawAnimationFrameEditor(){
   if(animationEntry->animation.isCrash3)
    ImGui::TextDisabled("Crash 3 linked-model selection is supplied by GOOL frame groups; the raw frame model field is not edited here.");
   ImGui::Separator();
+  ImGui::Text("Selected Vertex");
+  if(animationSelectedVertex_>=0&&static_cast<std::size_t>(animationSelectedVertex_)<frame.vertices.size()){
+   const auto&selectedVertex=frame.vertices[static_cast<std::size_t>(animationSelectedVertex_)];
+   ImGui::Text("Vertex Index: %d",animationSelectedVertex_);
+   ImGui::Text("X: %d    Y: %d    Z: %d",selectedVertex.x,selectedVertex.y,selectedVertex.z);
+   ImGui::TextDisabled("Decoded frame-space coordinates. Packed temporal vertex write-back is not implemented yet.");
+  }else ImGui::TextDisabled("Click a vertex point in the 3D Animation Editor to inspect it.");
+  ImGui::Separator();
   ImGui::Text("Frame Structure");
   ImGui::Text("Vertices: %u    Collisions: %u",frame.vertexCount,frame.collisionCount);
   ImGui::Text("Header Size: %u bytes    Special Vertices: %zu",frame.headerSize,frame.specialVertexCount);
@@ -3086,6 +3094,7 @@ void EditorUI::drawAnimationViewer(){
  const ImGuiIO&shortcutIo=ImGui::GetIO();
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
+  if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
   if(ImGui::IsKeyPressed(ImGuiKey_T,false))animationTexturesDisabled_=!animationTexturesDisabled_;
  }
@@ -3174,6 +3183,15 @@ void EditorUI::drawAnimationViewer(){
    if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
    return projectCamera(p);
   };
+  if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+   float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();int bestVertex=-1;
+   for(std::size_t vi=0;vi<displayPositions.size();++vi){
+    const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
+    const ImVec2 screen=projectCamera(camera);const float dx=screen.x-ImGui::GetIO().MousePos.x,dy=screen.y-ImGui::GetIO().MousePos.y;const float distance=std::sqrt(dx*dx+dy*dy);
+    if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;bestVertex=static_cast<int>(vi);}
+   }
+   if(bestVertex>=0){animationSelectedVertex_=bestVertex;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;}
+  }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
@@ -3225,8 +3243,8 @@ void EditorUI::drawAnimationViewer(){
     static Gpu gpu;
     auto shader=[](unsigned int type,const char*source){unsigned int id=GL::CreateShader(type);if(!id)return 0U;GL::ShaderSource(id,1,&source,nullptr);GL::CompileShader(id);int ok=0;GL::GetShaderiv(id,0x8B81U,&ok);if(!ok){GL::DeleteShader(id);return 0U;}return id;};
     if(!gpu.ready){
-     static const char*vsSource="#version 150\nin vec4 aPosition;in vec4 aColor;in vec2 aUV;in float aNoCull;out vec4 vColor;out vec2 vUV;flat out int vNoCull;void main(){gl_Position=aPosition;vColor=aColor;vUV=aUV;vNoCull=int(aNoCull+0.5);}";
-     static const char*fsSource="#version 150\nflat in int vNoCull;in vec4 vColor;in vec2 vUV;out vec4 fragColor;uniform sampler2D uTexture;uniform int uHasTexture;uniform int uBlendMask;uniform int uBlendMode;uniform int uCullMode;void main(){if(uCullMode!=0&&vNoCull==0){if(uCullMode==1&&!gl_FrontFacing)discard;if(uCullMode==2&&gl_FrontFacing)discard;}if(uHasTexture==0){if(uBlendMask!=3)discard;fragColor=vColor;return;}vec4 t=texture(uTexture,vUV);if(t.a<=0.0)discard;bool stp=t.a<0.999;if(uBlendMask==3){if(stp&&uBlendMode!=3)discard;}else if(uBlendMode!=uBlendMask)discard;float alpha=(uBlendMask==0&&uBlendMode==0&&stp)?0.5:1.0;fragColor=vec4(min(vColor.rgb*t.rgb*2.0,vec3(1.0)),alpha);}";
+     static const char*vsSource="#version 150\nin vec4 aPosition;in vec4 aColor;in vec2 aUV;in float aNoCull;out vec4 vColor;out vec2 vUV;flat out int vNoCull;void main(){gl_Position=aPosition;gl_PointSize=14.0;vColor=aColor;vUV=aUV;vNoCull=int(aNoCull+0.5);}";
+     static const char*fsSource="#version 150\nflat in int vNoCull;in vec4 vColor;in vec2 vUV;out vec4 fragColor;uniform sampler2D uTexture;uniform int uHasTexture;uniform int uBlendMask;uniform int uBlendMode;uniform int uCullMode;uniform int uPointMode;void main(){if(uPointMode!=0){vec2 p=gl_PointCoord-vec2(0.5);if(dot(p,p)>0.25)discard;fragColor=vColor;return;}if(uCullMode!=0&&vNoCull==0){if(uCullMode==1&&!gl_FrontFacing)discard;if(uCullMode==2&&gl_FrontFacing)discard;}if(uHasTexture==0){if(uBlendMask!=3)discard;fragColor=vColor;return;}vec4 t=texture(uTexture,vUV);if(t.a<=0.0)discard;bool stp=t.a<0.999;if(uBlendMask==3){if(stp&&uBlendMode!=3)discard;}else if(uBlendMode!=uBlendMask)discard;float alpha=(uBlendMask==0&&uBlendMode==0&&stp)?0.5:1.0;fragColor=vec4(min(vColor.rgb*t.rgb*2.0,vec3(1.0)),alpha);}";
      unsigned int vs=shader(0x8B31U,vsSource),fs=shader(0x8B30U,fsSource);
      if(vs&&fs){gpu.program=GL::CreateProgram();GL::AttachShader(gpu.program,vs);GL::AttachShader(gpu.program,fs);GL::BindAttribLocation(gpu.program,0,"aPosition");GL::BindAttribLocation(gpu.program,1,"aColor");GL::BindAttribLocation(gpu.program,2,"aUV");GL::BindAttribLocation(gpu.program,3,"aNoCull");GL::LinkProgram(gpu.program);int ok=0;GL::GetProgramiv(gpu.program,0x8B82U,&ok);gpu.ready=ok!=0;}
      if(vs)GL::DeleteShader(vs);if(fs)GL::DeleteShader(fs);
@@ -3405,6 +3423,22 @@ void EditorUI::drawAnimationViewer(){
        }
        GL::DepthFunc(0x0201U);GL::DepthMask(1);
       }
+      if(animationShowVertices_&&frame.verticesDecoded&&!displayPositions.empty()){
+       std::vector<Vertex> vertexPoints;vertexPoints.reserve(displayPositions.size());
+       auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
+       for(const auto&position:displayPositions){
+        const CameraPoint cam=toCamera(position.x,position.y,position.z);if(cam.depth<=0.05f)continue;
+        constexpr float nearP=.05f,farP=200.0f;
+        const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
+        const ImU32 color=IM_COL32(255,190,64,255);
+        vertexPoints.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),1.0f,0.0f,0.0f,1.0f});
+       }
+       GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
+       const int pointMode=GL::GetUniformLocation(gpu.program,"uPointMode");GL::Uniform1i(pointMode,1);
+       GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::PointSize(14.0f);
+       if(!vertexPoints.empty()){GL::BufferData(0x8892U,GL::SizePtr(vertexPoints.size()*sizeof(Vertex)),vertexPoints.data(),0x88E8U);GL::DrawArrays(0x0000U,0,int(vertexPoints.size()));}
+       GL::PointSize(1.0f);GL::Uniform1i(pointMode,0);GL::DepthFunc(0x0201U);GL::DepthMask(1);
+      }
       // CrashEdit-RE draws its world-origin grid after the model passes.
       // Keep depth testing enabled so models occlude the grid, but never let
       // the grid write depth before the animation has been rendered.
@@ -3463,20 +3497,6 @@ void EditorUI::drawAnimationViewer(){
    }
   }
  }
- if(animationShowVertices_&&frame.verticesDecoded){
-  // Draw vertex handles as viewport overlays so they remain legible in both
-  // textured and wireframe modes, independent of the model surface colors.
-  for(std::size_t vertexIndex=0;vertexIndex<displayPositions.size();++vertexIndex){
-   const auto&position=displayPositions[vertexIndex];
-   const CameraPoint camera=toCamera(position.x,position.y,position.z);
-   if(camera.depth<=0.1f)continue;
-   const ImVec2 screen=projectCamera(camera);
-   if(screen.x<canvasMin.x-8.0f||screen.x>canvasMax.x+8.0f||screen.y<canvasMin.y-8.0f||screen.y>canvasMax.y+8.0f)continue;
-   dl->AddCircleFilled(screen,7.0f,IM_COL32(12,16,22,235),20);
-   dl->AddCircleFilled(screen,5.0f,IM_COL32(255,190,64,255),20);
-   dl->AddCircle(screen,6.0f,IM_COL32(255,245,210,255),20,1.0f);
-  }
- }
  
  }
  dl->PopClipRect();
@@ -3489,6 +3509,7 @@ void EditorUI::drawAnimationViewer(){
   "W / A / S / D - Move camera",
   "Q / E - Move camera down / up",
   "C - Toggle collision display",
+  "V - Toggle vertices",
   "X - Toggle wireframe",
   "T - Toggle textures",
   "R - Reset camera"
