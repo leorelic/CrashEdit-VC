@@ -3312,7 +3312,7 @@ void EditorUI::drawAnimationViewer(){
        constexpr float collisionScale=102400.0f;
        const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
        const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
-       std::vector<Vertex> collisionFaces,collisionLines;
+       std::vector<Vertex> collisionFaces,collisionLines,collisionPoints;
        auto appendCollisionVertex=[&](std::vector<Vertex>&out,const CameraPoint&cam,ImU32 color){
         if(cam.depth<=0.05f)return false;
         const float nx=(cam.x*focal/cam.depth)/canvasSize.x*2.0f;
@@ -3353,11 +3353,24 @@ void EditorUI::drawAnimationViewer(){
          appendCollisionVertex(collisionLines,a,IM_COL32(0,255,0,255));
          appendCollisionVertex(collisionLines,b,IM_COL32(0,255,0,255));
         }
+        for(const auto&corner:corners)
+         appendCollisionVertex(collisionPoints,corner,IM_COL32(0,255,0,255));
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
        GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
        if(!collisionFaces.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionFaces.size()*sizeof(Vertex)),collisionFaces.data(),0x88E8U);GL::DrawArrays(0x0004U,0,int(collisionFaces.size()));}
-       if(!collisionLines.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(collisionLines.size()));}
+       if(!collisionLines.empty()){
+        GL::LineWidth(2.5f);
+        GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);
+        GL::DrawArrays(0x0001U,0,int(collisionLines.size()));
+        GL::LineWidth(1.0f);
+       }
+       if(!collisionPoints.empty()){
+        GL::PointSize(7.0f);
+        GL::BufferData(0x8892U,GL::SizePtr(collisionPoints.size()*sizeof(Vertex)),collisionPoints.data(),0x88E8U);
+        GL::DrawArrays(0x0000U,0,int(collisionPoints.size()));
+        GL::PointSize(1.0f);
+       }
        GL::DepthFunc(0x0201U);GL::DepthMask(1);
       }
       GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
@@ -3387,7 +3400,7 @@ void EditorUI::drawAnimationViewer(){
     const CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
     if(a.depth<=nearDepth)a=clipped;else b=clipped;
    }
-   dl->AddLine(projectCamera(a),projectCamera(b),collisionLine,1.75f);
+   dl->AddLine(projectCamera(a),projectCamera(b),collisionLine,3.0f);
   };
   for(const auto&collision:frame.collisions){
    const float x1=(static_cast<float>(collision.values[4])+static_cast<float>(collision.values[1]))/collisionScale;
@@ -3406,6 +3419,9 @@ void EditorUI::drawAnimationViewer(){
     if(visible)dl->AddConvexPolyFilled(points,4,collisionFill);
    }
    for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
+   for(const auto&corner:corners){
+    if(corner.depth>0.1f)dl->AddCircleFilled(projectCamera(corner),3.5f,collisionLine,12);
+   }
   }
  }
  
