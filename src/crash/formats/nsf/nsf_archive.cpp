@@ -260,11 +260,11 @@ static bool decodeModelPolygons(NsfModel&model){
  }
  std::int32_t lastCC=-1,lastAA=-1,lastValid=-3,lastNonBB=-1,lastColor=-1;std::size_t cur=0;
  auto triangleColor=[&](std::size_t i)->int{return i<cmd.size()&&cmd[i].triangle?cmd[i].color1:-1;};
- auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x){const int maxIndex=static_cast<int>(model.vertexCount)-special;if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0)return false;model.triangles.push_back({a,b,c,static_cast<std::uint8_t>(ca),static_cast<std::uint8_t>(cb),static_cast<std::uint8_t>(cc),x.texture,x.triType,x.triSubtype,x.animated,x.flag});return true;};
+ auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x,std::size_t wordIndex){const int maxIndex=static_cast<int>(model.vertexCount)-special;if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0)return false;NsfModelTriangle triangle;triangle.a=a;triangle.b=b;triangle.c=c;triangle.colorA=static_cast<std::uint8_t>(ca);triangle.colorB=static_cast<std::uint8_t>(cb);triangle.colorC=static_cast<std::uint8_t>(cc);triangle.textureIndex=x.texture;triangle.triangleType=x.triType;triangle.triangleSubtype=x.triSubtype;triangle.animated=x.animated;triangle.flag=x.flag;triangle.commandWordIndex=wordIndex;model.triangles.push_back(triangle);return true;};
  for(std::size_t i=0;i<count;++i){if(model.polygonWords[i]==0xffffffffU)break;const auto&x=cmd[i];if(!x.triangle){lastColor=static_cast<std::int32_t>(i);continue;}if(cur>=vtx.size())return fail("Model polygon stream is inconsistent.");
-  if(x.triType==0){if(cur<2)return fail("Model strip starts before three vertices.");const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);int c2=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color2:lastColor+2==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-2);if(!emit(vtx[cur],vtx[cur-1],vtx[cur-2],x.color1,c1,c2,x))return fail("Model strip triangle references invalid geometry.");lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
-  }else if(x.triType==1){int ci=-1;if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColor(static_cast<std::size_t>(lastNonBB-2));else if(lastColor==lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color1;else if(lastColor==lastNonBB-1&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;else if(lastColor>lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);if(cur<1)return fail("Connected triangle lacks preceding vertex.");const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];if(!emit(vtx[cur],vtx[cur-1],third,x.color1,c1,ci,x))return fail("Connected triangle references invalid geometry.");
-  }else if(x.triType==2){if(i+2<count&&lastValid+2<static_cast<int>(i)){if(cur+2>=vtx.size())return fail("Fan triangle exceeds vertex stream.");if(!emit(vtx[cur],vtx[cur+1],vtx[cur+2],x.color1,triangleColor(i+1),triangleColor(i+2),x))return fail("Fan triangle references invalid geometry.");lastValid=static_cast<int>(i);}lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);}
+  if(x.triType==0){if(cur<2)return fail("Model strip starts before three vertices.");const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);int c2=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color2:lastColor+2==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-2);if(!emit(vtx[cur],vtx[cur-1],vtx[cur-2],x.color1,c1,c2,x,i))return fail("Model strip triangle references invalid geometry.");lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
+  }else if(x.triType==1){int ci=-1;if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColor(static_cast<std::size_t>(lastNonBB-2));else if(lastColor==lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color1;else if(lastColor==lastNonBB-1&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;else if(lastColor>lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);if(cur<1)return fail("Connected triangle lacks preceding vertex.");const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];if(!emit(vtx[cur],vtx[cur-1],third,x.color1,c1,ci,x,i))return fail("Connected triangle references invalid geometry.");
+  }else if(x.triType==2){if(i+2<count&&lastValid+2<static_cast<int>(i)){if(cur+2>=vtx.size())return fail("Fan triangle exceeds vertex stream.");if(!emit(vtx[cur],vtx[cur+1],vtx[cur+2],x.color1,triangleColor(i+1),triangleColor(i+2),x,i))return fail("Fan triangle references invalid geometry.");lastValid=static_cast<int>(i);}lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);}
   ++cur;
  }
  if(model.polygonCount&&model.triangles.size()!=model.polygonCount)model.polygonError="Decoded polygon count differs from model header count.";
@@ -280,7 +280,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
  const std::uint32_t polygonWordCount=u32(bytes,h+0x2cU),textureCount=u32(bytes,h+0x34U);
  out.vertexCount=u32(bytes,h+0x38U);
  const std::uint32_t colorCount=u32(bytes,h+0x3cU),pageCount=u32(bytes,h+0x40U);
- out.polygonWordCount=polygonWordCount;out.polygonCount=u32(bytes,h+0x44U);
+ out.polygonWordCount=polygonWordCount;out.polygonCount=u32(bytes,h+0x44U);out.specialVertexCount=u32(bytes,h+0x4cU);
  const std::uint32_t extendedCount=u32(bytes,h+0x48U),positionBase=u32(bytes,h+0x4cU);
  constexpr std::uint32_t maxElements=16384U;
  if(out.polygonWordCount>maxElements||out.polygonCount>maxElements||textureCount>maxElements||out.vertexCount>maxElements||colorCount>maxElements||extendedCount>maxElements||pageCount>8U)
@@ -307,7 +307,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
    static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
  }
  const auto&extended=entry.items[4];
- for(std::uint32_t i=0;i<extendedCount;++i)out.extendedTextureWords.push_back(u32(bytes,extended.offset+static_cast<std::size_t>(i)*4U));
+ for(std::uint32_t i=0;i<extendedCount;++i){const std::uint32_t raw=u32(bytes,extended.offset+static_cast<std::size_t>(i)*4U);out.extendedTextureWords.push_back(raw);out.extendedTextures.push_back({raw,static_cast<std::uint16_t>(raw&0x7ffU),(raw&0x80000000U)!=0,(raw&(1U<<11U))!=0,static_cast<std::uint8_t>((raw>>12U)&0x7fU),static_cast<std::uint8_t>((raw>>19U)&0x7fU),static_cast<std::uint8_t>((raw>>26U)&0x1fU)});}
  if(entry.items.size()==6U){
   const auto&positions=entry.items[5];out.positions.reserve(positionCount);out.compressed=true;
   for(std::uint32_t i=0;i<positionCount;++i){
@@ -749,6 +749,83 @@ bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size
  }
  return true;
 }
+bool NsfArchive::setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value){
+ if(chunkIndex>=chunks_.size()||axis>=3U)return false;
+ auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||entry.items.size()<1U)return false;
+ const auto&item=entry.items[0];const std::size_t offset=item.offset+axis*4U;if(axis*4U+4U>item.size||!has(chunk.bytes,offset,4U))return false;
+ const std::uint32_t raw=static_cast<std::uint32_t>(value);for(unsigned i=0;i<4U;++i)chunk.bytes[offset+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ if(axis==0U)entry.model.scaleX=value;else if(axis==1U)entry.model.scaleY=value;else entry.model.scaleZ=value;
+ for(unsigned i=0;i<4U;++i)entry.model.header[axis*4U+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ return true;
+}
+bool NsfArchive::setModelTexturePageEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t pageIndex,std::uint32_t eid){
+ if(!isValidEid(eid)||chunkIndex>=chunks_.size())return false;
+ auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||pageIndex>=entry.model.texturePageEids.size()||entry.items.empty())return false;
+ const std::size_t relative=0x0cU+pageIndex*4U;if(relative+4U>entry.items[0].size)return false;
+ const std::size_t offset=entry.items[0].offset+relative;if(!has(chunk.bytes,offset,4U))return false;
+ for(unsigned i=0;i<4U;++i){const auto b=static_cast<std::uint8_t>(eid>>(i*8U));chunk.bytes[offset+i]=b;entry.model.header[relative+i]=b;}
+ entry.model.texturePageEids[pageIndex]=eid;return true;
+}
+bool NsfArchive::setModelColor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t colorIndex,const NsfSceneryColor&color){
+ if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||colorIndex>=entry.model.colors.size()||entry.items.size()<3U)return false;
+ const auto&item=entry.items[2];const std::size_t relative=colorIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
+ chunk.bytes[p]=color.r;chunk.bytes[p+1U]=color.g;chunk.bytes[p+2U]=color.b;chunk.bytes[p+3U]=color.extra;entry.model.colors[colorIndex]=color;return true;
+}
+bool NsfArchive::setModelTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,const NsfModelTexture&texture){
+ if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||textureIndex>=entry.model.textures.size()||entry.items.size()<4U)return false;
+ if(texture.clutX>15U||texture.clutY2>15U||texture.colorMode>3U||texture.blendMode>3U||texture.segment>15U||texture.page>63U)return false;
+ const auto&item=entry.items[3];const std::size_t relative=textureIndex*12U;if(relative+12U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,12U))return false;
+ const std::uint8_t old2=chunk.bytes[p+2U],old6=chunk.bytes[p+6U],old7=chunk.bytes[p+7U];
+ chunk.bytes[p]=texture.u1;chunk.bytes[p+1U]=texture.v1;
+ chunk.bytes[p+2U]=static_cast<std::uint8_t>((old2&0U)|(texture.clutX&0x0fU)|((texture.clutY2&0x0fU)<<4U));
+ chunk.bytes[p+3U]=texture.clutY1;chunk.bytes[p+4U]=texture.u2;chunk.bytes[p+5U]=texture.v2;
+ chunk.bytes[p+6U]=static_cast<std::uint8_t>((texture.colorMode&1U)<<7U|(texture.blendMode&3U)<<5U|(texture.segment&0x0fU));
+ chunk.bytes[p+7U]=static_cast<std::uint8_t>((old7&0x02U)|((texture.colorMode>>1U)&1U)|((texture.page&0x3fU)<<2U));
+ chunk.bytes[p+8U]=texture.u3;chunk.bytes[p+9U]=texture.v3;chunk.bytes[p+10U]=texture.u4;chunk.bytes[p+11U]=texture.v4;
+ (void)old6;entry.model.textures[textureIndex]=texture;return true;
+}
+bool NsfArchive::setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,std::uint32_t raw){
+ if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||textureIndex>=entry.model.extendedTextureWords.size()||entry.items.size()<5U)return false;
+ const auto&item=entry.items[4];const std::size_t relative=textureIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
+ for(unsigned i=0;i<4U;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ entry.model.extendedTextureWords[textureIndex]=raw;entry.model.extendedTextures[textureIndex]={raw,static_cast<std::uint16_t>(raw&0x7ffU),(raw&0x80000000U)!=0,(raw&(1U<<11U))!=0,static_cast<std::uint8_t>((raw>>12U)&0x7fU),static_cast<std::uint8_t>((raw>>19U)&0x7fU),static_cast<std::uint8_t>((raw>>26U)&0x1fU)};return true;
+}
+bool NsfArchive::setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated){
+ if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||triangleIndex>=entry.model.triangles.size()||entry.items.size()<2U)return false;
+ const auto&triangle=entry.model.triangles[triangleIndex];if(triangle.commandWordIndex>=entry.model.polygonWords.size())return false;
+ const auto&item=entry.items[1];const std::size_t relative=triangle.commandWordIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
+ std::uint32_t raw=u32(chunk.bytes,p);raw=(raw&~0x1ffU)|textureIndex|(animated?0x100U:0U);
+ for(unsigned i=0;i<4U;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ entry.model.polygonWords[triangle.commandWordIndex]=raw;entry.model.polygonsDecoded=decodeModelPolygons(entry.model);return entry.model.polygonsDecoded;
+}
+int resolveNsfModelTextureIndex(const NsfModel&model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool&valid){
+ valid=true;int textureId=static_cast<int>(textureIndex)-1;
+ if(animated){
+  ++textureId;if(textureId<0||static_cast<std::size_t>(textureId)>=model.extendedTextureWords.size()){valid=false;return -1;}
+  std::uint32_t anim=model.extendedTextureWords[static_cast<std::size_t>(textureId)];const int offset=static_cast<int>(anim&0x7ffU);
+  if(offset==0)return -1;
+  textureId=offset-1;
+  if((anim&0x80000000U)!=0)textureId+=static_cast<int>((anim>>29U)&3U);
+  else{
+   const int latency=static_cast<int>((anim>>26U)&0x1fU),delay=static_cast<int>((anim>>19U)&0x7fU),mask=static_cast<int>((anim>>12U)&0x7fU);
+   textureId+=(static_cast<int>(realFrame)/(1+latency)+delay)&mask;
+   if((anim&(1U<<11U))!=0){
+    ++textureId;if(textureId<0||static_cast<std::size_t>(textureId)>=model.extendedTextureWords.size()){valid=false;return -1;}
+    anim=model.extendedTextureWords[static_cast<std::size_t>(textureId)];
+    textureId=static_cast<int>(anim&0x7ffU)-1+static_cast<int>((anim>>29U)&3U);
+   }
+  }
+ }
+ if(textureId>=0&&static_cast<std::size_t>(textureId)>=model.textures.size())valid=false;
+ return textureId;
+}
+
 std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) const {
  std::vector<NsfEntryLocation> matches;
  for(std::size_t chunkIndex=0;chunkIndex<chunks_.size();++chunkIndex){

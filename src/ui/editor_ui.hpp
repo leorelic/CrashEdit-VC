@@ -14,7 +14,7 @@ public:
  void handleDroppedFiles(int count,const char** paths);
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
- void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
+ void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
@@ -37,7 +37,7 @@ private:
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
  int animationCameraEntryEid_=-1;
- bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false,animationInterpolate_=true,animationHalfSpeed_=false,animationCollisionViewer_=false,animationTexturesDisabled_=false,animationShowVertices_=false; int animationSelectedVertex_=-1;
+ bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false,animationInterpolate_=true,animationHalfSpeed_=false,animationCollisionViewer_=false,animationTexturesDisabled_=false,animationShowVertices_=false; int animationSelectedVertex_=-1,animationSelectedFace_=-1,animationHoveredFace_=-1;
  bool sceneCameraInitialized_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;

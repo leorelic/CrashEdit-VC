@@ -151,17 +151,25 @@ struct NsfModelTriangle {
  std::int32_t a=0,b=0,c=0;
  std::uint8_t colorA=0,colorB=0,colorC=0,textureIndex=0,triangleType=0,triangleSubtype=0;
  bool animated=false,flag=false;
+ std::size_t commandWordIndex=0;
+};
+struct NsfModelExtendedTexture {
+ std::uint32_t raw=0;
+ std::uint16_t offset=0;
+ bool isLod=false,leap=false;
+ std::uint8_t mask=0,delay=0,latency=0;
 };
 struct NsfModel {
  bool decoded=false,compressed=false,polygonsDecoded=false;
  std::vector<std::uint8_t> header;
  std::int32_t scaleX=0,scaleY=0,scaleZ=0;
  std::vector<std::uint32_t> texturePageEids,polygonWords,extendedTextureWords;
+ std::vector<NsfModelExtendedTexture> extendedTextures;
  std::vector<NsfSceneryColor> colors;
  std::vector<NsfModelTexture> textures;
  std::vector<NsfModelTriangle> triangles;
  std::vector<NsfModelPosition> positions;
- std::uint32_t vertexCount=0,polygonWordCount=0,polygonCount=0;
+ std::uint32_t vertexCount=0,polygonWordCount=0,polygonCount=0,specialVertexCount=0;
  std::string polygonError,error;
 };
 struct NsfEntry {
@@ -194,8 +202,15 @@ public:
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
  bool setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value);
  bool setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value);
+ bool setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value);
+ bool setModelTexturePageEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t pageIndex,std::uint32_t eid);
+ bool setModelColor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t colorIndex,const NsfSceneryColor& color);
+ bool setModelTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,const NsfModelTexture& texture);
+ bool setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,std::uint32_t raw);
+ bool setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;
 };
+int resolveNsfModelTextureIndex(const NsfModel& model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool& valid);
 }
