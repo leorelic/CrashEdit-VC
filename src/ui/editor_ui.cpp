@@ -3632,8 +3632,8 @@ void EditorUI::drawModelEditor(){
    ImGui::Separator();ImGui::Text("Texture page references");
    for(std::size_t i=0;i<model.texturePageEids.size();++i){
     std::uint32_t eid=model.texturePageEids[i];ImGui::PushID(static_cast<int>(i));
-    ImGui::SetNextItemWidth(180.0f);
-    if(ImGui::InputScalar(("TPAG "+std::to_string(i)).c_str(),ImGuiDataType_U32,&eid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelTexturePageEid(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,eid);
+    ImGui::Text("TPAG %zu",i);ImGui::SameLine();ImGui::SetNextItemWidth(180.0f);
+    if(ImGui::InputScalar("##TPAGEID",ImGuiDataType_U32,&eid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelTexturePageEid(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,eid);
     ImGui::SameLine();ImGui::TextDisabled("%s",Crash::eidToEName(eid).c_str());
     bool pageResolved=false;
     for(std::size_t textureChunk=0;textureChunk<nsf_.chunks().size();++textureChunk){const auto&candidate=nsf_.chunks()[textureChunk];if(candidate.type==1&&static_cast<std::uint32_t>(candidate.chunkId)==eid){pageResolved=true;break;}}
@@ -3658,7 +3658,7 @@ void EditorUI::drawModelEditor(){
     ImGui::Text("Command word: %zu | Raw: %08X",tri.commandWordIndex,model.polygonWords[tri.commandWordIndex]);
     int texture=tri.textureIndex;bool animated=tri.animated;
     if(labeledInt("Texture reference","##TextureReference",texture)){texture=std::clamp(texture,0,255);nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),static_cast<std::uint8_t>(texture),animated);}
-    if(ImGui::Checkbox("Animated texture",&animated))nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),tri.textureIndex,animated);
+    ImGui::TextUnformatted("Animated texture");ImGui::SameLine();if(ImGui::Checkbox("##AnimatedTexture",&animated))nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),tri.textureIndex,animated);
    }
    ImGui::Separator();ImGui::Text("Raw command stream");
    static int rawWordIndex=0;rawWordIndex=std::clamp(rawWordIndex,0,model.polygonWords.empty()?0:static_cast<int>(model.polygonWords.size()-1U));
@@ -3686,7 +3686,7 @@ void EditorUI::drawModelEditor(){
    if(!model.textures.empty()){
     ImGui::TextUnformatted("Texture descriptor");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##TextureDescriptorSlider",&textureIndex,0,static_cast<int>(model.textures.size()-1U));
     auto texture=model.textures[static_cast<std::size_t>(textureIndex)];
-    auto byteInput=[&](const char*label,std::uint8_t&value){int v=value;ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("##Value",&v)){value=static_cast<std::uint8_t>(std::clamp(v,0,255));return true;}return false;};
+    auto byteInput=[&](const char*label,std::uint8_t&value){int v=value;ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);ImGui::PushID(label);const bool changed=ImGui::InputInt("##Value",&v);ImGui::PopID();if(changed){value=static_cast<std::uint8_t>(std::clamp(v,0,255));return true;}return false;};
     bool changed=false;
     changed|=byteInput("U1",texture.u1);changed|=byteInput("V1",texture.v1);changed|=byteInput("U2",texture.u2);changed|=byteInput("V2",texture.v2);
     changed|=byteInput("U3",texture.u3);changed|=byteInput("V3",texture.v3);changed|=byteInput("U4",texture.u4);changed|=byteInput("V4",texture.v4);
@@ -3701,29 +3701,29 @@ void EditorUI::drawModelEditor(){
    if(!model.extendedTextureWords.empty()){
     ImGui::TextUnformatted("Extended texture record");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##ExtendedTextureRecordSlider",&extendedIndex,0,static_cast<int>(model.extendedTextureWords.size()-1U));
     std::uint32_t raw=model.extendedTextureWords[static_cast<std::size_t>(extendedIndex)];
-    if(ImGui::InputScalar("Raw word",ImGuiDataType_U32,&raw,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
+    ImGui::TextUnformatted("Raw word");ImGui::SameLine();ImGui::SetNextItemWidth(180.0f);if(ImGui::InputScalar("##RawWord",ImGuiDataType_U32,&raw,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
     auto record=model.extendedTextures[static_cast<std::size_t>(extendedIndex)];
     ImGui::Text("Offset: %u | %s",record.offset,record.isLod?"LOD selectors":"Flipbook sequence");
     bool changed=false;int offset=record.offset;bool isLod=record.isLod;
-    if(ImGui::InputInt("Texture offset",&offset)){offset=std::clamp(offset,0,2047);raw=(raw&~0x7ffU)|static_cast<std::uint32_t>(offset);changed=true;}
-    if(ImGui::Checkbox("LOD selector record",&isLod)){raw=isLod?(raw|0x80000000U):(raw&~0x80000000U);changed=true;}
+    if(labeledInt("Texture offset","##TextureOffset",offset)){offset=std::clamp(offset,0,2047);raw=(raw&~0x7ffU)|static_cast<std::uint32_t>(offset);changed=true;}
+    ImGui::TextUnformatted("LOD selector record");ImGui::SameLine();if(ImGui::Checkbox("##LodSelectorRecord",&isLod)){raw=isLod?(raw|0x80000000U):(raw&~0x80000000U);changed=true;}
     static int previewLodLevel=0;
     if(isLod){
-     ImGui::SliderInt("LOD level",&previewLodLevel,0,7);
+     ImGui::TextUnformatted("LOD level");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##LodLevel",&previewLodLevel,0,7);
      int lodSelector=static_cast<int>((raw>>(29U-static_cast<unsigned>(previewLodLevel)*2U))&3U);
-     if(ImGui::InputInt("LOD selection",&lodSelector)){lodSelector=std::clamp(lodSelector,0,3);const unsigned shift=29U-static_cast<unsigned>(previewLodLevel)*2U;raw=(raw&~(3U<<shift))|(static_cast<std::uint32_t>(lodSelector)<<shift);changed=true;}
+     if(labeledInt("LOD selection","##LodSelection",lodSelector,110.0f)){lodSelector=std::clamp(lodSelector,0,3);const unsigned shift=29U-static_cast<unsigned>(previewLodLevel)*2U;raw=(raw&~(3U<<shift))|(static_cast<std::uint32_t>(lodSelector)<<shift);changed=true;}
      for(std::size_t level=0;level<8U;++level)ImGui::Text("LOD %zu: %u",level,record.lod[level]);
     }else{
      bool leap=record.leap;int mask=record.mask,delay=record.delay,latency=record.latency;
-     if(ImGui::Checkbox("Leap to following record",&leap)){raw=(raw&~(1U<<11U))|(leap?(1U<<11U):0U);changed=true;}
-     if(ImGui::InputInt("Frame mask",&mask)){mask=std::clamp(mask,0,127);raw=(raw&~(0x7fU<<12U))|(static_cast<std::uint32_t>(mask)<<12U);changed=true;}
-     if(ImGui::InputInt("Delay",&delay)){delay=std::clamp(delay,0,127);raw=(raw&~(0x7fU<<19U))|(static_cast<std::uint32_t>(delay)<<19U);changed=true;}
-     if(ImGui::InputInt("Latency",&latency)){latency=std::clamp(latency,0,31);raw=(raw&~(0x1fU<<26U))|(static_cast<std::uint32_t>(latency)<<26U);changed=true;}
+     ImGui::TextUnformatted("Leap to following record");ImGui::SameLine();if(ImGui::Checkbox("##LeapToFollowingRecord",&leap)){raw=(raw&~(1U<<11U))|(leap?(1U<<11U):0U);changed=true;}
+     if(labeledInt("Frame mask","##FrameMask",mask,110.0f)){mask=std::clamp(mask,0,127);raw=(raw&~(0x7fU<<12U))|(static_cast<std::uint32_t>(mask)<<12U);changed=true;}
+     if(labeledInt("Delay","##Delay",delay,110.0f)){delay=std::clamp(delay,0,127);raw=(raw&~(0x7fU<<19U))|(static_cast<std::uint32_t>(delay)<<19U);changed=true;}
+     if(labeledInt("Latency","##Latency",latency,110.0f)){latency=std::clamp(latency,0,31);raw=(raw&~(0x1fU<<26U))|(static_cast<std::uint32_t>(latency)<<26U);changed=true;}
     }
     if(changed)nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
     const int animatedFaceCount=static_cast<int>(std::count_if(model.triangles.begin(),model.triangles.end(),[&](const auto&tri){return tri.animated&&tri.textureIndex==static_cast<std::uint8_t>(extendedIndex);}));
     ImGui::Text("Animated faces using this record: %d",animatedFaceCount);
-    static int previewFrame=0;ImGui::SliderInt("Preview clock (30 Hz)",&previewFrame,0,255);
+    static int previewFrame=0;ImGui::TextUnformatted("Preview clock (30 Hz)");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##PreviewClock",&previewFrame,0,255);
     bool previewValid=true;const int previewDescriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(previewFrame),previewValid,static_cast<std::uint8_t>(previewLodLevel));
     if(previewValid&&previewDescriptor>=0&&static_cast<std::size_t>(previewDescriptor)<model.textures.size()){
      const auto&previewTexture=model.textures[static_cast<std::size_t>(previewDescriptor)];
