@@ -3060,6 +3060,7 @@ void EditorUI::drawAnimationViewer(){
  if(ImGui::BeginPopup("AnimationViewportOptions")){
   ImGui::TextUnformatted("Rendering");
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
+  ImGui::MenuItem("Show Vertices",nullptr,&animationShowVertices_);
   ImGui::MenuItem("Collision Viewer",nullptr,&animationCollisionViewer_);
   ImGui::MenuItem("Disable Textures",nullptr,&animationTexturesDisabled_);
   ImGui::Separator();
@@ -3460,6 +3461,20 @@ void EditorUI::drawAnimationViewer(){
    for(const auto&corner:corners){
     if(corner.depth>0.1f)dl->AddCircleFilled(projectCamera(corner),3.5f,collisionLine,12);
    }
+  }
+ }
+ if(animationShowVertices_&&frame.verticesDecoded){
+  // Draw vertex handles as viewport overlays so they remain legible in both
+  // textured and wireframe modes, independent of the model surface colors.
+  for(std::size_t vertexIndex=0;vertexIndex<displayPositions.size();++vertexIndex){
+   const auto&position=displayPositions[vertexIndex];
+   const CameraPoint camera=toCamera(position.x,position.y,position.z);
+   if(camera.depth<=0.1f)continue;
+   const ImVec2 screen=projectCamera(camera);
+   if(screen.x<canvasMin.x-8.0f||screen.x>canvasMax.x+8.0f||screen.y<canvasMin.y-8.0f||screen.y>canvasMax.y+8.0f)continue;
+   dl->AddCircleFilled(screen,7.0f,IM_COL32(12,16,22,235),20);
+   dl->AddCircleFilled(screen,5.0f,IM_COL32(255,190,64,255),20);
+   dl->AddCircle(screen,6.0f,IM_COL32(255,245,210,255),20,1.0f);
   }
  }
  
