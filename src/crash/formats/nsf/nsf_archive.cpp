@@ -248,6 +248,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
 }
 struct ModelPolyCommand {bool triangle=false;std::uint8_t color1=0,color2=0,texture=0,key=0,type=0,triType=0,triSubtype=0;bool animated=false,flag=false;};
 static bool decodeModelPolygons(NsfModel&model){
+ model.triangles.clear();model.polygonError.clear();
  auto fail=[&](const char*m){model.polygonError=m;return false;};
  const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand> cmd(count);std::vector<std::int32_t> vtx;vtx.reserve(count);
  std::unordered_map<std::uint8_t,std::int32_t> keys;
@@ -777,7 +778,7 @@ bool NsfArchive::setModelColor(std::size_t chunkIndex,std::size_t entryIndex,std
 bool NsfArchive::setModelTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,const NsfModelTexture&texture){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
  auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||textureIndex>=entry.model.textures.size()||entry.items.size()<4U)return false;
- if(texture.clutX>15U||texture.clutY2>15U||texture.colorMode>3U||texture.blendMode>3U||texture.segment>15U||texture.page>63U)return false;
+ if(texture.clutX>15U||texture.clutY2>15U||texture.colorMode>3U||texture.blendMode>3U||texture.segment>15U||texture.page>=entry.model.texturePageEids.size()||texture.page>63U)return false;
  const auto&item=entry.items[3];const std::size_t relative=textureIndex*12U;if(relative+12U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,12U))return false;
  const std::uint8_t old2=chunk.bytes[p+2U],old6=chunk.bytes[p+6U],old7=chunk.bytes[p+7U];
  chunk.bytes[p]=texture.u1;chunk.bytes[p+1U]=texture.v1;

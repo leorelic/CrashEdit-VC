@@ -3053,7 +3053,7 @@ void EditorUI::drawAnimationViewer(){
   }
  }
  if(model&&linkedModelLocationValid&&animationSelectedFace_>=0&&static_cast<std::size_t>(animationSelectedFace_)<model->triangles.size()){
-  const auto&selectedTriangle=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];
+  const auto selectedTriangle=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];
   ImGui::Separator();ImGui::Text("Selected Face %d",animationSelectedFace_);
   int textureIndex=selectedTriangle.textureIndex;bool animated=selectedTriangle.animated;
   ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("Texture reference",&textureIndex)){textureIndex=std::clamp(textureIndex,0,255);if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture reference.";}
@@ -3357,6 +3357,7 @@ void EditorUI::drawAnimationViewer(){
        const Crash::NsfModelTexture*tex=nullptr;
        // Resolve texture animation and descriptor indexing through the shared
        // Model resolver used by the face inspector.
+       bool textureValid=true;
        const int textureId=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),textureValid);
        if(textureValid&&textureId>=0){
         if(static_cast<std::size_t>(textureId)>=model->textures.size())textureValid=false;
@@ -3624,7 +3625,7 @@ void EditorUI::drawModelEditor(){
    static int triangleIndex=0;triangleIndex=std::clamp(triangleIndex,0,model.triangles.empty()?0:static_cast<int>(model.triangles.size()-1U));
    if(!model.triangles.empty()){
     ImGui::SliderInt("Triangle",&triangleIndex,0,static_cast<int>(model.triangles.size()-1U));
-    const auto&tri=model.triangles[static_cast<std::size_t>(triangleIndex)];
+    const auto tri=model.triangles[static_cast<std::size_t>(triangleIndex)];
     ImGui::Text("Vertices: %d, %d, %d",tri.a,tri.b,tri.c);
     ImGui::Text("Corner colors: %u, %u, %u",tri.colorA,tri.colorB,tri.colorC);
     ImGui::Text("Command word: %zu | Raw: %08X",tri.commandWordIndex,model.polygonWords[tri.commandWordIndex]);
