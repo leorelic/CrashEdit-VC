@@ -33,6 +33,7 @@ private:
  float animationYaw_=0.0f,animationPitch_=0.261799f,animationDistance_=3.0f,animationFrameTimer_=0.0f;
  double animationPlaybackFrame_=0.0;
  float animationTargetX_=0.0f,animationTargetY_=0.0f,animationTargetZ_=0.0f;
+ float animationGridCenterX_=0.0f,animationGridCenterY_=0.0f,animationGridCenterZ_=0.0f,animationGridRadius_=1.0f;
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
  int animationCameraEntryEid_=-1;
