@@ -1557,8 +1557,6 @@ void EditorUI::drawViewport(){
   dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-(editorPreferences.rendererDiagnosticsVisible?40.0f:22.0f)),IM_COL32(180,194,210,255),stats);
   if(editorPreferences.rendererDiagnosticsVisible)dl->AddText(ImVec2(canvasMin.x+12,canvasMax.y-22),IM_COL32(145,190,210,255),performanceStats);
   if(faceCount==0)dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+34),IM_COL32(245,190,105,255),"No visible scenery faces at this camera position");
- }else{
-  dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+16),IM_COL32(205,211,220,255),nsfValid_?"Select a decoded zone entry to view its scenery":"No zone loaded — open an NSF");
  }
  dl->PopClipRect();
  // Keep the zone viewer legend inside the canvas, with each control on its
