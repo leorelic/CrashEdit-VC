@@ -775,11 +775,10 @@ bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size
  if(relative>=frame.rawSize||!has(chunk.bytes,frame.rawOffset+relative,1U))return false;
  chunk.bytes[frame.rawOffset+relative]=value;
  frame.specialVertices[vertexIndex][axis]=value;
- if(frame.verticesDecoded&&vertexIndex<frame.vertices.size()){
-  auto& decoded=frame.vertices[vertexIndex];
-  if(axis==0U)decoded.x=value;
-  else if(axis==1U)decoded.y=value;
-  else decoded.z=value;
+ if(frame.verticesDecoded){
+  const NsfModel*linkedModel=nullptr;
+  for(const auto&modelChunk:chunks_){if(modelChunk.type!=0||!modelChunk.entryTableValid)continue;for(const auto&modelEntry:modelChunk.entries)if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){linkedModel=&modelEntry.model;break;}if(linkedModel)break;}
+  decodeAnimationVertices(frame,linkedModel,entry.animation.isCrash3);
  }
  return true;
 }
@@ -803,8 +802,10 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
   if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
   return decodeAnimationVertices(frame,model,crash3);
  }
+ const std::size_t temporalOffset=frame.rawOffset+fakeHeader;
+ if(!has(chunk.bytes,temporalOffset,frame.temporalWords.size()*4U))return false;
  std::vector<std::uint8_t>bits;bits.reserve(frame.temporalWords.size()*32U);
- for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
+ for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
   if(vertexIndex>=model->positions.size()||model->positions.size()>frame.vertices.size())return false;
@@ -851,7 +852,7 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){
   std::uint32_t word=0;for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|bits[wordIndex*32U+bit];
   frame.temporalWords[wordIndex]=word;
-  const std::size_t offset=frame.rawOffset+fakeHeader+wordIndex*4U;if(!has(chunk.bytes,offset,4U))return false;
+  const std::size_t offset=temporalOffset+wordIndex*4U;if(!has(chunk.bytes,offset,4U))return false;
   for(unsigned byte=0;byte<4U;++byte)chunk.bytes[offset+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
  }
  return decodeAnimationVertices(frame,model,crash3);
