@@ -3098,7 +3098,22 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ auto drawModeButton=[&](const char*id,const char*tooltip,bool active,bool pencil,float y){
+   ImGui::SetCursorScreenPos(ImVec2(toolbarMin.x,y));const bool clicked=ImGui::InvisibleButton(id,ImVec2(28,28));
+   const bool over=ImGui::IsItemHovered();const ImVec2 lo=ImGui::GetItemRectMin(),hi=ImGui::GetItemRectMax();ImDrawList*icons=ImGui::GetWindowDrawList();
+   icons->AddRectFilled(lo,hi,ImGui::GetColorU32(active?ImGuiCol_ButtonActive:(over?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4);icons->AddRect(lo,hi,ImGui::GetColorU32(ImGuiCol_Border),4);
+   const ImU32 ink=ImGui::GetColorU32(ImGuiCol_Text);const ImVec2 c((lo.x+hi.x)*.5f,(lo.y+hi.y)*.5f);
+   if(pencil){icons->AddLine(ImVec2(c.x-7,c.y+7),ImVec2(c.x+6,c.y-6),ink,3);icons->AddLine(ImVec2(c.x-8,c.y+9),ImVec2(c.x-5,c.y+8),ink,2);icons->AddLine(ImVec2(c.x+5,c.y-7),ImVec2(c.x+8,c.y-4),ink,2);}
+   else{icons->AddLine(ImVec2(c.x-7,c.y+2),ImVec2(c.x-7,c.y-5),ink,2.2f);icons->AddLine(ImVec2(c.x-3,c.y+1),ImVec2(c.x-3,c.y-8),ink,2.2f);icons->AddLine(ImVec2(c.x+1,c.y+1),ImVec2(c.x+1,c.y-7),ink,2.2f);icons->AddLine(ImVec2(c.x+5,c.y+2),ImVec2(c.x+5,c.y-4),ink,2.2f);icons->AddLine(ImVec2(c.x-7,c.y-1),ImVec2(c.x-7,c.y+5),ink,2.2f);icons->AddLine(ImVec2(c.x-7,c.y+5),ImVec2(c.x-3,c.y+9),ink,2.2f);icons->AddLine(ImVec2(c.x-3,c.y+9),ImVec2(c.x+4,c.y+9),ink,2.2f);icons->AddLine(ImVec2(c.x+4,c.y+9),ImVec2(c.x+8,c.y+4),ink,2.2f);icons->AddLine(ImVec2(c.x+8,c.y+4),ImVec2(c.x+8,c.y+1),ink,2.2f);icons->AddLine(ImVec2(c.x+8,c.y+1),ImVec2(c.x+5,c.y),ink,2.2f);}
+   if(over)ImGui::SetTooltip("%s",tooltip);return std::pair<bool,bool>{clicked,over};
+  };
+  const float modeY=toolbarMax.y+5;
+  const auto faceModeButton=drawModeButton("##FaceEditingMode","Face Editing Mode (F)",animationFaceEditing_,true,modeY);
+  if(faceModeButton.first){animationFaceEditing_=true;animationHoveredFace_=-1;}
+  const auto viewModeButton=drawModeButton("##AnimationViewMode","View Mode",!animationFaceEditing_,false,modeY+32);
+  if(viewModeButton.first){animationFaceEditing_=false;animationHoveredFace_=-1;}
+  const bool modeButtonsHovered=faceModeButton.second||viewModeButton.second;
+  const bool viewportToolbarOwnsMouse=toolbarHovered||modeButtonsHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3106,6 +3121,7 @@ void EditorUI::drawAnimationViewer(){
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
  const ImGuiIO&shortcutIo=ImGui::GetIO();
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
+  if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;}
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
@@ -3542,6 +3558,7 @@ void EditorUI::drawAnimationViewer(){
   "V - Toggle vertices",
   "X - Toggle wireframe",
   "T - Toggle textures",
+  "F - Toggle face editing mode",
   "R - Reset camera"
  };
  ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
