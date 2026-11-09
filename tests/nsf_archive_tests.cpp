@@ -145,7 +145,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  std::size_t triOffset=triTable;for(std::size_t i=0;i<triItems;++i){p32(triangleChunk,triEntry+16+i*4,triOffset);triOffset+=triSizes[i];}p32(triangleChunk,triEntry+16+triItems*4,static_cast<std::uint32_t>(triSize));
  const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50,triColors=triPoly+12,triTextures=triColors+52,triExtended=triTextures+12;
  p32(triangleChunk,triInfo+0x2c,3);p32(triangleChunk,triInfo+0x34,1);p32(triangleChunk,triInfo+0x38,3);p32(triangleChunk,triInfo+0x3c,13);p32(triangleChunk,triInfo+0x40,1);p32(triangleChunk,triInfo+0x44,1);p32(triangleChunk,triInfo+0x48,1);p32(triangleChunk,triInfo+0x0c,0x4cd8206fU);
- for(std::uint32_t i=0;i<3;++i)p32(triangleChunk,triPoly+i*4,0x80000000U|((i+1U)<<16U)|(10U+i));
+ for(std::uint32_t i=0;i<3;++i)p32(triangleChunk,triPoly+i*4,0x80000000U|((i+1U)<<16U)|((10U+i)<<9U)|1U);
  for(std::uint32_t i=0;i<13;++i){triangleChunk[triColors+i*4]=static_cast<std::uint8_t>(i);triangleChunk[triColors+i*4+1]=static_cast<std::uint8_t>(i+1);triangleChunk[triColors+i*4+2]=static_cast<std::uint8_t>(i+2);}
  assert(a.loadBytes(triangleChunk,e));a.decodeAnimationModels(false);const auto&triModel=a.chunks()[0].entries[0].model;assert(triModel.decoded&&triModel.polygonsDecoded&&triModel.triangles.size()==1);
  assert(triModel.triangles[0].a==0&&triModel.triangles[0].b==1&&triModel.triangles[0].c==2);
