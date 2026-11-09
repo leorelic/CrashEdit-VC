@@ -165,19 +165,19 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 
 ### Animation pose editing and serialization
 
-- [ ] Implement matching compressed and uncompressed temporal vertex encoders based on CrashEdit-RE `Frame.MakeVertices(model)`.
-- [ ] Support edits to selected decoded animation vertices without changing unrelated temporal bits, collision data, special vertices or frame metadata.
-- [ ] Preserve the Model's compressed-position table and all Animation frames that reference the Model.
-- [ ] Treat topology/vertex-count changes as cross-resource operations. Do not enable add/remove topology or vertex-count changes until every dependent frame can be updated and round-tripped.
-- [ ] Recompute decoded Animation frames after Model or temporal data changes without resetting the camera or playback state.
+- [x] Implement compressed signed-delta and uncompressed byte-stream temporal vertex encoders based on the established CrashEdit-RE `Frame.MakeVertices(model)` decode ordering.
+- [x] Support edits to selected decoded animation vertices while preserving unrelated temporal bits, collision data, special-vertex bytes and frame metadata; reject values that cannot be represented by the frame's bit widths.
+- [x] Preserve the Model's compressed-position table and all other Animation frames that reference the Model when editing a single frame's temporal stream.
+- [x] Keep topology/vertex-count changes disabled as cross-resource operations until every dependent frame can be updated and round-tripped.
+- [x] Re-decode the edited Animation frame after temporal writes without resetting the viewer camera; fixed-size Model edits refresh the shared Model data directly.
 
 ### Regression and acceptance criteria
 
 - [ ] Compare reconstructed Model triangles, texture references and frame poses with CrashEdit-RE `airumu/CrashEdit` branch `t/net9`.
 - [ ] Test real Crash 2 Model/Animation pairs: `El1eG` / `El1eV` (unanimated textures) and `Cr10G` / `Cr10V` (animated eye textures).
 - [ ] Test parse → serialize → parse equality for untouched Models and Animations.
-- [x] Test targeted edits to a color record, texture descriptor, Model scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word in a synthetic NSF fixture.
-- [x] Verify NSF save/reload and checksum handling for the synthetic fixed-size Model edit fixture. Real archive-wide preservation testing remains pending.
+- [x] Test targeted edits to Model colors, descriptors, scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word, plus compressed and uncompressed Animation vertex writes in synthetic NSF fixtures.
+- [x] Verify NSF save/reload and checksum handling for synthetic fixed-size Model edits and compressed/uncompressed Animation vertex edits. Real archive-wide preservation testing remains pending.
 - [ ] Exercise malformed counts, truncated items, invalid texture indices, missing TPAG pages, invalid animation links and extended-texture boundary cases.
 - [ ] Keep Crash 2 as the acceptance target. Validate Crash 3-specific model/frame behavior separately and do not generalize it from Crash 2 samples.
 - [ ] Build and run the complete test suite; report exactly what was and was not verified.
@@ -193,17 +193,18 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture desc
 ## Current implementation status (2026-11-10)
 
 - [x] Animation vertex point display, V shortcut, depth-aware overlay, hover/selection and selected-vertex inspection — user-confirmed working before this implementation.
-- [x] Shared decoded Model data now supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
+- [x] Shared decoded Model data supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
 - [x] Structural Model Editor pages are available: General, Polygons, Colors, Textures, Extended Textures and conditional Positions.
 - [x] Animation Editor face selection is depth-aware and maps rendered faces back to reconstructed Model triangles in hardware and wireframe modes.
 - [x] Selected-face inspector supports texture assignment, animated-texture flags, per-corner color-index assignment and editing the referenced shared color records.
-- [x] Extended-texture controls expose flipbook/LOD fields and a 30 Hz descriptor-sequence preview. Static/animated descriptor indexing is shared between the renderer and face inspector.
-- [x] Synthetic NSF regression coverage exercises Model field edits, per-corner face material edits, save/reload and re-decoding.
+- [x] Extended-texture controls expose flipbook metadata and all eight LOD selectors, with a 30 Hz descriptor-sequence preview. Static/animated descriptor indexing is shared between the renderer and face inspector.
+- [x] Compressed signed-delta and uncompressed byte-stream Animation vertex writes are implemented. The selected decoded frame is re-decoded after a write, and the viewer camera is left intact.
+- [x] Synthetic NSF regression coverage exercises Model edits, face material edits, LOD resolution, compressed and uncompressed Animation vertex edits, and save/reload.
 - [ ] A variable-size Model item serializer is still required before adding/removing polygons, descriptors, colors, extended-texture records or changing vertex counts. Current setters patch existing fixed-size fields in place and preserve item offsets/sizes.
 - [ ] TPAG/CLUT resolution still needs a fully shared resource-preview path; the Animation Editor displays resolved descriptor and TPAG references while the renderer retains texture-page decoding.
 - [ ] Full CrashEdit-RE parity for chained flipbook/leap records and LOD edge cases remains to be validated against the t/net9 runtime implementation.
 - [ ] Real-sample parity and round-trip validation against `El1eG` / `El1eV` and `Cr10G` / `Cr10V` remains pending.
-- [ ] The compressed and uncompressed temporal vertex encoder remains pending. Special-vertex and compressed-position indexing needs another exact t/net9 parity pass before arbitrary decoded-vertex edits are enabled.
 - [ ] Topology editing and cross-resource vertex-count changes remain disabled until the Model serializer and every dependent Animation frame encoder are verified.
+- [ ] The full build and test suite have not yet been run in this environment.
 
 The implementation is being developed directly on the checkpoint branch rather than stopping for approval after each internal work unit. If a build or real-sample test exposes a regression, roll back to `7cd6d28d366f14dabd0f07168d04ccace401981b`.
