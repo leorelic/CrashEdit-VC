@@ -2778,37 +2778,40 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::Text("Frame Properties");
   ImGui::TextDisabled("Changes are written directly to the NSF.");
   ImGui::Spacing();
-  auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
-   int value=current;
-   ImGui::TextUnformatted(label);
-   ImGui::SetNextItemWidth(-1.0f);
-   ImGui::PushID(static_cast<int>(field));
-   if(ImGui::InputInt("##Value",&value,1,16)){
-    if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
-    else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
+  if(ImGui::BeginTable("##FrameHeaderFields",2,ImGuiTableFlags_SizingStretchProp)){
+   ImGui::TableSetupColumn("Property",ImGuiTableColumnFlags_WidthFixed,92.0f);
+   ImGui::TableSetupColumn("Value",ImGuiTableColumnFlags_WidthStretch);
+   auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
+    int value=current;
+    ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::AlignTextToFramePadding();ImGui::TextUnformatted(label);
+    ImGui::TableSetColumnIndex(1);ImGui::SetNextItemWidth(-1.0f);ImGui::PushID(static_cast<int>(field));
+    if(ImGui::InputInt("##Value",&value,1,16)){
+     if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
+     else if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),field,value))status_="Could not write the animation frame field.";
+    }
+    ImGui::PopID();
+   };
+   editShort("X Offset",0U,frame.xOffset);
+   editShort("Y Offset",1U,frame.yOffset);
+   editShort("Z Offset",2U,frame.zOffset);
+   editShort("Unknown",3U,frame.unknown);
+   if(!animationEntry->animation.isCrash3){
+    if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid||animationFrameModelEnameAnimationEid_!=animationEntry->eid||animationFrameModelEnameFrame_!=frameIndex){
+     const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
+     std::snprintf(animationFrameModelEname_,sizeof(animationFrameModelEname_),"%s",decodedModelEname.c_str());
+     animationFrameModelEid_=frame.modelEid;animationFrameModelEnameAnimationEid_=animationEntry->eid;animationFrameModelEnameFrame_=frameIndex;animationFrameModelEnameInitialized_=true;
+    }
+    ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Model EID");
+    ImGui::TableSetColumnIndex(1);ImGui::SetNextItemWidth(-1.0f);
+    if(ImGui::InputText("##ModelEID",animationFrameModelEname_,sizeof(animationFrameModelEname_),ImGuiInputTextFlags_CharsNoBlank)){
+     try{
+      const std::uint32_t editableModelEid=Crash::eNameToEid(animationFrameModelEname_);
+      if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
+      else animationFrameModelEid_=editableModelEid;
+     }catch(const std::exception&){status_="Model EID must be a valid five-character decoded EID name.";}
+    }
    }
-   ImGui::PopID();
-  };
-  editShort("X Offset",0U,frame.xOffset);
-  editShort("Y Offset",1U,frame.yOffset);
-  editShort("Z Offset",2U,frame.zOffset);
-  editShort("Unknown",3U,frame.unknown);
-  if(!animationEntry->animation.isCrash3){
-   if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid||animationFrameModelEnameAnimationEid_!=animationEntry->eid||animationFrameModelEnameFrame_!=frameIndex){
-    const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
-    std::snprintf(animationFrameModelEname_,sizeof(animationFrameModelEname_),"%s",decodedModelEname.c_str());
-    animationFrameModelEid_=frame.modelEid;animationFrameModelEnameAnimationEid_=animationEntry->eid;animationFrameModelEnameFrame_=frameIndex;animationFrameModelEnameInitialized_=true;
-   }
-   ImGui::TextUnformatted("Model EID");ImGui::SetNextItemWidth(-1.0f);
-   if(ImGui::InputText("##ModelEID",animationFrameModelEname_,sizeof(animationFrameModelEname_),ImGuiInputTextFlags_CharsNoBlank)){
-    try{
-     const std::uint32_t editableModelEid=Crash::eNameToEid(animationFrameModelEname_);
-     if(!nsf_.setAnimationFrameHeaderValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),4U,static_cast<std::int32_t>(editableModelEid)))status_="Could not write the animation frame Model EID.";
-     else animationFrameModelEid_=editableModelEid;
-    }catch(const std::exception&){status_="Model EID must be a valid five-character decoded EID name." ;}
-   }
-  }else{
-   ImGui::TextDisabled("Crash 3 linked-model selection is supplied by GOOL frame groups; the raw frame model field is not edited here.");
+   ImGui::EndTable();
   }
   ImGui::Separator();
   ImGui::Text("Frame Structure");
@@ -2822,26 +2825,30 @@ void EditorUI::drawAnimationFrameEditor(){
    ImGui::PushID(static_cast<int>(ci));
    const auto&collision=frame.collisions[ci];
    char title[64];std::snprintf(title,sizeof(title),"Collision %zu",ci+1U);
-   if(ImGui::CollapsingHeader(title,ImGuiTreeNodeFlags_DefaultOpen)){
-    int u=collision.values[0];ImGui::TextUnformatted("U");ImGui::SetNextItemWidth(-1.0f);
-    if(ImGui::InputInt("##CollisionU",&u)){
-     if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,0U,u))status_="Could not write the collision U value.";
-    }
-    const char*rowNames[]={"Offset","Point 1","Point 2"};
-    for(std::size_t row=0;row<3U;++row){
-     ImGui::PushID(static_cast<int>(row));
-     ImGui::Text("%s",rowNames[row]);
-     for(std::size_t axis=0;axis<3U;++axis){
-      const std::size_t valueIndex=1U+row*3U+axis;
+   if(ImGui::CollapsingHeader(title)){
+    if(ImGui::BeginTable("##CollisionFields",2,ImGuiTableFlags_SizingStretchProp)){
+     ImGui::TableSetupColumn("Property",ImGuiTableColumnFlags_WidthFixed,92.0f);
+     ImGui::TableSetupColumn("Value",ImGuiTableColumnFlags_WidthStretch);
+     auto editCollisionValue=[&](const char*name,const char*id,std::size_t valueIndex){
       int value=collision.values[valueIndex];
-      const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
-      ImGui::TextUnformatted(axisName);ImGui::SetNextItemWidth(-1.0f);
-      char label[24];std::snprintf(label,sizeof(label),"##Collision%s",axisName);
-      if(ImGui::InputInt(label,&value)){
-       if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,valueIndex,value))status_="Could not write a collision coordinate.";
+      ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::AlignTextToFramePadding();ImGui::TextUnformatted(name);
+      ImGui::TableSetColumnIndex(1);ImGui::SetNextItemWidth(-1.0f);
+      if(ImGui::InputInt(id,&value)){
+       if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,valueIndex,value))status_="Could not write a collision value.";
+      }
+     };
+     editCollisionValue("U","##CollisionU",0U);
+     const char*rowNames[]={"Offset","Point 1","Point 2"};
+     for(std::size_t row=0;row<3U;++row){
+      for(std::size_t axis=0;axis<3U;++axis){
+       const std::size_t valueIndex=1U+row*3U+axis;
+       const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
+       char name[32],id[48];std::snprintf(name,sizeof(name),"%s %s",rowNames[row],axisName);
+       std::snprintf(id,sizeof(id),"##Collision%zu%s",row,axisName);
+       editCollisionValue(name,id,valueIndex);
       }
      }
-     ImGui::PopID();
+     ImGui::EndTable();
     }
    }
    ImGui::PopID();
@@ -2852,7 +2859,7 @@ void EditorUI::drawAnimationFrameEditor(){
   else{
    ImGui::TextDisabled("%zu vertices decoded. Packed temporal vertices remain read-only until their encoder is implemented.",frame.vertices.size());
    const std::size_t showCount=std::min<std::size_t>(frame.vertices.size(),static_cast<std::size_t>(std::max(0,static_cast<int>(frame.specialVertexCount))));
-   if(showCount>0U&&ImGui::BeginTable("##SpecialVertices",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY,ImVec2(0.0f,220.0f))){
+   if(showCount>0U&&ImGui::BeginTable("##SpecialVertices",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY,ImVec2(0.0f,140.0f))){
     ImGui::TableSetupColumn("Index");ImGui::TableSetupColumn("X");ImGui::TableSetupColumn("Y");ImGui::TableSetupColumn("Z");ImGui::TableHeadersRow();
     for(std::size_t vi=0;vi<showCount;++vi){
      ImGui::PushID(static_cast<int>(vi));ImGui::TableNextRow();
