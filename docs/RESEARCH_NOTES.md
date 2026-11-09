@@ -171,3 +171,25 @@ For every significant discovery, record:
 5. Remaining uncertainties and the next validation step.
 
 Do not silently convert an inference into a specification. When later evidence changes an interpretation, keep a short correction note so the research history remains understandable. Promote concise, stable conclusions into the top-level README only after they are well-supported; keep detailed binary layouts and audit trails in focused documents under `docs/`.
+
+
+## Major milestone — Animation vertex inspection and selection
+
+**Implemented/tested — user-confirmed on 2026-11-09:** the 3D Animation Editor now has an interactive vertex inspection workflow. The user confirmed the latest build works as intended.
+
+- Vertex point display can be toggled from the viewport settings and with the V keyboard shortcut.
+- Vertex markers are object/position-aware in hardware rendering and respect depth testing rather than being drawn indiscriminately over the scene.
+- Individual vertex markers can be hovered and selected; hover is red and selection is green.
+- The selected vertex is exposed in the Animation Frame Editor with its decoded coordinates.
+- The overlay works independently of Collision Viewer; the marker pass explicitly establishes its own blend state so animation rendering state does not turn the markers black.
+- Markers are also available in wireframe mode to make triangle/vertex relationships easier to inspect.
+
+This completes the current Animation Editor vertex-inspection milestone. It does **not** mean packed temporal vertex editing, topology editing, or vertex-stream re-encoding is complete. Those remain dependent on understanding the Model entry and the relationship between its topology/compression metadata and Animation frame data.
+
+## Model Editor research — source-confirmed findings
+
+The original CrashEdit deprecate branch separates animated positions from model topology. Crash 2 Animation frames reference a Model EID; the Model entry supplies the polygon stream, color records, texture descriptors, texture-page references, and optional compressed-position metadata. The Animation frame supplies the pose-specific vertex data. This means the Model Editor is the next foundational phase and a likely source of the missing context for safe animation geometry editing.
+
+The original Model loader expects five items, or six when compressed-position metadata is present. The detailed phased plan, field notes, and validation requirements are in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md).
+
+**Important implementation constraint:** do not treat the polygon command stream as a conventional index buffer. Its words encode both triangle commands and color-pair commands; original/duplicate vertex keys and multiple topology modes must be interpreted in stream order. Preserve raw words and unknown bitfields while building a validated decoded representation.
