@@ -3659,10 +3659,10 @@ void EditorUI::drawModelEditor(){
     auto texture=model.textures[static_cast<std::size_t>(textureIndex)];
     auto byteInput=[&](const char*label,std::uint8_t&value){int v=value;if(ImGui::InputInt(label,&v)){value=static_cast<std::uint8_t>(std::clamp(v,0,255));return true;}return false;};
     bool changed=false;
-    changed|=byteInput("U1",&texture.u1);changed|=byteInput("V1",&texture.v1);changed|=byteInput("U2",&texture.u2);changed|=byteInput("V2",&texture.v2);
-    changed|=byteInput("U3",&texture.u3);changed|=byteInput("V3",&texture.v3);changed|=byteInput("U4",&texture.u4);changed|=byteInput("V4",&texture.v4);
-    changed|=byteInput("CLUT X",&texture.clutX);changed|=byteInput("CLUT Y1",&texture.clutY1);changed|=byteInput("CLUT Y2",&texture.clutY2);
-    changed|=byteInput("Color mode",&texture.colorMode);changed|=byteInput("Blend mode",&texture.blendMode);changed|=byteInput("Segment",&texture.segment);changed|=byteInput("TPAG slot",&texture.page);
+    changed|=byteInput("U1",texture.u1);changed|=byteInput("V1",texture.v1);changed|=byteInput("U2",texture.u2);changed|=byteInput("V2",texture.v2);
+    changed|=byteInput("U3",texture.u3);changed|=byteInput("V3",texture.v3);changed|=byteInput("U4",texture.u4);changed|=byteInput("V4",texture.v4);
+    changed|=byteInput("CLUT X",texture.clutX);changed|=byteInput("CLUT Y1",texture.clutY1);changed|=byteInput("CLUT Y2",texture.clutY2);
+    changed|=byteInput("Color mode",texture.colorMode);changed|=byteInput("Blend mode",texture.blendMode);changed|=byteInput("Segment",texture.segment);changed|=byteInput("TPAG slot",texture.page);
     if(changed&&!nsf_.setModelTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(textureIndex),texture))ImGui::TextColored(ImVec4(1,.4f,.3f,1),"Descriptor values exceed supported bit ranges.");
    }
    ImGui::Text("Texture descriptors: %zu",model.textures.size());ImGui::EndTabItem();

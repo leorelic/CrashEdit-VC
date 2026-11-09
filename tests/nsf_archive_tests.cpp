@@ -138,16 +138,29 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(animationChunk,animationFrame+20,0xffffffffU);
  assert(a.loadBytes(animationChunk,e));a.decodeAnimationModels(false);assert(!a.chunks()[0].entries[0].animation.decoded);
 
- // Three-vertex fan command reconstructs one model triangle.
+ // Three-vertex fan command reconstructs one editable Model triangle.
  std::vector<std::uint8_t> triangleChunk(65536);p16(triangleChunk,0,0x1234);p16(triangleChunk,2,0);p32(triangleChunk,4,4);p32(triangleChunk,8,1);
- constexpr std::size_t triEntry=24,triItems=5,triTable=16+triItems*4;const std::size_t triSizes[]={0x50,12,0,0,0};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
+ constexpr std::size_t triEntry=24,triItems=5,triTable=16+triItems*4;const std::size_t triSizes[]={0x50,12,52,12,4};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
  p32(triangleChunk,16,triEntry);p32(triangleChunk,20,triEntry+triSize);p32(triangleChunk,triEntry,0x0100ffff);p32(triangleChunk,triEntry+4,0x0200007b);p32(triangleChunk,triEntry+8,2);p32(triangleChunk,triEntry+12,triItems);
  std::size_t triOffset=triTable;for(std::size_t i=0;i<triItems;++i){p32(triangleChunk,triEntry+16+i*4,triOffset);triOffset+=triSizes[i];}p32(triangleChunk,triEntry+16+triItems*4,static_cast<std::uint32_t>(triSize));
- const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50;p32(triangleChunk,triInfo+0x2c,3);p32(triangleChunk,triInfo+0x38,3);p32(triangleChunk,triInfo+0x44,1);
+ const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50,triColors=triPoly+12,triTextures=triColors+52,triExtended=triTextures+12;
+ p32(triangleChunk,triInfo+0x2c,3);p32(triangleChunk,triInfo+0x34,1);p32(triangleChunk,triInfo+0x38,3);p32(triangleChunk,triInfo+0x3c,13);p32(triangleChunk,triInfo+0x40,1);p32(triangleChunk,triInfo+0x44,1);p32(triangleChunk,triInfo+0x48,1);p32(triangleChunk,triInfo+0x0c,0x4cd8206fU);
  for(std::uint32_t i=0;i<3;++i)p32(triangleChunk,triPoly+i*4,0x80000000U|((i+1U)<<16U)|(10U+i));
+ for(std::uint32_t i=0;i<13;++i){triangleChunk[triColors+i*4]=static_cast<std::uint8_t>(i);triangleChunk[triColors+i*4+1]=static_cast<std::uint8_t>(i+1);triangleChunk[triColors+i*4+2]=static_cast<std::uint8_t>(i+2);}
  assert(a.loadBytes(triangleChunk,e));a.decodeAnimationModels(false);const auto&triModel=a.chunks()[0].entries[0].model;assert(triModel.decoded&&triModel.polygonsDecoded&&triModel.triangles.size()==1);
  assert(triModel.triangles[0].a==0&&triModel.triangles[0].b==1&&triModel.triangles[0].c==2);
  assert(triModel.triangles[0].colorA==10&&triModel.triangles[0].colorB==11&&triModel.triangles[0].colorC==12);
+ assert(triModel.extendedTextures.size()==1&&triModel.texturePageEids.size()==1);
+ Crash::NsfSceneryColor editedColor{210,120,35,7};assert(a.setModelColor(0,0,10,editedColor));
+ Crash::NsfModelTexture editedTexture{};editedTexture.u1=8;editedTexture.v1=9;editedTexture.u2=10;editedTexture.v2=11;editedTexture.colorMode=1;editedTexture.page=0;
+ assert(a.setModelTexture(0,0,0,editedTexture));assert(a.setModelScale(0,0,0,777));assert(a.setModelTexturePageEid(0,0,0,0x4cd8206fU));
+ assert(a.setModelExtendedTextureWord(0,0,0,0x00001001U));assert(a.setModelTriangleTexture(0,0,0,0,true));
+ bool textureValid=false;assert(Crash::resolveNsfModelTextureIndex(a.chunks()[0].entries[0].model,0,true,0,textureValid)==0&&textureValid);
+ std::vector<std::uint8_t> editedNsf;assert(a.saveUncompressedBytes(editedNsf,e));Crash::NsfArchive roundTrip;assert(roundTrip.loadBytes(editedNsf,e));roundTrip.decodeAnimationModels(false);
+ const auto&roundModel=roundTrip.chunks()[0].entries[0].model;assert(roundModel.scaleX==777);assert(roundModel.colors[10].r==210&&roundModel.colors[10].g==120&&roundModel.colors[10].b==35);
+ assert(roundModel.textures[0].u1==8&&roundModel.textures[0].v1==9&&roundModel.textures[0].page==0);
+ assert(roundModel.texturePageEids[0]==0x4cd8206fU&&roundModel.extendedTextureWords[0]==0x00001001U);
+ assert(roundModel.triangles.size()==1&&roundModel.triangles[0].animated&&roundModel.triangles[0].textureIndex==0);
  // Crash 3 animation stores the linked Model EID at +8, with a reserved word at +12.
  std::vector<std::uint8_t> c3Animation(65536);p16(c3Animation,0,0x1234);p16(c3Animation,2,0);p32(c3Animation,4,5);p32(c3Animation,8,1);
  constexpr std::size_t c3Entry=24,c3Frame=44,c3EntrySize=56;p32(c3Animation,16,c3Entry);p32(c3Animation,20,c3Entry+c3EntrySize);

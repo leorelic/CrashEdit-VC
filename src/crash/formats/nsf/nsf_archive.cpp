@@ -780,14 +780,14 @@ bool NsfArchive::setModelTexture(std::size_t chunkIndex,std::size_t entryIndex,s
  auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||textureIndex>=entry.model.textures.size()||entry.items.size()<4U)return false;
  if(texture.clutX>15U||texture.clutY2>15U||texture.colorMode>3U||texture.blendMode>3U||texture.segment>15U||texture.page>=entry.model.texturePageEids.size()||texture.page>63U)return false;
  const auto&item=entry.items[3];const std::size_t relative=textureIndex*12U;if(relative+12U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,12U))return false;
- const std::uint8_t old2=chunk.bytes[p+2U],old6=chunk.bytes[p+6U],old7=chunk.bytes[p+7U];
+ const std::uint8_t old7=chunk.bytes[p+7U];
  chunk.bytes[p]=texture.u1;chunk.bytes[p+1U]=texture.v1;
- chunk.bytes[p+2U]=static_cast<std::uint8_t>((old2&0U)|(texture.clutX&0x0fU)|((texture.clutY2&0x0fU)<<4U));
+ chunk.bytes[p+2U]=static_cast<std::uint8_t>((texture.clutX&0x0fU)|((texture.clutY2&0x0fU)<<4U));
  chunk.bytes[p+3U]=texture.clutY1;chunk.bytes[p+4U]=texture.u2;chunk.bytes[p+5U]=texture.v2;
  chunk.bytes[p+6U]=static_cast<std::uint8_t>((texture.colorMode&1U)<<7U|(texture.blendMode&3U)<<5U|(texture.segment&0x0fU));
  chunk.bytes[p+7U]=static_cast<std::uint8_t>((old7&0x02U)|((texture.colorMode>>1U)&1U)|((texture.page&0x3fU)<<2U));
  chunk.bytes[p+8U]=texture.u3;chunk.bytes[p+9U]=texture.v3;chunk.bytes[p+10U]=texture.u4;chunk.bytes[p+11U]=texture.v4;
- (void)old6;entry.model.textures[textureIndex]=texture;return true;
+ entry.model.textures[textureIndex]=texture;return true;
 }
 bool NsfArchive::setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,std::uint32_t raw){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
