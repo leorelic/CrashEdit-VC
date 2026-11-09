@@ -143,7 +143,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  constexpr std::size_t triEntry=24,triItems=5,triTable=16+triItems*4;const std::size_t triSizes[]={0x50,12,52,12,4};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
  p32(triangleChunk,16,triEntry);p32(triangleChunk,20,triEntry+triSize);p32(triangleChunk,triEntry,0x0100ffff);p32(triangleChunk,triEntry+4,0x0200007b);p32(triangleChunk,triEntry+8,2);p32(triangleChunk,triEntry+12,triItems);
  std::size_t triOffset=triTable;for(std::size_t i=0;i<triItems;++i){p32(triangleChunk,triEntry+16+i*4,triOffset);triOffset+=triSizes[i];}p32(triangleChunk,triEntry+16+triItems*4,static_cast<std::uint32_t>(triSize));
- const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50,triColors=triPoly+12,triTextures=triColors+52,triExtended=triTextures+12;
+ const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50,triColors=triPoly+12,triTextures=triColors+52;
  p32(triangleChunk,triInfo+0x2c,3);p32(triangleChunk,triInfo+0x34,1);p32(triangleChunk,triInfo+0x38,3);p32(triangleChunk,triInfo+0x3c,13);p32(triangleChunk,triInfo+0x40,1);p32(triangleChunk,triInfo+0x44,1);p32(triangleChunk,triInfo+0x48,1);p32(triangleChunk,triInfo+0x0c,0x4cd8206fU);
  for(std::uint32_t i=0;i<3;++i)p32(triangleChunk,triPoly+i*4,0x80000000U|((i+1U)<<16U)|((10U+i)<<9U)|1U);
  for(std::uint32_t i=0;i<13;++i){triangleChunk[triColors+i*4]=static_cast<std::uint8_t>(i);triangleChunk[triColors+i*4+1]=static_cast<std::uint8_t>(i+1);triangleChunk[triColors+i*4+2]=static_cast<std::uint8_t>(i+2);}

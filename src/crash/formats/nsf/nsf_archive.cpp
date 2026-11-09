@@ -266,7 +266,7 @@ static bool decodeModelPolygons(NsfModel&model){
  std::int32_t lastCC=-1,lastAA=-1,lastValid=-3,lastNonBB=-1,lastColor=-1;std::size_t cur=0;
  auto emit=[&](int a,int b,int c,const ModelColorRef&ra,const ModelColorRef&rb,const ModelColorRef&rc,const ModelPolyCommand&x,std::size_t wordIndex){
   const int ca=colorValue(ra),cb=colorValue(rb),cc=colorValue(rc);const int maxIndex=static_cast<int>(model.vertexCount)-special;
-  if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0)return false;
+  if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0||static_cast<std::size_t>(ca)>=model.colors.size()||static_cast<std::size_t>(cb)>=model.colors.size()||static_cast<std::size_t>(cc)>=model.colors.size())return false;
   NsfModelTriangle triangle;triangle.a=a;triangle.b=b;triangle.c=c;triangle.colorA=static_cast<std::uint8_t>(ca);triangle.colorB=static_cast<std::uint8_t>(cb);triangle.colorC=static_cast<std::uint8_t>(cc);
   triangle.textureIndex=x.texture;triangle.triangleType=x.triType;triangle.triangleSubtype=x.triSubtype;triangle.animated=x.animated;triangle.flag=x.flag;triangle.commandWordIndex=wordIndex;
   triangle.colorWordIndexA=ra.wordIndex;triangle.colorWordIndexB=rb.wordIndex;triangle.colorWordIndexC=rc.wordIndex;triangle.colorBitOffsetA=ra.bitOffset;triangle.colorBitOffsetB=rb.bitOffset;triangle.colorBitOffsetC=rc.bitOffset;
