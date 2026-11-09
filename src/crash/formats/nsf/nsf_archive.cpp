@@ -831,7 +831,8 @@ bool NsfArchive::setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t 
 }
 bool NsfArchive::setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
- auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||triangleIndex>=entry.model.triangles.size()||entry.items.size()<2U)return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||!entry.model.polygonsDecoded||triangleIndex>=entry.model.triangles.size()||entry.items.size()<2U)return false;
+ if(animated?(textureIndex>=entry.model.extendedTextureWords.size()):(textureIndex!=0U&&static_cast<std::size_t>(textureIndex-1U)>=entry.model.textures.size()))return false;
  const auto&triangle=entry.model.triangles[triangleIndex];if(triangle.commandWordIndex>=entry.model.polygonWords.size())return false;
  const auto&item=entry.items[1];const std::size_t relative=triangle.commandWordIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
  std::uint32_t raw=u32(chunk.bytes,p);raw=(raw&~0x1ffU)|textureIndex|(animated?0x100U:0U);
