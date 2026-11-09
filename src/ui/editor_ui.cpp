@@ -3039,8 +3039,8 @@ void EditorUI::drawAnimationViewer(){
   const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
  }else{
-  // Match the original viewer's CorePositions: frame offsets and linked model
-  // scales are applied to every frame before calculating the camera bounds.
+  // Frame offsets move the animated geometry, not the viewer camera. Use the
+  // linked model's base geometry for stable camera framing.
   AnimationPoint boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
   bool haveBounds=false;
   for(const auto&candidate:animation.frames){
