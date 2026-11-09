@@ -3066,6 +3066,8 @@ void EditorUI::drawAnimationViewer(){
   const float radius=std::max(0.25f,std::sqrt(dx*dx+dy*dy+dz*dz)*0.5f);
   if(!animationCameraInitialized_||animationCameraEntryEid_!=animationEntry->eid){
    animationTargetX_=center.x;animationTargetY_=center.y;animationTargetZ_=center.z;
+   animationGridCenterX_=center.x;animationGridCenterY_=center.y;animationGridCenterZ_=center.z;
+   animationGridRadius_=radius;
    animationYaw_=0.0f;animationPitch_=0.261799f;
    // Match CrashEdit-RE's reset-camera behavior: frame all CorePositions,
    // center on their bounds, and keep enough distance for the full model.
@@ -3126,11 +3128,14 @@ void EditorUI::drawAnimationViewer(){
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
-  const float gridStep=std::max(0.25f,radius/4.0f);
+  // Keep the viewport reference grid fixed to the camera's initial framing.
+  // Editing a frame offset moves only that frame's geometry, never the camera
+  // reference or the grid beneath it.
+  const float gridStep=std::max(0.25f,animationGridRadius_/4.0f);
   constexpr int gridLines=10;
   const float planeExtent=gridStep*static_cast<float>(gridLines);
-  const float planeX=center.x;
-  const float planeZ=center.z;
+  const float planeX=animationGridCenterX_;
+  const float planeZ=animationGridCenterZ_;
   if(animationWireframe_){
   // Wireframe mode uses the ground grid as a reference only; no solid face is drawn.
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
