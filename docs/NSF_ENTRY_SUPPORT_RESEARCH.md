@@ -118,3 +118,12 @@ Texture pages are chunk type 1. The EID is stored in the page data header, and t
 - Keep parsing separate from UI and rendering.
 - Treat the original editor as a format reference, not as proof that every heuristic is universally correct.
 - Crash 2 is the first validation target; Crash 3-specific layouts and GOOL-derived model association must be gated by game version.
+
+
+## Model Editor phase — current priority
+
+The Model entry is now the next active editor target. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) for the implementation sequence and source map.
+
+The key architectural relationship is source-confirmed in the original CrashEdit animation renderer: each Crash 2 frame resolves its Model EID; the frame's vertex stream is decoded using that model's optional compressed-position records; the model's decoded triangles then select vertex indices, per-corner colors, texture descriptors, animated texture state, and TPAG pages. Consequently, model geometry and material edits should update the existing Animation Viewer live, while pose positions remain owned by the Animation frame.
+
+The currently completed vertex-marker milestone is recorded in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). It provides the inspection and selection foundation, but it does not yet implement vertex-stream re-encoding or topology editing.
