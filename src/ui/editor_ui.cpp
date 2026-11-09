@@ -2961,22 +2961,28 @@ void EditorUI::drawAnimationViewer(){
    }
   }
   ImGui::SetNextItemWidth(230.0f);
-  if(Crash::isValidEid(linkedModelEid)&&ImGui::BeginCombo("##ModelLinkedAnimation",currentAnimationLabel.c_str())){
+  if(ImGui::BeginCombo("##ModelLinkedAnimation",currentAnimationLabel.c_str())){
    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
     const auto&candidateChunk=nsf_.chunks()[ci];if(candidateChunk.type!=0||!candidateChunk.entryTableValid)continue;
     for(std::size_t ei=0;ei<candidateChunk.entries.size();++ei){
      const auto&candidate=candidateChunk.entries[ei];
      if(!candidate.valid||candidate.type!=1||!candidate.animation.decoded)continue;
-     bool usesSelectedModel=false;
-     for(const auto&candidateFrame:candidate.animation.frames){
-      const std::uint32_t candidateModelEid=candidate.animation.isCrash3?candidateFrame.linkedModelEid:candidateFrame.modelEid;
-      if(candidateModelEid==linkedModelEid){usesSelectedModel=true;break;}
+     if(animationSelectionModel_){
+      bool usesSelectedModel=false;
+      for(const auto&candidateFrame:candidate.animation.frames){
+       const std::uint32_t candidateModelEid=candidate.animation.isCrash3?candidateFrame.linkedModelEid:candidateFrame.modelEid;
+       if(candidateModelEid==linkedModelEid){usesSelectedModel=true;break;}
+      }
+      if(!usesSelectedModel)continue;
      }
-     if(!usesSelectedModel)continue;
      const bool selected=animationViewerChunk_==static_cast<int>(ci)&&animationViewerEntry_==static_cast<int>(ei);
      const std::string label=Crash::eidToEName(candidate.eid)+"  ["+std::to_string(ci)+":"+std::to_string(ei)+"]";
      if(ImGui::Selectable(label.c_str(),selected)){
       animationViewerChunk_=static_cast<int>(ci);animationViewerEntry_=static_cast<int>(ei);
+      if(!animationSelectionModel_){
+       selectedChunk_=static_cast<int>(ci);selectedEntry_=static_cast<int>(ei);
+       selectedEntity_=-1;selectedSpawn_=-1;openSelectedHierarchy_=true;
+      }
       animationFrame_=0;animationPlaybackFrame_=0.0;animationFrameTimer_=0.0f;
       animationPlaying_=false;animationHalfSpeed_=false;animationCameraInitialized_=false;
      }
@@ -2985,7 +2991,6 @@ void EditorUI::drawAnimationViewer(){
    }
    ImGui::EndCombo();
   }
- }
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
  else if(!model&&animation.isCrash3&&!Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("No matching GOOL VertexGroup3 links this animation to a Model.");
@@ -3125,16 +3130,7 @@ void EditorUI::drawAnimationViewer(){
   const float planeExtent=std::max(2.0f,radius*2.5f);
   constexpr float planeX=0.0f,planeZ=0.0f;
   if(animationWireframe_){
-  const ImVec2 floorCorners[4]={
-   project(planeX-planeExtent,groundY,planeZ-planeExtent),
-   project(planeX+planeExtent,groundY,planeZ-planeExtent),
-   project(planeX+planeExtent,groundY,planeZ+planeExtent),
-   project(planeX-planeExtent,groundY,planeZ+planeExtent)
-  };
-  // The ground plane and grid are a separate viewport background layer. They are
-  // drawn before the transparent model framebuffer and never enter its depth buffer.
-  const bool floorVisible=floorCorners[0].x>-99999.0f&&floorCorners[1].x>-99999.0f&&floorCorners[2].x>-99999.0f&&floorCorners[3].x>-99999.0f;
-  if(floorVisible)dl->AddConvexPolyFilled(floorCorners,4,IM_COL32(20,23,28,255));
+  // Wireframe mode uses the ground grid as a reference only; no solid face is drawn.
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
    CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
    constexpr float nearDepth=0.1f;
