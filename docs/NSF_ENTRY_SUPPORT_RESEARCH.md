@@ -1,6 +1,6 @@
 # NSF resource support research
 
-Research reference: the original [cbhacks/CrashEdit source](https://github.com/cbhacks/CrashEdit/tree/deprecate), branch `deprecate`. The implementation notes below are based on its format loaders, resource models, controllers, and animation renderer. This is a format-analysis checkpoint, not a claim that these formats are implemented in CrashEdit-VC.
+Research reference: [CrashEdit-RE](https://github.com/airumu/CrashEdit/tree/t/net9), repository airumu/CrashEdit, branch t/net9. The implementation notes below are based on its format loaders, resource models, controllers, and animation renderer. This is a format-analysis checkpoint, not a claim that these formats are implemented in CrashEdit-VC. Do not use cbhacks/CrashEdit or its deprecated branches as the comparison baseline.
 
 ## Entry types versus chunk types
 
@@ -127,3 +127,8 @@ The Model entry is now the next active editor target. See [MODEL_EDITOR_ROADMAP.
 The key architectural relationship is source-confirmed in the original CrashEdit animation renderer: each Crash 2 frame resolves its Model EID; the frame's vertex stream is decoded using that model's optional compressed-position records; the model's decoded triangles then select vertex indices, per-corner colors, texture descriptors, animated texture state, and TPAG pages. Consequently, model geometry and material edits should update the existing Animation Viewer live, while pose positions remain owned by the Animation frame.
 
 The currently completed vertex-marker milestone is recorded in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). It provides the inspection and selection foundation, but it does not yet implement vertex-stream re-encoding or topology editing.
+
+
+## Source-baseline correction
+
+All future format and UI comparisons in this roadmap use CrashEdit-RE's t/net branch. The previous research note that cited cbhacks/CrashEdit was an incorrect source selection and has been corrected in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). The Model Editor roadmap now cites the exact CrashEdit-RE source files and branch used for its findings.
