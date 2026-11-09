@@ -3123,18 +3123,15 @@ void EditorUI::drawAnimationViewer(){
    if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
    return projectCamera(p);
   };
-  // Keep the ground grid fixed at the user-selected world-space Y position.
-  // Clip each segment against the camera near plane before
-  // perspective division so rotating close to the floor cannot fling lines
-  // across the viewport.
+  // Match CrashEdit-RE's compact, fixed world-origin animation grid.
+  // Its default length is 4: eight lines in each direction, spaced one unit
+  // apart, spanning -3.5 to +3.5. Camera movement never changes its bounds.
   constexpr float groundY=0.0f;
-  // Keep a compact, fixed-size world grid centered on the animation's
-  // initial bounds. Camera movement and zoom must not move or expand it.
-  const float gridStep=std::max(0.25f,radius/4.0f);
-  constexpr int gridLines=10;
-  const float planeExtent=gridStep*static_cast<float>(gridLines);
-  const float planeX=center.x;
-  const float planeZ=center.z;
+  constexpr float gridStep=1.0f;
+  constexpr int gridLines=4;
+  constexpr float planeExtent=3.5f;
+  constexpr float planeX=0.0f;
+  constexpr float planeZ=0.0f;
   if(animationWireframe_){
   // Wireframe mode uses the ground grid as a reference only; no solid face is drawn.
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
@@ -3148,12 +3145,11 @@ void EditorUI::drawAnimationViewer(){
    }
    dl->AddLine(projectCamera(a),projectCamera(b),color,width);
   };
-  for(int i=-gridLines;i<=gridLines;++i){
-   const float offset=static_cast<float>(i)*gridStep;
-   const ImU32 gridColor=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
-   const float width=i==0?1.5f:1.0f;
-   drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,width);
-   drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,width);
+  for(int i=0;i<gridLines*2;++i){
+   const float offset=-planeExtent+static_cast<float>(i)*gridStep;
+   const ImU32 gridColor=IM_COL32(105,112,124,175);
+   drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,1.0f);
+   drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,1.0f);
   }
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
@@ -3194,10 +3190,10 @@ void EditorUI::drawAnimationViewer(){
      if(GL::CheckFramebufferStatus(0x8D40U)==0x8CD5U){
       using TextureKey=std::tuple<const std::vector<std::uint8_t>*,int,int,int>;
       using BatchKey=std::pair<TextureKey,int>;
-      std::map<BatchKey,std::vector<Vertex>> batches;
-      using FaceVertexKey=std::array<std::int64_t,3>;
-      using FaceKey=std::array<FaceVertexKey,3>;
-      std::map<FaceKey,int> duplicateFaceOrder;
+      // CrashEdit-RE keeps model triangles in source order in one VAO.
+      // Batch only adjacent triangles with identical texture/blend state so
+      // texture changes never reorder overlapping polygons.
+      std::vector<std::pair<BatchKey,std::vector<Vertex>>> batches;
       std::map<std::uint32_t,const std::vector<std::uint8_t>*> pageLookup;
       for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536U){
        const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8U)|(std::uint32_t(chunk.bytes[6])<<16U)|(std::uint32_t(chunk.bytes[7])<<24U);
@@ -3211,15 +3207,6 @@ void EditorUI::drawAnimationViewer(){
        const int vi[3]={baseVertices[order[0]],baseVertices[order[1]],baseVertices[order[2]]};
        const int ci[3]={baseColors[order[0]],baseColors[order[1]],baseColors[order[2]]};
        if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
-       // Later PS1 polygons overdraw earlier coincident faces. Apply a tiny
-       // depth priority only to identical triangles so overlays remain stable.
-       FaceKey faceKey{};
-       for(int k=0;k<3;++k){
-        const auto&p=displayPositions[static_cast<std::size_t>(vi[k])];
-        faceKey[static_cast<std::size_t>(k)]={static_cast<std::int64_t>(std::llround(double(p.x)*100000.0)),static_cast<std::int64_t>(std::llround(double(p.y)*100000.0)),static_cast<std::int64_t>(std::llround(double(p.z)*100000.0))};
-       }
-       std::sort(faceKey.begin(),faceKey.end());
-       const int duplicateOrder=duplicateFaceOrder[faceKey]++;
        const Crash::NsfModelTexture*tex=nullptr;
        int textureId=static_cast<int>(tri.textureIndex)-1;
        bool textureValid=true;
@@ -3262,10 +3249,10 @@ void EditorUI::drawAnimationViewer(){
        if(!triangleVisible)continue;
        const int blendMode=(!tex||!page)?3:(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3);
        const TextureKey textureKey{page,mode,clutX,clutY};
-       auto&out=batches[BatchKey{textureKey,blendMode}];
-       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;// A larger clip-space offset survives depth-buffer quantization and
-        // makes later coincident PS1 faces reliably win across texture batches.
-        const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP)-float(duplicateOrder)*0.0005f;ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
+       const BatchKey batchKey{textureKey,blendMode};
+       if(batches.empty()||batches.back().first!=batchKey)batches.emplace_back(batchKey,std::vector<Vertex>{});
+       auto&out=batches.back().second;
+       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];const auto cam=toCamera(p.x,p.y,p.z);constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;const float clipX=2.0f*cam.x*focal/canvasSize.x,clipY=2.0f*cam.y*focal/canvasSize.y;out.push_back({clipX,clipY,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
       GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
@@ -3273,41 +3260,27 @@ void EditorUI::drawAnimationViewer(){
       // Render the ground as real depth-buffer geometry. Models below the
       // selected Y plane are occluded; models above it remain visible.
       auto makePlaneVertex=[&](const CameraPoint&cam,ImU32 color,Vertex&out){
-       if(cam.depth<=0.05f)return false;
-       const float nx=(cam.x*focal/cam.depth)/canvasSize.x*2.0f;
-       const float ny=(cam.y*focal/cam.depth)/canvasSize.y*2.0f;
+       // Supply homogeneous clip coordinates directly and let OpenGL clip
+       // grid segments against the near plane, as CrashEdit-RE's line VAO does.
        constexpr float nearP=.05f,farP=200.0f;
        const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
        auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
-       out={nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f};
+       out={2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f};
        return true;
       };
       // The ground plane is a reference grid only; no solid face is drawn.
       std::vector<Vertex> planeGrid;
       auto appendPlaneLine=[&](float x1,float z1,float x2,float z2,ImU32 color){
-       CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
-       constexpr float nearDepth=0.05f;
-       if(a.depth<=nearDepth&&b.depth<=nearDepth)return;
-       if(a.depth<=nearDepth||b.depth<=nearDepth){
-        const float t=(nearDepth-a.depth)/(b.depth-a.depth);
-        CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
-        if(a.depth<=nearDepth)a=clipped;else b=clipped;
-       }
-       Vertex va{},vb{};if(makePlaneVertex(a,color,va)&&makePlaneVertex(b,color,vb)){planeGrid.push_back(va);planeGrid.push_back(vb);}
+       const CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
+       Vertex va{},vb{};makePlaneVertex(a,color,va);makePlaneVertex(b,color,vb);
+       planeGrid.push_back(va);planeGrid.push_back(vb);
       };
-      for(int i=-gridLines;i<=gridLines;++i){
-       const float offset=static_cast<float>(i)*gridStep;
-       const ImU32 color=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
+      for(int i=0;i<gridLines*2;++i){
+       const float offset=-planeExtent+static_cast<float>(i)*gridStep;
+       const ImU32 color=IM_COL32(105,112,124,175);
        appendPlaneLine(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,color);
        appendPlaneLine(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,color);
       }
-      GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
-      // Let the grid write depth so it behaves as a real ground reference:
-      // geometry above the plane passes in front, while geometry below it
-      // is hidden at the grid lines. Wireframe keeps its reference overlay.
-      GL::DepthFunc(0x0203U);GL::DepthMask(1);
-      if(!planeGrid.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeGrid.size()*sizeof(Vertex)),planeGrid.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(planeGrid.size()));}
-      GL::DepthFunc(0x0201U);GL::DepthMask(1);
       drawPass(3);
       GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);drawPass(0);
       // PS1 blend mode 1 is additive; mode 2 is subtractive. Keep the
@@ -3379,6 +3352,13 @@ void EditorUI::drawAnimationViewer(){
        }
        GL::DepthFunc(0x0201U);GL::DepthMask(1);
       }
+      // CrashEdit-RE draws its world-origin grid after the model passes.
+      // Keep depth testing enabled so models occlude the grid, but never let
+      // the grid write depth before the animation has been rendered.
+      GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
+      GL::DepthFunc(0x0201U);GL::DepthMask(1);
+      GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+      if(!planeGrid.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeGrid.size()*sizeof(Vertex)),planeGrid.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(planeGrid.size()));}
       GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
      }
      GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
