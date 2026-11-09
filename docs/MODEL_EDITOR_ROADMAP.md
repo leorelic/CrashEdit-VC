@@ -205,6 +205,6 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture desc
 - [ ] Full CrashEdit-RE parity for chained flipbook/leap records and LOD edge cases remains to be validated against the t/net9 runtime implementation.
 - [ ] Real-sample parity and round-trip validation against `El1eG` / `El1eV` and `Cr10G` / `Cr10V` remains pending.
 - [ ] Topology editing and cross-resource vertex-count changes remain disabled until the Model serializer and every dependent Animation frame encoder are verified.
-- [ ] The full build and test suite have not yet been run in this environment.
+- [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for implementation commit `8ab76bf9a650d05558b9b17b765f9c3282cde961`.
 
 The implementation is being developed directly on the checkpoint branch rather than stopping for approval after each internal work unit. If a build or real-sample test exposes a regression, roll back to `7cd6d28d366f14dabd0f07168d04ccace401981b`.
