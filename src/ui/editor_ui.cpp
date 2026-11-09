@@ -3400,6 +3400,35 @@ void EditorUI::drawAnimationViewer(){
       // equations aligned with the original CrashEdit blend-mode mapping.
       GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(2);
       GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(1);
+      if(animationFaceEditing_&&model&&model->polygonsDecoded){
+       std::vector<Vertex> faceEdges;faceEdges.reserve(model->triangles.size()*6U);
+       auto edgeChannel=[](ImU32 value,int shift){return float((value>>shift)&255U)/255.0f;};
+       for(std::size_t ti=0;ti<model->triangles.size();++ti){
+        const auto&tri=model->triangles[ti];const int offset=static_cast<int>(frame.specialVertexCount);
+        const int ids[3]={tri.a+offset,tri.b+offset,tri.c+offset};
+        const ImU32 color=static_cast<int>(ti)==animationSelectedFace_?IM_COL32(255,185,55,255):(static_cast<int>(ti)==animationHoveredFace_?IM_COL32(255,75,75,255):IM_COL32(90,175,245,225));
+        for(int edge=0;edge<3;++edge){
+         const int ia=ids[edge],ib=ids[(edge+1)%3];
+         if(ia<0||ib<0||static_cast<std::size_t>(ia)>=displayPositions.size()||static_cast<std::size_t>(ib)>=displayPositions.size())continue;
+         const auto&pa=displayPositions[static_cast<std::size_t>(ia)];const auto&pb=displayPositions[static_cast<std::size_t>(ib)];
+         const CameraPoint ca=toCamera(pa.x,pa.y,pa.z),cb=toCamera(pb.x,pb.y,pb.z);
+         if(ca.depth<=0.05f||cb.depth<=0.05f)continue;
+         auto append=[&](const CameraPoint&cam){
+          constexpr float nearP=.05f,farP=200.0f;
+          const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP)-0.000015f;
+          faceEdges.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,edgeChannel(color,IM_COL32_R_SHIFT),edgeChannel(color,IM_COL32_G_SHIFT),edgeChannel(color,IM_COL32_B_SHIFT),edgeChannel(color,IM_COL32_A_SHIFT),0.0f,0.0f,1.0f});
+         };
+         append(ca);append(cb);
+        }
+       }
+       if(!faceEdges.empty()){
+        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
+        GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+        GL::LineWidth(1.35f);GL::BufferData(0x8892U,GL::SizePtr(faceEdges.size()*sizeof(Vertex)),faceEdges.data(),0x88E8U);
+        GL::DrawArrays(0x0001U,0,int(faceEdges.size()));GL::LineWidth(1.0f);GL::DepthFunc(0x0201U);GL::DepthMask(1);
+       }
+      }
+
       if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
        const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
