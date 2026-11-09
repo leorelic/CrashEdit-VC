@@ -989,9 +989,8 @@ void EditorUI::drawResourceActionDialog(){
 }
 void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"[+] ":"    ")+n.name;if(n.isDirectory){bool open=ImGui::TreeNodeEx(label.c_str(),ImGuiTreeNodeFlags_SpanAvailWidth|(n.children.empty()?ImGuiTreeNodeFlags_Leaf:0));if(ImGui::IsItemClicked())workspace_.selectResource(n.path.string());if(open){for(const auto&c:n.children)drawNode(c);ImGui::TreePop();}}else if(ImGui::Selectable(label.c_str(),workspace_.selectedResource()==n.path.string(),ImGuiSelectableFlags_SpanAvailWidth)){workspace_.selectResource(n.path.string());if(n.path.extension()==".nsf"||n.path.extension()==".NSF"){std::snprintf(path_,sizeof(path_),"%s",n.path.string().c_str());openDialog_=true;centerOpenDialog_=true;}else status_="Selected: "+n.name+" ("+n.kind+")";}}
 void EditorUI::drawViewport(){
- ImGui::Begin("3D Zone Editor");
+ ImGui::Begin("3D Zone Editor",nullptr,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
  animationDockId_=ImGui::GetWindowDockID();
- ImGui::TextDisabled("Scenery / Zone viewer | Left drag: orbit | Wheel: zoom | WASD/QE: move | Shift: world-aligned | Viewport options: top-left button");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  // Never make the interaction canvas larger than the space actually available.
@@ -1562,8 +1561,28 @@ void EditorUI::drawViewport(){
   dl->AddText(ImVec2(canvasMin.x+16,canvasMin.y+16),IM_COL32(205,211,220,255),nsfValid_?"Select a decoded zone entry to view its scenery":"No zone loaded — open an NSF");
  }
  dl->PopClipRect();
+ // Keep the zone viewer legend inside the canvas, with each control on its
+ // own right-aligned line. Use ASCII separators for font compatibility.
+ const char*viewerHelpLines[]={
+  "Left Mouse - Orbit camera",
+  "Right Mouse - Pan camera",
+  "Mouse Wheel - Zoom camera",
+  "W / A / S / D - Move camera relative to view",
+  "Shift + W / A / S / D - Move camera along world axes",
+  "R - Reset camera",
+  "Top-left button - Viewport settings"
+ };
+ ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
+ const float helpRight=canvasMax.x-12.0f;
+ float helpY=canvasMin.y+10.0f;
+ const float helpLineHeight=ImGui::GetTextLineHeightWithSpacing();
+ const ImU32 helpColor=IM_COL32(220,226,236,225);
+ for(const char*line:viewerHelpLines){
+  const ImVec2 lineSize=ImGui::CalcTextSize(line);
+  toolbarDraw->AddText(ImVec2(helpRight-lineSize.x,helpY),helpColor,line);
+  helpY+=helpLineHeight;
+ }
  // Draw the toolbar last so scene geometry and status labels cannot cover it.
- ImDrawList* toolbarDraw=ImGui::GetWindowDrawList();
  toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
  const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
@@ -3451,15 +3470,15 @@ void EditorUI::drawAnimationViewer(){
  // Keep concise, individually aligned control hints inside the viewport.
  // Right-align every line so the help reads as a tidy control list.
  const char*viewerHelpLines[]={
-  "Left Mouse  —  Orbit camera",
-  "Right Mouse  —  Pan camera",
-  "Mouse Wheel  —  Zoom camera",
-  "W / A / S / D  —  Move camera",
-  "Q / E  —  Move camera down / up",
-  "C  —  Toggle collision display",
-  "X  —  Toggle wireframe",
-  "T  —  Toggle textures",
-  "R  —  Reset camera"
+  "Left Mouse - Orbit camera",
+  "Right Mouse - Pan camera",
+  "Mouse Wheel - Zoom camera",
+  "W / A / S / D - Move camera",
+  "Q / E - Move camera down / up",
+  "C - Toggle collision display",
+  "X - Toggle wireframe",
+  "T - Toggle textures",
+  "R - Reset camera"
  };
  ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
  const float helpRight=canvasMax.x-12.0f;
