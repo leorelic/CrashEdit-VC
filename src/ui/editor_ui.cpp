@@ -3685,9 +3685,41 @@ void EditorUI::drawModelEditor(){
     ImGui::SliderInt("Extended texture record",&extendedIndex,0,static_cast<int>(model.extendedTextureWords.size()-1U));
     std::uint32_t raw=model.extendedTextureWords[static_cast<std::size_t>(extendedIndex)];
     if(ImGui::InputScalar("Raw word",ImGuiDataType_U32,&raw,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
-    const auto&record=model.extendedTextures[static_cast<std::size_t>(extendedIndex)];
-    ImGui::Text("Offset: %u | %s",record.offset,record.isLod?"LOD":"Flipbook");
-    if(!record.isLod)ImGui::Text("Leap: %s | Mask: %u | Delay: %u | Latency: %u",record.leap?"Yes":"No",record.mask,record.delay,record.latency);
+    auto record=model.extendedTextures[static_cast<std::size_t>(extendedIndex)];
+    ImGui::Text("Offset: %u | %s",record.offset,record.isLod?"LOD selector":"Flipbook sequence");
+    bool changed=false;int offset=record.offset;
+    if(ImGui::InputInt("Texture offset",&offset)){offset=std::clamp(offset,0,2047);raw=(raw&~0x7ffU)|static_cast<std::uint32_t>(offset);changed=true;}
+    if(record.isLod){
+     int lodSelector=static_cast<int>((raw>>29U)&3U);
+     if(ImGui::InputInt("LOD selector",&lodSelector)){lodSelector=std::clamp(lodSelector,0,3);raw=(raw&~(3U<<29U))|(static_cast<std::uint32_t>(lodSelector)<<29U);changed=true;}
+    }else{
+     bool leap=record.leap;int mask=record.mask,delay=record.delay,latency=record.latency;
+     if(ImGui::Checkbox("Leap to following record",&leap)){raw=(raw&~(1U<<11U))|(leap?(1U<<11U):0U);changed=true;}
+     if(ImGui::InputInt("Frame mask",&mask)){mask=std::clamp(mask,0,127);raw=(raw&~(0x7fU<<12U))|(static_cast<std::uint32_t>(mask)<<12U);changed=true;}
+     if(ImGui::InputInt("Delay",&delay)){delay=std::clamp(delay,0,127);raw=(raw&~(0x7fU<<19U))|(static_cast<std::uint32_t>(delay)<<19U);changed=true;}
+     if(ImGui::InputInt("Latency",&latency)){latency=std::clamp(latency,0,31);raw=(raw&~(0x1fU<<26U))|(static_cast<std::uint32_t>(latency)<<26U);changed=true;}
+    }
+    if(changed)nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
+    const int animatedFaceCount=static_cast<int>(std::count_if(model.triangles.begin(),model.triangles.end(),[&](const auto&tri){return tri.animated&&tri.textureIndex==static_cast<std::uint8_t>(extendedIndex);}));
+    ImGui::Text("Animated faces using this record: %d",animatedFaceCount);
+    static int previewFrame=0;ImGui::SliderInt("Preview clock (30 Hz)",&previewFrame,0,255);
+    bool previewValid=true;const int previewDescriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(previewFrame),previewValid);
+    if(previewValid&&previewDescriptor>=0&&static_cast<std::size_t>(previewDescriptor)<model.textures.size()){
+     const auto&previewTexture=model.textures[static_cast<std::size_t>(previewDescriptor)];
+     ImGui::Text("Resolved descriptor: %d | TPAG slot: %u",previewDescriptor,static_cast<unsigned>(previewTexture.page));
+     if(previewTexture.page<model.texturePageEids.size())ImGui::TextDisabled("Texture page: %s (%08X)",Crash::eidToEName(model.texturePageEids[previewTexture.page]).c_str(),model.texturePageEids[previewTexture.page]);
+    }else ImGui::TextDisabled("This clock position resolves to no valid texture descriptor.");
+    ImGui::Separator();ImGui::Text("Sequence samples");
+    if(ImGui::BeginTable("ExtendedTextureSequence",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit)){
+     ImGui::TableSetupColumn("30 Hz tick");ImGui::TableSetupColumn("Descriptor");ImGui::TableSetupColumn("TPAG slot");ImGui::TableHeadersRow();
+     for(int tick=0;tick<16;++tick){
+      bool valid=true;const int descriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(tick*(static_cast<int>(record.latency)+1)),valid);
+      ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%d",tick);
+      ImGui::TableSetColumnIndex(1);if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model.textures.size())ImGui::Text("%d",descriptor);else ImGui::TextDisabled("—");
+      ImGui::TableSetColumnIndex(2);if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model.textures.size())ImGui::Text("%u",static_cast<unsigned>(model.textures[static_cast<std::size_t>(descriptor)].page));else ImGui::TextDisabled("—");
+     }
+     ImGui::EndTable();
+    }
    }
    ImGui::Text("Extended records: %zu",model.extendedTextureWords.size());ImGui::EndTabItem();
   }
