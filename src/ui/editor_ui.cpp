@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<3){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=3;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<4){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=4;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  bool showAnimationWorkspace=false;
@@ -2776,10 +2776,12 @@ void EditorUI::drawAnimationFrameEditor(){
   else ImGui::Text("Linked Model: %08X",modelEid);
   ImGui::Separator();
   ImGui::Text("Frame Properties");
-  ImGui::TextDisabled("Values are written directly to the NSF as they are changed.");
+  ImGui::TextDisabled("Changes are written directly to the NSF.");
+  ImGui::Spacing();
   auto editShort=[&](const char*label,std::uint32_t field,std::int16_t current){
    int value=current;
-   ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+   ImGui::TextUnformatted(label);
+   ImGui::SetNextItemWidth(-1.0f);
    ImGui::PushID(static_cast<int>(field));
    if(ImGui::InputInt("##Value",&value,1,16)){
     if(value<std::numeric_limits<std::int16_t>::min()||value>std::numeric_limits<std::int16_t>::max())status_="Frame offsets and unknown values must fit in a signed 16-bit field.";
@@ -2788,8 +2790,8 @@ void EditorUI::drawAnimationFrameEditor(){
    ImGui::PopID();
   };
   editShort("X Offset",0U,frame.xOffset);
-  ImGui::SameLine();editShort("Y Offset",1U,frame.yOffset);
-  ImGui::SameLine();editShort("Z Offset",2U,frame.zOffset);
+  editShort("Y Offset",1U,frame.yOffset);
+  editShort("Z Offset",2U,frame.zOffset);
   editShort("Unknown",3U,frame.unknown);
   if(!animationEntry->animation.isCrash3){
    if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid||animationFrameModelEnameAnimationEid_!=animationEntry->eid||animationFrameModelEnameFrame_!=frameIndex){
@@ -2797,7 +2799,7 @@ void EditorUI::drawAnimationFrameEditor(){
     std::snprintf(animationFrameModelEname_,sizeof(animationFrameModelEname_),"%s",decodedModelEname.c_str());
     animationFrameModelEid_=frame.modelEid;animationFrameModelEnameAnimationEid_=animationEntry->eid;animationFrameModelEnameFrame_=frameIndex;animationFrameModelEnameInitialized_=true;
    }
-   ImGui::TextUnformatted("Model EID");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+   ImGui::TextUnformatted("Model EID");ImGui::SetNextItemWidth(-1.0f);
    if(ImGui::InputText("##ModelEID",animationFrameModelEname_,sizeof(animationFrameModelEname_),ImGuiInputTextFlags_CharsNoBlank)){
     try{
      const std::uint32_t editableModelEid=Crash::eNameToEid(animationFrameModelEname_);
@@ -2821,7 +2823,7 @@ void EditorUI::drawAnimationFrameEditor(){
    const auto&collision=frame.collisions[ci];
    char title[64];std::snprintf(title,sizeof(title),"Collision %zu",ci+1U);
    if(ImGui::CollapsingHeader(title,ImGuiTreeNodeFlags_DefaultOpen)){
-    int u=collision.values[0];ImGui::TextUnformatted("U");ImGui::SameLine();ImGui::SetNextItemWidth(150.0f);
+    int u=collision.values[0];ImGui::TextUnformatted("U");ImGui::SetNextItemWidth(-1.0f);
     if(ImGui::InputInt("##CollisionU",&u)){
      if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,0U,u))status_="Could not write the collision U value.";
     }
@@ -2833,7 +2835,7 @@ void EditorUI::drawAnimationFrameEditor(){
       const std::size_t valueIndex=1U+row*3U+axis;
       int value=collision.values[valueIndex];
       const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
-      ImGui::TextUnformatted(axisName);ImGui::SameLine();ImGui::SetNextItemWidth(115.0f);
+      ImGui::TextUnformatted(axisName);ImGui::SetNextItemWidth(-1.0f);
       char label[24];std::snprintf(label,sizeof(label),"##Collision%s",axisName);
       if(ImGui::InputInt(label,&value)){
        if(!nsf_.setAnimationFrameCollisionValue(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),ci,valueIndex,value))status_="Could not write a collision coordinate.";
