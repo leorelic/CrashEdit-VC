@@ -3302,7 +3302,10 @@ void EditorUI::drawAnimationViewer(){
        appendPlaneLine(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,color);
       }
       GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
-      GL::DepthFunc(0x0203U);GL::DepthMask(0);
+      // Let the grid write depth so it behaves as a real ground reference:
+      // geometry above the plane passes in front, while geometry below it
+      // is hidden at the grid lines. Wireframe keeps its reference overlay.
+      GL::DepthFunc(0x0203U);GL::DepthMask(1);
       if(!planeGrid.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeGrid.size()*sizeof(Vertex)),planeGrid.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(planeGrid.size()));}
       GL::DepthFunc(0x0201U);GL::DepthMask(1);
       drawPass(3);
