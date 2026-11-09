@@ -2753,6 +2753,9 @@ void EditorUI::drawAnimationFrameEditor(){
  if(!animationFrameEditorOpen_)return;
  if(animationFrameEditorFocus_){ImGui::SetNextWindowFocus();animationFrameEditorFocus_=false;}
  if(!ImGui::Begin("Animation Frame Editor",&animationFrameEditorOpen_)){ImGui::End();return;}
+ // This editor is hosted in a narrow dock; wrap explanatory text to its
+ // content width instead of allowing long messages to run out of bounds.
+ ImGui::PushTextWrapPos(0.0f);
  const std::size_t chunkIndex=animationViewerChunk_>=0?static_cast<std::size_t>(animationViewerChunk_):nsf_.chunks().size();
  const std::size_t entryIndex=animationViewerEntry_>=0?static_cast<std::size_t>(animationViewerEntry_):0U;
  const Crash::NsfEntry*animationEntry=nullptr;
@@ -2882,12 +2885,28 @@ void EditorUI::drawAnimationFrameEditor(){
    }
   }
  }
+ ImGui::PopTextWrapPos();
  ImGui::End();
 }
 
 void EditorUI::drawAnimationViewer(){
  if(animationDockId_!=0)ImGui::SetNextWindowDockID(animationDockId_,ImGuiCond_FirstUseEver);
  if(!ImGui::Begin("3D Animation Editor")){ImGui::End();return;}
+ auto showEmptyViewerState=[](const char*heading,const char*message){
+  ImGui::BeginChild("AnimationViewerEmptyState",ImVec2(0.0f,0.0f),false);
+  const ImVec2 available=ImGui::GetContentRegionAvail();
+  const float wrapWidth=std::max(120.0f,available.x*0.78f);
+  const ImVec2 messageSize=ImGui::CalcTextSize(message,nullptr,false,wrapWidth);
+  const float blockHeight=ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+messageSize.y;
+  ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(),(available.y-blockHeight)*0.5f));
+  ImGui::SetCursorPosX(std::max(0.0f,(available.x-wrapWidth)*0.5f));
+  ImGui::TextDisabled("%s",heading);
+  ImGui::SetCursorPosX(std::max(0.0f,(available.x-wrapWidth)*0.5f));
+  ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+wrapWidth);
+  ImGui::TextWrapped("%s",message);
+  ImGui::PopTextWrapPos();
+  ImGui::EndChild();
+ };
  const Crash::NsfEntry*animationEntry=nullptr;
  if(nsfValid_&&animationViewerChunk_>=0&&static_cast<std::size_t>(animationViewerChunk_)<nsf_.chunks().size()){
   const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
@@ -2897,12 +2916,13 @@ void EditorUI::drawAnimationViewer(){
   }
  }
  if(!animationEntry){
-  ImGui::TextDisabled("Select a decoded Type 1 Animation entry in the Resource Hierarchy to preview it here.");
+  showEmptyViewerState("No animation selected","Select a decoded Type 1 Animation entry in the Resource Hierarchy to preview it here.");
   ImGui::End();return;
  }
  const auto&animation=animationEntry->animation;
  if(animation.frames.empty()){
-  ImGui::TextDisabled("This animation contains no frames.");ImGui::End();return;
+  showEmptyViewerState("Empty animation","This animation contains no frames.");
+  ImGui::End();return;
  }
  auto findModel=[&](std::uint32_t eid)->const Crash::NsfModel*{
   if(!Crash::isValidEid(eid))return nullptr;
