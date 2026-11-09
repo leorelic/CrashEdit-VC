@@ -3448,19 +3448,29 @@ void EditorUI::drawAnimationViewer(){
  
  }
  dl->PopClipRect();
- // Keep the interaction legend inside the viewport at the top-right, rather
- // than adding content below the canvas and forcing a vertical scrollbar.
- const char*viewerHelp="Orbit: Left drag  |  Pan: Right drag  |  Zoom: Wheel\nMove: WASD  |  Down/Up: Q/E  |  Collisions: C  |  Wireframe: X  |  Textures: T  |  Reset: R";
- const float helpWrapWidth=std::max(160.0f,canvasSize.x*0.68f);
- const ImVec2 helpTextSize=ImGui::CalcTextSize(viewerHelp,nullptr,false,helpWrapWidth);
- const ImVec2 helpPadding(8.0f,6.0f);
- const ImVec2 helpMin(canvasMax.x-10.0f-helpTextSize.x-helpPadding.x*2.0f,canvasMin.y+10.0f);
- const ImVec2 helpMax(canvasMax.x-10.0f,helpMin.y+helpTextSize.y+helpPadding.y*2.0f);
+ // Keep concise, individually aligned control hints inside the viewport.
+ // Right-align every line so the help reads as a tidy control list.
+ const char*viewerHelpLines[]={
+  "Left Mouse  —  Orbit camera",
+  "Right Mouse  —  Pan camera",
+  "Mouse Wheel  —  Zoom camera",
+  "W / A / S / D  —  Move camera",
+  "Q / E  —  Move camera down / up",
+  "C  —  Toggle collision display",
+  "X  —  Toggle wireframe",
+  "T  —  Toggle textures",
+  "R  —  Reset camera"
+ };
  ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
- toolbarDraw->AddRectFilled(helpMin,helpMax,IM_COL32(18,21,27,220),5.0f);
- toolbarDraw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),
-                      ImVec2(helpMin.x+helpPadding.x,helpMin.y+helpPadding.y),
-                      IM_COL32(220,226,236,235),viewerHelp,nullptr,helpWrapWidth);
+ const float helpRight=canvasMax.x-12.0f;
+ float helpY=canvasMin.y+10.0f;
+ const float helpLineHeight=ImGui::GetTextLineHeightWithSpacing();
+ const ImU32 helpColor=IM_COL32(220,226,236,225);
+ for(const char*line:viewerHelpLines){
+  const ImVec2 lineSize=ImGui::CalcTextSize(line);
+  toolbarDraw->AddText(ImVec2(helpRight-lineSize.x,helpY),helpColor,line);
+  helpY+=helpLineHeight;
+ }
  toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
  const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
