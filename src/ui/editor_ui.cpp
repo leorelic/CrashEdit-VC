@@ -3063,20 +3063,28 @@ void EditorUI::drawAnimationViewer(){
    const auto&descriptor=model->textures[static_cast<std::size_t>(descriptorIndex)];
    ImGui::TextDisabled("Descriptor %d | TPAG slot %u | Page EID %08X",descriptorIndex,static_cast<unsigned>(descriptor.page),descriptor.page<model->texturePageEids.size()?model->texturePageEids[descriptor.page]:0U);
   }else ImGui::TextDisabled("No resolved texture descriptor for this face.");
-  const std::size_t cornerColors[3]={selectedTriangle.colorA,selectedTriangle.colorB,selectedTriangle.colorC};
+  std::size_t cornerColors[3]={selectedTriangle.colorA,selectedTriangle.colorB,selectedTriangle.colorC};
   const char*cornerNames[3]={"Corner A","Corner B","Corner C"};
   for(std::size_t corner=0;corner<3U;++corner){
-   if(cornerColors[corner]>=model->colors.size())continue;
-   auto color=model->colors[cornerColors[corner]];
-   float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
    ImGui::PushID(static_cast<int>(corner));
-   if(ImGui::ColorEdit3(cornerNames[corner],rgb,ImGuiColorEditFlags_NoInputs)){
-    color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
-    color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
-    color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
-    nsf_.setModelColor(linkedModelChunkIndex,linkedModelEntryIndex,cornerColors[corner],color);
+   int colorIndex=static_cast<int>(cornerColors[corner]);
+   ImGui::SetNextItemWidth(62.0f);
+   if(ImGui::InputInt("Index",&colorIndex)){
+    colorIndex=std::clamp(colorIndex,0,127);
+    if(nsf_.setModelTriangleColorIndex(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),corner,static_cast<std::uint8_t>(colorIndex)))cornerColors[corner]=static_cast<std::size_t>(colorIndex);
    }
-   ImGui::SameLine();ImGui::TextDisabled("Color #%u (shared)",static_cast<unsigned>(cornerColors[corner]));
+   if(cornerColors[corner]<model->colors.size()){
+    auto color=model->colors[cornerColors[corner]];
+    float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
+    ImGui::SameLine();
+    if(ImGui::ColorEdit3(cornerNames[corner],rgb,ImGuiColorEditFlags_NoInputs)){
+     color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
+     color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
+     color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
+     nsf_.setModelColor(linkedModelChunkIndex,linkedModelEntryIndex,cornerColors[corner],color);
+    }
+    ImGui::SameLine();ImGui::TextDisabled("%s | shared record",cornerNames[corner]);
+   }
    ImGui::PopID();
   }
   ImGui::TextDisabled("Color edits affect every face that references the same Model color record.");
@@ -3628,6 +3636,10 @@ void EditorUI::drawModelEditor(){
     const auto tri=model.triangles[static_cast<std::size_t>(triangleIndex)];
     ImGui::Text("Vertices: %d, %d, %d",tri.a,tri.b,tri.c);
     ImGui::Text("Corner colors: %u, %u, %u",tri.colorA,tri.colorB,tri.colorC);
+    int colorA=tri.colorA,colorB=tri.colorB,colorC=tri.colorC;
+    if(ImGui::InputInt("Color A index",&colorA)){colorA=std::clamp(colorA,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),0,static_cast<std::uint8_t>(colorA));}
+    if(ImGui::InputInt("Color B index",&colorB)){colorB=std::clamp(colorB,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),1,static_cast<std::uint8_t>(colorB));}
+    if(ImGui::InputInt("Color C index",&colorC)){colorC=std::clamp(colorC,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),2,static_cast<std::uint8_t>(colorC));}
     ImGui::Text("Command word: %zu | Raw: %08X",tri.commandWordIndex,model.polygonWords[tri.commandWordIndex]);
     int texture=tri.textureIndex;bool animated=tri.animated;
     if(ImGui::InputInt("Texture reference",&texture)){texture=std::clamp(texture,0,255);nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),static_cast<std::uint8_t>(texture),animated);}

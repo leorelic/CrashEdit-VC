@@ -151,7 +151,8 @@ struct NsfModelTriangle {
  std::int32_t a=0,b=0,c=0;
  std::uint8_t colorA=0,colorB=0,colorC=0,textureIndex=0,triangleType=0,triangleSubtype=0;
  bool animated=false,flag=false;
- std::size_t commandWordIndex=0;
+ std::size_t commandWordIndex=0,colorWordIndexA=0,colorWordIndexB=0,colorWordIndexC=0;
+ std::uint8_t colorBitOffsetA=9,colorBitOffsetB=9,colorBitOffsetC=9;
 };
 struct NsfModelExtendedTexture {
  std::uint32_t raw=0;
@@ -208,6 +209,7 @@ public:
  bool setModelTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,const NsfModelTexture& texture);
  bool setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t entryIndex,std::size_t textureIndex,std::uint32_t raw);
  bool setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated);
+ bool setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::size_t corner,std::uint8_t colorIndex);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;

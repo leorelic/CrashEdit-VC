@@ -247,25 +247,58 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  return true;
 }
 struct ModelPolyCommand {bool triangle=false;std::uint8_t color1=0,color2=0,texture=0,key=0,type=0,triType=0,triSubtype=0;bool animated=false,flag=false;};
+struct ModelColorRef {std::size_t wordIndex=0;std::uint8_t bitOffset=9;bool valid=false;};
 static bool decodeModelPolygons(NsfModel&model){
  model.triangles.clear();model.polygonError.clear();
  auto fail=[&](const char*m){model.polygonError=m;return false;};
- const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand> cmd(count);std::vector<std::int32_t> vtx;vtx.reserve(count);
- std::unordered_map<std::uint8_t,std::int32_t> keys;
+ const std::size_t count=model.polygonWords.size();std::vector<ModelPolyCommand>cmd(count);std::vector<std::int32_t>vtx;vtx.reserve(count);
+ std::unordered_map<std::uint8_t,std::int32_t>keys;
  const std::int32_t special=model.compressed?static_cast<std::int32_t>(model.vertexCount-model.positions.size()):0;
  std::int32_t v=model.compressed?-special:0;
- for(std::size_t i=0;i<count;++i){const auto raw=model.polygonWords[i];if(raw==0xffffffffU)break;
+ for(std::size_t i=0;i<count;++i){
+  const auto raw=model.polygonWords[i];if(raw==0xffffffffU)break;
   if((raw&0xffff0000U)==0){cmd[i].color1=static_cast<std::uint8_t>((raw>>2U)&0x7fU);cmd[i].color2=static_cast<std::uint8_t>((raw>>9U)&0x7fU);continue;}
   auto&x=cmd[i];x.triangle=true;x.texture=static_cast<std::uint8_t>(raw);x.animated=((raw>>8U)&1U)!=0;x.color1=static_cast<std::uint8_t>((raw>>9U)&0x7fU);x.key=static_cast<std::uint8_t>(raw>>16U);x.type=static_cast<std::uint8_t>((raw>>26U)&1U);x.flag=((raw>>27U)&1U)!=0;const auto tri=static_cast<std::uint8_t>(raw>>28U);x.triSubtype=tri&3U;x.triType=(tri>>2U)&3U;
   if(x.type==0){if(x.key!=0x57U)keys[x.key]=v;vtx.push_back(v++);}else{auto it=keys.find(x.key);if(it==keys.end())return fail("Model polygon stream duplicates an undefined vertex key.");vtx.push_back(it->second);}
  }
+ auto triangleColorRef=[&](std::size_t i)->ModelColorRef{return i<count&&cmd[i].triangle?ModelColorRef{i,9U,true}:ModelColorRef{};};
+ auto colorValue=[&](const ModelColorRef&r)->int{if(!r.valid||r.wordIndex>=count)return -1;const auto raw=model.polygonWords[r.wordIndex];return static_cast<int>((raw>>r.bitOffset)&0x7fU);};
  std::int32_t lastCC=-1,lastAA=-1,lastValid=-3,lastNonBB=-1,lastColor=-1;std::size_t cur=0;
- auto triangleColor=[&](std::size_t i)->int{return i<cmd.size()&&cmd[i].triangle?cmd[i].color1:-1;};
- auto emit=[&](int a,int b,int c,int ca,int cb,int cc,const ModelPolyCommand&x,std::size_t wordIndex){const int maxIndex=static_cast<int>(model.vertexCount)-special;if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0)return false;NsfModelTriangle triangle;triangle.a=a;triangle.b=b;triangle.c=c;triangle.colorA=static_cast<std::uint8_t>(ca);triangle.colorB=static_cast<std::uint8_t>(cb);triangle.colorC=static_cast<std::uint8_t>(cc);triangle.textureIndex=x.texture;triangle.triangleType=x.triType;triangle.triangleSubtype=x.triSubtype;triangle.animated=x.animated;triangle.flag=x.flag;triangle.commandWordIndex=wordIndex;model.triangles.push_back(triangle);return true;};
- for(std::size_t i=0;i<count;++i){if(model.polygonWords[i]==0xffffffffU)break;const auto&x=cmd[i];if(!x.triangle){lastColor=static_cast<std::int32_t>(i);continue;}if(cur>=vtx.size())return fail("Model polygon stream is inconsistent.");
-  if(x.triType==0){if(cur<2)return fail("Model strip starts before three vertices.");const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);int c2=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color2:lastColor+2==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-2);if(!emit(vtx[cur],vtx[cur-1],vtx[cur-2],x.color1,c1,c2,x,i))return fail("Model strip triangle references invalid geometry.");lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
-  }else if(x.triType==1){int ci=-1;if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColor(static_cast<std::size_t>(lastNonBB-2));else if(lastColor==lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color1;else if(lastColor==lastNonBB-1&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;else if(lastColor>lastNonBB-2&&lastColor>=0)ci=cmd[static_cast<std::size_t>(lastColor)].color2;const int c1=lastColor+1==static_cast<int>(i)?cmd[static_cast<std::size_t>(lastColor)].color1:triangleColor(i-1);if(cur<1)return fail("Connected triangle lacks preceding vertex.");const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];if(!emit(vtx[cur],vtx[cur-1],third,x.color1,c1,ci,x,i))return fail("Connected triangle references invalid geometry.");
-  }else if(x.triType==2){if(i+2<count&&lastValid+2<static_cast<int>(i)){if(cur+2>=vtx.size())return fail("Fan triangle exceeds vertex stream.");if(!emit(vtx[cur],vtx[cur+1],vtx[cur+2],x.color1,triangleColor(i+1),triangleColor(i+2),x,i))return fail("Fan triangle references invalid geometry.");lastValid=static_cast<int>(i);}lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);}
+ auto emit=[&](int a,int b,int c,const ModelColorRef&ra,const ModelColorRef&rb,const ModelColorRef&rc,const ModelPolyCommand&x,std::size_t wordIndex){
+  const int ca=colorValue(ra),cb=colorValue(rb),cc=colorValue(rc);const int maxIndex=static_cast<int>(model.vertexCount)-special;
+  if(a< -special||b< -special||c< -special||a>=maxIndex||b>=maxIndex||c>=maxIndex||ca<0||cb<0||cc<0)return false;
+  NsfModelTriangle triangle;triangle.a=a;triangle.b=b;triangle.c=c;triangle.colorA=static_cast<std::uint8_t>(ca);triangle.colorB=static_cast<std::uint8_t>(cb);triangle.colorC=static_cast<std::uint8_t>(cc);
+  triangle.textureIndex=x.texture;triangle.triangleType=x.triType;triangle.triangleSubtype=x.triSubtype;triangle.animated=x.animated;triangle.flag=x.flag;triangle.commandWordIndex=wordIndex;
+  triangle.colorWordIndexA=ra.wordIndex;triangle.colorWordIndexB=rb.wordIndex;triangle.colorWordIndexC=rc.wordIndex;triangle.colorBitOffsetA=ra.bitOffset;triangle.colorBitOffsetB=rb.bitOffset;triangle.colorBitOffsetC=rc.bitOffset;
+  model.triangles.push_back(triangle);return true;
+ };
+ for(std::size_t i=0;i<count;++i){
+  if(model.polygonWords[i]==0xffffffffU)break;const auto&x=cmd[i];if(!x.triangle){lastColor=static_cast<std::int32_t>(i);continue;}if(cur>=vtx.size())return fail("Model polygon stream is inconsistent.");
+  const ModelColorRef current{i,9U,true};
+  if(x.triType==0){
+   if(cur<2)return fail("Model strip starts before three vertices.");
+   const ModelColorRef c1=lastColor+1==static_cast<int>(i)?ModelColorRef{static_cast<std::size_t>(lastColor),2U,true}:triangleColorRef(i-1U);
+   const ModelColorRef c2=lastColor+1==static_cast<int>(i)?ModelColorRef{static_cast<std::size_t>(lastColor),9U,true}:lastColor+2==static_cast<int>(i)?ModelColorRef{static_cast<std::size_t>(lastColor),2U,true}:triangleColorRef(i-2U);
+   if(!emit(vtx[cur],vtx[cur-1U],vtx[cur-2U],current,c1,c2,x,i))return fail("Model strip triangle references invalid geometry.");
+   lastAA=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
+  }else if(x.triType==1){
+   ModelColorRef ci{};
+   if(lastColor<lastNonBB-2&&lastNonBB>=2)ci=triangleColorRef(static_cast<std::size_t>(lastNonBB-2));
+   else if(lastColor==lastNonBB-2&&lastColor>=0)ci={static_cast<std::size_t>(lastColor),2U,true};
+   else if(lastColor==lastNonBB-1&&lastColor>=0)ci={static_cast<std::size_t>(lastColor),9U,true};
+   else if(lastColor>lastNonBB-2&&lastColor>=0)ci={static_cast<std::size_t>(lastColor),9U,true};
+   const ModelColorRef c1=lastColor+1==static_cast<int>(i)?ModelColorRef{static_cast<std::size_t>(lastColor),2U,true}:triangleColorRef(i-1U);
+   if(cur<1)return fail("Connected triangle lacks preceding vertex.");
+   const int third=vtx[static_cast<std::size_t>(lastCC>lastAA?lastCC:std::max(0,lastAA-2))];
+   if(!emit(vtx[cur],vtx[cur-1U],third,current,c1,ci,x,i))return fail("Connected triangle references invalid geometry.");
+  }else if(x.triType==2){
+   if(i+2U<count&&lastValid+2<static_cast<int>(i)){
+    if(cur+2U>=vtx.size())return fail("Fan triangle exceeds vertex stream.");
+    if(!emit(vtx[cur],vtx[cur+1U],vtx[cur+2U],current,triangleColorRef(i+1U),triangleColorRef(i+2U),x,i))return fail("Model fan triangle references invalid geometry.");
+    lastValid=static_cast<int>(i);
+   }
+   lastCC=static_cast<int>(cur);lastNonBB=static_cast<int>(i);
+  }
   ++cur;
  }
  if(model.polygonCount&&model.triangles.size()!=model.polygonCount)model.polygonError="Decoded polygon count differs from model header count.";
@@ -805,6 +838,18 @@ bool NsfArchive::setModelTriangleTexture(std::size_t chunkIndex,std::size_t entr
  for(unsigned i=0;i<4U;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(raw>>(i*8U));
  entry.model.polygonWords[triangle.commandWordIndex]=raw;entry.model.polygonsDecoded=decodeModelPolygons(entry.model);return entry.model.polygonsDecoded;
 }
+bool NsfArchive::setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::size_t corner,std::uint8_t colorIndex){
+ if(chunkIndex>=chunks_.size()||corner>=3U)return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||triangleIndex>=entry.model.triangles.size()||colorIndex>=entry.model.colors.size()||entry.items.size()<2U)return false;
+ const auto&triangle=entry.model.triangles[triangleIndex];const std::size_t wordIndex=corner==0U?triangle.colorWordIndexA:corner==1U?triangle.colorWordIndexB:triangle.colorWordIndexC;
+ const std::uint8_t bitOffset=corner==0U?triangle.colorBitOffsetA:corner==1U?triangle.colorBitOffsetB:triangle.colorBitOffsetC;
+ if(wordIndex>=entry.model.polygonWords.size()||bitOffset>25U||colorIndex>127U)return false;
+ const auto&item=entry.items[1];const std::size_t relative=wordIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
+ std::uint32_t raw=u32(chunk.bytes,p);const std::uint32_t mask=0x7fU<<bitOffset;raw=(raw&~mask)|(static_cast<std::uint32_t>(colorIndex)<<bitOffset);
+ for(unsigned i=0;i<4U;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(raw>>(i*8U));
+ entry.model.polygonWords[wordIndex]=raw;entry.model.polygonsDecoded=decodeModelPolygons(entry.model);return entry.model.polygonsDecoded;
+}
+
 int resolveNsfModelTextureIndex(const NsfModel&model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool&valid){
  valid=true;int textureId=static_cast<int>(textureIndex)-1;
  if(animated){

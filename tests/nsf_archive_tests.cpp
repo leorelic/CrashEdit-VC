@@ -154,13 +154,13 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  Crash::NsfSceneryColor editedColor{210,120,35,7};assert(a.setModelColor(0,0,10,editedColor));
  Crash::NsfModelTexture editedTexture{};editedTexture.u1=8;editedTexture.v1=9;editedTexture.u2=10;editedTexture.v2=11;editedTexture.colorMode=1;editedTexture.page=0;
  assert(a.setModelTexture(0,0,0,editedTexture));assert(a.setModelScale(0,0,0,777));assert(a.setModelTexturePageEid(0,0,0,0x4cd8206fU));
- assert(a.setModelExtendedTextureWord(0,0,0,0x00001001U));assert(a.setModelTriangleTexture(0,0,0,0,true));
+ assert(a.setModelExtendedTextureWord(0,0,0,0x00001001U));assert(a.setModelTriangleTexture(0,0,0,0,true));assert(a.setModelTriangleColorIndex(0,0,0,1,12));
  bool textureValid=false;assert(Crash::resolveNsfModelTextureIndex(a.chunks()[0].entries[0].model,0,true,0,textureValid)==0&&textureValid);
  std::vector<std::uint8_t> editedNsf;assert(a.saveUncompressedBytes(editedNsf,e));Crash::NsfArchive roundTrip;assert(roundTrip.loadBytes(editedNsf,e));roundTrip.decodeAnimationModels(false);
  const auto&roundModel=roundTrip.chunks()[0].entries[0].model;assert(roundModel.scaleX==777);assert(roundModel.colors[10].r==210&&roundModel.colors[10].g==120&&roundModel.colors[10].b==35);
  assert(roundModel.textures[0].u1==8&&roundModel.textures[0].v1==9&&roundModel.textures[0].page==0);
  assert(roundModel.texturePageEids[0]==0x4cd8206fU&&roundModel.extendedTextureWords[0]==0x00001001U);
- assert(roundModel.triangles.size()==1&&roundModel.triangles[0].animated&&roundModel.triangles[0].textureIndex==0);
+ assert(roundModel.triangles.size()==1&&roundModel.triangles[0].animated&&roundModel.triangles[0].textureIndex==0&&roundModel.triangles[0].colorB==12);
  // Crash 3 animation stores the linked Model EID at +8, with a reserved word at +12.
  std::vector<std::uint8_t> c3Animation(65536);p16(c3Animation,0,0x1234);p16(c3Animation,2,0);p32(c3Animation,4,5);p32(c3Animation,8,1);
  constexpr std::size_t c3Entry=24,c3Frame=44,c3EntrySize=56;p32(c3Animation,16,c3Entry);p32(c3Animation,20,c3Entry+c3EntrySize);
