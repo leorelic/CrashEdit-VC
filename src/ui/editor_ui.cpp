@@ -2891,7 +2891,7 @@ void EditorUI::drawAnimationFrameEditor(){
 
 void EditorUI::drawAnimationViewer(){
  if(animationDockId_!=0)ImGui::SetNextWindowDockID(animationDockId_,ImGuiCond_FirstUseEver);
- if(!ImGui::Begin("3D Animation Editor")){ImGui::End();return;}
+ if(!ImGui::Begin("3D Animation Editor",nullptr,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse)){ImGui::End();return;}
  auto showEmptyViewerState=[](const char*heading,const char*message){
   ImGui::BeginChild("AnimationViewerEmptyState",ImVec2(0.0f,0.0f),false);
   const ImVec2 available=ImGui::GetContentRegionAvail();
@@ -3448,12 +3448,24 @@ void EditorUI::drawAnimationViewer(){
  
  }
  dl->PopClipRect();
+ // Keep the interaction legend inside the viewport at the top-right, rather
+ // than adding content below the canvas and forcing a vertical scrollbar.
+ const char*viewerHelp="Orbit: Left drag  |  Pan: Right drag  |  Zoom: Wheel\nMove: WASD  |  Down/Up: Q/E  |  Collisions: C  |  Wireframe: X  |  Textures: T  |  Reset: R";
+ const float helpWrapWidth=std::max(160.0f,canvasSize.x*0.68f);
+ const ImVec2 helpTextSize=ImGui::CalcTextSize(viewerHelp,nullptr,false,helpWrapWidth);
+ const ImVec2 helpPadding(8.0f,6.0f);
+ const ImVec2 helpMin(canvasMax.x-10.0f-helpTextSize.x-helpPadding.x*2.0f,canvasMin.y+10.0f);
+ const ImVec2 helpMax(canvasMax.x-10.0f,helpMin.y+helpTextSize.y+helpPadding.y*2.0f);
  ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
+ toolbarDraw->AddRectFilled(helpMin,helpMax,IM_COL32(18,21,27,220),5.0f);
+ toolbarDraw->AddText(ImGui::GetFont(),ImGui::GetFontSize(),
+                      ImVec2(helpMin.x+helpPadding.x,helpMin.y+helpPadding.y),
+                      IM_COL32(220,226,236,235),viewerHelp,nullptr,helpWrapWidth);
  toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
  const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
  for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
- ImGui::TextDisabled("Left drag: orbit | Right drag: pan | Wheel: zoom | WASD: move | Q/E: down/up | C: collisions | X: wireframe | T: textures | R: reset camera");
+
  ImGui::End();
 }
 
