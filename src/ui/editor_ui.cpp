@@ -3268,16 +3268,8 @@ void EditorUI::drawAnimationViewer(){
        out={nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f};
        return true;
       };
-      std::vector<Vertex> planeFill,planeGrid;
-      const CameraPoint planeCorners[4]={
-       toCamera(planeX-planeExtent,groundY,planeZ-planeExtent),toCamera(planeX+planeExtent,groundY,planeZ-planeExtent),
-       toCamera(planeX+planeExtent,groundY,planeZ+planeExtent),toCamera(planeX-planeExtent,groundY,planeZ+planeExtent)
-      };
-      bool planeVisible=true;for(const auto&corner:planeCorners)if(corner.depth<=0.05f)planeVisible=false;
-      if(planeVisible){
-       const ImU32 floorColor=IM_COL32(20,23,28,255);
-       for(int index:{0,1,2,0,2,3}){Vertex v{};makePlaneVertex(planeCorners[index],floorColor,v);planeFill.push_back(v);}
-      }
+      // The ground plane is a reference grid only; no solid face is drawn.
+      std::vector<Vertex> planeGrid;
       auto appendPlaneLine=[&](float x1,float z1,float x2,float z2,ImU32 color){
        CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
        constexpr float nearDepth=0.05f;
@@ -3297,8 +3289,6 @@ void EditorUI::drawAnimationViewer(){
        appendPlaneLine(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,color);
       }
       GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
-      GL::DepthMask(1);GL::DepthFunc(0x0201U);
-      if(!planeFill.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeFill.size()*sizeof(Vertex)),planeFill.data(),0x88E8U);GL::DrawArrays(0x0004U,0,int(planeFill.size()));}
       GL::DepthFunc(0x0203U);GL::DepthMask(0);
       if(!planeGrid.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeGrid.size()*sizeof(Vertex)),planeGrid.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(planeGrid.size()));}
       GL::DepthFunc(0x0201U);GL::DepthMask(1);
