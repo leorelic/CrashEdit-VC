@@ -159,6 +159,7 @@ struct NsfModelExtendedTexture {
  std::uint16_t offset=0;
  bool isLod=false,leap=false;
  std::uint8_t mask=0,delay=0,latency=0;
+ std::array<std::uint8_t,8> lod{};
 };
 struct NsfModel {
  bool decoded=false,compressed=false,polygonsDecoded=false;
@@ -214,5 +215,5 @@ private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  std::vector<NsfChunk> chunks_;
 };
-int resolveNsfModelTextureIndex(const NsfModel& model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool& valid);
+int resolveNsfModelTextureIndex(const NsfModel& model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool& valid,std::uint8_t lodLevel=0);
 }

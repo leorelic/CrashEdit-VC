@@ -156,6 +156,10 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(a.setModelTexture(0,0,0,editedTexture));assert(a.setModelScale(0,0,0,777));assert(a.setModelTexturePageEid(0,0,0,0x4cd8206fU));
  assert(a.setModelExtendedTextureWord(0,0,0,0x00001001U));assert(a.setModelTriangleTexture(0,0,0,0,true));assert(a.setModelTriangleColorIndex(0,0,0,1,12));
  bool textureValid=false;assert(Crash::resolveNsfModelTextureIndex(a.chunks()[0].entries[0].model,0,true,0,textureValid)==0&&textureValid);
+ Crash::NsfModel lodModel;lodModel.textures.resize(4);lodModel.extendedTextureWords.push_back(0x80000001U|(2U<<29U)|(1U<<27U));
+ bool lodValid=false;assert(Crash::resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,0)==2&&lodValid);
+ lodValid=false;assert(Crash::resolveNsfModelTextureIndex(lodModel,0,true,0,lodValid,1)==1&&lodValid);
+
  std::vector<std::uint8_t> editedNsf;assert(a.saveUncompressedBytes(editedNsf,e));Crash::NsfArchive roundTrip;assert(roundTrip.loadBytes(editedNsf,e));roundTrip.decodeAnimationModels(false);
  const auto&roundModel=roundTrip.chunks()[0].entries[0].model;assert(roundModel.scaleX==777);assert(roundModel.colors[10].r==210&&roundModel.colors[10].g==120&&roundModel.colors[10].b==35);
  assert(roundModel.textures[0].u1==8&&roundModel.textures[0].v1==9&&roundModel.textures[0].page==0);

@@ -341,7 +341,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
    static_cast<std::uint8_t>(b6&0xfU),static_cast<std::uint8_t>((b7>>2U)&0x3fU)});
  }
  const auto&extended=entry.items[4];
- for(std::uint32_t i=0;i<extendedCount;++i){const std::uint32_t raw=u32(bytes,extended.offset+static_cast<std::size_t>(i)*4U);out.extendedTextureWords.push_back(raw);out.extendedTextures.push_back({raw,static_cast<std::uint16_t>(raw&0x7ffU),(raw&0x80000000U)!=0,(raw&(1U<<11U))!=0,static_cast<std::uint8_t>((raw>>12U)&0x7fU),static_cast<std::uint8_t>((raw>>19U)&0x7fU),static_cast<std::uint8_t>((raw>>26U)&0x1fU)});}
+ for(std::uint32_t i=0;i<extendedCount;++i){const std::uint32_t raw=u32(bytes,extended.offset+static_cast<std::size_t>(i)*4U);out.extendedTextureWords.push_back(raw);NsfModelExtendedTexture record;record.raw=raw;record.offset=static_cast<std::uint16_t>(raw&0x7ffU);record.isLod=(raw&0x80000000U)!=0;record.leap=(raw&(1U<<11U))!=0;record.mask=static_cast<std::uint8_t>((raw>>12U)&0x7fU);record.delay=static_cast<std::uint8_t>((raw>>19U)&0x7fU);record.latency=static_cast<std::uint8_t>((raw>>26U)&0x1fU);for(std::size_t level=0;level<8U;++level)record.lod[level]=static_cast<std::uint8_t>((raw>>(29U-level*2U))&3U);out.extendedTextures.push_back(record);}
  if(entry.items.size()==6U){
   const auto&positions=entry.items[5];out.positions.reserve(positionCount);out.compressed=true;
   for(std::uint32_t i=0;i<positionCount;++i){
@@ -827,7 +827,7 @@ bool NsfArchive::setModelExtendedTextureWord(std::size_t chunkIndex,std::size_t 
  auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=2||!entry.model.decoded||textureIndex>=entry.model.extendedTextureWords.size()||entry.items.size()<5U)return false;
  const auto&item=entry.items[4];const std::size_t relative=textureIndex*4U;if(relative+4U>item.size)return false;const std::size_t p=item.offset+relative;if(!has(chunk.bytes,p,4U))return false;
  for(unsigned i=0;i<4U;++i)chunk.bytes[p+i]=static_cast<std::uint8_t>(raw>>(i*8U));
- entry.model.extendedTextureWords[textureIndex]=raw;entry.model.extendedTextures[textureIndex]={raw,static_cast<std::uint16_t>(raw&0x7ffU),(raw&0x80000000U)!=0,(raw&(1U<<11U))!=0,static_cast<std::uint8_t>((raw>>12U)&0x7fU),static_cast<std::uint8_t>((raw>>19U)&0x7fU),static_cast<std::uint8_t>((raw>>26U)&0x1fU)};return true;
+ entry.model.extendedTextureWords[textureIndex]=raw;NsfModelExtendedTexture record;record.raw=raw;record.offset=static_cast<std::uint16_t>(raw&0x7ffU);record.isLod=(raw&0x80000000U)!=0;record.leap=(raw&(1U<<11U))!=0;record.mask=static_cast<std::uint8_t>((raw>>12U)&0x7fU);record.delay=static_cast<std::uint8_t>((raw>>19U)&0x7fU);record.latency=static_cast<std::uint8_t>((raw>>26U)&0x1fU);for(std::size_t level=0;level<8U;++level)record.lod[level]=static_cast<std::uint8_t>((raw>>(29U-level*2U))&3U);entry.model.extendedTextures[textureIndex]=record;return true;
 }
 bool NsfArchive::setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated){
  if(chunkIndex>=chunks_.size())return false;auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
@@ -851,21 +851,22 @@ bool NsfArchive::setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t e
  entry.model.polygonWords[wordIndex]=raw;entry.model.polygonsDecoded=decodeModelPolygons(entry.model);return entry.model.polygonsDecoded;
 }
 
-int resolveNsfModelTextureIndex(const NsfModel&model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool&valid){
+int resolveNsfModelTextureIndex(const NsfModel&model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool&valid,std::uint8_t lodLevel){
  valid=true;int textureId=static_cast<int>(textureIndex)-1;
  if(animated){
   ++textureId;if(textureId<0||static_cast<std::size_t>(textureId)>=model.extendedTextureWords.size()){valid=false;return -1;}
   std::uint32_t anim=model.extendedTextureWords[static_cast<std::size_t>(textureId)];const int offset=static_cast<int>(anim&0x7ffU);
   if(offset==0)return -1;
   textureId=offset-1;
-  if((anim&0x80000000U)!=0)textureId+=static_cast<int>((anim>>29U)&3U);
+  if((anim&0x80000000U)!=0){const unsigned shift=29U-static_cast<unsigned>(std::min<std::uint8_t>(lodLevel,7U))*2U;textureId+=static_cast<int>((anim>>shift)&3U);}
   else{
    const int latency=static_cast<int>((anim>>26U)&0x1fU),delay=static_cast<int>((anim>>19U)&0x7fU),mask=static_cast<int>((anim>>12U)&0x7fU);
    textureId+=(static_cast<int>(realFrame)/(1+latency)+delay)&mask;
    if((anim&(1U<<11U))!=0){
     ++textureId;if(textureId<0||static_cast<std::size_t>(textureId)>=model.extendedTextureWords.size()){valid=false;return -1;}
     anim=model.extendedTextureWords[static_cast<std::size_t>(textureId)];
-    textureId=static_cast<int>(anim&0x7ffU)-1+static_cast<int>((anim>>29U)&3U);
+    const unsigned shift=29U-static_cast<unsigned>(std::min<std::uint8_t>(lodLevel,7U))*2U;
+    textureId=static_cast<int>(anim&0x7ffU)-1+static_cast<int>((anim>>shift)&3U);
    }
   }
  }

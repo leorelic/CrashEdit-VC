@@ -3692,12 +3692,16 @@ void EditorUI::drawModelEditor(){
     std::uint32_t raw=model.extendedTextureWords[static_cast<std::size_t>(extendedIndex)];
     if(ImGui::InputScalar("Raw word",ImGuiDataType_U32,&raw,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
     auto record=model.extendedTextures[static_cast<std::size_t>(extendedIndex)];
-    ImGui::Text("Offset: %u | %s",record.offset,record.isLod?"LOD selector":"Flipbook sequence");
-    bool changed=false;int offset=record.offset;
+    ImGui::Text("Offset: %u | %s",record.offset,record.isLod?"LOD selectors":"Flipbook sequence");
+    bool changed=false;int offset=record.offset;bool isLod=record.isLod;
     if(ImGui::InputInt("Texture offset",&offset)){offset=std::clamp(offset,0,2047);raw=(raw&~0x7ffU)|static_cast<std::uint32_t>(offset);changed=true;}
-    if(record.isLod){
-     int lodSelector=static_cast<int>((raw>>29U)&3U);
-     if(ImGui::InputInt("LOD selector",&lodSelector)){lodSelector=std::clamp(lodSelector,0,3);raw=(raw&~(3U<<29U))|(static_cast<std::uint32_t>(lodSelector)<<29U);changed=true;}
+    if(ImGui::Checkbox("LOD selector record",&isLod)){raw=isLod?(raw|0x80000000U):(raw&~0x80000000U);changed=true;}
+    static int previewLodLevel=0;
+    if(isLod){
+     ImGui::SliderInt("LOD level",&previewLodLevel,0,7);
+     int lodSelector=static_cast<int>((raw>>(29U-static_cast<unsigned>(previewLodLevel)*2U))&3U);
+     if(ImGui::InputInt("LOD selection",&lodSelector)){lodSelector=std::clamp(lodSelector,0,3);const unsigned shift=29U-static_cast<unsigned>(previewLodLevel)*2U;raw=(raw&~(3U<<shift))|(static_cast<std::uint32_t>(lodSelector)<<shift);changed=true;}
+     for(std::size_t level=0;level<8U;++level)ImGui::Text("LOD %zu: %u",level,record.lod[level]);
     }else{
      bool leap=record.leap;int mask=record.mask,delay=record.delay,latency=record.latency;
      if(ImGui::Checkbox("Leap to following record",&leap)){raw=(raw&~(1U<<11U))|(leap?(1U<<11U):0U);changed=true;}
@@ -3709,7 +3713,7 @@ void EditorUI::drawModelEditor(){
     const int animatedFaceCount=static_cast<int>(std::count_if(model.triangles.begin(),model.triangles.end(),[&](const auto&tri){return tri.animated&&tri.textureIndex==static_cast<std::uint8_t>(extendedIndex);}));
     ImGui::Text("Animated faces using this record: %d",animatedFaceCount);
     static int previewFrame=0;ImGui::SliderInt("Preview clock (30 Hz)",&previewFrame,0,255);
-    bool previewValid=true;const int previewDescriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(previewFrame),previewValid);
+    bool previewValid=true;const int previewDescriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(previewFrame),previewValid,static_cast<std::uint8_t>(previewLodLevel));
     if(previewValid&&previewDescriptor>=0&&static_cast<std::size_t>(previewDescriptor)<model.textures.size()){
      const auto&previewTexture=model.textures[static_cast<std::size_t>(previewDescriptor)];
      ImGui::Text("Resolved descriptor: %d | TPAG slot: %u",previewDescriptor,static_cast<unsigned>(previewTexture.page));
@@ -3719,7 +3723,7 @@ void EditorUI::drawModelEditor(){
     if(ImGui::BeginTable("ExtendedTextureSequence",3,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingFixedFit)){
      ImGui::TableSetupColumn("30 Hz tick");ImGui::TableSetupColumn("Descriptor");ImGui::TableSetupColumn("TPAG slot");ImGui::TableHeadersRow();
      for(int tick=0;tick<16;++tick){
-      bool valid=true;const int descriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(tick*(static_cast<int>(record.latency)+1)),valid);
+      bool valid=true;const int descriptor=Crash::resolveNsfModelTextureIndex(model,static_cast<std::uint8_t>(extendedIndex),true,static_cast<std::uint32_t>(tick*(static_cast<int>(record.latency)+1)),valid,static_cast<std::uint8_t>(previewLodLevel));
       ImGui::TableNextRow();ImGui::TableSetColumnIndex(0);ImGui::Text("%d",tick);
       ImGui::TableSetColumnIndex(1);if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model.textures.size())ImGui::Text("%d",descriptor);else ImGui::TextDisabled("—");
       ImGui::TableSetColumnIndex(2);if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model.textures.size())ImGui::Text("%u",static_cast<unsigned>(model.textures[static_cast<std::size_t>(descriptor)].page));else ImGui::TextDisabled("—");
