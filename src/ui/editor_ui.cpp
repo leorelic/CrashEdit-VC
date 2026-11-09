@@ -2903,7 +2903,7 @@ void EditorUI::drawAnimationViewer(){
   return nullptr;
  };
  struct AnimationPoint{float x,y,z;AnimationPoint(float px,float py,float pz):x(px),y(py),z(pz){}};
- auto transformVertex=[](const Crash::NsfAnimationVertex&v,const Crash::NsfAnimationFrame&frame,const Crash::NsfModel*model){
+ auto transformVertex=[](const Crash::NsfAnimationVertex&v,const Crash::NsfAnimationFrame&frame,const Crash::NsfModel*model,bool includeFrameOffset=true){
   constexpr float fallbackScale=1.0f/128.0f;
   constexpr float modelScale=3200.0f*128.0f;
   const float sx=model?static_cast<float>(model->scaleX)/modelScale:fallbackScale;
@@ -2912,9 +2912,9 @@ void EditorUI::drawAnimationViewer(){
   // CrashEdit-RE's animation path swaps Y/Z, adds the frame translation,
   // then applies the linked model's per-axis scale.
   return AnimationPoint(
-   (static_cast<float>(v.x)+static_cast<float>(frame.xOffset)/4.0f)*sx,
-   (static_cast<float>(v.z)+static_cast<float>(frame.yOffset)/4.0f)*sy,
-   (static_cast<float>(v.y)+static_cast<float>(frame.zOffset)/4.0f)*sz
+   (static_cast<float>(v.x)+(includeFrameOffset?static_cast<float>(frame.xOffset)/4.0f:0.0f))*sx,
+   (static_cast<float>(v.z)+(includeFrameOffset?static_cast<float>(frame.yOffset)/4.0f:0.0f))*sy,
+   (static_cast<float>(v.y)+(includeFrameOffset?static_cast<float>(frame.zOffset)/4.0f:0.0f))*sz
   );
  };
  const int lastFrame=static_cast<int>(animation.frames.size()-1U);
@@ -3047,7 +3047,7 @@ void EditorUI::drawAnimationViewer(){
    if(!candidate.verticesDecoded)continue;
    const auto*candidateModel=findModel(animation.isCrash3?candidate.linkedModelEid:candidate.modelEid);
    for(const auto&v:candidate.vertices){
-    const AnimationPoint p=transformVertex(v,candidate,candidateModel);
+    const AnimationPoint p=transformVertex(v,candidate,candidateModel,false);
     boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
     boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
     haveBounds=true;
@@ -3306,7 +3306,7 @@ void EditorUI::drawAnimationViewer(){
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
        GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
        if(!collisionFaces.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionFaces.size()*sizeof(Vertex)),collisionFaces.data(),0x88E8U);GL::DrawArrays(0x0004U,0,int(collisionFaces.size()));}
-       if(!collisionLines.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);GL::LineWidth(1.75f);GL::DrawArrays(0x0001U,0,int(collisionLines.size()));}
+       if(!collisionLines.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(collisionLines.size()));}
        GL::DepthFunc(0x0201U);GL::DepthMask(1);
       }
       GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
