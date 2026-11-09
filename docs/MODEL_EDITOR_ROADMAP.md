@@ -4,9 +4,11 @@
 
 **Authoritative comparison target:** [CrashEdit-RE — airumu/CrashEdit, branch t/net9](https://github.com/airumu/CrashEdit/tree/t/net9). The README identifies this as CrashEdit: Re and documents its Model / Compressed Model editors. Future research must use CrashEdit-RE and the appropriate t/net branch. Do not use cbhacks/CrashEdit or its deprecated branches as the project's reference implementation.
 
-This roadmap targets Crash 2 first. The Model entry owns polygon topology, per-corner color selection, texture mapping, texture-page references, and (for compressed models) metadata used to decode animation-frame vertex positions. Animation frames own the changing pose data. The Model Editor should therefore become the source of topology/material data consumed by the existing 3D Animation Viewer.
+This roadmap targets Crash 2 first. The Model entry owns polygon topology, per-corner color selection, texture mapping, texture-page references, and (for compressed models) metadata used to decode animation-frame vertex positions. Animation frames own the changing pose data. The native archive already decodes both resources and links Animation frames to Models; the shared Model representation should remain the source of topology/material data consumed by the 3D Animation Editor.
 
-## CrashEdit-RE Model editor structure
+**Agreed editor responsibility:** the Model Editor remains the structural/data inspector. Its Colors and Textures pages will stay available temporarily as research and raw-data inspection tools. The long-term visual workflow belongs in the Animation Editor: select reconstructed faces in 3D, apply colors or texture descriptors/pages to those faces, and write the changes back to the shared Model data. This avoids asking users to edit face materials through disconnected numeric tables when the corresponding geometry is visible. Do not remove the interim Model pages until the Animation Editor can replace their useful inspection and editing capabilities.
+
+## CrashEdit-RE Model editor structure and interim research pages
 
 The CrashEdit-RE ModelBox exposes these pages:
 - **General:** model scale values and model information.
@@ -16,7 +18,7 @@ The CrashEdit-RE ModelBox exposes these pages:
 - **Extended Textures:** flipbook and LOD metadata.
 - **Positions:** compressed-model position records only.
 
-The separate Vertices page in ModelBox is removed for Model entries; it is used by Scenery. Do not copy that Scenery-specific page into the Model Editor without a distinct reason. The Model's vertex positions are resolved through Animation frames.
+The separate Vertices page in ModelBox is removed for Model entries; it is used by Scenery. Do not copy that Scenery-specific page into the Model Editor without a distinct reason. The Model's visible pose is reconstructed with Animation frame data. CrashEdit-VC may retain General, Polygons, Colors, Textures, Extended Textures and conditional Positions pages as interim research/inspection tabs, but face-level material editing is intended to move to the Animation Editor.
 
 Relevant source files on the reference branch:
 - Crash/Formats/Crash Formats/Model/ModelEntryLoader.cs
@@ -51,7 +53,7 @@ Important Info offsets read by the reference loader/model class:
 - Extended texture count: 0x48.
 - Special vertex count: 0x4C.
 - **Polygon command count used by ModelEntryLoader for item 1: 0x2C.**
-- **Open question:** ModelEntry.PolyCount separately reads 0x44. Trace all consumers and compare real files before assigning this field a semantic name. Do not replace the loader's 0x2C count with 0x44.
+- **Decoded polygon count: 0x44.** ModelEntry.PolyCount reads this field, and CrashEdit-RE ModelBox displays it as the model's Polygon count. It is distinct from the 0x2C polygon-command-word count used to size item 1. The native decoder uses 0x44 to validate the number of reconstructed triangles. These fields therefore describe different stages/counts; do not substitute one for the other.
 
 The reference loader checks the item lengths against the associated counts, but the native implementation should add stricter bounds, overflow checks, and diagnostics rather than copying any unsafe assumptions.
 
@@ -117,38 +119,41 @@ This is the key Model-to-Animation dependency. Model position records are not th
 ## Implementation phases
 
 ### Phase 0 — native inventory and source comparison
-- [ ] Audit current native Model entry parsing, hierarchy labels, item preservation and save behavior.
-- [ ] Audit current Animation frame decoder against CrashEdit-RE Frame.Load, Frame.LoadNew and Frame.MakeVertices(model).
-- [ ] Trace native Model EID resolution from Animation frames into the 3D Animation Viewer.
-- [ ] Resolve the 0x2C versus 0x44 polygon-count field discrepancy from source consumers and representative Crash 2 samples.
-- [ ] Collect paired Model + Animation examples, including compressed and uncompressed models.
+- [x] Audit the existing native Model parser: `NsfModel` stores the Info header, scales, TPAG EIDs, raw polygon words, decoded colors/textures, extended-texture words, compressed-position records and reconstructed triangles. The original NSF chunk bytes remain available through the archive for loss-preserving reads.
+- [x] Audit the existing native Animation parser: `NsfAnimationFrame` retains frame header values, collisions, special vertices, temporal words, raw item offsets/sizes and decoded vertices.
+- [x] Trace Model resolution: Crash 2 frames use their direct Model EID; the current Crash 3 path derives Model EIDs from GOOL vertex frame groups. Selecting a Model in the UI searches for an Animation that uses it and opens that Animation in the 3D Animation Editor.
+- [x] Compare temporal vertex decoding with CrashEdit-RE `Frame.MakeVertices(model)`: the native code follows the X-Z-Y compressed component order, sign extension, accumulation/wrapping, special-vertex temporal offset, uncompressed byte ordering and Crash 3 scale behavior.
+- [x] Resolve the 0x2C versus 0x44 count fields: 0x2C is the serialized polygon-command word count; 0x44 is the reconstructed polygon/triangle count shown by ModelBox.
+- [ ] Validate paired Model + Animation examples from real Crash 2 NSF files, including compressed and uncompressed models. Current automated coverage is synthetic and does not yet prove broad sample parity.
 
-### Phase 1 — loss-preserving Model data model
-- [ ] Introduce a typed Model structure while retaining original raw item bytes.
-- [ ] Decode the Info block, scales, TPAG EIDs and all counts with bounded reads.
-- [ ] Decode item-2 color records and item-3 texture descriptors.
-- [ ] Decode item-4 extended texture words while preserving raw values.
-- [ ] Decode optional item-5 compressed-position records into X/Z/Y bases and bit widths.
+**Native audit gaps:** there are no dedicated Model field setters or verified Model edit serializer yet. The current Model tests cover basic item decoding and a synthetic fan-triangle reconstruction; Animation tests cover frame parsing and an uncompressed temporal sample, but do not yet provide a comprehensive paired compressed Model/Animation round-trip. The current UI handoff from a selected Model to an Animation is present, but visual face selection and face-level material editing are not.
+
+### Phase 1 — complete and harden the shared Model representation
+- [x] Establish the native `NsfModel` representation and bounded decoding of the Info block, scales, TPAG EIDs, item counts, colors, texture descriptors, extended-texture words and optional compressed-position records.
+- [x] Retain raw polygon command words and the original archive bytes; keep unknown packed fields available for loss-preserving work.
+- [ ] Audit count/size validation and malformed-entry behavior against real Crash 2 samples.
+- [ ] Add explicit Model setters and a verified item serializer only after each editable field has a known binary mapping.
 - [ ] Add parse/serialize/parse tests for untouched Model entries before exposing edits.
 
-### Phase 2 — topology reconstruction
-- [ ] Implement the two-pass polygon command decoder with original/duplicate key mapping.
-- [ ] Preserve command type, key, unknown bits, flags, triangle type/subtype, animated bit and color-pair commands.
-- [ ] Reconstruct triangle vertex indices, per-corner colors and texture references.
-- [ ] Add bounds diagnostics for footer, command count, duplicate keys, vertex/color/texture indices and malformed sequences.
-- [ ] Compare native reconstructed triangles against CrashEdit-RE on several Crash 2 models.
+### Phase 2 — validate topology reconstruction
+- [x] Implement the two-pass polygon command decoder with original/duplicate key mapping.
+- [x] Preserve raw command words and expose reconstructed triangle vertex indices, per-corner colors, texture index, triangle type/subtype and animated flag.
+- [ ] Audit all malformed-stream and index-boundary cases, including duplicate-key failures and command/footer handling.
+- [ ] Compare native reconstructed triangles against CrashEdit-RE on several real Crash 2 models; the current synthetic fan-triangle test is only a starting point.
 
-### Phase 3 — Model Editor UI and live preview
-- [ ] Build General, Polygons, Colors, Textures, Extended Textures and conditional Positions inspector pages, following the useful organization of CrashEdit-RE while retaining CrashEdit-VC's native UI conventions.
+### Phase 3 — structural Model inspection and Animation Editor integration
+- [ ] Build temporary General, Polygons, Colors, Textures, Extended Textures and conditional Positions pages as research/inspection tabs; do not treat the Colors and Textures tables as the final user-facing material-editing workflow.
 - [ ] In Polygons, provide both raw command inspection and decoded triangle inspection.
-- [ ] Make model vertices and polygons inspectable in the existing 3D Animation Viewer, using the selected animation pose when a linked frame is available.
+- [x] Keep the existing Model-to-Animation workspace handoff, selecting an Animation that references the chosen Model when possible.
 - [ ] Resolve texture descriptors through TPAG EIDs into existing type-1 texture chunks and CLUT data.
-- [ ] Ensure model edits refresh the Animation Viewer without reopening the Animation entry or resetting camera/playback state.
+- [ ] Add visual face selection in the Animation Editor, with a clear mapping from a selected rendered face to its Model triangle and per-corner color/texture references.
+- [ ] Ensure Model data changes refresh the Animation Editor without reopening the Animation entry or resetting camera/playback state.
 
-### Phase 4 — safe material and model editing
-- [ ] Start with color-table editing and texture-descriptor editing with validated references and live preview.
-- [ ] Add scale and TPAG edits only after renderer/resource resolution is validated.
-- [ ] Add extended-texture edits with separate flipbook/LOD field validation.
+### Phase 4 — visual material editing through the Animation Editor
+- [ ] Implement face-level color editing in the Animation Editor; edits must update the corresponding Model color records and per-corner color references safely.
+- [ ] Implement face-level texture assignment and descriptor editing in the Animation Editor, resolving TPAG page, texture descriptor and CLUT references.
+- [ ] Keep the Model Editor's Colors and Textures pages available as raw/structured inspection tools during this transition; do not remove them until the visual workflow covers their useful capabilities.
+- [ ] Add scale, TPAG and extended-texture editing only after renderer/resource resolution and binary round-trips are validated.
 - [ ] Keep unsupported raw command bits and unknown fields intact.
 
 ### Phase 5 — topology and animation vertex editing
@@ -170,5 +175,7 @@ This is the key Model-to-Animation dependency. Model position records are not th
 ## Current status
 
 - [x] Animation vertex marker display, V shortcut, depth-aware hardware overlay, hover/selection coloring and selected-vertex inspection — user-confirmed working on 2026-11-09 (major milestone).
-- [ ] Model decoder and Model Editor UI — next active phase.
-- [ ] Model-driven animation temporal vertex encoder — pending Model/Animation source parity and round-trip tests.
+- [x] Native Model and Animation decoding plus Model EID handoff into the 3D Animation Editor — existing implementation audited on 2026-11-09; real-sample parity remains pending.
+- [ ] Temporary structural Model research tabs, including Colors and Textures.
+- [ ] Visual face selection and material editing in the Animation Editor, writing changes back to the shared Model data.
+- [ ] Verified Model edit serialization and Model-driven animation temporal vertex encoder — pending source parity and round-trip tests.
