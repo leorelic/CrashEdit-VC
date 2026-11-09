@@ -2814,7 +2814,8 @@ void EditorUI::drawAnimationFrameEditor(){
    editShort("X Offset",0U,frame.xOffset);
    editShort("Y Offset",1U,frame.yOffset);
    editShort("Z Offset",2U,frame.zOffset);
-   editShort("Unknown",3U,frame.unknown);
+   editShort("Unknown (0x06)",3U,frame.unknown);
+   if(ImGui::IsItemHovered())ImGui::SetTooltip("Unidentified signed 16-bit animation-frame header value at byte offset 0x06. Its purpose is not yet verified.");
    if(!animationEntry->animation.isCrash3){
     if(!animationFrameModelEnameInitialized_||animationFrameModelEid_!=frame.modelEid||animationFrameModelEnameAnimationEid_!=animationEntry->eid||animationFrameModelEnameFrame_!=frameIndex){
      const std::string decodedModelEname=Crash::eidToEName(frame.modelEid);
@@ -3183,14 +3184,17 @@ void EditorUI::drawAnimationViewer(){
    if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
    return projectCamera(p);
   };
-  if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
-   float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();int bestVertex=-1;
+  int hoveredVertex=-1;
+  if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse){
+   float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();
    for(std::size_t vi=0;vi<displayPositions.size();++vi){
     const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
     const ImVec2 screen=projectCamera(camera);const float dx=screen.x-ImGui::GetIO().MousePos.x,dy=screen.y-ImGui::GetIO().MousePos.y;const float distance=std::sqrt(dx*dx+dy*dy);
-    if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;bestVertex=static_cast<int>(vi);}
+    if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);}
    }
-   if(bestVertex>=0){animationSelectedVertex_=bestVertex;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;}
+  }
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+   animationSelectedVertex_=hoveredVertex;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
   }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
@@ -3236,6 +3240,14 @@ void EditorUI::drawAnimationViewer(){
      ImU32 color=IM_COL32(165,190,220,235);
      if(tri.colorA<model->colors.size()){const auto&col=model->colors[tri.colorA];color=IM_COL32(col.r,col.g,col.b,235);}
      dl->AddLine(projected[a],projected[b],color,1.25f);dl->AddLine(projected[b],projected[c],color,1.25f);dl->AddLine(projected[c],projected[a],color,1.25f);
+    }
+    if(animationShowVertices_&&frame.verticesDecoded){
+     for(std::size_t vi=0;vi<displayPositions.size();++vi){
+      if(!visible[vi])continue;
+      const ImU32 color=static_cast<int>(vi)==animationSelectedVertex_?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
+      dl->AddCircleFilled(projected[vi],6.0f,color,16);
+      dl->AddCircle(projected[vi],7.0f,IM_COL32(20,24,30,255),16,1.5f);
+     }
     }
    }else{
     struct Vertex{float x,y,z,w,r,g,b,a,u,v,noCull;};
@@ -3426,11 +3438,12 @@ void EditorUI::drawAnimationViewer(){
       if(animationShowVertices_&&frame.verticesDecoded&&!displayPositions.empty()){
        std::vector<Vertex> vertexPoints;vertexPoints.reserve(displayPositions.size());
        auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
-       for(const auto&position:displayPositions){
+       for(std::size_t vi=0;vi<displayPositions.size();++vi){
+        const auto&position=displayPositions[vi];
         const CameraPoint cam=toCamera(position.x,position.y,position.z);if(cam.depth<=0.05f)continue;
         constexpr float nearP=.05f,farP=200.0f;
         const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
-        const ImU32 color=IM_COL32(255,190,64,255);
+        const ImU32 color=static_cast<int>(vi)==animationSelectedVertex_?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
         vertexPoints.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),1.0f,0.0f,0.0f,1.0f});
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
