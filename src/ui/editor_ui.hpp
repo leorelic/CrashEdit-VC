@@ -36,7 +36,7 @@ private:
  unsigned int animationDockId_=0;
  int animationViewerChunk_=-1,animationViewerEntry_=-1,animationFrame_=0;
  int animationCameraEntryEid_=-1;
- bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false,animationInterpolate_=true,animationHalfSpeed_=false,animationCollisionViewer_=false;
+ bool animationPlaying_=false,animationCameraInitialized_=false,animationWireframe_=false,animationInterpolate_=true,animationHalfSpeed_=false,animationCollisionViewer_=false,animationTexturesDisabled_=false;
  bool sceneCameraInitialized_=false;
  int textureFormat_=1,textureColorMode_=0,textureBlendMode_=0;
  int textureX_=0,textureY_=0,textureW_=64,textureH_=64,textureClutX_=0,textureClutY_=0;
