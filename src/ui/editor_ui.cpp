@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<4){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=4;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<5){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=5;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  bool showAnimationWorkspace=false;
@@ -387,10 +387,10 @@ void EditorUI::draw(){
   }
  }
  drawViewport();
+ drawBottom();
  if(showAnimationWorkspace)drawAnimationViewer();
  drawModelEditor();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
- drawBottom();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
  else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
  if(selectedChunk_==-2&&nsdValid_)drawSpawnPointsEditor();drawNsdGoolMap();
@@ -3064,8 +3064,8 @@ void EditorUI::drawAnimationViewer(){
   const auto selectedTriangle=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];
   ImGui::Separator();ImGui::Text("Selected Face %d",animationSelectedFace_);
   int textureIndex=selectedTriangle.textureIndex;bool animated=selectedTriangle.animated;
-  ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("Texture reference",&textureIndex)){textureIndex=std::clamp(textureIndex,0,255);if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture reference.";}
-  ImGui::SameLine();if(ImGui::Checkbox("Animated texture",&animated)){if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture mode.";}
+  ImGui::TextUnformatted("Texture reference");ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("##FaceTextureReference",&textureIndex)){textureIndex=std::clamp(textureIndex,0,255);if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture reference.";}
+  ImGui::TextUnformatted("Animated texture");ImGui::SameLine();if(ImGui::Checkbox("##FaceAnimatedTexture",&animated)){if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture mode.";}
   bool textureValid=true;const int descriptorIndex=Crash::resolveNsfModelTextureIndex(*model,selectedTriangle.textureIndex,selectedTriangle.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),textureValid);
   if(textureValid&&descriptorIndex>=0&&static_cast<std::size_t>(descriptorIndex)<model->textures.size()){
    const auto&descriptor=model->textures[static_cast<std::size_t>(descriptorIndex)];
@@ -3076,8 +3076,8 @@ void EditorUI::drawAnimationViewer(){
   for(std::size_t corner=0;corner<3U;++corner){
    ImGui::PushID(static_cast<int>(corner));
    int colorIndex=static_cast<int>(cornerColors[corner]);
-   ImGui::SetNextItemWidth(62.0f);
-   if(ImGui::InputInt("Index",&colorIndex)){
+   ImGui::TextUnformatted(cornerNames[corner]);ImGui::SameLine();ImGui::SetNextItemWidth(62.0f);
+   if(ImGui::InputInt("##ColorIndex",&colorIndex)){
     colorIndex=std::clamp(colorIndex,0,127);
     if(nsf_.setModelTriangleColorIndex(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),corner,static_cast<std::uint8_t>(colorIndex)))cornerColors[corner]=static_cast<std::size_t>(colorIndex);
    }
@@ -3085,7 +3085,7 @@ void EditorUI::drawAnimationViewer(){
     auto color=model->colors[cornerColors[corner]];
     float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
     ImGui::SameLine();
-    if(ImGui::ColorEdit3(cornerNames[corner],rgb,ImGuiColorEditFlags_NoInputs)){
+    if(ImGui::ColorEdit3("##CornerColor",rgb,ImGuiColorEditFlags_NoInputs)){
      color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
      color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
      color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
@@ -3615,17 +3615,20 @@ void EditorUI::drawModelEditor(){
  if(chunk.type!=0||selectedEntry_<0||static_cast<std::size_t>(selectedEntry_)>=chunk.entries.size())return;
  const auto&entry=chunk.entries[static_cast<std::size_t>(selectedEntry_)];
  if(!entry.valid||entry.type!=2||!entry.model.decoded)return;
+ if(ImGuiWindow* properties=ImGui::FindWindowByName("Properties"))
+  if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
  ImGui::Begin("Model Editor");
  const auto&model=entry.model;
+ auto labeledInt=[&](const char*label,const char*id,int&value,float width=180.0f){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(width);return ImGui::InputInt(id,&value);};
  ImGui::Text("%s | %zu vertices | %zu triangles",Crash::eidToEName(entry.eid).c_str(),model.vertexCount,model.triangles.size());
  if(!model.error.empty())ImGui::TextColored(ImVec4(1.0f,.45f,.35f,1.0f),"%s",model.error.c_str());
  if(!model.polygonError.empty())ImGui::TextColored(ImVec4(1.0f,.65f,.30f,1.0f),"%s",model.polygonError.c_str());
  if(ImGui::BeginTabBar("ModelEditorTabs")){
   if(ImGui::BeginTabItem("General")){
    int scaleX=model.scaleX,scaleY=model.scaleY,scaleZ=model.scaleZ;
-   if(ImGui::InputInt("Scale X",&scaleX))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),0,scaleX);
-   if(ImGui::InputInt("Scale Y",&scaleY))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),1,scaleY);
-   if(ImGui::InputInt("Scale Z",&scaleZ))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),2,scaleZ);
+   if(labeledInt("Scale X","##ScaleX",scaleX))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),0,scaleX);
+   if(labeledInt("Scale Y","##ScaleY",scaleY))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),1,scaleY);
+   if(labeledInt("Scale Z","##ScaleZ",scaleZ))nsf_.setModelScale(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),2,scaleZ);
    ImGui::Separator();ImGui::Text("Texture page references");
    for(std::size_t i=0;i<model.texturePageEids.size();++i){
     std::uint32_t eid=model.texturePageEids[i];ImGui::PushID(static_cast<int>(i));
@@ -3644,22 +3647,22 @@ void EditorUI::drawModelEditor(){
    ImGui::Text("Polygon words: %u | Reconstructed triangles: %zu | Header polygon count: %u",model.polygonWordCount,model.triangles.size(),model.polygonCount);
    static int triangleIndex=0;triangleIndex=std::clamp(triangleIndex,0,model.triangles.empty()?0:static_cast<int>(model.triangles.size()-1U));
    if(!model.triangles.empty()){
-    ImGui::SliderInt("Triangle",&triangleIndex,0,static_cast<int>(model.triangles.size()-1U));
+    ImGui::TextUnformatted("Triangle");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##Triangle",&triangleIndex,0,static_cast<int>(model.triangles.size()-1U));
     const auto tri=model.triangles[static_cast<std::size_t>(triangleIndex)];
     ImGui::Text("Vertices: %d, %d, %d",tri.a,tri.b,tri.c);
     ImGui::Text("Corner colors: %u, %u, %u",tri.colorA,tri.colorB,tri.colorC);
     int colorA=tri.colorA,colorB=tri.colorB,colorC=tri.colorC;
-    if(ImGui::InputInt("Color A index",&colorA)){colorA=std::clamp(colorA,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),0,static_cast<std::uint8_t>(colorA));}
-    if(ImGui::InputInt("Color B index",&colorB)){colorB=std::clamp(colorB,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),1,static_cast<std::uint8_t>(colorB));}
-    if(ImGui::InputInt("Color C index",&colorC)){colorC=std::clamp(colorC,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),2,static_cast<std::uint8_t>(colorC));}
+    if(labeledInt("Color A index","##ColorAIndex",colorA)){colorA=std::clamp(colorA,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),0,static_cast<std::uint8_t>(colorA));}
+    if(labeledInt("Color B index","##ColorBIndex",colorB)){colorB=std::clamp(colorB,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),1,static_cast<std::uint8_t>(colorB));}
+    if(labeledInt("Color C index","##ColorCIndex",colorC)){colorC=std::clamp(colorC,0,127);nsf_.setModelTriangleColorIndex(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),2,static_cast<std::uint8_t>(colorC));}
     ImGui::Text("Command word: %zu | Raw: %08X",tri.commandWordIndex,model.polygonWords[tri.commandWordIndex]);
     int texture=tri.textureIndex;bool animated=tri.animated;
-    if(ImGui::InputInt("Texture reference",&texture)){texture=std::clamp(texture,0,255);nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),static_cast<std::uint8_t>(texture),animated);}
+    if(labeledInt("Texture reference","##TextureReference",texture)){texture=std::clamp(texture,0,255);nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),static_cast<std::uint8_t>(texture),animated);}
     if(ImGui::Checkbox("Animated texture",&animated))nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),tri.textureIndex,animated);
    }
    ImGui::Separator();ImGui::Text("Raw command stream");
    static int rawWordIndex=0;rawWordIndex=std::clamp(rawWordIndex,0,model.polygonWords.empty()?0:static_cast<int>(model.polygonWords.size()-1U));
-   if(!model.polygonWords.empty()){ImGui::SliderInt("Raw word index",&rawWordIndex,0,static_cast<int>(model.polygonWords.size()-1U));ImGui::Text("Word %d: %08X",rawWordIndex,model.polygonWords[static_cast<std::size_t>(rawWordIndex)]);}
+   if(!model.polygonWords.empty()){ImGui::TextUnformatted("Raw word index");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##RawWordIndex",&rawWordIndex,0,static_cast<int>(model.polygonWords.size()-1U));ImGui::Text("Word %d: %08X",rawWordIndex,model.polygonWords[static_cast<std::size_t>(rawWordIndex)]);}
    if(ImGui::BeginTable("ModelRawPolygonWords",2,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,220))){
     ImGui::TableSetupColumn("Word");ImGui::TableSetupColumn("Raw value");ImGui::TableHeadersRow();
     const std::size_t count=std::min<std::size_t>(model.polygonWords.size(),256U);
@@ -3671,19 +3674,19 @@ void EditorUI::drawModelEditor(){
   if(ImGui::BeginTabItem("Colors")){
    static int colorIndex=0;colorIndex=std::clamp(colorIndex,0,model.colors.empty()?0:static_cast<int>(model.colors.size()-1U));
    if(!model.colors.empty()){
-    ImGui::SliderInt("Color record",&colorIndex,0,static_cast<int>(model.colors.size()-1U));
+    ImGui::TextUnformatted("Color record");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##ColorRecordSlider",&colorIndex,0,static_cast<int>(model.colors.size()-1U));
     auto color=model.colors[static_cast<std::size_t>(colorIndex)];float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
-    if(ImGui::ColorEdit3("RGB",rgb)){color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));nsf_.setModelColor(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(colorIndex),color);}
-    int extra=color.extra;if(ImGui::InputInt("Extra",&extra)){color.extra=static_cast<std::uint8_t>(std::clamp(extra,0,255));nsf_.setModelColor(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(colorIndex),color);}
+    ImGui::TextUnformatted("RGB");ImGui::SameLine();if(ImGui::ColorEdit3("##RGB",rgb)){color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));nsf_.setModelColor(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(colorIndex),color);}
+    int extra=color.extra;if(labeledInt("Extra","##ColorExtra",extra)){color.extra=static_cast<std::uint8_t>(std::clamp(extra,0,255));nsf_.setModelColor(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(colorIndex),color);}
    }
    ImGui::Text("Color records: %zu",model.colors.size());ImGui::EndTabItem();
   }
   if(ImGui::BeginTabItem("Textures")){
    static int textureIndex=0;textureIndex=std::clamp(textureIndex,0,model.textures.empty()?0:static_cast<int>(model.textures.size()-1U));
    if(!model.textures.empty()){
-    ImGui::SliderInt("Texture descriptor",&textureIndex,0,static_cast<int>(model.textures.size()-1U));
+    ImGui::TextUnformatted("Texture descriptor");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##TextureDescriptorSlider",&textureIndex,0,static_cast<int>(model.textures.size()-1U));
     auto texture=model.textures[static_cast<std::size_t>(textureIndex)];
-    auto byteInput=[&](const char*label,std::uint8_t&value){int v=value;if(ImGui::InputInt(label,&v)){value=static_cast<std::uint8_t>(std::clamp(v,0,255));return true;}return false;};
+    auto byteInput=[&](const char*label,std::uint8_t&value){int v=value;ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("##Value",&v)){value=static_cast<std::uint8_t>(std::clamp(v,0,255));return true;}return false;};
     bool changed=false;
     changed|=byteInput("U1",texture.u1);changed|=byteInput("V1",texture.v1);changed|=byteInput("U2",texture.u2);changed|=byteInput("V2",texture.v2);
     changed|=byteInput("U3",texture.u3);changed|=byteInput("V3",texture.v3);changed|=byteInput("U4",texture.u4);changed|=byteInput("V4",texture.v4);
@@ -3696,7 +3699,7 @@ void EditorUI::drawModelEditor(){
   if(ImGui::BeginTabItem("Extended Textures")){
    static int extendedIndex=0;extendedIndex=std::clamp(extendedIndex,0,model.extendedTextureWords.empty()?0:static_cast<int>(model.extendedTextureWords.size()-1U));
    if(!model.extendedTextureWords.empty()){
-    ImGui::SliderInt("Extended texture record",&extendedIndex,0,static_cast<int>(model.extendedTextureWords.size()-1U));
+    ImGui::TextUnformatted("Extended texture record");ImGui::SameLine();ImGui::SetNextItemWidth(220.0f);ImGui::SliderInt("##ExtendedTextureRecordSlider",&extendedIndex,0,static_cast<int>(model.extendedTextureWords.size()-1U));
     std::uint32_t raw=model.extendedTextureWords[static_cast<std::size_t>(extendedIndex)];
     if(ImGui::InputScalar("Raw word",ImGuiDataType_U32,&raw,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelExtendedTextureWord(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(extendedIndex),raw);
     auto record=model.extendedTextures[static_cast<std::size_t>(extendedIndex)];
