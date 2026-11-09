@@ -187,4 +187,27 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
  std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));Crash::NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
+
+ // Compressed Model positions use signed, variable-width X-Z-Y deltas.
+ std::vector<std::uint8_t> compressedModelChunk(65536);p16(compressedModelChunk,0,0x1234);p16(compressedModelChunk,2,0);p32(compressedModelChunk,4,6);p32(compressedModelChunk,8,1);
+ constexpr std::size_t cmEntry=24,cmItems=6,cmTable=16+cmItems*4;const std::size_t cmSizes[]={0x50,12,52,12,4,12};std::size_t cmEntrySize=cmTable;for(auto n:cmSizes)cmEntrySize+=n;
+ p32(compressedModelChunk,16,cmEntry);p32(compressedModelChunk,20,cmEntry+cmEntrySize);p32(compressedModelChunk,cmEntry,0x0100ffff);p32(compressedModelChunk,cmEntry+4,0x0200007b);p32(compressedModelChunk,cmEntry+8,2);p32(compressedModelChunk,cmEntry+12,cmItems);
+ std::size_t cmOffset=cmTable;for(std::size_t i=0;i<cmItems;++i){p32(compressedModelChunk,cmEntry+16+i*4,cmOffset);cmOffset+=cmSizes[i];}p32(compressedModelChunk,cmEntry+16+cmItems*4,static_cast<std::uint32_t>(cmEntrySize));
+ const std::size_t cmInfo=cmEntry+cmTable,cmPoly=cmInfo+0x50,cmColors=cmPoly+12,cmTextures=cmColors+52,cmExtended=cmTextures+12,cmPositions=cmExtended+4;
+ p32(compressedModelChunk,cmInfo+0x2c,3);p32(compressedModelChunk,cmInfo+0x34,1);p32(compressedModelChunk,cmInfo+0x38,3);p32(compressedModelChunk,cmInfo+0x3c,13);p32(compressedModelChunk,cmInfo+0x40,1);p32(compressedModelChunk,cmInfo+0x44,1);p32(compressedModelChunk,cmInfo+0x48,1);p32(compressedModelChunk,cmInfo+0x0c,0x4cd8206fU);
+ for(std::uint32_t i=0;i<3;++i)p32(compressedModelChunk,cmPoly+i*4,0x80000000U|((i+1U)<<16U)|((10U+i)<<9U)|1U);
+ for(std::uint32_t i=0;i<13;++i){compressedModelChunk[cmColors+i*4]=static_cast<std::uint8_t>(i);compressedModelChunk[cmColors+i*4+1]=static_cast<std::uint8_t>(i+1);compressedModelChunk[cmColors+i*4+2]=static_cast<std::uint8_t>(i+2);}
+ p32(compressedModelChunk,cmExtended,0x00001001U);for(std::uint32_t i=0;i<3;++i)p32(compressedModelChunk,cmPositions+i*4,0x000001ffU);
+ std::vector<std::uint8_t> compressedAnimationChunk(65536);p16(compressedAnimationChunk,0,0x1234);p16(compressedAnimationChunk,2,0);p32(compressedAnimationChunk,4,7);p32(compressedAnimationChunk,8,1);
+ constexpr std::size_t caEntry=24,caFrame=44,caEntrySize=56;p32(compressedAnimationChunk,16,caEntry);p32(compressedAnimationChunk,20,caEntry+caEntrySize);
+ p32(compressedAnimationChunk,caEntry,0x0100ffff);p32(compressedAnimationChunk,caEntry+4,0x0200007b);p32(compressedAnimationChunk,caEntry+8,1);p32(compressedAnimationChunk,caEntry+12,1);p32(compressedAnimationChunk,caEntry+16,20);p32(compressedAnimationChunk,caEntry+20,caEntrySize);
+ p32(compressedAnimationChunk,caFrame+8,3);p32(compressedAnimationChunk,caFrame+12,0);p32(compressedAnimationChunk,caFrame+16,0x0200007b);p32(compressedAnimationChunk,caFrame+20,24);
+ std::vector<std::uint8_t> compressedArchiveBytes;compressedArchiveBytes.reserve(131072);compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedModelChunk.begin(),compressedModelChunk.end());compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
+ Crash::NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
+ assert(compressedArchive.chunks().size()==2&&compressedArchive.chunks()[0].entries[0].model.compressed);
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
+ assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
+ std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));Crash::NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
+ assert(compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
