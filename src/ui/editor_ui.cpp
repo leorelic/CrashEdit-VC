@@ -3434,6 +3434,9 @@ void EditorUI::drawAnimationViewer(){
         vertexPoints.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),1.0f,0.0f,0.0f,1.0f});
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
+       // The preceding model pass may leave subtractive PS1 blending active.
+       // Set the overlay blend state explicitly, independent of Collision Viewer.
+       GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
        const int pointMode=GL::GetUniformLocation(gpu.program,"uPointMode");GL::Uniform1i(pointMode,1);
        GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::PointSize(14.0f);
        if(!vertexPoints.empty()){GL::BufferData(0x8892U,GL::SizePtr(vertexPoints.size()*sizeof(Vertex)),vertexPoints.data(),0x88E8U);GL::DrawArrays(0x0000U,0,int(vertexPoints.size()));}
