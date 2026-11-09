@@ -3623,7 +3623,11 @@ void EditorUI::drawModelEditor(){
     std::uint32_t eid=model.texturePageEids[i];ImGui::PushID(static_cast<int>(i));
     ImGui::SetNextItemWidth(180.0f);
     if(ImGui::InputScalar(("TPAG "+std::to_string(i)).c_str(),ImGuiDataType_U32,&eid,nullptr,nullptr,"%08X",ImGuiInputTextFlags_CharsHexadecimal))nsf_.setModelTexturePageEid(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),i,eid);
-    ImGui::SameLine();ImGui::TextDisabled("%s",Crash::eidToEName(eid).c_str());ImGui::PopID();
+    ImGui::SameLine();ImGui::TextDisabled("%s",Crash::eidToEName(eid).c_str());
+    bool pageResolved=false;
+    for(std::size_t textureChunk=0;textureChunk<nsf_.chunks().size();++textureChunk){const auto&candidate=nsf_.chunks()[textureChunk];if(candidate.type==1&&static_cast<std::uint32_t>(candidate.chunkId)==eid){pageResolved=true;break;}}
+    ImGui::SameLine();if(pageResolved)ImGui::TextDisabled("Resolved");else ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"Missing page");
+    ImGui::PopID();
    }
    ImGui::TextDisabled("Compressed positions: %zu | Special vertices: %u",model.positions.size(),model.specialVertexCount);
    ImGui::EndTabItem();
@@ -3645,7 +3649,9 @@ void EditorUI::drawModelEditor(){
     if(ImGui::InputInt("Texture reference",&texture)){texture=std::clamp(texture,0,255);nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),static_cast<std::uint8_t>(texture),animated);}
     if(ImGui::Checkbox("Animated texture",&animated))nsf_.setModelTriangleTexture(static_cast<std::size_t>(selectedChunk_),static_cast<std::size_t>(selectedEntry_),static_cast<std::size_t>(triangleIndex),tri.textureIndex,animated);
    }
-   ImGui::Separator();ImGui::Text("Raw command stream (first 256 words)");
+   ImGui::Separator();ImGui::Text("Raw command stream");
+   static int rawWordIndex=0;rawWordIndex=std::clamp(rawWordIndex,0,model.polygonWords.empty()?0:static_cast<int>(model.polygonWords.size()-1U));
+   if(!model.polygonWords.empty()){ImGui::SliderInt("Raw word index",&rawWordIndex,0,static_cast<int>(model.polygonWords.size()-1U));ImGui::Text("Word %d: %08X",rawWordIndex,model.polygonWords[static_cast<std::size_t>(rawWordIndex)]);}
    if(ImGui::BeginTable("ModelRawPolygonWords",2,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY|ImGuiTableFlags_SizingFixedFit,ImVec2(0,220))){
     ImGui::TableSetupColumn("Word");ImGui::TableSetupColumn("Raw value");ImGui::TableHeadersRow();
     const std::size_t count=std::min<std::size_t>(model.polygonWords.size(),256U);
