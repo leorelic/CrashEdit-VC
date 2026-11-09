@@ -3099,7 +3099,7 @@ void EditorUI::drawAnimationViewer(){
     if(ImGui::IsKeyDown(ImGuiKey_W)){animationTargetX_-=syaw*moveSpeed;animationTargetZ_-=cyaw*moveSpeed;}
     if(ImGui::IsKeyDown(ImGuiKey_S)){animationTargetX_+=syaw*moveSpeed;animationTargetZ_+=cyaw*moveSpeed;}
     if(ImGui::IsKeyDown(ImGuiKey_A)){animationTargetX_-=cyaw*moveSpeed;animationTargetZ_+=syaw*moveSpeed;}
-    if(ImGui::IsKeyDown(ImGuiKey_D)){animationTargetX_+=cyaw*moveSpeed;animationTargetZ_-=cyaw*moveSpeed;}
+    if(ImGui::IsKeyDown(ImGuiKey_D)){animationTargetX_+=cyaw*moveSpeed;animationTargetZ_-=syaw*moveSpeed;}
    }
    if(ImGui::IsKeyDown(ImGuiKey_E))animationTargetY_+=moveSpeed;
    if(ImGui::IsKeyDown(ImGuiKey_Q))animationTargetY_-=moveSpeed;
@@ -3128,8 +3128,13 @@ void EditorUI::drawAnimationViewer(){
   // perspective division so rotating close to the floor cannot fling lines
   // across the viewport.
   constexpr float groundY=0.0f;
-  const float planeExtent=std::max(2.0f,radius*2.5f);
-  constexpr float planeX=0.0f,planeZ=0.0f;
+  // Draw a camera-local section of a world-aligned grid, snapped to fixed spacing.
+  const float gridStep=std::max(0.25f,radius/8.0f);
+  const float gridViewExtent=std::max(radius*2.5f,animationDistance_*1.5f);
+  const int gridLines=std::clamp(static_cast<int>(std::ceil(gridViewExtent/gridStep)),8,64);
+  const float planeExtent=gridStep*static_cast<float>(gridLines);
+  const float planeX=std::round(animationTargetX_/gridStep)*gridStep;
+  const float planeZ=std::round(animationTargetZ_/gridStep)*gridStep;
   if(animationWireframe_){
   // Wireframe mode uses the ground grid as a reference only; no solid face is drawn.
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
@@ -3143,8 +3148,6 @@ void EditorUI::drawAnimationViewer(){
    }
    dl->AddLine(projectCamera(a),projectCamera(b),color,width);
   };
-  const int gridLines=16;
-  const float gridStep=planeExtent/static_cast<float>(gridLines);
   for(int i=-gridLines;i<=gridLines;++i){
    const float offset=static_cast<float>(i)*gridStep;
    const ImU32 gridColor=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
@@ -3192,6 +3195,9 @@ void EditorUI::drawAnimationViewer(){
       using TextureKey=std::tuple<const std::vector<std::uint8_t>*,int,int,int>;
       using BatchKey=std::pair<TextureKey,int>;
       std::map<BatchKey,std::vector<Vertex>> batches;
+      using FaceVertexKey=std::array<std::int64_t,3>;
+      using FaceKey=std::array<FaceVertexKey,3>;
+      std::map<FaceKey,int> duplicateFaceOrder;
       std::map<std::uint32_t,const std::vector<std::uint8_t>*> pageLookup;
       for(const auto&chunk:nsf_.chunks())if(chunk.type==1&&chunk.bytes.size()>=65536U){
        const std::uint32_t pageId=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8U)|(std::uint32_t(chunk.bytes[6])<<16U)|(std::uint32_t(chunk.bytes[7])<<24U);
@@ -3205,6 +3211,15 @@ void EditorUI::drawAnimationViewer(){
        const int vi[3]={baseVertices[order[0]],baseVertices[order[1]],baseVertices[order[2]]};
        const int ci[3]={baseColors[order[0]],baseColors[order[1]],baseColors[order[2]]};
        if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
+       // Later PS1 polygons overdraw earlier coincident faces. Apply a tiny
+       // depth priority only to identical triangles so overlays remain stable.
+       FaceKey faceKey{};
+       for(int k=0;k<3;++k){
+        const auto&p=displayPositions[static_cast<std::size_t>(vi[k])];
+        faceKey[static_cast<std::size_t>(k)]={static_cast<std::int64_t>(std::llround(double(p.x)*100000.0)),static_cast<std::int64_t>(std::llround(double(p.y)*100000.0)),static_cast<std::int64_t>(std::llround(double(p.z)*100000.0))};
+       }
+       std::sort(faceKey.begin(),faceKey.end());
+       const int duplicateOrder=duplicateFaceOrder[faceKey]++;
        const Crash::NsfModelTexture*tex=nullptr;
        int textureId=static_cast<int>(tri.textureIndex)-1;
        bool textureValid=true;
@@ -3248,7 +3263,7 @@ void EditorUI::drawAnimationViewer(){
        const int blendMode=(!tex||!page)?3:(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3);
        const TextureKey textureKey{page,mode,clutX,clutY};
        auto&out=batches[BatchKey{textureKey,blendMode}];
-       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
+       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];const auto cam=toCamera(p.x,p.y,p.z);const auto screen=projectCamera(cam);const float nx=2.0f*(screen.x-canvasMin.x)/canvasSize.x-1.0f,ny=1.0f-2.0f*(screen.y-canvasMin.y)/canvasSize.y;constexpr float nearP=.05f,farP=200.0f;const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP)-float(duplicateOrder)*0.000002f;ImU32 col=IM_COL32(180,180,180,255);if(ci[k]>=0&&std::size_t(ci[k])<model->colors.size()){const auto&v=model->colors[std::size_t(ci[k])];col=IM_COL32(v.r,v.g,v.b,255);}auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};const int width=1024>>mode;out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(col,IM_COL32_R_SHIFT),channel(col,IM_COL32_G_SHIFT),channel(col,IM_COL32_B_SHIFT),1.0f,page?ux[k]/float(width):0.0f,page?uy[k]/128.0f:0.0f});}
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
       GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
@@ -3278,7 +3293,6 @@ void EditorUI::drawAnimationViewer(){
        }
        Vertex va{},vb{};if(makePlaneVertex(a,color,va)&&makePlaneVertex(b,color,vb)){planeGrid.push_back(va);planeGrid.push_back(vb);}
       };
-      const int gridLines=16;const float gridStep=planeExtent/static_cast<float>(gridLines);
       for(int i=-gridLines;i<=gridLines;++i){
        const float offset=static_cast<float>(i)*gridStep;
        const ImU32 color=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
