@@ -42,7 +42,6 @@ struct EditorPreferences {
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
  bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=false;
- float animationGroundPlaneY=0.0f;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
@@ -139,7 +138,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
  else if(std::sscanf(line,"PALRegion=%d",&value)==1)editorPreferences.palRegion=value!=0;
  else if(std::sscanf(line,"AnimationPlaybackMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
- else if(std::sscanf(line,"AnimationGroundPlaneY=%f",&editorPreferences.animationGroundPlaneY)==1){}
+
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -148,8 +147,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationPlaybackMode=%d\nAnimationGroundPlaneY=%.6f\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.animationGroundPlaneY,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationPlaybackMode=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -3009,10 +3008,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::TextUnformatted("Rendering");
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
   ImGui::MenuItem("Collision Viewer",nullptr,&animationCollisionViewer_);
-  ImGui::Separator();
-  ImGui::TextUnformatted("Ground plane");
-  ImGui::SetNextItemWidth(180.0f);
-  ImGui::DragFloat("Y Position",&editorPreferences.animationGroundPlaneY,0.01f,-10000.0f,10000.0f,"%.3f");
+  ImGui::MenuItem("Disable Textures",nullptr,&animationTexturesDisabled_);
   ImGui::Separator();
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
@@ -3033,21 +3029,27 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SetNextItemAllowOverlap();
  ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
+ const ImGuiIO&shortcutIo=ImGui::GetIO();
+ if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
+  if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
+  if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
+  if(ImGui::IsKeyPressed(ImGuiKey_T,false))animationTexturesDisabled_=!animationTexturesDisabled_;
+ }
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));dl->PushClipRect(canvasMin,canvasMax,true);
  if(!frame.verticesDecoded||frame.vertices.empty()){
   const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
  }else{
-  // Frame offsets move the animated geometry, not the viewer camera. Use the
-  // linked model's base geometry for stable camera framing.
+  // Frame all animation poses, including their source frame offsets, once when
+  // opening the animation. Later offset edits move the geometry without recentering.
   AnimationPoint boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
   bool haveBounds=false;
   for(const auto&candidate:animation.frames){
    if(!candidate.verticesDecoded)continue;
    const auto*candidateModel=findModel(animation.isCrash3?candidate.linkedModelEid:candidate.modelEid);
    for(const auto&v:candidate.vertices){
-    const AnimationPoint p=transformVertex(v,candidate,candidateModel,false);
+    const AnimationPoint p=transformVertex(v,candidate,candidateModel);
     boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
     boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
     haveBounds=true;
@@ -3120,7 +3122,7 @@ void EditorUI::drawAnimationViewer(){
   // Clip each segment against the camera near plane before
   // perspective division so rotating close to the floor cannot fling lines
   // across the viewport.
-  const float groundY=editorPreferences.animationGroundPlaneY;
+  constexpr float groundY=0.0f;
   const float planeExtent=std::max(2.0f,radius*2.5f);
   constexpr float planeX=0.0f,planeZ=0.0f;
   if(animationWireframe_){
@@ -3254,7 +3256,7 @@ void EditorUI::drawAnimationViewer(){
       }
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
       GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
-      auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page?getTexture(textureKey):0);GL::Uniform1i(has,page?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
+      auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page&&!animationTexturesDisabled_?getTexture(textureKey):0);GL::Uniform1i(has,page&&!animationTexturesDisabled_?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
       // Render the ground as real depth-buffer geometry. Models below the
       // selected Y plane are occluded; models above it remain visible.
       auto makePlaneVertex=[&](const CameraPoint&cam,ImU32 color,Vertex&out){
@@ -3318,8 +3320,11 @@ void EditorUI::drawAnimationViewer(){
         const float ny=(cam.y*focal/cam.depth)/canvasSize.y*2.0f;
         constexpr float nearP=.05f,farP=200.0f;
         const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
+        // Pull collision geometry a tiny amount toward the camera in depth
+        // space so coincident collision/model surfaces do not z-fight.
+        const float collisionDepthBias=0.0005f;
         auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
-        out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f});
+        out.push_back({nx*cam.depth,ny*cam.depth,cz-collisionDepthBias,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f});
         return true;
        };
        for(const auto&collision:frame.collisions){
@@ -3412,7 +3417,7 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
  for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
- ImGui::TextDisabled("Left drag: orbit | Right drag: pan | Wheel: zoom | WASD: move | Q/E: down/up | Shift: world-aligned | R: reset camera");
+ ImGui::TextDisabled("Left drag: orbit | Right drag: pan | Wheel: zoom | WASD: move | Q/E: down/up | C: collisions | X: wireframe | T: textures | R: reset camera");
  ImGui::End();
 }
 
