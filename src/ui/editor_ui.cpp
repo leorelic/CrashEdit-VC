@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<5){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=5;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<6){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=6;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  bool showAnimationWorkspace=false;
@@ -389,6 +389,7 @@ void EditorUI::draw(){
  drawViewport();
  drawBottom();
  if(showAnimationWorkspace)drawAnimationViewer();
+ if(showAnimationWorkspace&&animationFaceEditing_)drawFaceEditor();
  drawModelEditor();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
@@ -3060,43 +3061,6 @@ void EditorUI::drawAnimationViewer(){
    ImGui::EndCombo();
   }
  }
- if(model&&linkedModelLocationValid&&animationSelectedFace_>=0&&static_cast<std::size_t>(animationSelectedFace_)<model->triangles.size()){
-  const auto selectedTriangle=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];
-  ImGui::Separator();ImGui::Text("Selected Face %d",animationSelectedFace_);
-  int textureIndex=selectedTriangle.textureIndex;bool animated=selectedTriangle.animated;
-  ImGui::TextUnformatted("Texture reference");ImGui::SameLine();ImGui::SetNextItemWidth(110.0f);if(ImGui::InputInt("##FaceTextureReference",&textureIndex)){textureIndex=std::clamp(textureIndex,0,255);if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture reference.";}
-  ImGui::TextUnformatted("Animated texture");ImGui::SameLine();if(ImGui::Checkbox("##FaceAnimatedTexture",&animated)){if(nsf_.setModelTriangleTexture(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(textureIndex),animated))status_="Updated selected face texture mode.";}
-  bool textureValid=true;const int descriptorIndex=Crash::resolveNsfModelTextureIndex(*model,selectedTriangle.textureIndex,selectedTriangle.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),textureValid);
-  if(textureValid&&descriptorIndex>=0&&static_cast<std::size_t>(descriptorIndex)<model->textures.size()){
-   const auto&descriptor=model->textures[static_cast<std::size_t>(descriptorIndex)];
-   ImGui::TextDisabled("Descriptor %d | TPAG slot %u | Page EID %08X",descriptorIndex,static_cast<unsigned>(descriptor.page),descriptor.page<model->texturePageEids.size()?model->texturePageEids[descriptor.page]:0U);
-  }else ImGui::TextDisabled("No resolved texture descriptor for this face.");
-  std::size_t cornerColors[3]={selectedTriangle.colorA,selectedTriangle.colorB,selectedTriangle.colorC};
-  const char*cornerNames[3]={"Corner A","Corner B","Corner C"};
-  for(std::size_t corner=0;corner<3U;++corner){
-   ImGui::PushID(static_cast<int>(corner));
-   int colorIndex=static_cast<int>(cornerColors[corner]);
-   ImGui::TextUnformatted(cornerNames[corner]);ImGui::SameLine();ImGui::SetNextItemWidth(62.0f);
-   if(ImGui::InputInt("##ColorIndex",&colorIndex)){
-    colorIndex=std::clamp(colorIndex,0,127);
-    if(nsf_.setModelTriangleColorIndex(linkedModelChunkIndex,linkedModelEntryIndex,static_cast<std::size_t>(animationSelectedFace_),corner,static_cast<std::uint8_t>(colorIndex)))cornerColors[corner]=static_cast<std::size_t>(colorIndex);
-   }
-   if(cornerColors[corner]<model->colors.size()){
-    auto color=model->colors[cornerColors[corner]];
-    float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
-    ImGui::SameLine();
-    if(ImGui::ColorEdit3("##CornerColor",rgb,ImGuiColorEditFlags_NoInputs)){
-     color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
-     color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
-     color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
-     nsf_.setModelColor(linkedModelChunkIndex,linkedModelEntryIndex,cornerColors[corner],color);
-    }
-    ImGui::SameLine();ImGui::TextDisabled("%s | shared record",cornerNames[corner]);
-   }
-   ImGui::PopID();
-  }
-  ImGui::TextDisabled("Color edits affect every face that references the same Model color record.");
- }
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
  else if(!model&&animation.isCrash3&&!Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("No matching GOOL VertexGroup3 links this animation to a Model.");
@@ -3245,7 +3209,7 @@ void EditorUI::drawAnimationViewer(){
    animationSelectedVertex_=hoveredVertex;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
   }
   int hoveredFace=-1;float nearestFaceDepth=std::numeric_limits<float>::max();
-  if(hovered&&!viewportToolbarOwnsMouse&&model&&model->polygonsDecoded){
+  if(animationFaceEditing_&&hovered&&!viewportToolbarOwnsMouse&&model&&model->polygonsDecoded){
    const ImVec2 mouse=io.MousePos;
    for(std::size_t ti=0;ti<model->triangles.size();++ti){
     const auto&tri=model->triangles[ti];const int offset=static_cast<int>(frame.specialVertexCount);
@@ -3266,14 +3230,8 @@ void EditorUI::drawAnimationViewer(){
    }
   }
   animationHoveredFace_=hoveredFace;
-  if(hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
+  if(animationFaceEditing_&&hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
    animationSelectedFace_=hoveredFace;animationPlaying_=false;
-  }
-  std::array<ImVec2,3> faceOutlinePoints{};bool faceOutlineValid=false;
-  if(animationSelectedFace_>=0&&model&&static_cast<std::size_t>(animationSelectedFace_)<model->triangles.size()){
-   const auto&tri=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];const int offset=static_cast<int>(frame.specialVertexCount);
-   const int ids[3]={tri.a+offset,tri.b+offset,tri.c+offset};faceOutlineValid=true;
-   for(int k=0;k<3;++k){if(ids[k]<0||static_cast<std::size_t>(ids[k])>=displayPositions.size()){faceOutlineValid=false;break;}const auto&p=displayPositions[static_cast<std::size_t>(ids[k])];const auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f){faceOutlineValid=false;break;}faceOutlinePoints[static_cast<std::size_t>(k)]=projectCamera(cam);}
   }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
@@ -3529,10 +3487,6 @@ void EditorUI::drawAnimationViewer(){
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
    dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
   }
- if(faceOutlineValid){
-  dl->AddConvexPolyFilled(faceOutlinePoints.data(),3,IM_COL32(255,170,40,38));
-  for(int k=0;k<3;++k)dl->AddLine(faceOutlinePoints[static_cast<std::size_t>(k)],faceOutlinePoints[static_cast<std::size_t>((k+1)%3)],IM_COL32(255,190,65,255),2.5f);
- }
  // Match CrashEdit-RE: collision bounds use their own 102400-unit scale and
  // are positioned from the frame collision offset, independently of model scale.
  if(animationCollisionViewer_&&animationWireframe_&&!frame.collisions.empty()){
@@ -3609,6 +3563,32 @@ void EditorUI::drawAnimationViewer(){
 }
 
 
+void EditorUI::drawFaceEditor(){
+ if(!animationFaceEditing_||animationSelectedFace_<0||animationViewerChunk_<0||static_cast<std::size_t>(animationViewerChunk_)>=nsf_.chunks().size())return;
+ const auto&ac=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+ if(ac.type!=0||animationViewerEntry_<0||static_cast<std::size_t>(animationViewerEntry_)>=ac.entries.size())return;
+ const auto&ae=ac.entries[static_cast<std::size_t>(animationViewerEntry_)];
+ if(!ae.valid||ae.type!=1||!ae.animation.decoded||ae.animation.frames.empty())return;
+ const auto&animation=ae.animation;const auto&frame=animation.frames[std::min<std::size_t>(static_cast<std::size_t>(std::max(0,animationFrame_)),animation.frames.size()-1U)];
+ const std::uint32_t eid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
+ std::size_t mc=0,me=0;const Crash::NsfModel*model=nullptr;
+ for(std::size_t ci=0;ci<nsf_.chunks().size()&&!model;++ci){const auto&ch=nsf_.chunks()[ci];if(ch.type!=0||!ch.entryTableValid)continue;for(std::size_t ei=0;ei<ch.entries.size();++ei){const auto&e=ch.entries[ei];if(e.valid&&e.type==2&&e.eid==eid&&e.model.decoded){model=&e.model;mc=ci;me=ei;break;}}}
+ if(!model||!model->polygonsDecoded||static_cast<std::size_t>(animationSelectedFace_)>=model->triangles.size())return;
+ if(ImGuiWindow*properties=ImGui::FindWindowByName("Properties"))if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
+ ImGui::Begin("Face Editor");ImGui::Text("Face %d | %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
+ const auto tri=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];int texture=tri.textureIndex;bool animated=tri.animated;
+ ImGui::TextUnformatted("Texture reference");ImGui::SameLine();ImGui::SetNextItemWidth(110);
+ if(ImGui::InputInt("##FaceTextureReference",&texture)){texture=std::clamp(texture,0,255);if(nsf_.setModelTriangleTexture(mc,me,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(texture),animated))status_="Updated selected face texture reference.";}
+ ImGui::TextUnformatted("Animated texture");ImGui::SameLine();if(ImGui::Checkbox("##FaceAnimatedTexture",&animated))if(nsf_.setModelTriangleTexture(mc,me,static_cast<std::size_t>(animationSelectedFace_),static_cast<std::uint8_t>(texture),animated))status_="Updated selected face texture mode.";
+ bool valid=true;const int descriptor=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),valid);
+ if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model->textures.size()){const auto&d=model->textures[static_cast<std::size_t>(descriptor)];ImGui::TextDisabled("Descriptor %d | TPAG slot %u | Page EID %08X",descriptor,static_cast<unsigned>(d.page),d.page<model->texturePageEids.size()?model->texturePageEids[d.page]:0U);}else ImGui::TextDisabled("No resolved texture descriptor for this face.");
+ std::size_t colors[3]={tri.colorA,tri.colorB,tri.colorC};const char*names[3]={"Corner A","Corner B","Corner C"};
+ for(std::size_t c=0;c<3;++c){ImGui::PushID(static_cast<int>(c));int index=static_cast<int>(colors[c]);ImGui::TextUnformatted(names[c]);ImGui::SameLine();ImGui::SetNextItemWidth(62);
+  if(ImGui::InputInt("##ColorIndex",&index)){index=std::clamp(index,0,127);if(nsf_.setModelTriangleColorIndex(mc,me,static_cast<std::size_t>(animationSelectedFace_),c,static_cast<std::uint8_t>(index)))colors[c]=static_cast<std::size_t>(index);}
+  if(colors[c]<model->colors.size()){auto color=model->colors[colors[c]];float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};ImGui::SameLine();if(ImGui::ColorEdit3("##CornerColor",rgb,ImGuiColorEditFlags_NoInputs)){color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255)),0,255));color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255)),0,255));color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255)),0,255));nsf_.setModelColor(mc,me,colors[c],color);}ImGui::SameLine();ImGui::TextDisabled("%s | shared record",names[c]);}ImGui::PopID();}
+ ImGui::TextWrapped("Color edits affect every face that references the same Model color record.");ImGui::PopTextWrapPos();ImGui::End();
+}
+
 void EditorUI::drawModelEditor(){
  if(!nsfValid_||selectedChunk_<0||static_cast<std::size_t>(selectedChunk_)>=nsf_.chunks().size())return;
  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
@@ -3618,6 +3598,7 @@ void EditorUI::drawModelEditor(){
  if(ImGuiWindow* properties=ImGui::FindWindowByName("Properties"))
   if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
  ImGui::Begin("Model Editor");
+ ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
  const auto&model=entry.model;
  auto labeledInt=[&](const char*label,const char*id,int&value,float width=180.0f){ImGui::TextUnformatted(label);ImGui::SameLine();ImGui::SetNextItemWidth(width);return ImGui::InputInt(id,&value);};
  ImGui::Text("%s | %zu vertices | %zu triangles",Crash::eidToEName(entry.eid).c_str(),model.vertexCount,model.triangles.size());
@@ -3755,6 +3736,7 @@ void EditorUI::drawModelEditor(){
   }
   ImGui::EndTabBar();
  }
+ ImGui::PopTextWrapPos();
  ImGui::End();
 }
 
