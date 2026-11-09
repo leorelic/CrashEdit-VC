@@ -3123,6 +3123,7 @@ void EditorUI::drawAnimationViewer(){
   const float groundY=editorPreferences.animationGroundPlaneY;
   const float planeExtent=std::max(2.0f,radius*2.5f);
   constexpr float planeX=0.0f,planeZ=0.0f;
+  if(animationWireframe_){
   const ImVec2 floorCorners[4]={
    project(planeX-planeExtent,groundY,planeZ-planeExtent),
    project(planeX+planeExtent,groundY,planeZ-planeExtent),
@@ -3152,6 +3153,7 @@ void EditorUI::drawAnimationViewer(){
    const float width=i==0?1.5f:1.0f;
    drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,width);
    drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,width);
+  }
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
    if(animationWireframe_){
@@ -3253,7 +3255,52 @@ void EditorUI::drawAnimationViewer(){
       auto getTexture=[&](const TextureKey&key){const auto*page=std::get<0>(key);if(!page)return 0U;auto it=gpu.textures.find(key);if(it!=gpu.textures.end())return it->second;const int mode=std::get<1>(key),cx=std::get<2>(key),cy=std::get<3>(key),width=1024>>mode;std::vector<std::uint8_t>rgba(std::size_t(width)*128U*4U,0);auto ex=[](unsigned x){return (x*255U+15U)/31U;};for(int y=0;y<128;++y)for(int x=0;x<width;++x){const std::size_t row=std::size_t(y)*512U;std::uint16_t raw=0;if(mode<2){const unsigned idx=mode==0?(((*page)[row+std::size_t(x/2)]>>((x&1)?4:0))&15U):(*page)[row+std::size_t(x)];const std::size_t pos=std::size_t(cy)*512U+std::size_t(cx*16+int(idx))*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}else{const std::size_t pos=row+std::size_t(x)*2U;if(pos+1U>=page->size())continue;raw=std::uint16_t((*page)[pos])|(std::uint16_t((*page)[pos+1U])<<8U);}const std::size_t o=(std::size_t(y)*std::size_t(width)+std::size_t(x))*4U;rgba[o]=std::uint8_t(ex(raw&31U));rgba[o+1U]=std::uint8_t(ex((raw>>5U)&31U));rgba[o+2U]=std::uint8_t(ex((raw>>10U)&31U));rgba[o+3U]=std::uint8_t((raw&0x7fffU)==0&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));}unsigned int id=0;GL::GenTextures(1,&id);GL::BindTexture(0x0DE1U,id);GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);GL::TexImage2D(0x0DE1U,0,0x8058,width,128,0,0x1908U,0x1401U,rgba.data());gpu.textures.emplace(key,id);return id;};
       GL::Viewport(0,0,w,h);GL::Enable(0x0B71U);GL::DepthFunc(0x0201U);GL::DepthMask(1);GL::Enable(0x0BE2U);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);GL::ClearColor(0,0,0,0);GL::Clear(0x00004000U|0x00000100U);GL::UseProgram(gpu.program);GL::BindVertexArray(gpu.vao);GL::BindBuffer(0x8892U,gpu.vbo);GL::Uniform1i(GL::GetUniformLocation(gpu.program,"uTexture"),0);const int has=GL::GetUniformLocation(gpu.program,"uHasTexture"),blendMask=GL::GetUniformLocation(gpu.program,"uBlendMask"),blendMode=GL::GetUniformLocation(gpu.program,"uBlendMode");
       auto drawPass=[&](int mask){GL::Uniform1i(blendMask,mask);for(const auto&batch:batches){const auto&textureKey=batch.first.first;const int mode=batch.first.second;if(mask!=3&&mode!=mask)continue;const auto*page=std::get<0>(textureKey);GL::BindTexture(0x0DE1U,page?getTexture(textureKey):0);GL::Uniform1i(has,page?1:0);GL::Uniform1i(blendMode,mode);const auto&v=batch.second;GL::BufferData(0x8892U,GL::SizePtr(v.size()*sizeof(Vertex)),v.data(),0x88E8U);if(!v.empty())GL::DrawArrays(0x0004U,0,int(v.size()));}};
-      GL::DepthMask(1);
+      // Render the ground as real depth-buffer geometry. Models below the
+      // selected Y plane are occluded; models above it remain visible.
+      auto makePlaneVertex=[&](const CameraPoint&cam,ImU32 color,Vertex&out){
+       if(cam.depth<=0.05f)return false;
+       const float nx=(cam.x*focal/cam.depth)/canvasSize.x*2.0f;
+       const float ny=(cam.y*focal/cam.depth)/canvasSize.y*2.0f;
+       constexpr float nearP=.05f,farP=200.0f;
+       const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
+       auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
+       out={nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f};
+       return true;
+      };
+      std::vector<Vertex> planeFill,planeGrid;
+      const CameraPoint planeCorners[4]={
+       toCamera(planeX-planeExtent,groundY,planeZ-planeExtent),toCamera(planeX+planeExtent,groundY,planeZ-planeExtent),
+       toCamera(planeX+planeExtent,groundY,planeZ+planeExtent),toCamera(planeX-planeExtent,groundY,planeZ+planeExtent)
+      };
+      bool planeVisible=true;for(const auto&corner:planeCorners)if(corner.depth<=0.05f)planeVisible=false;
+      if(planeVisible){
+       const ImU32 floorColor=IM_COL32(20,23,28,255);
+       for(int index:{0,1,2,0,2,3}){Vertex v{};makePlaneVertex(planeCorners[index],floorColor,v);planeFill.push_back(v);}
+      }
+      auto appendPlaneLine=[&](float x1,float z1,float x2,float z2,ImU32 color){
+       CameraPoint a=toCamera(x1,groundY,z1),b=toCamera(x2,groundY,z2);
+       constexpr float nearDepth=0.05f;
+       if(a.depth<=nearDepth&&b.depth<=nearDepth)return;
+       if(a.depth<=nearDepth||b.depth<=nearDepth){
+        const float t=(nearDepth-a.depth)/(b.depth-a.depth);
+        CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
+        if(a.depth<=nearDepth)a=clipped;else b=clipped;
+       }
+       Vertex va{},vb{};if(makePlaneVertex(a,color,va)&&makePlaneVertex(b,color,vb)){planeGrid.push_back(va);planeGrid.push_back(vb);}
+      };
+      const int gridLines=16;const float gridStep=planeExtent/static_cast<float>(gridLines);
+      for(int i=-gridLines;i<=gridLines;++i){
+       const float offset=static_cast<float>(i)*gridStep;
+       const ImU32 color=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
+       appendPlaneLine(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,color);
+       appendPlaneLine(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,color);
+      }
+      GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
+      GL::DepthMask(1);GL::DepthFunc(0x0201U);
+      if(!planeFill.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeFill.size()*sizeof(Vertex)),planeFill.data(),0x88E8U);GL::DrawArrays(0x0004U,0,int(planeFill.size()));}
+      GL::DepthFunc(0x0203U);GL::DepthMask(0);
+      if(!planeGrid.empty()){GL::BufferData(0x8892U,GL::SizePtr(planeGrid.size()*sizeof(Vertex)),planeGrid.data(),0x88E8U);GL::DrawArrays(0x0001U,0,int(planeGrid.size()));}
+      GL::DepthFunc(0x0201U);GL::DepthMask(1);
       drawPass(3);
       GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);drawPass(0);
       // PS1 blend mode 1 is additive; mode 2 is subtractive. Keep the
