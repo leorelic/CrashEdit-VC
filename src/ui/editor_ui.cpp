@@ -42,6 +42,7 @@ struct EditorPreferences {
  bool useModernFont=false,softwareRendering=false,depthBufferEnabled=true,rendererDiagnosticsVisible=false;
  bool showProperties=true,showConsole=true,createBakBackup=false,createDatedBackup=false;
  bool traditionalGoolInspection=false,palRegion=false,animationRefreshRateMode=false;
+ float animationGroundPlaneY=0.0f;
  int dockLayoutVersion=0;
  int sceneMoveSpeed=100,animationMoveSpeed=100;
  std::string lastNsfPath;
@@ -138,6 +139,7 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
  else if(std::sscanf(line,"PALRegion=%d",&value)==1)editorPreferences.palRegion=value!=0;
  else if(std::sscanf(line,"AnimationPlaybackMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
+ else if(std::sscanf(line,"AnimationGroundPlaneY=%f",&editorPreferences.animationGroundPlaneY)==1){}
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -146,8 +148,8 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
 }
 static void writeEditorSettings(ImGuiContext*,ImGuiSettingsHandler* handler,ImGuiTextBuffer* buffer){
  const auto& p=*static_cast<EditorPreferences*>(handler->UserData);
- buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationPlaybackMode=%d\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
- p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.dockLayoutVersion,p.lastNsfPath.c_str());
+ buffer->appendf("[CrashEdit][Preferences]\nUIScaling=%d\nUseModernFont=%d\nSoftwareRendering=%d\nDepthBufferEnabled=%d\nShowRendererDiagnostics=%d\nSceneMoveSpeed=%d\nAnimationMoveSpeed=%d\nShowProperties=%d\nShowConsole=%d\nCreateBakBackup=%d\nCreateDatedBackup=%d\nTraditionalGoolInspection=%d\nPALRegion=%d\nAnimationPlaybackMode=%d\nAnimationGroundPlaneY=%.6f\nDockLayoutVersion=%d\nLastNSF=%s\n\n",
+ p.uiScaling,p.useModernFont?1:0,p.softwareRendering?1:0,p.depthBufferEnabled?1:0,p.rendererDiagnosticsVisible?1:0,p.sceneMoveSpeed,p.animationMoveSpeed,p.showProperties?1:0,p.showConsole?1:0,p.createBakBackup?1:0,p.createDatedBackup?1:0,p.traditionalGoolInspection?1:0,p.palRegion?1:0,p.animationRefreshRateMode?1:0,p.animationGroundPlaneY,p.dockLayoutVersion,p.lastNsfPath.c_str());
 }
 static void registerEditorSettingsHandler(){
  ImGuiSettingsHandler handler{};
@@ -3008,6 +3010,10 @@ void EditorUI::drawAnimationViewer(){
   if(ImGui::MenuItem("Interpolate animation frames",nullptr,animationInterpolate_))animationInterpolate_=!animationInterpolate_;
   ImGui::MenuItem("Collision Viewer",nullptr,&animationCollisionViewer_);
   ImGui::Separator();
+  ImGui::TextUnformatted("Ground plane");
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::DragFloat("Y Position",&editorPreferences.animationGroundPlaneY,0.01f,-10000.0f,10000.0f,"%.3f");
+  ImGui::Separator();
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
   const char*refreshSpeedLabel=editorPreferences.palRegion?"Full Speed (50 FPS)":"Full Speed (60 FPS)";
@@ -3110,13 +3116,13 @@ void EditorUI::drawAnimationViewer(){
    if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
    return projectCamera(p);
   };
-  // Keep the ground grid fixed in model space, directly below the complete
-  // animation bounds. Clip each segment against the camera near plane before
+  // Keep the ground grid fixed at the user-selected world-space Y position.
+  // Clip each segment against the camera near plane before
   // perspective division so rotating close to the floor cannot fling lines
   // across the viewport.
-  const float groundY=boundsMin.y-std::max(0.02f,radius*0.015f);
+  const float groundY=editorPreferences.animationGroundPlaneY;
   const float planeExtent=std::max(2.0f,radius*2.5f);
-  const float planeX=center.x,planeZ=center.z;
+  constexpr float planeX=0.0f,planeZ=0.0f;
   const ImVec2 floorCorners[4]={
    project(planeX-planeExtent,groundY,planeZ-planeExtent),
    project(planeX+planeExtent,groundY,planeZ-planeExtent),
@@ -3254,7 +3260,56 @@ void EditorUI::drawAnimationViewer(){
       // equations aligned with the original CrashEdit blend-mode mapping.
       GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(2);
       GL::BlendEquation(0x800BU);GL::BlendFuncSeparate(1U,1U,0U,1U);drawPass(1);
-      GL::DepthMask(1);GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
+      if(animationCollisionViewer_&&!frame.collisions.empty()){
+       constexpr float collisionScale=102400.0f;
+       const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
+       const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
+       std::vector<Vertex> collisionFaces,collisionLines;
+       auto appendCollisionVertex=[&](std::vector<Vertex>&out,const CameraPoint&cam,ImU32 color){
+        if(cam.depth<=0.05f)return false;
+        const float nx=(cam.x*focal/cam.depth)/canvasSize.x*2.0f;
+        const float ny=(cam.y*focal/cam.depth)/canvasSize.y*2.0f;
+        constexpr float nearP=.05f,farP=200.0f;
+        const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
+        auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
+        out.push_back({nx*cam.depth,ny*cam.depth,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f});
+        return true;
+       };
+       for(const auto&collision:frame.collisions){
+        const float x1=(float(collision.values[4])+float(collision.values[1]))/collisionScale;
+        const float y1=(float(collision.values[5])+float(collision.values[2]))/collisionScale;
+        const float z1=(float(collision.values[6])+float(collision.values[3]))/collisionScale;
+        const float x2=(float(collision.values[7])+float(collision.values[1]))/collisionScale;
+        const float y2=(float(collision.values[8])+float(collision.values[2]))/collisionScale;
+        const float z2=(float(collision.values[9])+float(collision.values[3]))/collisionScale;
+        const CameraPoint corners[8]={
+         toCamera(x1,y1,z1),toCamera(x2,y1,z1),toCamera(x1,y2,z1),toCamera(x2,y2,z1),
+         toCamera(x1,y1,z2),toCamera(x2,y1,z2),toCamera(x1,y2,z2),toCamera(x2,y2,z2)
+        };
+        for(const auto&face:boxFaces){
+         const ImU32 fill=IM_COL32(0,255,0,42);
+         bool visible=true;
+         for(int i=0;i<4;++i)if(corners[face[i]].depth<=0.05f)visible=false;
+         if(!visible)continue;
+         for(int tri=0;tri<2;++tri){
+          const int order[3]={0,tri==0?1:2,tri==0?2:3};
+          for(int k:order)appendCollisionVertex(collisionFaces,corners[face[k]],fill);
+         }
+        }
+        for(const auto&edge:boxEdges){
+         const auto&a=corners[edge[0]],&b=corners[edge[1]];
+         if(a.depth<=0.05f||b.depth<=0.05f)continue;
+         appendCollisionVertex(collisionLines,a,IM_COL32(0,255,0,255));
+         appendCollisionVertex(collisionLines,b,IM_COL32(0,255,0,255));
+        }
+       }
+       GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
+       GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
+       if(!collisionFaces.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionFaces.size()*sizeof(Vertex)),collisionFaces.data(),0x88E8U);GL::DrawArrays(0x0004U,0,int(collisionFaces.size()));}
+       if(!collisionLines.empty()){GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);GL::LineWidth(1.75f);GL::DrawArrays(0x0001U,0,int(collisionLines.size()));}
+       GL::DepthFunc(0x0201U);GL::DepthMask(1);
+      }
+      GL::BindTexture(0x0DE1U,0);GL::BindVertexArray(0);GL::UseProgram(0);GL::Disable(0x0B71U);rendered=true;
      }
      GL::DepthMask(static_cast<unsigned char>(oldDepthMask!=0));GL::BindFramebuffer(0x8D40U,unsigned(oldFbo));GL::Viewport(oldViewport[0],oldViewport[1],oldViewport[2],oldViewport[3]);GL::ActiveTexture(0x84C0U);GL::BindTexture(0x0DE1U,unsigned(oldTexture));GL::ActiveTexture(unsigned(oldActive));GL::BindRenderbuffer(0x8D41U,unsigned(oldRenderbuffer));
      if(rendered){dl->AddCallback(usePremultipliedAnimationImageBlend,nullptr);dl->AddImage((ImTextureID)(std::intptr_t)gpu.color,canvasMin,canvasMax,ImVec2(0,1),ImVec2(1,0));dl->AddCallback(ImDrawCallback_ResetRenderState,nullptr);}
@@ -3267,7 +3322,7 @@ void EditorUI::drawAnimationViewer(){
   }
  // Match CrashEdit-RE: collision bounds use their own 102400-unit scale and
  // are positioned from the frame collision offset, independently of model scale.
- if(animationCollisionViewer_&&!frame.collisions.empty()){
+ if(animationCollisionViewer_&&animationWireframe_&&!frame.collisions.empty()){
   constexpr float collisionScale=102400.0f;
   const ImU32 collisionFill=IM_COL32(0,255,0,42);
   const ImU32 collisionLine=IM_COL32(0,255,0,255);
