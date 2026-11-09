@@ -783,6 +783,80 @@ bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size
  }
  return true;
 }
+bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value){
+ if(chunkIndex>=chunks_.size()||axis>=3U)return false;
+ auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=1||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ auto&frame=entry.animation.frames[frameIndex];if(!frame.verticesDecoded||vertexIndex>=frame.vertexCount)return false;
+ const bool crash3=entry.animation.isCrash3;
+ if(crash3){if(value%8!=0)return false;value/=8;}
+ if(value<0||value>255)return false;
+ const std::size_t fixedHeader=crash3?28U:24U;
+ const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U;
+ if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize))return false;
+ const NsfModel*model=nullptr;
+ for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
+  for(const auto&modelEntry:modelChunk.entries)
+   if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
+ if(!(model&&model->compressed)&&vertexIndex<frame.specialVertexCount){
+  if(value>255)return false;
+  if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
+  return decodeAnimationVertices(frame,model,crash3);
+ }
+ std::vector<std::uint8_t>bits;bits.reserve(frame.temporalWords.size()*32U);
+ for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
+ const std::size_t start=frame.specialVertexCount*24U;
+ if(model&&model->compressed){
+  if(vertexIndex>=model->positions.size()||model->positions.size()>frame.vertices.size())return false;
+  std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
+  auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>255)return false;target=source;return true;};
+  auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
+   if(bit>=bits.size())return false;const std::int32_t minValue=-(1<<width),maxValue=(1<<width)-1;
+   if(delta<minValue||delta>maxValue)return false;
+   bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+(1<<width):delta);
+   for(unsigned b=0;b<width;++b){if(bit>=bits.size())return false;bits[bit++]=static_cast<std::uint8_t>((encoded>>(width-1U-b))&1U);}
+   return true;
+  };
+  for(std::size_t i=0;i<model->positions.size();++i){
+   const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
+   std::int32_t targetX=0,targetY=0,targetZ=0;
+   const auto&source=frame.vertices[i];
+   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
+   const std::int32_t baseZ=(zAcc+p.z)&0xff;
+   const std::int32_t baseY=(yAcc+p.y)&0xff;
+   auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
+   const std::int32_t dx=deltaFor(targetX,baseX),dz=deltaFor(targetZ,baseZ),dy=deltaFor(targetY,baseY);
+   if(!encodeSigned(p.xBits,dx)||!encodeSigned(p.zBits,dz)||!encodeSigned(p.yBits,dy))return false;
+   xAcc=targetX;yAcc=targetY;zAcc=targetZ;
+  }
+ }else{
+  const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
+  if(bits.size()<required||vertexIndex<frame.specialVertexCount)return false;
+  std::vector<std::uint8_t>reordered(bits.size());
+  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+   for(std::size_t byte=0;byte<4U;++byte)
+    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
+  std::size_t bit=start+(vertexIndex-frame.specialVertexCount)*24U;
+  const std::int32_t current[3]={frame.vertices[vertexIndex].x,frame.vertices[vertexIndex].y,frame.vertices[vertexIndex].z};
+  for(std::size_t component=0;component<3U;++component){
+   const std::int32_t v=component==axis?value:(crash3?current[component]/8:current[component]);
+   if(v<0||v>255)return false;
+   for(unsigned b=0;b<8U;++b)reordered[bit++]=static_cast<std::uint8_t>((static_cast<std::uint32_t>(v)>>(7U-b))&1U);
+  }
+  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+   for(std::size_t byte=0;byte<4U;++byte)
+    for(std::size_t b=0;b<8U;++b)bits[base+byte*8U+b]=reordered[base+24U-byte*8U+b];
+ }
+ for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){
+  std::uint32_t word=0;for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|bits[wordIndex*32U+bit];
+  frame.temporalWords[wordIndex]=word;
+  const std::size_t offset=frame.rawOffset+fakeHeader+wordIndex*4U;if(!has(chunk.bytes,offset,4U))return false;
+  for(unsigned byte=0;byte<4U;++byte)chunk.bytes[offset+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
+ }
+ return decodeAnimationVertices(frame,model,crash3);
+}
+
 bool NsfArchive::setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value){
  if(chunkIndex>=chunks_.size()||axis>=3U)return false;
  auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;

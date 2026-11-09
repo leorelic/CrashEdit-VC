@@ -183,4 +183,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(vertexAnimation,vaFrame+28,0x03020100);
  assert(a.loadBytes(vertexAnimation,e));a.decodeAnimationModels(true);const auto&va=a.chunks()[0].entries[0].animation;
  assert(va.decoded&&va.frames[0].verticesDecoded&&va.frames[0].vertices.size()==1);
+ assert(va.frames[0].vertices[0].x==0&&va.frames[0].vertices[0].y==8&&va.frames[0].vertices[0].z==16);
+ assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
+ std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));Crash::NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
+ assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}

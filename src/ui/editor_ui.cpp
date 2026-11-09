@@ -2840,10 +2840,18 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::Separator();
   ImGui::Text("Selected Vertex");
   if(animationSelectedVertex_>=0&&static_cast<std::size_t>(animationSelectedVertex_)<frame.vertices.size()){
-   const auto&selectedVertex=frame.vertices[static_cast<std::size_t>(animationSelectedVertex_)];
+   const auto selectedVertex=frame.vertices[static_cast<std::size_t>(animationSelectedVertex_)];
    ImGui::Text("Vertex Index: %d",animationSelectedVertex_);
-   ImGui::Text("X: %d    Y: %d    Z: %d",selectedVertex.x,selectedVertex.y,selectedVertex.z);
-   ImGui::TextDisabled("Decoded frame-space coordinates. Packed temporal vertex write-back is not implemented yet.");
+   int vertexValues[3]={selectedVertex.x,selectedVertex.y,selectedVertex.z};
+   const char*axisLabels[3]={"X","Y","Z"};
+   for(std::size_t axis=0;axis<3U;++axis){
+    ImGui::SetNextItemWidth(110.0f);
+    if(ImGui::InputInt(axisLabels[axis],&vertexValues[axis])){
+     if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(animationSelectedVertex_),axis,vertexValues[axis]))status_="Vertex value cannot be represented by this frame's packed temporal format.";
+    }
+    if(axis<2U)ImGui::SameLine();
+   }
+   ImGui::TextDisabled("Edits are encoded back into the frame's temporal stream; unsupported values are rejected.");
   }else ImGui::TextDisabled("Click a vertex point in the 3D Animation Editor to inspect it.");
   ImGui::Separator();
   ImGui::Text("Frame Structure");
@@ -2889,7 +2897,7 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::Text("Decoded Vertices");
   if(!frame.verticesDecoded)ImGui::TextDisabled("Vertices are not decoded: %s",frame.vertexError.c_str());
   else{
-   ImGui::TextDisabled("%zu vertices decoded. Packed temporal vertices remain read-only until their encoder is implemented.",frame.vertices.size());
+   ImGui::TextDisabled("%zu vertices decoded. Select a point above to edit its frame-space coordinates.",frame.vertices.size());
    const std::size_t showCount=std::min<std::size_t>(frame.vertices.size(),static_cast<std::size_t>(std::max(0,static_cast<int>(frame.specialVertexCount))));
    if(showCount>0U&&ImGui::BeginTable("##SpecialVertices",4,ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|ImGuiTableFlags_ScrollY,ImVec2(0.0f,140.0f))){
     ImGui::TableSetupColumn("Index");ImGui::TableSetupColumn("X");ImGui::TableSetupColumn("Y");ImGui::TableSetupColumn("Z");ImGui::TableHeadersRow();

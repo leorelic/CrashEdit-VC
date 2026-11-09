@@ -204,6 +204,7 @@ public:
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
  bool setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value);
  bool setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value);
+ bool setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value);
  bool setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value);
  bool setModelTexturePageEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t pageIndex,std::uint32_t eid);
  bool setModelColor(std::size_t chunkIndex,std::size_t entryIndex,std::size_t colorIndex,const NsfSceneryColor& color);
