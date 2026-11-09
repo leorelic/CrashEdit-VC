@@ -3123,15 +3123,14 @@ void EditorUI::drawAnimationViewer(){
    if(p.depth<=0.1f)return ImVec2(-100000.0f,-100000.0f);
    return projectCamera(p);
   };
-  // Match CrashEdit-RE's compact, fixed world-origin animation grid.
-  // Its default length is 4: eight lines in each direction, spaced one unit
-  // apart, spanning -3.5 to +3.5. Camera movement never changes its bounds.
+  // Keep the compact grid centered on the animation's initial bounds.
+  // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
-  constexpr float gridStep=1.0f;
-  constexpr int gridLines=4;
-  constexpr float planeExtent=3.5f;
-  constexpr float planeX=0.0f;
-  constexpr float planeZ=0.0f;
+  const float gridStep=std::max(0.25f,radius/4.0f);
+  constexpr int gridLines=10;
+  const float planeExtent=gridStep*static_cast<float>(gridLines);
+  const float planeX=center.x;
+  const float planeZ=center.z;
   if(animationWireframe_){
   // Wireframe mode uses the ground grid as a reference only; no solid face is drawn.
   auto drawGridSegment=[&](float x1,float z1,float x2,float z2,ImU32 color,float width){
@@ -3145,11 +3144,12 @@ void EditorUI::drawAnimationViewer(){
    }
    dl->AddLine(projectCamera(a),projectCamera(b),color,width);
   };
-  for(int i=0;i<gridLines*2;++i){
-   const float offset=-planeExtent+static_cast<float>(i)*gridStep;
-   const ImU32 gridColor=IM_COL32(105,112,124,175);
-   drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,1.0f);
-   drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,1.0f);
+  for(int i=-gridLines;i<=gridLines;++i){
+   const float offset=static_cast<float>(i)*gridStep;
+   const ImU32 gridColor=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
+   const float width=i==0?1.5f:1.0f;
+   drawGridSegment(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,gridColor,width);
+   drawGridSegment(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,gridColor,width);
   }
   }
   if(model&&model->polygonsDecoded&&!model->triangles.empty()){
@@ -3244,9 +3244,8 @@ void EditorUI::drawAnimationViewer(){
        if(tex&&tex->page<model->texturePageEids.size()){const auto found=pageLookup.find(model->texturePageEids[tex->page]);if(found!=pageLookup.end())page=found->second;}
        const int mode=tex?std::clamp<int>(tex->colorMode,0,2):0,clutX=tex?std::clamp<int>(tex->clutX,0,15):0,clutY=tex?std::clamp<int>((tex->clutY2<<2U)|((tex->clutY1>>2U)&3U),0,127):0;
        float ux[3]{},uy[3]{};const int uvOrder=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?2:0),uvOrder1=1,uvOrder2=(((tri.triangleType!=2&&!flip)||(tri.triangleType==2&&tri.triangleSubtype==1))?0:2);if(tex){const int off=(1<<(2-mode))*64*tex->segment;int x1=int(tex->u1)+off,x2=int(tex->u2)+off,x3=int(tex->u3)+off;int y1=tex->v1,y2=tex->v2,y3=tex->v3;if(x1>x2||x1>x3)++x1;if(x2>x1||x2>x3)++x2;if(x3>x2||x3>x1)++x3;if(y1>y2||y1>y3)++y1;if(y2>y1||y2>y3)++y2;if(y3>y2||y3>y1)++y3;const float u[3]={float(x1),float(x2),float(x3)},v[3]={float(y1),float(y2),float(y3)};const int uv[3]={uvOrder,uvOrder1,uvOrder2};for(int k=0;k<3;++k){ux[k]=u[uv[k]];uy[k]=v[uv[k]];}}
-       bool triangleVisible=true;
-       for(int k=0;k<3;++k){const auto p=displayPositions[std::size_t(vi[k])];if(toCamera(p.x,p.y,p.z).depth<=0.1f)triangleVisible=false;}
-       if(!triangleVisible)continue;
+       // Submit complete triangles and let OpenGL clip them against the near
+       // plane, as CrashEdit-RE does; one close vertex must not drop a whole face.
        const int blendMode=(!tex||!page)?3:(tex->blendMode==0?0:tex->blendMode==1?2:tex->blendMode==2?1:3);
        const TextureKey textureKey{page,mode,clutX,clutY};
        const BatchKey batchKey{textureKey,blendMode};
@@ -3275,9 +3274,9 @@ void EditorUI::drawAnimationViewer(){
        Vertex va{},vb{};makePlaneVertex(a,color,va);makePlaneVertex(b,color,vb);
        planeGrid.push_back(va);planeGrid.push_back(vb);
       };
-      for(int i=0;i<gridLines*2;++i){
-       const float offset=-planeExtent+static_cast<float>(i)*gridStep;
-       const ImU32 color=IM_COL32(105,112,124,175);
+      for(int i=-gridLines;i<=gridLines;++i){
+       const float offset=static_cast<float>(i)*gridStep;
+       const ImU32 color=i==0?IM_COL32(105,112,124,210):IM_COL32(58,65,76,175);
        appendPlaneLine(planeX+offset,planeZ-planeExtent,planeX+offset,planeZ+planeExtent,color);
        appendPlaneLine(planeX-planeExtent,planeZ+offset,planeX+planeExtent,planeZ+offset,color);
       }
