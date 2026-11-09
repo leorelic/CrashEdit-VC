@@ -2991,6 +2991,7 @@ void EditorUI::drawAnimationViewer(){
    }
    ImGui::EndCombo();
   }
+ }
  if(!frame.vertexError.empty())ImGui::TextColored(ImVec4(1.0f,.55f,.35f,1.0f),"%s",frame.vertexError.c_str());
  if(!frame.verticesDecoded)ImGui::TextDisabled("Frame vertices are not decoded.");
  else if(!model&&animation.isCrash3&&!Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("No matching GOOL VertexGroup3 links this animation to a Model.");
