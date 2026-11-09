@@ -138,7 +138,6 @@ static void readEditorSettingsLine(ImGuiContext*,ImGuiSettingsHandler*,void*,con
  else if(std::sscanf(line,"TraditionalGoolInspection=%d",&value)==1)editorPreferences.traditionalGoolInspection=value!=0;
  else if(std::sscanf(line,"PALRegion=%d",&value)==1)editorPreferences.palRegion=value!=0;
  else if(std::sscanf(line,"AnimationPlaybackMode=%d",&value)==1)editorPreferences.animationRefreshRateMode=value!=0;
-
  else if(std::sscanf(line,"CreateSaveBackups=%d",&value)==1){editorPreferences.createBakBackup=value!=0;editorPreferences.createDatedBackup=value!=0;}
  else if(std::sscanf(line,"CreateBakBackup=%d",&value)==1)editorPreferences.createBakBackup=value!=0;
  else if(std::sscanf(line,"CreateDatedBackup=%d",&value)==1)editorPreferences.createDatedBackup=value!=0;
@@ -3322,7 +3321,7 @@ void EditorUI::drawAnimationViewer(){
         const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
         // Pull collision geometry a tiny amount toward the camera in depth
         // space so coincident collision/model surfaces do not z-fight.
-        const float collisionDepthBias=0.0005f;
+        const float collisionDepthBias=0.00001f;
         auto channel=[](ImU32 v,int shift){return float((v>>shift)&255U)/255.0f;};
         out.push_back({nx*cam.depth,ny*cam.depth,cz-collisionDepthBias,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),channel(color,IM_COL32_A_SHIFT),0.0f,0.0f});
         return true;
