@@ -3067,43 +3067,7 @@ void EditorUI::drawAnimationViewer(){
  else if(!model)ImGui::TextDisabled("Linked Model resource is not present in this NSF.");
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
- // Put mode selection in the editor toolbar, outside the viewport image.
- // Standard ImGui buttons keep both labels visible and clickable.
- ImGui::Separator();
- ImGui::AlignTextToFramePadding();
- ImGui::TextUnformatted("Mode");
- ImGui::SameLine();
- ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,4.0f);
- const bool faceModeWasActive=animationFaceEditing_;
- if(faceModeWasActive)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
- const bool faceModeClicked=ImGui::Button("Face Editing##AnimationMode",ImVec2(136.0f,30.0f));
- const ImVec2 faceButtonMin=ImGui::GetItemRectMin(),faceButtonMax=ImGui::GetItemRectMax();
- if(faceModeWasActive)ImGui::PopStyleColor();
- ImDrawList*modeIcons=ImGui::GetWindowDrawList();
- const ImVec2 faceIconCenter(faceButtonMin.x+16.0f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
- const ImU32 modeIconColor=ImGui::GetColorU32(ImGuiCol_Text);
- modeIcons->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeIconColor,2.5f);
- modeIcons->AddLine(ImVec2(faceIconCenter.x-6,faceIconCenter.y+7),ImVec2(faceIconCenter.x-3,faceIconCenter.y+6),modeIconColor,1.8f);
- if(faceModeClicked){animationFaceEditing_=true;animationHoveredFace_=-1;}
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Face Editing Mode (F) - select and edit model faces");
- ImGui::SameLine();
- const bool viewModeWasActive=!animationFaceEditing_;
- if(viewModeWasActive)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
- const bool viewModeClicked=ImGui::Button("View Mode##AnimationMode",ImVec2(122.0f,30.0f));
- const ImVec2 viewButtonMin=ImGui::GetItemRectMin(),viewButtonMax=ImGui::GetItemRectMax();
- if(viewModeWasActive)ImGui::PopStyleColor();
- const ImVec2 handCenter(viewButtonMin.x+16.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
- modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+3),ImVec2(handCenter.x-5,handCenter.y-4),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x-1,handCenter.y+2),ImVec2(handCenter.x-1,handCenter.y-7),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x+3,handCenter.y+2),ImVec2(handCenter.x+3,handCenter.y-6),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x+7,handCenter.y+3),ImVec2(handCenter.x+7,handCenter.y-3),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+2),ImVec2(handCenter.x-5,handCenter.y+7),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+7),ImVec2(handCenter.x-1,handCenter.y+10),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x-1,handCenter.y+10),ImVec2(handCenter.x+5,handCenter.y+10),modeIconColor,1.8f);
- modeIcons->AddLine(ImVec2(handCenter.x+5,handCenter.y+10),ImVec2(handCenter.x+8,handCenter.y+5),modeIconColor,1.8f);
- if(viewModeClicked){animationFaceEditing_=false;animationHoveredFace_=-1;}
- if(ImGui::IsItemHovered())ImGui::SetTooltip("View Mode - navigate without selecting faces");
- ImGui::PopStyleVar();
+ // The mode controls are viewport overlays; keep the canvas origin unchanged.
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
@@ -3135,7 +3099,21 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ const ImVec2 modeToolbarStart(canvasMin.x+44.0f,canvasMin.y+8.0f);
+ const ImVec2 faceButtonMin=modeToolbarStart,faceButtonMax(modeToolbarStart.x+136.0f,modeToolbarStart.y+26.0f);
+ ImGui::SetCursorScreenPos(faceButtonMin);
+ const bool faceModeClicked=ImGui::InvisibleButton("##AnimationFaceEditMode",ImVec2(136.0f,26.0f));
+ const bool faceModeHovered=ImGui::IsItemHovered();
+ if(faceModeClicked){animationFaceEditing_=true;animationHoveredFace_=-1;}
+ if(faceModeHovered)ImGui::SetTooltip("Face Editing Mode (F) - select and edit model faces");
+ const ImVec2 viewButtonMin(modeToolbarStart.x+140.0f,modeToolbarStart.y);
+ const ImVec2 viewButtonMax(viewButtonMin.x+122.0f,viewButtonMin.y+26.0f);
+ ImGui::SetCursorScreenPos(viewButtonMin);
+ const bool viewModeClicked=ImGui::InvisibleButton("##AnimationViewMode",ImVec2(122.0f,26.0f));
+ const bool viewModeHovered=ImGui::IsItemHovered();
+ if(viewModeClicked){animationFaceEditing_=false;animationHoveredFace_=-1;}
+ if(viewModeHovered)ImGui::SetTooltip("View Mode - navigate without selecting faces");
+ const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3150,7 +3128,31 @@ void EditorUI::drawAnimationViewer(){
   if(ImGui::IsKeyPressed(ImGuiKey_T,false))animationTexturesDisabled_=!animationTexturesDisabled_;
  }
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
- dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));dl->PushClipRect(canvasMin,canvasMax,true);
+ dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));
+ // Draw the overlay after the canvas background so the controls remain visible.
+ ImDrawList*modeOverlay=ImGui::GetForegroundDrawList();
+ const ImU32 modeTextColor=ImGui::GetColorU32(ImGuiCol_Text);
+ auto drawModeButton=[&](const ImVec2&min,const ImVec2&max,const char*label,bool active,bool hovered){
+  const ImGuiCol color=active?ImGuiCol_ButtonActive:(hovered?ImGuiCol_ButtonHovered:ImGuiCol_Button);
+  modeOverlay->AddRectFilled(min,max,ImGui::GetColorU32(color),4.0f);
+  modeOverlay->AddRect(min,max,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
+  modeOverlay->AddText(ImVec2(min.x+29.0f,min.y+(26.0f-ImGui::GetTextLineHeight())*0.5f),modeTextColor,label);
+ };
+ drawModeButton(faceButtonMin,faceButtonMax,"Face Editing",animationFaceEditing_,faceModeHovered);
+ const ImVec2 faceIconCenter(faceButtonMin.x+14.0f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
+ modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
+ modeOverlay->AddLine(ImVec2(faceIconCenter.x-6,faceIconCenter.y+7),ImVec2(faceIconCenter.x-3,faceIconCenter.y+6),modeTextColor,1.8f);
+ drawModeButton(viewButtonMin,viewButtonMax,"View Mode",!animationFaceEditing_,viewModeHovered);
+ const ImVec2 handCenter(viewButtonMin.x+14.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
+ modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+3),ImVec2(handCenter.x-5,handCenter.y-4),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x-1,handCenter.y+2),ImVec2(handCenter.x-1,handCenter.y-7),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x+3,handCenter.y+2),ImVec2(handCenter.x+3,handCenter.y-6),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x+7,handCenter.y+3),ImVec2(handCenter.x+7,handCenter.y-3),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+2),ImVec2(handCenter.x-5,handCenter.y+7),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+7),ImVec2(handCenter.x-1,handCenter.y+10),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x-1,handCenter.y+10),ImVec2(handCenter.x+5,handCenter.y+10),modeTextColor,1.8f);
+ modeOverlay->AddLine(ImVec2(handCenter.x+5,handCenter.y+10),ImVec2(handCenter.x+8,handCenter.y+5),modeTextColor,1.8f);
+ dl->PushClipRect(canvasMin,canvasMax,true);
  if(!frame.verticesDecoded||frame.vertices.empty()){
   const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
   dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
