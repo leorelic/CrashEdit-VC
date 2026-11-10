@@ -4035,24 +4035,24 @@ void EditorUI::drawFaceTextureSelector(){
    ImGui::EndTable();
   }
   ImGui::TextUnformatted("CLUT coordinates");
-  const float clutFieldWidth=std::max(64.0f,(ImGui::GetContentRegionAvail().x-180.0f)/3.0f);
-  ImGui::SetNextItemWidth(clutFieldWidth);
-  const bool clutXChanged=ImGui::InputInt("CLUT X",&clutX,1,4);
-  clutX=std::clamp(clutX,0,15);edited.clutX=static_cast<std::uint8_t>(clutX);
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(clutFieldWidth);
-  const bool clutY1Changed=ImGui::InputInt("CLUT Y1",&clutY1,1,4);
-  clutY1=std::clamp(clutY1,0,255);edited.clutY1=static_cast<std::uint8_t>(clutY1);
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(clutFieldWidth);
-  const bool clutY2Changed=ImGui::InputInt("CLUT Y2",&clutY2,1,4);
-  clutY2=std::clamp(clutY2,0,15);edited.clutY2=static_cast<std::uint8_t>(clutY2);
-  descriptorChanged=descriptorChanged||clutXChanged||clutY1Changed||clutY2Changed;
-  ImGui::SameLine();
-  if(ImGui::Button("Apply to Face")){
-   if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
-    status_="Applied the selected texture descriptor to this face.";
-   else status_="Could not assign the selected texture descriptor to this face.";
+  if(ImGui::BeginTable("##FaceTextureClutControls",4,ImGuiTableFlags_SizingStretchSame,ImVec2(0,0))){
+   ImGui::TableNextRow();
+   ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("CLUT X");ImGui::SetNextItemWidth(-FLT_MIN);
+   const bool clutXChanged=ImGui::InputInt("##SelectorClutX",&clutX,1,4);
+   ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("CLUT Y1");ImGui::SetNextItemWidth(-FLT_MIN);
+   const bool clutY1Changed=ImGui::InputInt("##SelectorClutY1",&clutY1,1,4);
+   ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("CLUT Y2");ImGui::SetNextItemWidth(-FLT_MIN);
+   const bool clutY2Changed=ImGui::InputInt("##SelectorClutY2",&clutY2,1,4);
+   ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("Face");if(ImGui::Button("Apply to Face",ImVec2(-FLT_MIN,0))){
+    if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
+     status_="Applied the selected texture descriptor to this face.";
+    else status_="Could not assign the selected texture descriptor to this face.";
+   }
+   ImGui::EndTable();
+   clutX=std::clamp(clutX,0,15);edited.clutX=static_cast<std::uint8_t>(clutX);
+   clutY1=std::clamp(clutY1,0,255);edited.clutY1=static_cast<std::uint8_t>(clutY1);
+   clutY2=std::clamp(clutY2,0,15);edited.clutY2=static_cast<std::uint8_t>(clutY2);
+   descriptorChanged=descriptorChanged||clutXChanged||clutY1Changed||clutY2Changed;
   }
   std::size_t descriptorUseCount=0;
   for(const auto&other:model->triangles){
