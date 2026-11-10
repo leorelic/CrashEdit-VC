@@ -3825,6 +3825,8 @@ void EditorUI::drawFaceTextureSelector(){
    char label[128];std::snprintf(label,sizeof(label),"Descriptor %d | Page %u | %u-bit",index,
     static_cast<unsigned>(d.page),d.colorMode==0?4U:d.colorMode==1?8U:16U);return std::string(label);
   };
+  Crash::NsfModelTexture edited=model->textures[static_cast<std::size_t>(selectedDescriptor)];
+  bool descriptorChanged=false;
   const int colorMode=std::clamp<int>(edited.colorMode,0,2);
   int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
   const int clutY=std::clamp((static_cast<int>(edited.clutY2)<<2)|((static_cast<int>(edited.clutY1)>>2)&3),0,127);
