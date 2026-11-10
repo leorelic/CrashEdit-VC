@@ -3127,7 +3127,7 @@ void EditorUI::drawAnimationViewer(){
  const bool viewModeHovered=ImGui::IsItemHovered();
  if(viewModeClicked){animationFaceEditing_=false;animationTextureSelectorOpen_=false;animationHoveredFace_=-1;}
  if(viewModeHovered)ImGui::SetTooltip("View Mode");
- const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3136,7 +3136,6 @@ void EditorUI::drawAnimationViewer(){
  const ImGuiIO&shortcutIo=ImGui::GetIO();
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
   if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;if(!animationFaceEditing_)animationTextureSelectorOpen_=false;}
-  if(animationFaceEditing_&&ImGui::IsKeyPressed(ImGuiKey_H,false))animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
