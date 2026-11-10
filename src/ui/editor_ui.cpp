@@ -3782,7 +3782,7 @@ void EditorUI::drawFaceTextureSelector(){
  const float contentWidth=std::max(1.0f,contentMax.x-contentMin.x);
  const float contentHeight=std::max(1.0f,contentMax.y-contentMin.y);
  const float panelWidth=contentWidth;
- const float panelHeight=std::min(contentHeight-8.0f,std::max(280.0f,contentHeight*0.68f));
+ const float panelHeight=std::min(contentHeight-8.0f,std::clamp(contentHeight*0.42f,240.0f,380.0f));
  const float slideOffset=(1.0f-slideProgress)*panelHeight;
  const ImVec2 panelPos(viewerPos.x+contentMin.x,
   viewerPos.y+contentMax.y-panelHeight+slideOffset);
@@ -3796,7 +3796,7 @@ void EditorUI::drawFaceTextureSelector(){
  ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize,1.0f);
  ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(0.075f,0.085f,0.105f,0.98f));
  if(!ImGui::BeginChild("FaceTextureSelectorOverlay",ImVec2(panelWidth,panelHeight),true,ImGuiWindowFlags_NoSavedSettings)){
-  ImGui::EndChild();ImGui::PopStyleColor();ImGui::PopStyleVar(2);ImGui::SetCursorScreenPos(savedCursor);return;
+  ImGui::EndChild();ImGui::PopStyleColor();ImGui::PopStyleVar(2);ImGui::SetCursorScreenPos(savedCursor);ImGui::Dummy(ImVec2(1.0f,1.0f));return;
  }
  ImGui::TextUnformatted("FACE TEXTURE SELECTOR");
  ImGui::SameLine();
@@ -3902,12 +3902,13 @@ void EditorUI::drawFaceTextureSelector(){
    ImDrawList*draw=ImGui::GetWindowDrawList();
    const ImVec2 atlasMax(atlasMin.x+atlasSize.x,atlasMin.y+atlasSize.y);
    draw->AddImage((ImTextureID)(std::intptr_t)previewTexture,atlasMin,atlasMax,ImVec2(0,0),ImVec2(1,1));
+   // Match CrashEdit:Re ModelTexture bounds: the first three UV corners define the face region.
    const int regionX0=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
-    std::min(std::min(edited.u1,edited.u2),std::min(edited.u3,edited.u4)),0,textureWidth-1);
+    std::min(edited.u1,std::min(edited.u2,edited.u3)),0,textureWidth-1);
    const int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
-    std::max(std::max(edited.u1,edited.u2),std::max(edited.u3,edited.u4))+1,regionX0+1,textureWidth);
-   const int regionY0=std::clamp(static_cast<int>(std::min(std::min(edited.v1,edited.v2),std::min(edited.v3,edited.v4))),0,127);
-   const int regionY1=std::clamp(std::max(std::max(edited.v1,edited.v2),std::max(edited.v3,edited.v4))+1,regionY0+1,128);
+    std::max(edited.u1,std::max(edited.u2,edited.u3))+1,regionX0+1,textureWidth);
+   const int regionY0=std::clamp(static_cast<int>(std::min(edited.v1,std::min(edited.v2,edited.v3))),0,127);
+   const int regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
    const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
    const ImVec2 regionMax(atlasMin.x+atlasSize.x*static_cast<float>(regionX1)/static_cast<float>(textureWidth),
@@ -4074,6 +4075,8 @@ void EditorUI::drawFaceTextureSelector(){
  ImGui::PopStyleColor();
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(savedCursor);
+ // Complete the parent layout after restoring the cursor to avoid Dear ImGui boundary warnings.
+ ImGui::Dummy(ImVec2(1.0f,1.0f));
 }
 
 void EditorUI::drawModelEditor(){
