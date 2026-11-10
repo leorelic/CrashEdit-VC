@@ -3074,14 +3074,34 @@ void EditorUI::drawAnimationViewer(){
  ImGui::TextUnformatted("Mode");
  ImGui::SameLine();
  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,4.0f);
- if(animationFaceEditing_)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
- if(ImGui::Button("Face Editing##AnimationMode",ImVec2(126.0f,28.0f))){animationFaceEditing_=true;animationHoveredFace_=-1;}
- if(animationFaceEditing_)ImGui::PopStyleColor();
+ const bool faceModeWasActive=animationFaceEditing_;
+ if(faceModeWasActive)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+ const bool faceModeClicked=ImGui::Button("Face Editing##AnimationMode",ImVec2(136.0f,30.0f));
+ const ImVec2 faceButtonMin=ImGui::GetItemRectMin(),faceButtonMax=ImGui::GetItemRectMax();
+ if(faceModeWasActive)ImGui::PopStyleColor();
+ ImDrawList*modeIcons=ImGui::GetWindowDrawList();
+ const ImVec2 faceIconCenter(faceButtonMin.x+16.0f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
+ const ImU32 modeIconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ modeIcons->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeIconColor,2.5f);
+ modeIcons->AddLine(ImVec2(faceIconCenter.x-6,faceIconCenter.y+7),ImVec2(faceIconCenter.x-3,faceIconCenter.y+6),modeIconColor,1.8f);
+ if(faceModeClicked){animationFaceEditing_=true;animationHoveredFace_=-1;}
  if(ImGui::IsItemHovered())ImGui::SetTooltip("Face Editing Mode (F) - select and edit model faces");
  ImGui::SameLine();
- if(!animationFaceEditing_)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
- if(ImGui::Button("View Mode##AnimationMode",ImVec2(112.0f,28.0f))){animationFaceEditing_=false;animationHoveredFace_=-1;}
- if(!animationFaceEditing_)ImGui::PopStyleColor();
+ const bool viewModeWasActive=!animationFaceEditing_;
+ if(viewModeWasActive)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+ const bool viewModeClicked=ImGui::Button("View Mode##AnimationMode",ImVec2(122.0f,30.0f));
+ const ImVec2 viewButtonMin=ImGui::GetItemRectMin(),viewButtonMax=ImGui::GetItemRectMax();
+ if(viewModeWasActive)ImGui::PopStyleColor();
+ const ImVec2 handCenter(viewButtonMin.x+16.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
+ modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+3),ImVec2(handCenter.x-5,handCenter.y-4),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x-1,handCenter.y+2),ImVec2(handCenter.x-1,handCenter.y-7),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x+3,handCenter.y+2),ImVec2(handCenter.x+3,handCenter.y-6),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x+7,handCenter.y+3),ImVec2(handCenter.x+7,handCenter.y-3),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+2),ImVec2(handCenter.x-5,handCenter.y+7),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x-5,handCenter.y+7),ImVec2(handCenter.x-1,handCenter.y+10),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x-1,handCenter.y+10),ImVec2(handCenter.x+5,handCenter.y+10),modeIconColor,1.8f);
+ modeIcons->AddLine(ImVec2(handCenter.x+5,handCenter.y+10),ImVec2(handCenter.x+8,handCenter.y+5),modeIconColor,1.8f);
+ if(viewModeClicked){animationFaceEditing_=false;animationHoveredFace_=-1;}
  if(ImGui::IsItemHovered())ImGui::SetTooltip("View Mode - navigate without selecting faces");
  ImGui::PopStyleVar();
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
