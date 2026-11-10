@@ -3067,6 +3067,23 @@ void EditorUI::drawAnimationViewer(){
  else if(!model)ImGui::TextDisabled("Linked Model resource is not present in this NSF.");
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
+ // Put mode selection in the editor toolbar, outside the viewport image.
+ // Standard ImGui buttons keep both labels visible and clickable.
+ ImGui::Separator();
+ ImGui::AlignTextToFramePadding();
+ ImGui::TextUnformatted("Mode");
+ ImGui::SameLine();
+ ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,4.0f);
+ if(animationFaceEditing_)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+ if(ImGui::Button("Face Editing##AnimationMode",ImVec2(126.0f,28.0f))){animationFaceEditing_=true;animationHoveredFace_=-1;}
+ if(animationFaceEditing_)ImGui::PopStyleColor();
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Face Editing Mode (F) - select and edit model faces");
+ ImGui::SameLine();
+ if(!animationFaceEditing_)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+ if(ImGui::Button("View Mode##AnimationMode",ImVec2(112.0f,28.0f))){animationFaceEditing_=false;animationHoveredFace_=-1;}
+ if(!animationFaceEditing_)ImGui::PopStyleColor();
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("View Mode - navigate without selecting faces");
+ ImGui::PopStyleVar();
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
@@ -3098,22 +3115,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- auto drawModeButton=[&](const char*id,const char*tooltip,bool active,bool pencil,float y){
-   ImGui::SetCursorScreenPos(ImVec2(toolbarMin.x,y));const bool clicked=ImGui::InvisibleButton(id,ImVec2(28,28));
-   const bool over=ImGui::IsItemHovered();const ImVec2 lo=ImGui::GetItemRectMin(),hi=ImGui::GetItemRectMax();ImDrawList*icons=ImGui::GetWindowDrawList();
-   icons->AddRectFilled(lo,hi,ImGui::GetColorU32(active?ImGuiCol_ButtonActive:(over?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4);icons->AddRect(lo,hi,ImGui::GetColorU32(ImGuiCol_Border),4);
-   const ImU32 ink=ImGui::GetColorU32(ImGuiCol_Text);const ImVec2 c((lo.x+hi.x)*.5f,(lo.y+hi.y)*.5f);
-   if(pencil){icons->AddLine(ImVec2(c.x-7,c.y+7),ImVec2(c.x+6,c.y-6),ink,3);icons->AddLine(ImVec2(c.x-8,c.y+9),ImVec2(c.x-5,c.y+8),ink,2);icons->AddLine(ImVec2(c.x+5,c.y-7),ImVec2(c.x+8,c.y-4),ink,2);}
-   else{icons->AddLine(ImVec2(c.x-7,c.y+2),ImVec2(c.x-7,c.y-5),ink,2.2f);icons->AddLine(ImVec2(c.x-3,c.y+1),ImVec2(c.x-3,c.y-8),ink,2.2f);icons->AddLine(ImVec2(c.x+1,c.y+1),ImVec2(c.x+1,c.y-7),ink,2.2f);icons->AddLine(ImVec2(c.x+5,c.y+2),ImVec2(c.x+5,c.y-4),ink,2.2f);icons->AddLine(ImVec2(c.x-7,c.y-1),ImVec2(c.x-7,c.y+5),ink,2.2f);icons->AddLine(ImVec2(c.x-7,c.y+5),ImVec2(c.x-3,c.y+9),ink,2.2f);icons->AddLine(ImVec2(c.x-3,c.y+9),ImVec2(c.x+4,c.y+9),ink,2.2f);icons->AddLine(ImVec2(c.x+4,c.y+9),ImVec2(c.x+8,c.y+4),ink,2.2f);icons->AddLine(ImVec2(c.x+8,c.y+4),ImVec2(c.x+8,c.y+1),ink,2.2f);icons->AddLine(ImVec2(c.x+8,c.y+1),ImVec2(c.x+5,c.y),ink,2.2f);}
-   if(over)ImGui::SetTooltip("%s",tooltip);return std::pair<bool,bool>{clicked,over};
-  };
-  const float modeY=toolbarMax.y+5;
-  const auto faceModeButton=drawModeButton("##FaceEditingMode","Face Editing Mode (F)",animationFaceEditing_,true,modeY);
-  if(faceModeButton.first){animationFaceEditing_=true;animationHoveredFace_=-1;}
-  const auto viewModeButton=drawModeButton("##AnimationViewMode","View Mode",!animationFaceEditing_,false,modeY+32);
-  if(viewModeButton.first){animationFaceEditing_=false;animationHoveredFace_=-1;}
-  const bool modeButtonsHovered=faceModeButton.second||viewModeButton.second;
-  const bool viewportToolbarOwnsMouse=toolbarHovered||modeButtonsHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ const bool viewportToolbarOwnsMouse=toolbarHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3604,34 +3606,6 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
  for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
-
- // Draw the mode tools last: the viewport image/background is submitted after
- // their hit targets, so drawing them here keeps the visible controls above it.
- auto drawModeOverlay=[&](float y,bool active,bool hovered,bool pencil){
-  const ImVec2 lo(toolbarMin.x,y),hi(toolbarMin.x+28.0f,y+28.0f);
-  toolbarDraw->AddRectFilled(lo,hi,ImGui::GetColorU32(active?ImGuiCol_ButtonActive:(hovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);
-  toolbarDraw->AddRect(lo,hi,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
-  const ImVec2 c((lo.x+hi.x)*0.5f,(lo.y+hi.y)*0.5f);
-  const ImU32 ink=ImGui::GetColorU32(ImGuiCol_Text);
-  if(pencil){
-   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+7),ImVec2(c.x+6,c.y-6),ink,3.0f);
-   toolbarDraw->AddLine(ImVec2(c.x-8,c.y+9),ImVec2(c.x-5,c.y+8),ink,2.0f);
-   toolbarDraw->AddLine(ImVec2(c.x+5,c.y-7),ImVec2(c.x+8,c.y-4),ink,2.0f);
-  }else{
-   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+2),ImVec2(c.x-7,c.y-5),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x-3,c.y+1),ImVec2(c.x-3,c.y-8),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x+1,c.y+1),ImVec2(c.x+1,c.y-7),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x+5,c.y+2),ImVec2(c.x+5,c.y-4),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x-7,c.y-1),ImVec2(c.x-7,c.y+5),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+5),ImVec2(c.x-3,c.y+9),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x-3,c.y+9),ImVec2(c.x+4,c.y+9),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x+4,c.y+9),ImVec2(c.x+8,c.y+4),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x+8,c.y+4),ImVec2(c.x+8,c.y+1),ink,2.2f);
-   toolbarDraw->AddLine(ImVec2(c.x+8,c.y+1),ImVec2(c.x+5,c.y),ink,2.2f);
-  }
- };
- drawModeOverlay(modeY,animationFaceEditing_,faceModeButton.second,true);
- drawModeOverlay(modeY+32,!animationFaceEditing_,viewModeButton.second,false);
 
  ImGui::End();
 }
