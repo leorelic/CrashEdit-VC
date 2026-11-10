@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<6){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",rightBottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=6;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<7){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",bottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=7;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  bool showAnimationWorkspace=false;
@@ -3099,20 +3099,20 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const ImVec2 modeToolbarStart(canvasMin.x+44.0f,canvasMin.y+8.0f);
- const ImVec2 faceButtonMin=modeToolbarStart,faceButtonMax(modeToolbarStart.x+136.0f,modeToolbarStart.y+26.0f);
+ const ImVec2 modeToolbarStart(canvasMin.x+8.0f,canvasMin.y+38.0f);
+ const ImVec2 faceButtonMin=modeToolbarStart,faceButtonMax(modeToolbarStart.x+28.0f,modeToolbarStart.y+26.0f);
  ImGui::SetCursorScreenPos(faceButtonMin);
- const bool faceModeClicked=ImGui::InvisibleButton("##AnimationFaceEditMode",ImVec2(136.0f,26.0f));
+ const bool faceModeClicked=ImGui::InvisibleButton("##AnimationFaceEditMode",ImVec2(28.0f,26.0f));
  const bool faceModeHovered=ImGui::IsItemHovered();
  if(faceModeClicked){animationFaceEditing_=true;animationHoveredFace_=-1;}
- if(faceModeHovered)ImGui::SetTooltip("Face Editing Mode (F) - select and edit model faces");
- const ImVec2 viewButtonMin(modeToolbarStart.x+140.0f,modeToolbarStart.y);
- const ImVec2 viewButtonMax(viewButtonMin.x+122.0f,viewButtonMin.y+26.0f);
+ if(faceModeHovered)ImGui::SetTooltip("Face Editing Mode (F)");
+ const ImVec2 viewButtonMin(modeToolbarStart.x,modeToolbarStart.y+30.0f);
+ const ImVec2 viewButtonMax(viewButtonMin.x+28.0f,viewButtonMin.y+26.0f);
  ImGui::SetCursorScreenPos(viewButtonMin);
- const bool viewModeClicked=ImGui::InvisibleButton("##AnimationViewMode",ImVec2(122.0f,26.0f));
+ const bool viewModeClicked=ImGui::InvisibleButton("##AnimationViewMode",ImVec2(28.0f,26.0f));
  const bool viewModeHovered=ImGui::IsItemHovered();
  if(viewModeClicked){animationFaceEditing_=false;animationHoveredFace_=-1;}
- if(viewModeHovered)ImGui::SetTooltip("View Mode - navigate without selecting faces");
+ if(viewModeHovered)ImGui::SetTooltip("View Mode");
  const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
@@ -3132,17 +3132,17 @@ void EditorUI::drawAnimationViewer(){
  // Draw the overlay after the canvas background so the controls remain visible.
  ImDrawList*modeOverlay=ImGui::GetForegroundDrawList();
  const ImU32 modeTextColor=ImGui::GetColorU32(ImGuiCol_Text);
- auto drawModeButton=[&](const ImVec2&min,const ImVec2&max,const char*label,bool active,bool hovered){
+ auto drawModeButton=[&](const ImVec2&min,const ImVec2&max,bool active,bool hovered){
   const ImGuiCol color=active?ImGuiCol_ButtonActive:(hovered?ImGuiCol_ButtonHovered:ImGuiCol_Button);
   modeOverlay->AddRectFilled(min,max,ImGui::GetColorU32(color),4.0f);
   modeOverlay->AddRect(min,max,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
-  modeOverlay->AddText(ImVec2(min.x+29.0f,min.y+(26.0f-ImGui::GetTextLineHeight())*0.5f),modeTextColor,label);
  };
- drawModeButton(faceButtonMin,faceButtonMax,"Face Editing",animationFaceEditing_,faceModeHovered);
- const ImVec2 faceIconCenter(faceButtonMin.x+14.0f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
+ drawModeButton(faceButtonMin,faceButtonMax,animationFaceEditing_,faceModeHovered);
+ const ImVec2 faceIconCenter((faceButtonMin.x+faceButtonMax.x)*0.5f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-6,faceIconCenter.y+7),ImVec2(faceIconCenter.x-3,faceIconCenter.y+6),modeTextColor,1.8f);
- drawModeButton(viewButtonMin,viewButtonMax,"View Mode",!animationFaceEditing_,viewModeHovered);
+ modeOverlay->AddLine(ImVec2(faceIconCenter.x+2,faceIconCenter.y-2),ImVec2(faceIconCenter.x+6,faceIconCenter.y-6),modeTextColor,1.8f);
+ drawModeButton(viewButtonMin,viewButtonMax,!animationFaceEditing_,viewModeHovered);
  const ImVec2 handCenter(viewButtonMin.x+14.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+3),ImVec2(handCenter.x-5,handCenter.y-4),modeTextColor,1.8f);
  modeOverlay->AddLine(ImVec2(handCenter.x-1,handCenter.y+2),ImVec2(handCenter.x-1,handCenter.y-7),modeTextColor,1.8f);
@@ -3644,7 +3644,6 @@ void EditorUI::drawFaceEditor(){
  std::size_t mc=0,me=0;const Crash::NsfModel*model=nullptr;
  for(std::size_t ci=0;ci<nsf_.chunks().size()&&!model;++ci){const auto&ch=nsf_.chunks()[ci];if(ch.type!=0||!ch.entryTableValid)continue;for(std::size_t ei=0;ei<ch.entries.size();++ei){const auto&e=ch.entries[ei];if(e.valid&&e.type==2&&e.eid==eid&&e.model.decoded){model=&e.model;mc=ci;me=ei;break;}}}
  if(!model||!model->polygonsDecoded||static_cast<std::size_t>(animationSelectedFace_)>=model->triangles.size())return;
- if(ImGuiWindow*properties=ImGui::FindWindowByName("Properties"))if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
  ImGui::Begin("Face Editor");ImGui::Text("Face %d | %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
  const auto tri=model->triangles[static_cast<std::size_t>(animationSelectedFace_)];int texture=tri.textureIndex;bool animated=tri.animated;
  ImGui::TextUnformatted("Texture reference");ImGui::SameLine();ImGui::SetNextItemWidth(110);
