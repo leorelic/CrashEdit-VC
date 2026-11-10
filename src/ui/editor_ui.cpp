@@ -3751,7 +3751,11 @@ void EditorUI::drawFaceEditor(){
  ImGui::End();
 }
 void EditorUI::drawFaceTextureSelector(){
- if(!animationTextureSelectorOpen_||!animationFaceEditing_)return;
+ if(!animationFaceEditing_)return;
+ static float slideProgress=0.0f;
+ slideProgress=ImLerp(slideProgress,animationTextureSelectorOpen_?1.0f:0.0f,
+  std::clamp(ImGui::GetIO().DeltaTime*14.0f,0.0f,1.0f));
+ if(!animationTextureSelectorOpen_&&slideProgress<0.01f)return;
  if(animationViewerChunk_<0||static_cast<std::size_t>(animationViewerChunk_)>=nsf_.chunks().size())return;
  const auto&ac=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
  if(ac.type!=0||animationViewerEntry_<0||static_cast<std::size_t>(animationViewerEntry_)>=ac.entries.size())return;
@@ -3770,15 +3774,12 @@ void EditorUI::drawFaceTextureSelector(){
  }
  if(!model||!model->polygonsDecoded||animationSelectedFace_<0||static_cast<std::size_t>(animationSelectedFace_)>=model->triangles.size())return;
  const ImVec2 viewerPos=ImGui::GetWindowPos();
- const ImVec2 viewerSize=ImGui::GetWindowSize();
  const ImVec2 contentMin=ImGui::GetWindowContentRegionMin();
  const ImVec2 contentMax=ImGui::GetWindowContentRegionMax();
  const float contentWidth=std::max(1.0f,contentMax.x-contentMin.x);
  const float contentHeight=std::max(1.0f,contentMax.y-contentMin.y);
- const float panelWidth=std::clamp(contentWidth*0.48f,460.0f,760.0f);
- const float panelHeight=std::max(240.0f,contentHeight-12.0f);
- static float slideProgress=0.0f;
- slideProgress=ImLerp(slideProgress,1.0f,std::clamp(ImGui::GetIO().DeltaTime*14.0f,0.0f,1.0f));
+ const float panelWidth=std::clamp(contentWidth*0.48f,std::min(360.0f,contentWidth),std::min(760.0f,contentWidth));
+ const float panelHeight=std::max(180.0f,contentHeight-12.0f);
  const float slideOffset=(1.0f-slideProgress)*panelWidth;
  const ImVec2 savedCursor=ImGui::GetCursorScreenPos();
  ImGui::SetCursorScreenPos(ImVec2(viewerPos.x+contentMax.x-panelWidth+slideOffset,viewerPos.y+contentMin.y+6.0f));
