@@ -3973,7 +3973,7 @@ void EditorUI::drawFaceTextureSelector(){
      descriptorChanged=true;
     }
    }
-  }  }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
+  }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
   if(pageBytes&&colorMode<2){
    const int paletteCount=colorMode==0?16:256;
    const float swatchSize=std::max(5.0f,std::min(14.0f,(ImGui::GetContentRegionAvail().x-15.0f)/16.0f));
