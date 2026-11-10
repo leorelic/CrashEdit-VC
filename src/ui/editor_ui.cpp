@@ -390,7 +390,6 @@ void EditorUI::draw(){
  drawBottom();
  if(showAnimationWorkspace)drawAnimationViewer();
  if(showAnimationWorkspace&&animationFaceEditing_)drawFaceEditor();
- if(showAnimationWorkspace&&animationFaceEditing_)drawFaceTextureSelector();
  drawModelEditor();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
@@ -3650,6 +3649,7 @@ void EditorUI::drawAnimationViewer(){
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
  for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
 
+ if(animationFaceEditing_)drawFaceTextureSelector();
  ImGui::End();
 }
 
@@ -3769,15 +3769,32 @@ void EditorUI::drawFaceTextureSelector(){
   }
  }
  if(!model||!model->polygonsDecoded||animationSelectedFace_<0||static_cast<std::size_t>(animationSelectedFace_)>=model->triangles.size())return;
- ImGuiWindow*viewer=ImGui::FindWindowByName("3D Animation Editor");
- if(viewer){
-  const float width=std::clamp(viewer->Size.x*0.78f,520.0f,920.0f);
-  const float height=std::clamp(viewer->Size.y*0.84f,440.0f,760.0f);
-  ImGui::SetNextWindowPos(ImVec2(viewer->Pos.x+(viewer->Size.x-width)*0.5f,viewer->Pos.y+(viewer->Size.y-height)*0.5f),ImGuiCond_Appearing);
-  ImGui::SetNextWindowSize(ImVec2(width,height),ImGuiCond_Appearing);
+ const ImVec2 viewerPos=ImGui::GetWindowPos();
+ const ImVec2 viewerSize=ImGui::GetWindowSize();
+ const ImVec2 contentMin=ImGui::GetWindowContentRegionMin();
+ const ImVec2 contentMax=ImGui::GetWindowContentRegionMax();
+ const float contentWidth=std::max(1.0f,contentMax.x-contentMin.x);
+ const float contentHeight=std::max(1.0f,contentMax.y-contentMin.y);
+ const float panelWidth=std::clamp(contentWidth*0.48f,460.0f,760.0f);
+ const float panelHeight=std::max(240.0f,contentHeight-12.0f);
+ static float slideProgress=0.0f;
+ slideProgress=ImLerp(slideProgress,1.0f,std::clamp(ImGui::GetIO().DeltaTime*14.0f,0.0f,1.0f));
+ const float slideOffset=(1.0f-slideProgress)*panelWidth;
+ const ImVec2 savedCursor=ImGui::GetCursorScreenPos();
+ ImGui::SetCursorScreenPos(ImVec2(viewerPos.x+contentMax.x-panelWidth+slideOffset,viewerPos.y+contentMin.y+6.0f));
+ ImGui::SetNextWindowBgAlpha(0.98f);
+ ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,5.0f);
+ ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize,1.0f);
+ ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(0.075f,0.085f,0.105f,0.98f));
+ if(!ImGui::BeginChild("FaceTextureSelectorOverlay",ImVec2(panelWidth,panelHeight),true,ImGuiWindowFlags_NoSavedSettings)){
+  ImGui::EndChild();ImGui::PopStyleColor();ImGui::PopStyleVar(2);ImGui::SetCursorScreenPos(savedCursor);return;
  }
- ImGui::SetNextWindowBgAlpha(0.97f);
- if(!ImGui::Begin("Face Texture Selector",&animationTextureSelectorOpen_,ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoCollapse)){ImGui::End();return;}
+ ImGui::TextUnformatted("FACE TEXTURE SELECTOR");
+ ImGui::SameLine();
+ ImGui::SetCursorPosX(ImGui::GetWindowWidth()-ImGui::CalcTextSize("Close").x-ImGui::GetStyle().FramePadding.x*2.0f-8.0f);
+ if(ImGui::SmallButton("Close"))animationTextureSelectorOpen_=false;
+ ImGui::Separator();
+ ImGui::TextDisabled("Face %d  |  Model %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());
  const auto triangleIndex=static_cast<std::size_t>(animationSelectedFace_);
  const auto tri=model->triangles[triangleIndex];
  const float fieldWidth=std::max(120.0f,ImGui::GetContentRegionAvail().x*0.42f);
@@ -4014,7 +4031,10 @@ void EditorUI::drawFaceTextureSelector(){
   ImGui::SameLine();ImGui::TextDisabled("Applying a static descriptor disables animated texture playback for this face.");
  }
 
- ImGui::End();
+ ImGui::EndChild();
+ ImGui::PopStyleColor();
+ ImGui::PopStyleVar(2);
+ ImGui::SetCursorScreenPos(savedCursor);
 }
 
 void EditorUI::drawModelEditor(){
