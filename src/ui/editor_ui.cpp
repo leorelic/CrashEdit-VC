@@ -3811,6 +3811,17 @@ void EditorUI::drawFaceEditor(){
    ImDrawList*draw=ImGui::GetWindowDrawList();
    const ImVec2 atlasMax(atlasMin.x+atlasSize.x,atlasMin.y+atlasSize.y);
    draw->AddImage((ImTextureID)(std::intptr_t)previewTexture,atlasMin,atlasMax,ImVec2(0,0),ImVec2(1,1));
+   const int regionX0=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+    std::min(std::min(edited.u1,edited.u2),std::min(edited.u3,edited.u4)),0,textureWidth-1);
+   const int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+    std::max(std::max(edited.u1,edited.u2),std::max(edited.u3,edited.u4))+1,regionX0+1,textureWidth);
+   const int regionY0=std::clamp(std::min(std::min(edited.v1,edited.v2),std::min(edited.v3,edited.v4)),0,127);
+   const int regionY1=std::clamp(std::max(std::max(edited.v1,edited.v2),std::max(edited.v3,edited.v4))+1,regionY0+1,128);
+   const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
+    atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
+   const ImVec2 regionMax(atlasMin.x+atlasSize.x*static_cast<float>(regionX1)/static_cast<float>(textureWidth),
+    atlasMin.y+atlasSize.y*static_cast<float>(regionY1)/128.0f);
+   draw->AddRect(regionMin,regionMax,IM_COL32(65,210,245,230),0.0f,0,1.5f);
    if(atlasHovered&&ImGui::IsMouseClicked(0)){selectionDragging=true;selectionStart=ImGui::GetIO().MousePos;selectionEnd=selectionStart;}
    if(selectionDragging&&ImGui::IsMouseDown(0)){
     selectionEnd=ImGui::GetIO().MousePos;
