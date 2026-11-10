@@ -390,6 +390,7 @@ void EditorUI::draw(){
  drawBottom();
  if(showAnimationWorkspace)drawAnimationViewer();
  if(showAnimationWorkspace&&animationFaceEditing_)drawFaceEditor();
+ if(showAnimationWorkspace&&animationFaceEditing_)drawFaceTextureSelector();
  drawModelEditor();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
@@ -3102,6 +3103,16 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
+ const ImVec2 textureButtonMin(canvasMin.x+42.0f,canvasMin.y+8.0f);
+ const ImVec2 textureButtonMax(textureButtonMin.x+28.0f,textureButtonMin.y+26.0f);
+ bool textureButtonHovered=false;
+ if(animationFaceEditing_){
+  ImGui::SetCursorScreenPos(textureButtonMin);
+  const bool textureButtonClicked=ImGui::InvisibleButton("##AnimationTextureSelector",ImVec2(28.0f,26.0f));
+  textureButtonHovered=ImGui::IsItemHovered();
+  if(textureButtonClicked)animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
+  if(textureButtonHovered)ImGui::SetTooltip("Texture Selector (H)");
+ }
  const ImVec2 modeToolbarStart(canvasMin.x+8.0f,canvasMin.y+38.0f);
  const ImVec2 faceButtonMin=modeToolbarStart,faceButtonMax(modeToolbarStart.x+28.0f,modeToolbarStart.y+26.0f);
  ImGui::SetCursorScreenPos(faceButtonMin);
@@ -3114,9 +3125,9 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SetCursorScreenPos(viewButtonMin);
  const bool viewModeClicked=ImGui::InvisibleButton("##AnimationViewMode",ImVec2(28.0f,26.0f));
  const bool viewModeHovered=ImGui::IsItemHovered();
- if(viewModeClicked){animationFaceEditing_=false;animationHoveredFace_=-1;}
+ if(viewModeClicked){animationFaceEditing_=false;animationTextureSelectorOpen_=false;animationHoveredFace_=-1;}
  if(viewModeHovered)ImGui::SetTooltip("View Mode");
- const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3124,7 +3135,8 @@ void EditorUI::drawAnimationViewer(){
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
  const ImGuiIO&shortcutIo=ImGui::GetIO();
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
-  if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;}
+  if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;if(!animationFaceEditing_)animationTextureSelectorOpen_=false;}
+  if(animationFaceEditing_&&ImGui::IsKeyPressed(ImGuiKey_H,false))animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
@@ -3140,6 +3152,12 @@ void EditorUI::drawAnimationViewer(){
   modeOverlay->AddRectFilled(min,max,ImGui::GetColorU32(color),4.0f);
   modeOverlay->AddRect(min,max,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
  };
+ if(animationFaceEditing_){
+  modeOverlay->AddRectFilled(textureButtonMin,textureButtonMax,ImGui::GetColorU32(animationTextureSelectorOpen_?ImGuiCol_ButtonActive:(textureButtonHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);
+  modeOverlay->AddRect(textureButtonMin,textureButtonMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
+  const float cell=5.0f,gap=2.0f,sx=textureButtonMin.x+7.0f,sy=textureButtonMin.y+6.0f;
+  for(int y=0;y<2;++y)for(int x=0;x<2;++x){const ImVec2 a(sx+float(x)*(cell+gap),sy+float(y)*(cell+gap));modeOverlay->AddRectFilled(a,ImVec2(a.x+cell,a.y+cell),modeTextColor,1.0f);}
+ }
  drawModeButton(faceButtonMin,faceButtonMax,animationFaceEditing_,faceModeHovered);
  const ImVec2 faceIconCenter((faceButtonMin.x+faceButtonMax.x)*0.5f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
@@ -3695,6 +3713,84 @@ void EditorUI::drawFaceEditor(){
    status_="Could not change the selected face's animated texture binding.";
  }
  ImGui::Separator();
+ ImGui::Separator();
+ ImGui::TextUnformatted("Corner colors");
+ ImGui::TextWrapped("Each corner points to a shared color record. Faces that reference the same record will share edits to that record.");
+ const std::size_t colors[3]={tri.colorA,tri.colorB,tri.colorC};
+ const char*names[3]={"Corner A","Corner B","Corner C"};
+ for(std::size_t c=0;c<3;++c){
+  ImGui::PushID(static_cast<int>(c));
+  ImGui::Separator();
+  ImGui::TextUnformatted(names[c]);
+  int index=static_cast<int>(colors[c]);
+  if(labeledInt("Color record index","##ColorIndex",index,0,127)){
+   if(nsf_.setModelTriangleColorIndex(mc,me,triangleIndex,c,static_cast<std::uint8_t>(index)))status_="Updated selected face corner color reference.";
+  }
+  if(static_cast<std::size_t>(index)<model->colors.size()){
+   std::size_t useCount=0,faceCount=0;
+   for(const auto&other:model->triangles){
+    const std::size_t refs[3]={other.colorA,other.colorB,other.colorC};
+    bool faceUses=false;
+    for(const auto ref:refs)if(ref==static_cast<std::size_t>(index)){++useCount;faceUses=true;}
+    if(faceUses)++faceCount;
+   }
+   auto color=model->colors[static_cast<std::size_t>(index)];
+   float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
+   ImGui::Text("Record %d | RGB %u, %u, %u",index,static_cast<unsigned>(color.r),static_cast<unsigned>(color.g),static_cast<unsigned>(color.b));
+   ImGui::SetNextItemWidth(fieldWidth);
+   if(ImGui::ColorEdit3("Color##CornerColor",rgb,ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_AlphaBar)){
+    color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
+    color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
+    color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
+    nsf_.setModelColor(mc,me,static_cast<std::size_t>(index),color);
+   }
+   ImGui::TextDisabled("Referenced by %zu corner(s) across %zu face(s).",useCount,faceCount);
+  }else ImGui::TextDisabled("This corner references an unavailable color record.");
+  ImGui::PopID();
+ }
+ ImGui::End();
+}
+void EditorUI::drawFaceTextureSelector(){
+ if(!animationTextureSelectorOpen_||!animationFaceEditing_)return;
+ if(animationViewerChunk_<0||static_cast<std::size_t>(animationViewerChunk_)>=nsf_.chunks().size())return;
+ const auto&ac=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+ if(ac.type!=0||animationViewerEntry_<0||static_cast<std::size_t>(animationViewerEntry_)>=ac.entries.size())return;
+ const auto&ae=ac.entries[static_cast<std::size_t>(animationViewerEntry_)];
+ if(!ae.valid||ae.type!=1||!ae.animation.decoded||ae.animation.frames.empty())return;
+ const auto&animation=ae.animation;
+ const auto&frame=animation.frames[std::min<std::size_t>(static_cast<std::size_t>(std::max(0,animationFrame_)),animation.frames.size()-1U)];
+ const std::uint32_t eid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
+ std::size_t mc=0,me=0;const Crash::NsfModel*model=nullptr;
+ for(std::size_t ci=0;ci<nsf_.chunks().size()&&!model;++ci){
+  const auto&ch=nsf_.chunks()[ci];if(ch.type!=0||!ch.entryTableValid)continue;
+  for(std::size_t ei=0;ei<ch.entries.size();++ei){
+   const auto&e=ch.entries[ei];
+   if(e.valid&&e.type==2&&e.eid==eid&&e.model.decoded){model=&e.model;mc=ci;me=ei;break;}
+  }
+ }
+ if(!model||!model->polygonsDecoded||animationSelectedFace_<0||static_cast<std::size_t>(animationSelectedFace_)>=model->triangles.size())return;
+ ImGuiWindow*viewer=ImGui::FindWindowByName("3D Animation Editor");
+ if(viewer){
+  const float width=std::clamp(viewer->Size.x*0.78f,520.0f,920.0f);
+  const float height=std::clamp(viewer->Size.y*0.84f,440.0f,760.0f);
+  ImGui::SetNextWindowPos(ImVec2(viewer->Pos.x+(viewer->Size.x-width)*0.5f,viewer->Pos.y+(viewer->Size.y-height)*0.5f),ImGuiCond_Appearing);
+  ImGui::SetNextWindowSize(ImVec2(width,height),ImGuiCond_Appearing);
+ }
+ ImGui::SetNextWindowBgAlpha(0.97f);
+ if(!ImGui::Begin("Face Texture Selector",&animationTextureSelectorOpen_,ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoCollapse)){ImGui::End();return;}
+ const auto triangleIndex=static_cast<std::size_t>(animationSelectedFace_);
+ const auto tri=model->triangles[triangleIndex];
+ const float fieldWidth=std::max(120.0f,ImGui::GetContentRegionAvail().x*0.42f);
+ auto labeledInt=[&](const char*label,const char*id,int&value,int minValue,int maxValue){
+  ImGui::TextUnformatted(label);ImGui::SetNextItemWidth(fieldWidth);
+  if(ImGui::InputInt(id,&value)){value=std::clamp(value,minValue,maxValue);return true;}return false;
+ };
+ bool currentTextureValid=true;
+ const int currentDescriptor=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),currentTextureValid);
+ ImGui::Text("Texture Selector  |  Face %d  |  %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());
+ ImGui::Separator();
+ if(ImGui::Button("Close"))animationTextureSelectorOpen_=false;
+ ImGui::SameLine();ImGui::TextDisabled("Drag a region in the atlas to edit it, then apply the descriptor to this face.");
  static std::uint32_t selectorModelEid=0;
  static int selectorFace=-1,selectedDescriptor=-1;
  static bool selectionDragging=false;
@@ -3706,7 +3802,7 @@ void EditorUI::drawFaceEditor(){
   selectionDragging=false;
  }
  if(selectedDescriptor>=static_cast<int>(model->textures.size())||selectedDescriptor>=255)selectedDescriptor=-1;
- ImGui::TextUnformatted("Texture Selector");
+ ImGui::Text("Face %d | Model %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());
  if(model->textures.empty()||model->texturePageEids.empty()){
   ImGui::TextDisabled("This Model has no texture descriptors or TPAG pages.");
  }else{
@@ -3730,7 +3826,7 @@ void EditorUI::drawFaceEditor(){
   bool descriptorChanged=false;
   const std::string currentPageName=edited.page<model->texturePageEids.size()?
    Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
-  if(ImGui::BeginCombo("TPAG page",currentPageName.c_str())){
+  if(ImGui::BeginCombo("TPAG slot",currentPageName.c_str())){
    for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
     const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
     if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
@@ -3738,6 +3834,15 @@ void EditorUI::drawFaceEditor(){
     }
    }
    ImGui::EndCombo();
+  }
+  if(edited.page<model->texturePageEids.size()){
+   const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
+   std::string assignedChunkLabel="Unresolved texture chunk";
+   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}}
+   if(ImGui::BeginCombo("Texture chunk",assignedChunkLabel.c_str())){
+    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);const std::string label="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);if(ImGui::Selectable(label.c_str(),candidateEid==assignedPageEid)){if(nsf_.setModelTexturePageEid(mc,me,edited.page,candidateEid))status_="Reassigned TPAG slot "+std::to_string(edited.page)+" to Texture Chunk "+std::to_string(ci)+".";else status_="Could not assign the selected Texture Chunk to this TPAG slot.";}}
+    ImGui::EndCombo();
+   }
   }
   const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
   int colorMode=std::clamp<int>(edited.colorMode,0,2);
@@ -3811,9 +3916,9 @@ void EditorUI::drawFaceEditor(){
     GL::BindTexture(0x0DE1U,static_cast<unsigned int>(oldTexture));GL::ActiveTexture(static_cast<unsigned int>(oldActive));
    }
   }
-  ImGui::Text("Texture page | %d x 128",textureWidth);
+  ImGui::Text("Atlas preview | %d x 128 pixels",textureWidth);
   if(pageBytes&&previewTexture){
-   const float displayWidth=std::max(120.0f,std::min(ImGui::GetContentRegionAvail().x,560.0f));
+   const float displayWidth=std::max(240.0f,std::min(ImGui::GetContentRegionAvail().x,900.0f));
    const ImVec2 atlasSize(displayWidth,displayWidth*128.0f/static_cast<float>(textureWidth));
    const ImVec2 atlasMin=ImGui::GetCursorScreenPos();
    ImGui::InvisibleButton("##TextureAtlasPicker",atlasSize);
@@ -3908,43 +4013,10 @@ void EditorUI::drawFaceEditor(){
   }
   ImGui::SameLine();ImGui::TextDisabled("Applying a static descriptor disables animated texture playback for this face.");
  }
- ImGui::Separator();
- ImGui::TextUnformatted("Corner colors");
- ImGui::TextWrapped("Each corner points to a shared color record. Faces that reference the same record will share edits to that record.");
- const std::size_t colors[3]={tri.colorA,tri.colorB,tri.colorC};
- const char*names[3]={"Corner A","Corner B","Corner C"};
- for(std::size_t c=0;c<3;++c){
-  ImGui::PushID(static_cast<int>(c));
-  ImGui::Separator();
-  ImGui::TextUnformatted(names[c]);
-  int index=static_cast<int>(colors[c]);
-  if(labeledInt("Color record index","##ColorIndex",index,0,127)){
-   if(nsf_.setModelTriangleColorIndex(mc,me,triangleIndex,c,static_cast<std::uint8_t>(index)))status_="Updated selected face corner color reference.";
-  }
-  if(static_cast<std::size_t>(index)<model->colors.size()){
-   std::size_t useCount=0,faceCount=0;
-   for(const auto&other:model->triangles){
-    const std::size_t refs[3]={other.colorA,other.colorB,other.colorC};
-    bool faceUses=false;
-    for(const auto ref:refs)if(ref==static_cast<std::size_t>(index)){++useCount;faceUses=true;}
-    if(faceUses)++faceCount;
-   }
-   auto color=model->colors[static_cast<std::size_t>(index)];
-   float rgb[3]={color.r/255.0f,color.g/255.0f,color.b/255.0f};
-   ImGui::Text("Record %d | RGB %u, %u, %u",index,static_cast<unsigned>(color.r),static_cast<unsigned>(color.g),static_cast<unsigned>(color.b));
-   ImGui::SetNextItemWidth(fieldWidth);
-   if(ImGui::ColorEdit3("Color##CornerColor",rgb,ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_AlphaBar)){
-    color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
-    color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
-    color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
-    nsf_.setModelColor(mc,me,static_cast<std::size_t>(index),color);
-   }
-   ImGui::TextDisabled("Referenced by %zu corner(s) across %zu face(s).",useCount,faceCount);
-  }else ImGui::TextDisabled("This corner references an unavailable color record.");
-  ImGui::PopID();
- }
+
  ImGui::End();
 }
+
 void EditorUI::drawModelEditor(){
  if(!nsfValid_||selectedChunk_<0||static_cast<std::size_t>(selectedChunk_)>=nsf_.chunks().size())return;
  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
