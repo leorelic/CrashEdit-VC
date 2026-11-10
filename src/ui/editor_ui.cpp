@@ -3133,9 +3133,12 @@ void EditorUI::drawAnimationViewer(){
  ImGui::InvisibleButton("AnimationViewerCanvas",canvasSize,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
  const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
  const ImGuiIO&shortcutIo=ImGui::GetIO();
+ if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&animationFaceEditing_&&
+    !shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper&&
+    ImGui::IsKeyPressed(ImGuiKey_H,false))
+  animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
   if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;if(!animationFaceEditing_)animationTextureSelectorOpen_=false;}
-  if(animationFaceEditing_&&ImGui::IsKeyPressed(ImGuiKey_H,false))animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
@@ -3778,11 +3781,11 @@ void EditorUI::drawFaceTextureSelector(){
  const ImVec2 contentMax=ImGui::GetWindowContentRegionMax();
  const float contentWidth=std::max(1.0f,contentMax.x-contentMin.x);
  const float contentHeight=std::max(1.0f,contentMax.y-contentMin.y);
- const float panelWidth=std::min(contentWidth-16.0f,std::max(480.0f,contentWidth*0.90f));
- const float panelHeight=std::min(contentHeight-16.0f,std::max(260.0f,contentHeight*0.62f));
+ const float panelWidth=contentWidth;
+ const float panelHeight=std::min(contentHeight-8.0f,std::max(280.0f,contentHeight*0.68f));
  const float slideOffset=(1.0f-slideProgress)*panelHeight;
- const ImVec2 panelPos(viewerPos.x+contentMin.x+(contentWidth-panelWidth)*0.5f,
-  viewerPos.y+contentMax.y-panelHeight-8.0f+slideOffset);
+ const ImVec2 panelPos(viewerPos.x+contentMin.x,
+  viewerPos.y+contentMax.y-panelHeight+slideOffset);
  const ImVec2 savedCursor=ImGui::GetCursorScreenPos();
  ImGui::SetCursorScreenPos(panelPos);
  // Reserve the overlay's bounds in the parent before creating the overlapping child.
@@ -3967,56 +3970,55 @@ void EditorUI::drawFaceTextureSelector(){
    ImGui::Dummy(ImVec2(16.0f*(swatchSize+1.0f),static_cast<float>(rows)*(swatchSize+1.0f)));
   }
   ImGui::Separator();
-  ImGui::TextUnformatted("Texture assignment");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(220.0f);
-  const std::string activeDescriptorLabel=descriptorLabel(selectedDescriptor);
-  if(ImGui::BeginCombo("##SelectorTextureDescriptor",activeDescriptorLabel.c_str())){
-   const int count=static_cast<int>(std::min<std::size_t>(model->textures.size(),255U));
-   for(int i=0;i<count;++i){
-    const std::string label=descriptorLabel(i);
-    if(ImGui::Selectable(label.c_str(),selectedDescriptor==i))selectedDescriptor=i;
-    if(selectedDescriptor==i)ImGui::SetItemDefaultFocus();
-   }
-   ImGui::EndCombo();
-  }
-  ImGui::SameLine();
-  ImGui::TextUnformatted("Color depth");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(145.0f);
-  const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
-  int selectedColorMode=colorMode;
-  if(ImGui::Combo("##SelectorColorDepth",&selectedColorMode,colorModeNames,3)){
-   edited.colorMode=static_cast<std::uint8_t>(selectedColorMode);
-   descriptorChanged=true;
-  }
-  ImGui::SameLine();
-  ImGui::TextUnformatted("TPAG");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(190.0f);
-  const std::string currentPageName=edited.page<model->texturePageEids.size()?
-   Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
-  if(ImGui::BeginCombo("##SelectorTpagSlot",currentPageName.c_str())){
-   for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
-    const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
-    if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
-     edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
+  ImGui::TextUnformatted("Texture settings");
+  if(ImGui::BeginTable("##FaceTextureSettings",2,ImGuiTableFlags_SizingStretchSame|ImGuiTableFlags_BordersInnerV,ImVec2(0,0))){
+   ImGui::TableNextRow();
+   ImGui::TableSetColumnIndex(0);
+   ImGui::TextUnformatted("Texture descriptor");
+   ImGui::SetNextItemWidth(-FLT_MIN);
+   const std::string activeDescriptorLabel=descriptorLabel(selectedDescriptor);
+   if(ImGui::BeginCombo("##SelectorTextureDescriptor",activeDescriptorLabel.c_str())){
+    const int count=static_cast<int>(std::min<std::size_t>(model->textures.size(),255U));
+    for(int i=0;i<count;++i){
+     const std::string label=descriptorLabel(i);
+     if(ImGui::Selectable(label.c_str(),selectedDescriptor==i))selectedDescriptor=i;
+     if(selectedDescriptor==i)ImGui::SetItemDefaultFocus();
     }
+    ImGui::EndCombo();
    }
-   ImGui::EndCombo();
-  }
-  if(edited.page<model->texturePageEids.size()){
-   const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
+   ImGui::TableSetColumnIndex(1);
+   ImGui::TextUnformatted("Color depth");
+   ImGui::SetNextItemWidth(-FLT_MIN);
+   const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
+   int selectedColorMode=colorMode;
+   if(ImGui::Combo("##SelectorColorDepth",&selectedColorMode,colorModeNames,3)){
+    edited.colorMode=static_cast<std::uint8_t>(selectedColorMode);descriptorChanged=true;
+   }
+   ImGui::TableNextRow();
+   ImGui::TableSetColumnIndex(0);
+   ImGui::TextUnformatted("TPAG slot");
+   ImGui::SetNextItemWidth(-FLT_MIN);
+   const std::string currentPageName=edited.page<model->texturePageEids.size()?
+    Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
+   if(ImGui::BeginCombo("##SelectorTpagSlot",currentPageName.c_str())){
+    for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
+     const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
+     if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
+      edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
+     }
+    }
+    ImGui::EndCombo();
+   }
+   ImGui::TableSetColumnIndex(1);
+   ImGui::TextUnformatted("Texture chunk");
+   ImGui::SetNextItemWidth(-FLT_MIN);
+   std::uint32_t assignedPageEid=edited.page<model->texturePageEids.size()?model->texturePageEids[edited.page]:0U;
    std::string assignedChunkLabel="Unresolved texture chunk";
    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
     const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;
     const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);
     if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}
    }
-   ImGui::SameLine();
-   ImGui::TextUnformatted("Texture chunk");
-   ImGui::SameLine();
-   ImGui::SetNextItemWidth(230.0f);
    if(ImGui::BeginCombo("##SelectorTextureChunk",assignedChunkLabel.c_str())){
     for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
      const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;
@@ -4030,27 +4032,27 @@ void EditorUI::drawFaceTextureSelector(){
     }
     ImGui::EndCombo();
    }
+   ImGui::EndTable();
   }
+  ImGui::TextUnformatted("CLUT coordinates");
+  const float clutFieldWidth=std::max(64.0f,(ImGui::GetContentRegionAvail().x-180.0f)/3.0f);
+  ImGui::SetNextItemWidth(clutFieldWidth);
+  ImGui::InputInt("CLUT X",&clutX,1,4);
+  clutX=std::clamp(clutX,0,15);edited.clutX=static_cast<std::uint8_t>(clutX);
   ImGui::SameLine();
-  ImGui::TextUnformatted("CLUT X");
+  ImGui::SetNextItemWidth(clutFieldWidth);
+  ImGui::InputInt("CLUT Y1",&clutY1,1,4);
+  clutY1=std::clamp(clutY1,0,255);edited.clutY1=static_cast<std::uint8_t>(clutY1);
   ImGui::SameLine();
-  ImGui::SetNextItemWidth(75.0f);
-  if(ImGui::InputInt("##SelectorClutX",&clutX,1,4)){clutX=std::clamp(clutX,0,15);edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
-  ImGui::SameLine();
-  ImGui::TextUnformatted("Y1");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(75.0f);
-  if(ImGui::InputInt("##SelectorClutY1",&clutY1,1,4)){clutY1=std::clamp(clutY1,0,255);edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
-  ImGui::SameLine();
-  ImGui::TextUnformatted("Y2");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(75.0f);
-  if(ImGui::InputInt("##SelectorClutY2",&clutY2,1,4)){clutY2=std::clamp(clutY2,0,15);edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
+  ImGui::SetNextItemWidth(clutFieldWidth);
+  ImGui::InputInt("CLUT Y2",&clutY2,1,4);
+  clutY2=std::clamp(clutY2,0,15);edited.clutY2=static_cast<std::uint8_t>(clutY2);
+  if(ImGui::IsItemDeactivatedAfterEdit())descriptorChanged=true;
   ImGui::SameLine();
   if(ImGui::Button("Apply to Face")){
    if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
     status_="Applied the selected texture descriptor to this face.";
-   else status_="Could not assign this texture descriptor to the selected face.";
+   else status_="Could not assign the selected texture descriptor to this face.";
   }
   std::size_t descriptorUseCount=0;
   for(const auto&other:model->triangles){
