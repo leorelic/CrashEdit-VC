@@ -3818,43 +3818,8 @@ void EditorUI::drawFaceEditor(){
   }
   Crash::NsfModelTexture edited=model->textures[static_cast<std::size_t>(selectedDescriptor)];
   bool descriptorChanged=false;
-  if(ImGui::CollapsingHeader("TPAG Assignment",ImGuiTreeNodeFlags_DefaultOpen)){
-  const std::string currentPageName=edited.page<model->texturePageEids.size()?
-   Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
-  if(ImGui::BeginCombo("TPAG slot",currentPageName.c_str())){
-   for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
-    const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
-    if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
-     edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
-    }
-   }
-   ImGui::EndCombo();
-  }
-  if(edited.page<model->texturePageEids.size()){
-   const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
-   std::string assignedChunkLabel="Unresolved texture chunk";
-   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}}
-   if(ImGui::BeginCombo("Texture chunk",assignedChunkLabel.c_str())){
-    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);const std::string label="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);if(ImGui::Selectable(label.c_str(),candidateEid==assignedPageEid)){if(nsf_.setModelTexturePageEid(mc,me,edited.page,candidateEid))status_="Reassigned TPAG slot "+std::to_string(edited.page)+" to Texture Chunk "+std::to_string(ci)+".";else status_="Could not assign the selected Texture Chunk to this TPAG slot.";}}
-    ImGui::EndCombo();
-   }
-  }
-  }
-  const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
   int colorMode=std::clamp<int>(edited.colorMode,0,2);
-  if(ImGui::CollapsingHeader("Texture & CLUT Settings",ImGuiTreeNodeFlags_DefaultOpen)){
-  if(ImGui::BeginCombo("Color depth",colorModeNames[colorMode])){
-   for(int mode=0;mode<3;++mode)if(ImGui::Selectable(colorModeNames[mode],colorMode==mode)){
-    colorMode=mode;edited.colorMode=static_cast<std::uint8_t>(mode);descriptorChanged=true;
-   }
-   ImGui::EndCombo();
-  }
   int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
-  if(labeledInt("CLUT X","##SelectorClutX",clutX,0,15)){edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
-  if(labeledInt("CLUT Y1","##SelectorClutY1",clutY1,0,255)){edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
-  if(labeledInt("CLUT Y2","##SelectorClutY2",clutY2,0,15)){edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
-
-  }
   const std::uint32_t pageEid=edited.page<model->texturePageEids.size()?model->texturePageEids[edited.page]:0U;
   const std::vector<std::uint8_t>*pageBytes=nullptr;
   for(const auto&chunk:nsf_.chunks()){
@@ -3966,6 +3931,42 @@ void EditorUI::drawFaceEditor(){
     descriptorChanged=true;selectionDragging=false;
    }
   }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
+  if(ImGui::CollapsingHeader("TPAG Assignment",ImGuiTreeNodeFlags_DefaultOpen)){
+  const std::string currentPageName=edited.page<model->texturePageEids.size()?
+   Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
+  if(ImGui::BeginCombo("TPAG slot",currentPageName.c_str())){
+   for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
+    const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
+    if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
+     edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
+    }
+   }
+   ImGui::EndCombo();
+  }
+  if(edited.page<model->texturePageEids.size()){
+   const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
+   std::string assignedChunkLabel="Unresolved texture chunk";
+   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}}
+   if(ImGui::BeginCombo("Texture chunk",assignedChunkLabel.c_str())){
+    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);const std::string label="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);if(ImGui::Selectable(label.c_str(),candidateEid==assignedPageEid)){if(nsf_.setModelTexturePageEid(mc,me,edited.page,candidateEid))status_="Reassigned TPAG slot "+std::to_string(edited.page)+" to Texture Chunk "+std::to_string(ci)+".";else status_="Could not assign the selected Texture Chunk to this TPAG slot.";}}
+    ImGui::EndCombo();
+   }
+  }
+  }
+  const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
+  int colorMode=std::clamp<int>(edited.colorMode,0,2);
+  if(ImGui::CollapsingHeader("Texture & CLUT Settings",ImGuiTreeNodeFlags_DefaultOpen)){
+  if(ImGui::BeginCombo("Color depth",colorModeNames[colorMode])){
+   for(int mode=0;mode<3;++mode)if(ImGui::Selectable(colorModeNames[mode],colorMode==mode)){
+    colorMode=mode;edited.colorMode=static_cast<std::uint8_t>(mode);descriptorChanged=true;
+    ImGui::EndCombo();
+  }
+  int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
+  if(labeledInt("CLUT X","##SelectorClutX",clutX,0,15)){edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
+  if(labeledInt("CLUT Y1","##SelectorClutY1",clutY1,0,255)){edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
+  if(labeledInt("CLUT Y2","##SelectorClutY2",clutY2,0,15)){edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
+
+  }
   if(pageBytes&&colorMode<2&&ImGui::CollapsingHeader("CLUT Palette")){
    const int paletteCount=colorMode==0?16:256;
    const float swatchSize=std::max(5.0f,std::min(14.0f,(ImGui::GetContentRegionAvail().x-15.0f)/16.0f));
