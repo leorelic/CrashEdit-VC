@@ -3825,7 +3825,7 @@ void EditorUI::drawFaceEditor(){
     std::min(std::min(edited.u1,edited.u2),std::min(edited.u3,edited.u4)),0,textureWidth-1);
    const int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
     std::max(std::max(edited.u1,edited.u2),std::max(edited.u3,edited.u4))+1,regionX0+1,textureWidth);
-   const int regionY0=std::clamp(std::min(std::min(edited.v1,edited.v2),std::min(edited.v3,edited.v4)),0,127);
+   const int regionY0=std::clamp(static_cast<int>(std::min(std::min(edited.v1,edited.v2),std::min(edited.v3,edited.v4))),0,127);
    const int regionY1=std::clamp(std::max(std::max(edited.v1,edited.v2),std::max(edited.v3,edited.v4))+1,regionY0+1,128);
    const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
