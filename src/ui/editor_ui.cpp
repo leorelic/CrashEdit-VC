@@ -3829,7 +3829,6 @@ void EditorUI::drawFaceTextureSelector(){
   bool descriptorChanged=false;
   const int colorMode=std::clamp<int>(edited.colorMode,0,2);
   int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
-  const int clutY=std::clamp((static_cast<int>(edited.clutY2)<<2)|((static_cast<int>(edited.clutY1)>>2)&3),0,127);
   const std::uint32_t pageEid=edited.page<model->texturePageEids.size()?model->texturePageEids[edited.page]:0U;
   const std::vector<std::uint8_t>*pageBytes=nullptr;
   for(const auto&chunk:nsf_.chunks()){
