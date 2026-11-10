@@ -2845,12 +2845,15 @@ void EditorUI::drawAnimationFrameEditor(){
    ImGui::Text("Vertex Index: %d",animationSelectedVertex_);
    int vertexValues[3]={selectedVertex.x,selectedVertex.y,selectedVertex.z};
    const char*axisLabels[3]={"X","Y","Z"};
+   const float vertexFieldWidth=ImGui::GetContentRegionAvail().x;
    for(std::size_t axis=0;axis<3U;++axis){
-    ImGui::SetNextItemWidth(110.0f);
-    if(ImGui::InputInt(axisLabels[axis],&vertexValues[axis])){
+    ImGui::PushID(static_cast<int>(axis));
+    ImGui::TextUnformatted(axisLabels[axis]);
+    ImGui::SetNextItemWidth(vertexFieldWidth);
+    if(ImGui::InputInt("##VertexCoordinate",&vertexValues[axis])){
      if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(animationSelectedVertex_),axis,vertexValues[axis]))status_="Vertex value cannot be represented by this frame's packed temporal format.";
     }
-    if(axis<2U)ImGui::SameLine();
+    ImGui::PopID();
    }
    ImGui::TextDisabled("Edits are encoded back into the frame's temporal stream; unsupported values are rejected.");
   }else ImGui::TextDisabled("Click a vertex point in the 3D Animation Editor to inspect it.");
