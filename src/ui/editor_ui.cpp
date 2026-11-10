@@ -3667,23 +3667,226 @@ void EditorUI::drawFaceEditor(){
   if(ImGui::InputInt(id,&value)){value=std::clamp(value,minValue,maxValue);return true;}
   return false;
  };
- ImGui::TextUnformatted("Texture");
- int texture=tri.textureIndex;bool animated=tri.animated;
- if(labeledInt("Texture reference","##FaceTextureReference",texture,0,255))
-  if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(texture),animated))status_="Updated selected face texture reference.";
- if(ImGui::Checkbox("Animated texture",&animated))
-  if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(texture),animated))status_="Updated selected face texture mode.";
- bool valid=true;
- const int descriptor=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),valid);
- if(valid&&descriptor>=0&&static_cast<std::size_t>(descriptor)<model->textures.size()){
-  const auto&d=model->textures[static_cast<std::size_t>(descriptor)];
-  const std::uint32_t pageEid=d.page<model->texturePageEids.size()?model->texturePageEids[d.page]:0U;
-  ImGui::TextWrapped("Resolved descriptor: %d | TPAG slot: %u | Page: %s (%08X)",descriptor,static_cast<unsigned>(d.page),Crash::eidToEName(pageEid).c_str(),pageEid);
-  ImGui::TextWrapped("CLUT: X %u | Y1 %u | Y2 %u",static_cast<unsigned>(d.clutX),static_cast<unsigned>(d.clutY1),static_cast<unsigned>(d.clutY2));
-  ImGui::TextDisabled("Texture region UV: (%u,%u) (%u,%u) (%u,%u) (%u,%u)",
-   static_cast<unsigned>(d.u1),static_cast<unsigned>(d.v1),static_cast<unsigned>(d.u2),static_cast<unsigned>(d.v2),
-   static_cast<unsigned>(d.u3),static_cast<unsigned>(d.v3),static_cast<unsigned>(d.u4),static_cast<unsigned>(d.v4));
- }else ImGui::TextDisabled("No resolved texture descriptor for this face.");
+ bool currentTextureValid=true;
+ const int currentDescriptor=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,
+  static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),currentTextureValid);
+ ImGui::TextUnformatted("Currently Used Texture");
+ if(currentTextureValid&&currentDescriptor>=0&&static_cast<std::size_t>(currentDescriptor)<model->textures.size()){
+  const auto&current=model->textures[static_cast<std::size_t>(currentDescriptor)];
+  const std::uint32_t pageEid=current.page<model->texturePageEids.size()?model->texturePageEids[current.page]:0U;
+  ImGui::TextWrapped("Descriptor %d | TPAG slot %u | Page %s (%08X)",currentDescriptor,
+   static_cast<unsigned>(current.page),Crash::eidToEName(pageEid).c_str(),pageEid);
+  ImGui::Text("CLUT X %u | Y1 %u | Y2 %u",static_cast<unsigned>(current.clutX),
+   static_cast<unsigned>(current.clutY1),static_cast<unsigned>(current.clutY2));
+  ImGui::TextDisabled("UV: (%u,%u)  (%u,%u)  (%u,%u)  (%u,%u)",
+   static_cast<unsigned>(current.u1),static_cast<unsigned>(current.v1),
+   static_cast<unsigned>(current.u2),static_cast<unsigned>(current.v2),
+   static_cast<unsigned>(current.u3),static_cast<unsigned>(current.v3),
+   static_cast<unsigned>(current.u4),static_cast<unsigned>(current.v4));
+ }else ImGui::TextDisabled("This face currently has no resolved texture descriptor.");
+ ImGui::Separator();
+ static std::uint32_t selectorModelEid=0;
+ static int selectorFace=-1,selectedDescriptor=-1;
+ static bool selectionDragging=false;
+ static ImVec2 selectionStart(0,0),selectionEnd(0,0);
+ if(selectorModelEid!=eid||selectorFace!=animationSelectedFace_){
+  selectorModelEid=eid;selectorFace=animationSelectedFace_;
+  selectedDescriptor=(currentTextureValid&&currentDescriptor>=0&&static_cast<std::size_t>(currentDescriptor)<model->textures.size())?
+   currentDescriptor:(model->textures.empty()?-1:0);
+  selectionDragging=false;
+ }
+ if(selectedDescriptor>=static_cast<int>(model->textures.size())||selectedDescriptor>=255)selectedDescriptor=-1;
+ ImGui::TextUnformatted("Texture Selector");
+ if(model->textures.empty()||model->texturePageEids.empty()){
+  ImGui::TextDisabled("This Model has no texture descriptors or TPAG pages.");
+ }else{
+  if(selectedDescriptor<0)selectedDescriptor=0;
+  auto descriptorLabel=[&](int index){
+   const auto&d=model->textures[static_cast<std::size_t>(index)];
+   char label[128];std::snprintf(label,sizeof(label),"Descriptor %d | Page %u | %u-bit",index,
+    static_cast<unsigned>(d.page),d.colorMode==0?4U:d.colorMode==1?8U:16U);return std::string(label);
+  };
+  const std::string activeDescriptorLabel=descriptorLabel(selectedDescriptor);
+  if(ImGui::BeginCombo("Texture descriptor",activeDescriptorLabel.c_str())){
+   const int count=static_cast<int>(std::min<std::size_t>(model->textures.size(),255U));
+   for(int i=0;i<count;++i){
+    const std::string label=descriptorLabel(i);
+    if(ImGui::Selectable(label.c_str(),selectedDescriptor==i))selectedDescriptor=i;
+    if(selectedDescriptor==i)ImGui::SetItemDefaultFocus();
+   }
+   ImGui::EndCombo();
+  }
+  Crash::NsfModelTexture edited=model->textures[static_cast<std::size_t>(selectedDescriptor)];
+  bool descriptorChanged=false;
+  const std::string currentPageName=edited.page<model->texturePageEids.size()?
+   Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
+  if(ImGui::BeginCombo("TPAG page",currentPageName.c_str())){
+   for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
+    const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
+    if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
+     edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
+    }
+   }
+   ImGui::EndCombo();
+  }
+  const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
+  int colorMode=std::clamp<int>(edited.colorMode,0,2);
+  if(ImGui::BeginCombo("Color depth",colorModeNames[colorMode])){
+   for(int mode=0;mode<3;++mode)if(ImGui::Selectable(colorModeNames[mode],colorMode==mode)){
+    colorMode=mode;edited.colorMode=static_cast<std::uint8_t>(mode);descriptorChanged=true;
+   }
+   ImGui::EndCombo();
+  }
+  int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
+  if(labeledInt("CLUT X","##SelectorClutX",clutX,0,15)){edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
+  if(labeledInt("CLUT Y1","##SelectorClutY1",clutY1,0,255)){edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
+  if(labeledInt("CLUT Y2","##SelectorClutY2",clutY2,0,15)){edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
+  const std::uint32_t pageEid=edited.page<model->texturePageEids.size()?model->texturePageEids[edited.page]:0U;
+  const std::vector<std::uint8_t>*pageBytes=nullptr;
+  for(const auto&chunk:nsf_.chunks()){
+   if(chunk.type!=1||chunk.bytes.size()<65536U)continue;
+   const std::uint32_t chunkEid=std::uint32_t(chunk.bytes[4])|(std::uint32_t(chunk.bytes[5])<<8U)|
+    (std::uint32_t(chunk.bytes[6])<<16U)|(std::uint32_t(chunk.bytes[7])<<24U);
+   if(chunkEid==pageEid){pageBytes=&chunk.bytes;break;}
+  }
+  const int textureWidth=1024>>colorMode;
+  const int segmentWidth=256>>colorMode;
+  const int clutY=std::clamp((static_cast<int>(edited.clutY2)<<2)|((static_cast<int>(edited.clutY1)>>2)&3),0,127);
+  struct FaceTexturePreviewCache{
+   std::string path;
+   std::map<std::tuple<const std::vector<std::uint8_t>*,int,int,int>,unsigned int> textures;
+  };
+  static FaceTexturePreviewCache previewCache;
+  if(previewCache.path!=nsfPath_.string()){
+   for(const auto&cached:previewCache.textures)GL::DeleteTextures(1,&cached.second);
+   previewCache.textures.clear();previewCache.path=nsfPath_.string();
+  }
+  unsigned int previewTexture=0;
+  if(pageBytes){
+   const auto key=std::make_tuple(pageBytes,colorMode,static_cast<int>(edited.clutX),clutY);
+   auto found=previewCache.textures.find(key);
+   if(found!=previewCache.textures.end())previewTexture=found->second;
+   else{
+    std::vector<std::uint8_t>rgba(static_cast<std::size_t>(textureWidth)*128U*4U,0);
+    auto expand5=[](unsigned value){return (value*255U+15U)/31U;};
+    for(int y=0;y<128;++y)for(int x=0;x<textureWidth;++x){
+     const std::size_t row=static_cast<std::size_t>(y)*512U;
+     std::uint16_t raw=0;
+     if(colorMode<2){
+      const unsigned index=colorMode==0?
+       ((pageBytes->at(row+static_cast<std::size_t>(x/2))>>((x&1)?4:0))&15U):
+       pageBytes->at(row+static_cast<std::size_t>(x));
+      const std::size_t paletteOffset=static_cast<std::size_t>(clutY)*512U+
+       (static_cast<std::size_t>(edited.clutX)*16U+index)*2U;
+      if(paletteOffset+1U>=pageBytes->size())continue;
+      raw=std::uint16_t((*pageBytes)[paletteOffset])|(std::uint16_t((*pageBytes)[paletteOffset+1U])<<8U);
+     }else{
+      const std::size_t offset=row+static_cast<std::size_t>(x)*2U;
+      if(offset+1U>=pageBytes->size())continue;
+      raw=std::uint16_t((*pageBytes)[offset])|(std::uint16_t((*pageBytes)[offset+1U])<<8U);
+     }
+     const std::size_t out=(static_cast<std::size_t>(y)*static_cast<std::size_t>(textureWidth)+static_cast<std::size_t>(x))*4U;
+     rgba[out]=static_cast<std::uint8_t>(expand5(raw&31U));
+     rgba[out+1U]=static_cast<std::uint8_t>(expand5((raw>>5U)&31U));
+     rgba[out+2U]=static_cast<std::uint8_t>(expand5((raw>>10U)&31U));
+     rgba[out+3U]=static_cast<std::uint8_t>((raw&0x7fffU)==0U&&!(raw&0x8000U)?0U:((raw&0x8000U)?128U:255U));
+    }
+    int oldTexture=0,oldActive=0;GL::GetIntegerv(0x84E0U,&oldActive);GL::ActiveTexture(0x84C0U);
+    GL::GetIntegerv(0x8069U,&oldTexture);
+    GL::GenTextures(1,&previewTexture);GL::BindTexture(0x0DE1U,previewTexture);
+    GL::TexParameteri(0x0DE1U,0x2801U,0x2600);GL::TexParameteri(0x0DE1U,0x2800U,0x2600);
+    GL::TexParameteri(0x0DE1U,0x2802U,0x812F);GL::TexParameteri(0x0DE1U,0x2803U,0x812F);
+    GL::TexImage2D(0x0DE1U,0,0x8058,textureWidth,128,0,0x1908U,0x1401U,rgba.data());
+    previewCache.textures.emplace(key,previewTexture);
+    GL::BindTexture(0x0DE1U,static_cast<unsigned int>(oldTexture));GL::ActiveTexture(static_cast<unsigned int>(oldActive));
+   }
+  }
+  ImGui::Text("Texture page | %d x 128",textureWidth);
+  if(pageBytes&&previewTexture){
+   const float displayWidth=std::max(120.0f,std::min(ImGui::GetContentRegionAvail().x,560.0f));
+   const ImVec2 atlasSize(displayWidth,displayWidth*128.0f/static_cast<float>(textureWidth));
+   const ImVec2 atlasMin=ImGui::GetCursorScreenPos();
+   ImGui::InvisibleButton("##TextureAtlasPicker",atlasSize);
+   const bool atlasHovered=ImGui::IsItemHovered();
+   ImDrawList*draw=ImGui::GetWindowDrawList();
+   const ImVec2 atlasMax(atlasMin.x+atlasSize.x,atlasMin.y+atlasSize.y);
+   draw->AddImage((ImTextureID)(std::intptr_t)previewTexture,atlasMin,atlasMax,ImVec2(0,0),ImVec2(1,1));
+   if(atlasHovered&&ImGui::IsMouseClicked(0)){selectionDragging=true;selectionStart=ImGui::GetIO().MousePos;selectionEnd=selectionStart;}
+   if(selectionDragging&&ImGui::IsMouseDown(0)){
+    selectionEnd=ImGui::GetIO().MousePos;
+    selectionEnd.x=std::clamp(selectionEnd.x,atlasMin.x,atlasMax.x);
+    selectionEnd.y=std::clamp(selectionEnd.y,atlasMin.y,atlasMax.y);
+   }
+   if(selectionDragging){
+    const ImVec2 a(std::clamp(std::min(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x),
+     std::clamp(std::min(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y));
+    const ImVec2 b(std::clamp(std::max(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x),
+     std::clamp(std::max(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y));
+    draw->AddRect(a,b,IM_COL32(255,210,80,255),0.0f,0,2.0f);
+   }
+   if(selectionDragging&&ImGui::IsMouseReleased(0)){
+    selectionEnd=ImGui::GetIO().MousePos;
+    const float left=std::clamp(std::min(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x);
+    const float right=std::clamp(std::max(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x);
+    const float top=std::clamp(std::min(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y);
+    const float bottom=std::clamp(std::max(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y);
+    const int x0=std::clamp(static_cast<int>(std::floor((left-atlasMin.x)/atlasSize.x*textureWidth)),0,textureWidth-1);
+    int x1=std::clamp(static_cast<int>(std::ceil((right-atlasMin.x)/atlasSize.x*textureWidth)),x0+1,textureWidth);
+    const int y0=std::clamp(static_cast<int>(std::floor((top-atlasMin.y)/atlasSize.y*128.0f)),0,127);
+    const int y1=std::clamp(static_cast<int>(std::ceil((bottom-atlasMin.y)/atlasSize.y*128.0f)),y0+1,128);
+    const int segment=std::clamp(x0/segmentWidth,0,3),segmentStart=segment*segmentWidth;
+    x1=std::min(x1,segmentStart+segmentWidth);if(x1<=x0)x1=std::min(textureWidth,x0+1);
+    edited.segment=static_cast<std::uint8_t>(segment);
+    edited.u1=static_cast<std::uint8_t>(std::clamp(x0-segmentStart,0,255));edited.v1=static_cast<std::uint8_t>(y0);
+    edited.u2=static_cast<std::uint8_t>(std::clamp(x1-1-segmentStart,0,255));edited.v2=static_cast<std::uint8_t>(y0);
+    edited.u3=static_cast<std::uint8_t>(std::clamp(x0-segmentStart,0,255));edited.v3=static_cast<std::uint8_t>(y1-1);
+    edited.u4=static_cast<std::uint8_t>(std::clamp(x1-1-segmentStart,0,255));edited.v4=static_cast<std::uint8_t>(y1-1);
+    descriptorChanged=true;selectionDragging=false;
+   }
+  }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
+  if(pageBytes&&colorMode<2){
+   const int paletteCount=colorMode==0?16:256;
+   const float swatchSize=std::max(5.0f,std::min(14.0f,(ImGui::GetContentRegionAvail().x-15.0f)/16.0f));
+   ImGui::Text("CLUT palette (%d colors)",paletteCount);
+   ImDrawList*draw=ImGui::GetWindowDrawList();const ImVec2 origin=ImGui::GetCursorScreenPos();
+   for(int i=0;i<paletteCount;++i){
+    const std::size_t offset=static_cast<std::size_t>(clutY)*512U+
+     (static_cast<std::size_t>(edited.clutX)*16U+static_cast<std::size_t>(i))*2U;
+    ImU32 color=IM_COL32(255,0,255,255);
+    if(offset+1U<pageBytes->size()){
+     const std::uint16_t raw=std::uint16_t((*pageBytes)[offset])|(std::uint16_t((*pageBytes)[offset+1U])<<8U);
+     const auto expand=[](unsigned value){return static_cast<int>((value*255U+15U)/31U);};
+     color=IM_COL32(expand(raw&31U),expand((raw>>5U)&31U),expand((raw>>10U)&31U),
+      (raw&0x7fffU)==0U&&!(raw&0x8000U)?0:((raw&0x8000U)?128:255));
+    }
+    const int column=i%16,row=i/16;
+    const ImVec2 a(origin.x+static_cast<float>(column)*(swatchSize+1.0f),origin.y+static_cast<float>(row)*(swatchSize+1.0f));
+    draw->AddRectFilled(a,ImVec2(a.x+swatchSize,a.y+swatchSize),color);
+    draw->AddRect(a,ImVec2(a.x+swatchSize,a.y+swatchSize),IM_COL32(20,24,30,220));
+   }
+   const int rows=(paletteCount+15)/16;
+   ImGui::Dummy(ImVec2(16.0f*(swatchSize+1.0f),static_cast<float>(rows)*(swatchSize+1.0f)));
+  }
+  std::size_t descriptorUseCount=0;
+  for(const auto&other:model->triangles){
+   bool otherValid=true;
+   const int resolved=Crash::resolveNsfModelTextureIndex(*model,other.textureIndex,other.animated,
+    static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),otherValid);
+   if(otherValid&&resolved==selectedDescriptor)++descriptorUseCount;
+  }
+  ImGui::TextDisabled("Descriptor referenced by %zu face(s). Editing its page, region or CLUT also changes every face using this descriptor.",descriptorUseCount);
+  if(descriptorChanged){
+   if(nsf_.setModelTexture(mc,me,static_cast<std::size_t>(selectedDescriptor),edited))
+    status_="Updated texture descriptor. Faces sharing this descriptor use the same region and CLUT.";
+   else status_="Texture descriptor update was rejected; its values exceed supported ranges.";
+  }
+  if(ImGui::Button("Apply Selected Texture to Face")){
+   if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
+    status_="Applied the selected texture descriptor to this face.";
+   else status_="Could not assign this texture descriptor to the selected face.";
+  }
+  ImGui::SameLine();ImGui::TextDisabled("Applying a static descriptor disables animated texture playback for this face.");
+ }
  ImGui::Separator();
  ImGui::TextUnformatted("Corner colors");
  ImGui::TextWrapped("Each corner points to a shared color record. Faces that reference the same record will share edits to that record.");
@@ -3721,7 +3924,6 @@ void EditorUI::drawFaceEditor(){
  }
  ImGui::End();
 }
-
 void EditorUI::drawModelEditor(){
  if(!nsfValid_||selectedChunk_<0||static_cast<std::size_t>(selectedChunk_)>=nsf_.chunks().size())return;
  const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(selectedChunk_)];
