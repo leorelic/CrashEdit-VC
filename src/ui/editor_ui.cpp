@@ -3810,13 +3810,10 @@ void EditorUI::drawFaceTextureSelector(){
  const int currentDescriptor=Crash::resolveNsfModelTextureIndex(*model,tri.textureIndex,tri.animated,static_cast<std::uint32_t>(std::floor(ImGui::GetTime()*30.0)),currentTextureValid);
  static std::uint32_t selectorModelEid=0;
  static int selectorFace=-1,selectedDescriptor=-1;
- static bool selectionDragging=false;
- static ImVec2 selectionStart(0,0),selectionEnd(0,0);
  if(selectorModelEid!=eid||selectorFace!=animationSelectedFace_){
   selectorModelEid=eid;selectorFace=animationSelectedFace_;
   selectedDescriptor=(currentTextureValid&&currentDescriptor>=0&&static_cast<std::size_t>(currentDescriptor)<model->textures.size())?
    currentDescriptor:(model->textures.empty()?-1:0);
-  selectionDragging=false;
  }
  if(selectedDescriptor>=static_cast<int>(model->textures.size())||selectedDescriptor>=255)selectedDescriptor=-1;
  if(model->textures.empty()||model->texturePageEids.empty()){
@@ -3892,7 +3889,8 @@ void EditorUI::drawFaceTextureSelector(){
     GL::BindTexture(0x0DE1U,static_cast<unsigned int>(oldTexture));GL::ActiveTexture(static_cast<unsigned int>(oldActive));
    }
   }
-  ImGui::Text("Texture atlas  |  %d x 128 pixels  |  Drag to select a region",textureWidth);
+  ImGui::Text("Texture atlas  |  %d x 128 pixels  |  Click to position the current selection",textureWidth);
+  int selectionX=0,selectionY=0,selectionWidth=1,selectionHeight=1;
   if(pageBytes&&previewTexture){
    const float displayWidth=std::max(240.0f,ImGui::GetContentRegionAvail().x);
    const ImVec2 atlasSize(displayWidth,displayWidth*128.0f/static_cast<float>(textureWidth));
@@ -3902,51 +3900,80 @@ void EditorUI::drawFaceTextureSelector(){
    ImDrawList*draw=ImGui::GetWindowDrawList();
    const ImVec2 atlasMax(atlasMin.x+atlasSize.x,atlasMin.y+atlasSize.y);
    draw->AddImage((ImTextureID)(std::intptr_t)previewTexture,atlasMin,atlasMax,ImVec2(0,0),ImVec2(1,1));
-   // Match CrashEdit:Re ModelTexture bounds: the first three UV corners define the face region.
-   const int regionX0=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+   // The first three UV corners define the current face region, matching CrashEdit:Re.
+   int regionX0=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
     std::min(edited.u1,std::min(edited.u2,edited.u3)),0,textureWidth-1);
-   const int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+   int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
     std::max(edited.u1,std::max(edited.u2,edited.u3))+1,regionX0+1,textureWidth);
-   const int regionY0=std::clamp(static_cast<int>(std::min(edited.v1,std::min(edited.v2,edited.v3))),0,127);
-   const int regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
+   int regionY0=std::clamp(static_cast<int>(std::min(edited.v1,std::min(edited.v2,edited.v3))),0,127);
+   int regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
+   selectionX=regionX0;selectionY=regionY0;
+   selectionWidth=regionX1-regionX0;selectionHeight=regionY1-regionY0;
+   // A click repositions the existing rectangle; it never changes its dimensions.
+   if(atlasHovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+    const ImVec2 mouse=ImGui::GetIO().MousePos;
+    const int clickedX=std::clamp(static_cast<int>((mouse.x-atlasMin.x)/atlasSize.x*textureWidth),0,textureWidth-1);
+    const int clickedY=std::clamp(static_cast<int>((mouse.y-atlasMin.y)/atlasSize.y*128.0f),0,127);
+    selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
+    selectionHeight=std::clamp(selectionHeight,1,128);
+    const int segment=std::clamp(clickedX/segmentWidth,0,3);
+    const int segmentStart=segment*segmentWidth;
+    selectionX=std::clamp(clickedX-selectionWidth/2,segmentStart,segmentStart+segmentWidth-selectionWidth);
+    selectionY=std::clamp(clickedY-selectionHeight/2,0,128-selectionHeight);
+    edited.segment=static_cast<std::uint8_t>(segment);
+    edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
+    edited.v1=static_cast<std::uint8_t>(selectionY);
+    edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
+    edited.v2=static_cast<std::uint8_t>(selectionY);
+    edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
+    edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
+    edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
+    edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
+    regionX0=selectionX;regionX1=selectionX+selectionWidth;
+    regionY0=selectionY;regionY1=selectionY+selectionHeight;
+    descriptorChanged=true;
+   }
    const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
    const ImVec2 regionMax(atlasMin.x+atlasSize.x*static_cast<float>(regionX1)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY1)/128.0f);
    draw->AddRect(regionMin,regionMax,IM_COL32(65,210,245,230),0.0f,0,1.5f);
-   if(atlasHovered&&ImGui::IsMouseClicked(0)){selectionDragging=true;selectionStart=ImGui::GetIO().MousePos;selectionEnd=selectionStart;}
-   if(selectionDragging&&ImGui::IsMouseDown(0)){
-    selectionEnd=ImGui::GetIO().MousePos;
-    selectionEnd.x=std::clamp(selectionEnd.x,atlasMin.x,atlasMax.x);
-    selectionEnd.y=std::clamp(selectionEnd.y,atlasMin.y,atlasMax.y);
+   selectionX=regionX0;selectionY=regionY0;
+   selectionWidth=regionX1-regionX0;selectionHeight=regionY1-regionY0;
+   ImGui::TextUnformatted("Texture region");
+   if(ImGui::BeginTable("##FaceTextureRegionFields",4,ImGuiTableFlags_SizingStretchSame,ImVec2(0,0))){
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("X");ImGui::SetNextItemWidth(-FLT_MIN);
+    const bool xChanged=ImGui::InputInt("##FaceTextureRegionX",&selectionX);
+    ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("Y");ImGui::SetNextItemWidth(-FLT_MIN);
+    const bool yChanged=ImGui::InputInt("##FaceTextureRegionY",&selectionY);
+    ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("Width");ImGui::SetNextItemWidth(-FLT_MIN);
+    const bool widthChanged=ImGui::InputInt("##FaceTextureRegionWidth",&selectionWidth);
+    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("Height");ImGui::SetNextItemWidth(-FLT_MIN);
+    const bool heightChanged=ImGui::InputInt("##FaceTextureRegionHeight",&selectionHeight);
+    ImGui::EndTable();
+    if(xChanged||yChanged||widthChanged||heightChanged){
+     selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
+     selectionHeight=std::clamp(selectionHeight,1,128);
+     selectionX=std::clamp(selectionX,0,textureWidth-selectionWidth);
+     selectionY=std::clamp(selectionY,0,128-selectionHeight);
+     int segment=std::clamp(selectionX/segmentWidth,0,3);
+     const int segmentStart=segment*segmentWidth;
+     if(selectionX+selectionWidth>segmentStart+segmentWidth)
+      selectionX=segmentStart+segmentWidth-selectionWidth;
+     edited.segment=static_cast<std::uint8_t>(segment);
+     edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
+     edited.v1=static_cast<std::uint8_t>(selectionY);
+     edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
+     edited.v2=static_cast<std::uint8_t>(selectionY);
+     edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
+     edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
+     edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
+     edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
+     descriptorChanged=true;
+    }
    }
-   if(selectionDragging){
-    const ImVec2 a(std::clamp(std::min(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x),
-     std::clamp(std::min(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y));
-    const ImVec2 b(std::clamp(std::max(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x),
-     std::clamp(std::max(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y));
-    draw->AddRect(a,b,IM_COL32(255,210,80,255),0.0f,0,2.0f);
-   }
-   if(selectionDragging&&ImGui::IsMouseReleased(0)){
-    selectionEnd=ImGui::GetIO().MousePos;
-    const float left=std::clamp(std::min(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x);
-    const float right=std::clamp(std::max(selectionStart.x,selectionEnd.x),atlasMin.x,atlasMax.x);
-    const float top=std::clamp(std::min(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y);
-    const float bottom=std::clamp(std::max(selectionStart.y,selectionEnd.y),atlasMin.y,atlasMax.y);
-    const int x0=std::clamp(static_cast<int>(std::floor((left-atlasMin.x)/atlasSize.x*textureWidth)),0,textureWidth-1);
-    int x1=std::clamp(static_cast<int>(std::ceil((right-atlasMin.x)/atlasSize.x*textureWidth)),x0+1,textureWidth);
-    const int y0=std::clamp(static_cast<int>(std::floor((top-atlasMin.y)/atlasSize.y*128.0f)),0,127);
-    const int y1=std::clamp(static_cast<int>(std::ceil((bottom-atlasMin.y)/atlasSize.y*128.0f)),y0+1,128);
-    const int segment=std::clamp(x0/segmentWidth,0,3),segmentStart=segment*segmentWidth;
-    x1=std::min(x1,segmentStart+segmentWidth);if(x1<=x0)x1=std::min(textureWidth,x0+1);
-    edited.segment=static_cast<std::uint8_t>(segment);
-    edited.u1=static_cast<std::uint8_t>(std::clamp(x0-segmentStart,0,255));edited.v1=static_cast<std::uint8_t>(y0);
-    edited.u2=static_cast<std::uint8_t>(std::clamp(x1-1-segmentStart,0,255));edited.v2=static_cast<std::uint8_t>(y0);
-    edited.u3=static_cast<std::uint8_t>(std::clamp(x0-segmentStart,0,255));edited.v3=static_cast<std::uint8_t>(y1-1);
-    edited.u4=static_cast<std::uint8_t>(std::clamp(x1-1-segmentStart,0,255));edited.v4=static_cast<std::uint8_t>(y1-1);
-    descriptorChanged=true;selectionDragging=false;
-   }
-  }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
+  }  }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
   if(pageBytes&&colorMode<2){
    const int paletteCount=colorMode==0?16:256;
    const float swatchSize=std::max(5.0f,std::min(14.0f,(ImGui::GetContentRegionAvail().x-15.0f)/16.0f));
