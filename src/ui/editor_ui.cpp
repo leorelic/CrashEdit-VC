@@ -3605,6 +3605,34 @@ void EditorUI::drawAnimationViewer(){
  const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
  for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
 
+ // Draw the mode tools last: the viewport image/background is submitted after
+ // their hit targets, so drawing them here keeps the visible controls above it.
+ auto drawModeOverlay=[&](float y,bool active,bool hovered,bool pencil){
+  const ImVec2 lo(toolbarMin.x,y),hi(toolbarMin.x+28.0f,y+28.0f);
+  toolbarDraw->AddRectFilled(lo,hi,ImGui::GetColorU32(active?ImGuiCol_ButtonActive:(hovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);
+  toolbarDraw->AddRect(lo,hi,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
+  const ImVec2 c((lo.x+hi.x)*0.5f,(lo.y+hi.y)*0.5f);
+  const ImU32 ink=ImGui::GetColorU32(ImGuiCol_Text);
+  if(pencil){
+   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+7),ImVec2(c.x+6,c.y-6),ink,3.0f);
+   toolbarDraw->AddLine(ImVec2(c.x-8,c.y+9),ImVec2(c.x-5,c.y+8),ink,2.0f);
+   toolbarDraw->AddLine(ImVec2(c.x+5,c.y-7),ImVec2(c.x+8,c.y-4),ink,2.0f);
+  }else{
+   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+2),ImVec2(c.x-7,c.y-5),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x-3,c.y+1),ImVec2(c.x-3,c.y-8),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x+1,c.y+1),ImVec2(c.x+1,c.y-7),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x+5,c.y+2),ImVec2(c.x+5,c.y-4),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x-7,c.y-1),ImVec2(c.x-7,c.y+5),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x-7,c.y+5),ImVec2(c.x-3,c.y+9),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x-3,c.y+9),ImVec2(c.x+4,c.y+9),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x+4,c.y+9),ImVec2(c.x+8,c.y+4),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x+8,c.y+4),ImVec2(c.x+8,c.y+1),ink,2.2f);
+   toolbarDraw->AddLine(ImVec2(c.x+8,c.y+1),ImVec2(c.x+5,c.y),ink,2.2f);
+  }
+ };
+ drawModeOverlay(modeY,animationFaceEditing_,faceModeButton.second,true);
+ drawModeOverlay(modeY+32,!animationFaceEditing_,viewModeButton.second,false);
+
  ImGui::End();
 }
 
