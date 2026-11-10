@@ -4037,17 +4037,17 @@ void EditorUI::drawFaceTextureSelector(){
   ImGui::TextUnformatted("CLUT coordinates");
   const float clutFieldWidth=std::max(64.0f,(ImGui::GetContentRegionAvail().x-180.0f)/3.0f);
   ImGui::SetNextItemWidth(clutFieldWidth);
-  ImGui::InputInt("CLUT X",&clutX,1,4);
+  const bool clutXChanged=ImGui::InputInt("CLUT X",&clutX,1,4);
   clutX=std::clamp(clutX,0,15);edited.clutX=static_cast<std::uint8_t>(clutX);
   ImGui::SameLine();
   ImGui::SetNextItemWidth(clutFieldWidth);
-  ImGui::InputInt("CLUT Y1",&clutY1,1,4);
+  const bool clutY1Changed=ImGui::InputInt("CLUT Y1",&clutY1,1,4);
   clutY1=std::clamp(clutY1,0,255);edited.clutY1=static_cast<std::uint8_t>(clutY1);
   ImGui::SameLine();
   ImGui::SetNextItemWidth(clutFieldWidth);
-  ImGui::InputInt("CLUT Y2",&clutY2,1,4);
+  const bool clutY2Changed=ImGui::InputInt("CLUT Y2",&clutY2,1,4);
   clutY2=std::clamp(clutY2,0,15);edited.clutY2=static_cast<std::uint8_t>(clutY2);
-  if(ImGui::IsItemDeactivatedAfterEdit())descriptorChanged=true;
+  descriptorChanged=descriptorChanged||clutXChanged||clutY1Changed||clutY2Changed;
   ImGui::SameLine();
   if(ImGui::Button("Apply to Face")){
    if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
