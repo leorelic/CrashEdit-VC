@@ -3127,7 +3127,7 @@ void EditorUI::drawAnimationViewer(){
  const bool viewModeHovered=ImGui::IsItemHovered();
  if(viewModeClicked){animationFaceEditing_=false;animationTextureSelectorOpen_=false;animationHoveredFace_=-1;}
  if(viewModeHovered)ImGui::SetTooltip("View Mode");
- const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions");
+ const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3136,13 +3136,12 @@ void EditorUI::drawAnimationViewer(){
  const ImGuiIO&shortcutIo=ImGui::GetIO();
  if(hovered&&!viewportToolbarOwnsMouse&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper){
   if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;if(!animationFaceEditing_)animationTextureSelectorOpen_=false;}
+  if(animationFaceEditing_&&ImGui::IsKeyPressed(ImGuiKey_H,false))animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
   if(ImGui::IsKeyPressed(ImGuiKey_C,false))animationCollisionViewer_=!animationCollisionViewer_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
   if(ImGui::IsKeyPressed(ImGuiKey_T,false))animationTexturesDisabled_=!animationTexturesDisabled_;
  }
- if(animationFaceEditing_&&(hovered||animationTextureSelectorOpen_)&&!shortcutIo.WantTextInput&&!shortcutIo.KeyCtrl&&!shortcutIo.KeyAlt&&!shortcutIo.KeySuper&&ImGui::IsKeyPressed(ImGuiKey_H,false))
-  animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));
  // Draw the overlay after the canvas background so the controls remain visible.
@@ -3743,7 +3742,15 @@ void EditorUI::drawFaceEditor(){
     color.r=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[0]*255.0f)),0,255));
     color.g=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[1]*255.0f)),0,255));
     color.b=static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(rgb[2]*255.0f)),0,255));
-    nsf_.setModelColor(mc,mevoid EditorUI::drawFaceTextureSelector(){
+    nsf_.setModelColor(mc,me,static_cast<std::size_t>(index),color);
+   }
+   ImGui::TextDisabled("Referenced by %zu corner(s) across %zu face(s).",useCount,faceCount);
+  }else ImGui::TextDisabled("This corner references an unavailable color record.");
+  ImGui::PopID();
+ }
+ ImGui::End();
+}
+void EditorUI::drawFaceTextureSelector(){
  if(!animationTextureSelectorOpen_||!animationFaceEditing_)return;
  if(animationViewerChunk_<0||static_cast<std::size_t>(animationViewerChunk_)>=nsf_.chunks().size())return;
  const auto&ac=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
@@ -3795,6 +3802,7 @@ void EditorUI::drawFaceEditor(){
   selectionDragging=false;
  }
  if(selectedDescriptor>=static_cast<int>(model->textures.size())||selectedDescriptor>=255)selectedDescriptor=-1;
+ ImGui::Text("Face %d | Model %s",animationSelectedFace_,Crash::eidToEName(eid).c_str());
  if(model->textures.empty()||model->texturePageEids.empty()){
   ImGui::TextDisabled("This Model has no texture descriptors or TPAG pages.");
  }else{
@@ -3804,7 +3812,6 @@ void EditorUI::drawFaceEditor(){
    char label[128];std::snprintf(label,sizeof(label),"Descriptor %d | Page %u | %u-bit",index,
     static_cast<unsigned>(d.page),d.colorMode==0?4U:d.colorMode==1?8U:16U);return std::string(label);
   };
-  if(ImGui::CollapsingHeader("Texture Descriptor",ImGuiTreeNodeFlags_DefaultOpen)){
   const std::string activeDescriptorLabel=descriptorLabel(selectedDescriptor);
   if(ImGui::BeginCombo("Texture descriptor",activeDescriptorLabel.c_str())){
    const int count=static_cast<int>(std::min<std::size_t>(model->textures.size(),255U));
@@ -3815,11 +3822,40 @@ void EditorUI::drawFaceEditor(){
    }
    ImGui::EndCombo();
   }
-  }
   Crash::NsfModelTexture edited=model->textures[static_cast<std::size_t>(selectedDescriptor)];
   bool descriptorChanged=false;
+  const std::string currentPageName=edited.page<model->texturePageEids.size()?
+   Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
+  if(ImGui::BeginCombo("TPAG slot",currentPageName.c_str())){
+   for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
+    const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
+    if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){
+     edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;
+    }
+   }
+   ImGui::EndCombo();
+  }
+  if(edited.page<model->texturePageEids.size()){
+   const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
+   std::string assignedChunkLabel="Unresolved texture chunk";
+   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}}
+   if(ImGui::BeginCombo("Texture chunk",assignedChunkLabel.c_str())){
+    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);const std::string label="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);if(ImGui::Selectable(label.c_str(),candidateEid==assignedPageEid)){if(nsf_.setModelTexturePageEid(mc,me,edited.page,candidateEid))status_="Reassigned TPAG slot "+std::to_string(edited.page)+" to Texture Chunk "+std::to_string(ci)+".";else status_="Could not assign the selected Texture Chunk to this TPAG slot.";}}
+    ImGui::EndCombo();
+   }
+  }
+  const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
   int colorMode=std::clamp<int>(edited.colorMode,0,2);
+  if(ImGui::BeginCombo("Color depth",colorModeNames[colorMode])){
+   for(int mode=0;mode<3;++mode)if(ImGui::Selectable(colorModeNames[mode],colorMode==mode)){
+    colorMode=mode;edited.colorMode=static_cast<std::uint8_t>(mode);descriptorChanged=true;
+   }
+   ImGui::EndCombo();
+  }
   int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
+  if(labeledInt("CLUT X","##SelectorClutX",clutX,0,15)){edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
+  if(labeledInt("CLUT Y1","##SelectorClutY1",clutY1,0,255)){edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
+  if(labeledInt("CLUT Y2","##SelectorClutY2",clutY2,0,15)){edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
   const std::uint32_t pageEid=edited.page<model->texturePageEids.size()?model->texturePageEids[edited.page]:0U;
   const std::vector<std::uint8_t>*pageBytes=nullptr;
   for(const auto&chunk:nsf_.chunks()){
@@ -3890,14 +3926,17 @@ void EditorUI::drawFaceEditor(){
    ImDrawList*draw=ImGui::GetWindowDrawList();
    const ImVec2 atlasMax(atlasMin.x+atlasSize.x,atlasMin.y+atlasSize.y);
    draw->AddImage((ImTextureID)(std::intptr_t)previewTexture,atlasMin,atlasMax,ImVec2(0,0),ImVec2(1,1));
-   const float uvOffset=static_cast<float>(edited.segment*segmentWidth);
-   const auto uvPoint=[&](int u,int v){return ImVec2(atlasMin.x+atlasSize.x*(uvOffset+static_cast<float>(u))/static_cast<float>(textureWidth),atlasMin.y+atlasSize.y*static_cast<float>(v)/128.0f);};
-   const ImVec2 uvA=uvPoint(edited.u1,edited.v1),uvB=uvPoint(edited.u2,edited.v2),uvC=uvPoint(edited.u3,edited.v3);
-   draw->AddTriangleFilled(uvA,uvB,uvC,IM_COL32(65,210,245,34));
-   draw->AddTriangle(uvA,uvB,uvC,IM_COL32(65,210,245,245),2.0f);
-   draw->AddCircleFilled(uvA,4.0f,IM_COL32(255,210,80,255));
-   draw->AddCircleFilled(uvB,4.0f,IM_COL32(255,210,80,255));
-   draw->AddCircleFilled(uvC,4.0f,IM_COL32(255,210,80,255));
+   const int regionX0=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+    std::min(std::min(edited.u1,edited.u2),std::min(edited.u3,edited.u4)),0,textureWidth-1);
+   const int regionX1=std::clamp(static_cast<int>(edited.segment)*segmentWidth+
+    std::max(std::max(edited.u1,edited.u2),std::max(edited.u3,edited.u4))+1,regionX0+1,textureWidth);
+   const int regionY0=std::clamp(static_cast<int>(std::min(std::min(edited.v1,edited.v2),std::min(edited.v3,edited.v4))),0,127);
+   const int regionY1=std::clamp(std::max(std::max(edited.v1,edited.v2),std::max(edited.v3,edited.v4))+1,regionY0+1,128);
+   const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
+    atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
+   const ImVec2 regionMax(atlasMin.x+atlasSize.x*static_cast<float>(regionX1)/static_cast<float>(textureWidth),
+    atlasMin.y+atlasSize.y*static_cast<float>(regionY1)/128.0f);
+   draw->AddRect(regionMin,regionMax,IM_COL32(65,210,245,230),0.0f,0,1.5f);
    if(atlasHovered&&ImGui::IsMouseClicked(0)){selectionDragging=true;selectionStart=ImGui::GetIO().MousePos;selectionEnd=selectionStart;}
    if(selectionDragging&&ImGui::IsMouseDown(0)){
     selectionEnd=ImGui::GetIO().MousePos;
@@ -3931,48 +3970,7 @@ void EditorUI::drawFaceEditor(){
     descriptorChanged=true;selectionDragging=false;
    }
   }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
-  if(ImGui::CollapsingHeader("TPAG Assignment",ImGuiTreeNodeFlags_DefaultOpen)){
-   const std::string currentPageName=edited.page<model->texturePageEids.size()?Crash::eidToEName(model->texturePageEids[edited.page]):"Invalid page";
-   if(ImGui::BeginCombo("TPAG slot",currentPageName.c_str())){
-    for(std::size_t pageIndex=0;pageIndex<model->texturePageEids.size();++pageIndex){
-     const std::string pageName=Crash::eidToEName(model->texturePageEids[pageIndex])+" | Slot "+std::to_string(pageIndex);
-     if(ImGui::Selectable(pageName.c_str(),edited.page==pageIndex)){edited.page=static_cast<std::uint8_t>(pageIndex);descriptorChanged=true;}
-    }
-    ImGui::EndCombo();
-   }
-   if(edited.page<model->texturePageEids.size()){
-    const std::uint32_t assignedPageEid=model->texturePageEids[edited.page];
-    std::string assignedChunkLabel="Unresolved texture chunk";
-    for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
-     const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;
-     const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);
-     if(candidateEid==assignedPageEid){assignedChunkLabel="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);break;}
-    }
-    if(ImGui::BeginCombo("Texture chunk",assignedChunkLabel.c_str())){
-     for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
-      const auto&candidate=nsf_.chunks()[ci];if(candidate.type!=1||candidate.bytes.size()<8U)continue;
-      const std::uint32_t candidateEid=std::uint32_t(candidate.bytes[4])|(std::uint32_t(candidate.bytes[5])<<8U)|(std::uint32_t(candidate.bytes[6])<<16U)|(std::uint32_t(candidate.bytes[7])<<24U);
-      const std::string label="Texture Chunk "+std::to_string(ci)+" | "+Crash::eidToEName(candidateEid);
-      if(ImGui::Selectable(label.c_str(),candidateEid==assignedPageEid)){
-       if(nsf_.setModelTexturePageEid(mc,me,edited.page,candidateEid))status_="Reassigned TPAG slot "+std::to_string(edited.page)+" to Texture Chunk "+std::to_string(ci)+".";else status_="Could not assign the selected Texture Chunk to this TPAG slot."; 
-      }
-     }
-     ImGui::EndCombo();
-    }
-   }
-  }
-  if(ImGui::CollapsingHeader("Texture & CLUT Settings",ImGuiTreeNodeFlags_DefaultOpen)){
-   const char*colorModeNames[]={"4-bit indexed","8-bit indexed","16-bit direct"};
-   if(ImGui::BeginCombo("Color depth",colorModeNames[colorMode])){
-    for(int mode=0;mode<3;++mode)if(ImGui::Selectable(colorModeNames[mode],colorMode==mode)){colorMode=mode;edited.colorMode=static_cast<std::uint8_t>(mode);descriptorChanged=true;}
-    ImGui::EndCombo();
-   }
-   int clutX=edited.clutX,clutY1=edited.clutY1,clutY2=edited.clutY2;
-   if(labeledInt("CLUT X","##SelectorClutX",clutX,0,15)){edited.clutX=static_cast<std::uint8_t>(clutX);descriptorChanged=true;}
-   if(labeledInt("CLUT Y1","##SelectorClutY1",clutY1,0,255)){edited.clutY1=static_cast<std::uint8_t>(clutY1);descriptorChanged=true;}
-   if(labeledInt("CLUT Y2","##SelectorClutY2",clutY2,0,15)){edited.clutY2=static_cast<std::uint8_t>(clutY2);descriptorChanged=true;}
-  }
-  if(pageBytes&&colorMode<2&&ImGui::CollapsingHeader("CLUT Palette")){
+  if(pageBytes&&colorMode<2){
    const int paletteCount=colorMode==0?16:256;
    const float swatchSize=std::max(5.0f,std::min(14.0f,(ImGui::GetContentRegionAvail().x-15.0f)/16.0f));
    ImGui::Text("CLUT palette (%d colors)",paletteCount);
@@ -3995,10 +3993,6 @@ void EditorUI::drawFaceEditor(){
    const int rows=(paletteCount+15)/16;
    ImGui::Dummy(ImVec2(16.0f*(swatchSize+1.0f),static_cast<float>(rows)*(swatchSize+1.0f)));
   }
-  if(descriptorChanged){
-   if(nsf_.setModelTexture(mc,me,static_cast<std::size_t>(selectedDescriptor),edited))status_="Updated texture descriptor. Faces sharing this descriptor use the same region and CLUT.";else status_="Texture descriptor update was rejected; its values exceed supported ranges."; 
-  }
-  if(ImGui::CollapsingHeader("Face Assignment",ImGuiTreeNodeFlags_DefaultOpen)){
   std::size_t descriptorUseCount=0;
   for(const auto&other:model->triangles){
    bool otherValid=true;
@@ -4015,15 +4009,6 @@ void EditorUI::drawFaceEditor(){
   if(ImGui::Button("Apply Selected Texture to Face")){
    if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
     status_="Applied the selected texture descriptor to this face.";
-   else status_="Could not assign this texture descriptor to the selected face.";
-  }
-  ImGui::SameLine();ImGui::TextDisabled("Static assignment disables animated playback for this face.");
-  }
- }
-
- ImGui::End();
-}
-ture descriptor to this face.";
    else status_="Could not assign this texture descriptor to the selected face.";
   }
   ImGui::SameLine();ImGui::TextDisabled("Applying a static descriptor disables animated texture playback for this face.");
