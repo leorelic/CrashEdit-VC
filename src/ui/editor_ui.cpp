@@ -3676,7 +3676,7 @@ void EditorUI::drawFaceEditor(){
   const auto&d=model->textures[static_cast<std::size_t>(descriptor)];
   const std::uint32_t pageEid=d.page<model->texturePageEids.size()?model->texturePageEids[d.page]:0U;
   ImGui::TextWrapped("Resolved descriptor: %d | TPAG slot: %u | Page: %s (%08X)",descriptor,static_cast<unsigned>(d.page),Crash::eidToEName(pageEid).c_str(),pageEid);
-  ImGui::TextWrapped("CLUT: X %u | Y %u%s",static_cast<unsigned>(d.clutX),static_cast<unsigned>(d.clutY1),d.clutY1==d.clutY2?"":" / second Y row");
+  ImGui::TextWrapped("CLUT: X %u | Y1 %u | Y2 %u",static_cast<unsigned>(d.clutX),static_cast<unsigned>(d.clutY1),static_cast<unsigned>(d.clutY2));
   ImGui::TextDisabled("Texture region UV: (%u,%u) (%u,%u) (%u,%u) (%u,%u)",
    static_cast<unsigned>(d.u1),static_cast<unsigned>(d.v1),static_cast<unsigned>(d.u2),static_cast<unsigned>(d.v2),
    static_cast<unsigned>(d.u3),static_cast<unsigned>(d.v3),static_cast<unsigned>(d.u4),static_cast<unsigned>(d.v4));
