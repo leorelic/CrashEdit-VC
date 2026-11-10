@@ -4064,11 +4064,6 @@ void EditorUI::drawFaceTextureSelector(){
     status_="Updated texture descriptor. Faces sharing this descriptor use the same region and CLUT.";
    else status_="Texture descriptor update was rejected; its values exceed supported ranges.";
   }
-  if(ImGui::Button("Apply Selected Texture to Face")){
-   if(nsf_.setModelTriangleTexture(mc,me,triangleIndex,static_cast<std::uint8_t>(selectedDescriptor+1),false))
-    status_="Applied the selected texture descriptor to this face.";
-   else status_="Could not assign this texture descriptor to the selected face.";
-  }
   ImGui::SameLine();ImGui::TextDisabled("Applying a static descriptor disables animated texture playback for this face.");
  }
 
