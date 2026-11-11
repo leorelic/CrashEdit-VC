@@ -3930,7 +3930,7 @@ void EditorUI::drawFaceTextureSelector(){
     const int requestedDeltaX=targetX-oldMinX;
     const int requestedDeltaY=targetY-oldMinY;
 
-    // Keep all four U bytes representable and inside the displayed TPAG.
+    // Keep UV1-UV3 inside the visible TPAG; UV4 only needs a valid byte encoding.
     // Segment is a base offset; more than one segment can sometimes encode
     // the same absolute coordinates, so prefer the segment nearest the target.
     // The selected triangle's visible atlas bounds come from UV1-UV3.
