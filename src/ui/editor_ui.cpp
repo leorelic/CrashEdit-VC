@@ -3930,7 +3930,8 @@ void EditorUI::drawFaceTextureSelector(){
     const int requestedDeltaX=targetX-oldMinX;
     const int requestedDeltaY=targetY-oldMinY;
 
-    // Keep UV1-UV3 inside the visible TPAG; UV4 only needs a valid byte encoding.
+    // UV1-UV3 define the selected triangle. UV4 is auxiliary quad data and
+    // must not restrict where that triangle can be placed on the TPAG.
     // Segment is a base offset; more than one segment can sometimes encode
     // the same absolute coordinates, so prefer the segment nearest the target.
     // The selected triangle's visible atlas bounds come from UV1-UV3.
@@ -3946,7 +3947,7 @@ void EditorUI::drawFaceTextureSelector(){
     for(int candidate=0;candidate<4;++candidate){
      const int candidateStart=candidate*segmentWidth;
      int minDelta=globalMinDelta,maxDelta=globalMaxDelta;
-     for(int i=0;i<4;++i){
+     for(int i=0;i<3;++i){
       minDelta=std::max(minDelta,candidateStart-oldAbsoluteX[i]);
       maxDelta=std::min(maxDelta,candidateStart+255-oldAbsoluteX[i]);
      }
@@ -3967,7 +3968,7 @@ void EditorUI::drawFaceTextureSelector(){
     // inside the 128-row preview while allowing the fourth (quad) corner to
     // retain any valid byte-sized V coordinate.
     int minDeltaY=-255,maxDeltaY=255;
-    for(int i=0;i<4;++i){
+    for(int i=0;i<3;++i){
      minDeltaY=std::max(minDeltaY,-oldV[i]);
      maxDeltaY=std::min(maxDeltaY,255-oldV[i]);
     }
@@ -3989,7 +3990,15 @@ void EditorUI::drawFaceTextureSelector(){
     edited.v1=static_cast<std::uint8_t>(oldV[0]+deltaY);
     edited.v2=static_cast<std::uint8_t>(oldV[1]+deltaY);
     edited.v3=static_cast<std::uint8_t>(oldV[2]+deltaY);
-    edited.v4=static_cast<std::uint8_t>(oldV[3]+deltaY);
+    const int translatedU4=oldAbsoluteX[3]+deltaX-newSegmentStart;
+    const int translatedV4=oldV[3]+deltaY;
+    // Keep the auxiliary fourth corner translated when its byte fields can
+    // represent it; otherwise retain its previous raw values instead of
+    // letting this unused triangle corner block UV1-UV3.
+    edited.u4=translatedU4>=0&&translatedU4<=255?
+     static_cast<std::uint8_t>(translatedU4):oldU[3];
+    edited.v4=translatedV4>=0&&translatedV4<=255?
+     static_cast<std::uint8_t>(translatedV4):oldV[3];
     descriptorChanged=descriptorChanged||deltaX!=0||deltaY!=0||chosenSegment!=oldSegment;
 
     regionX0=std::clamp(chosenSegment*segmentWidth+
