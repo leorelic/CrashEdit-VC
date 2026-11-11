@@ -3933,10 +3933,13 @@ void EditorUI::drawFaceTextureSelector(){
     // Keep all four U bytes representable and inside the displayed TPAG.
     // Segment is a base offset; more than one segment can sometimes encode
     // the same absolute coordinates, so prefer the segment nearest the target.
-    const int globalMinDelta=-std::min(std::min(oldAbsoluteX[0],oldAbsoluteX[1]),
-     std::min(oldAbsoluteX[2],oldAbsoluteX[3]));
-    const int globalMaxDelta=textureWidth-1-std::max(std::max(oldAbsoluteX[0],oldAbsoluteX[1]),
-     std::max(oldAbsoluteX[2],oldAbsoluteX[3]));
+    // The selected triangle's visible atlas bounds come from UV1-UV3.
+    // UV4 is still translated and kept byte-representable below, but it must
+    // not clamp where this triangle can be positioned on the TPAG.
+    const int globalMinDelta=-std::min(oldAbsoluteX[0],
+     std::min(oldAbsoluteX[1],oldAbsoluteX[2]));
+    const int globalMaxDelta=textureWidth-1-std::max(oldAbsoluteX[0],
+     std::max(oldAbsoluteX[1],oldAbsoluteX[2]));
     const int targetSegment=std::clamp(targetX/segmentWidth,0,3);
     int chosenSegment=-1,chosenMinDelta=0,chosenMaxDelta=-1;
     int bestDistance=std::numeric_limits<int>::max();
