@@ -3909,29 +3909,96 @@ void EditorUI::drawFaceTextureSelector(){
    int regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
    selectionX=regionX0;selectionY=regionY0;
    selectionWidth=regionX1-regionX0;selectionHeight=regionY1-regionY0;
-   // A click repositions the existing rectangle; it never changes its dimensions.
+   // Move the existing UV mapping as a unit. Keep its four corner offsets
+   // intact so selecting a new atlas position cannot flatten a skewed or
+   // otherwise non-rectangular face mapping into a rectangle.
+   auto moveUvRegion=[&](int targetX,int targetY){
+    const int oldU[4]={edited.u1,edited.u2,edited.u3,edited.u4};
+    const int oldV[4]={edited.v1,edited.v2,edited.v3,edited.v4};
+    const int oldSegment=static_cast<int>(edited.segment);
+    const int oldSegmentStart=oldSegment*segmentWidth;
+    const int oldAbsoluteX[4]={
+     oldSegmentStart+oldU[0],oldSegmentStart+oldU[1],
+     oldSegmentStart+oldU[2],oldSegmentStart+oldU[3]};
+    const int oldMinX=oldSegmentStart+std::min(oldU[0],std::min(oldU[1],oldU[2]));
+    const int oldMinY=std::min(oldV[0],std::min(oldV[1],oldV[2]));
+    const int requestedDeltaX=targetX-oldMinX;
+    const int requestedDeltaY=targetY-oldMinY;
+
+    // Keep all four U bytes representable and inside the displayed TPAG.
+    // Segment is a base offset; more than one segment can sometimes encode
+    // the same absolute coordinates, so prefer the segment nearest the target.
+    const int globalMinDelta=-std::min(std::min(oldAbsoluteX[0],oldAbsoluteX[1]),
+     std::min(oldAbsoluteX[2],oldAbsoluteX[3]));
+    const int globalMaxDelta=textureWidth-1-std::max(std::max(oldAbsoluteX[0],oldAbsoluteX[1]),
+     std::max(oldAbsoluteX[2],oldAbsoluteX[3]));
+    const int targetSegment=std::clamp(targetX/segmentWidth,0,3);
+    int chosenSegment=-1,chosenMinDelta=0,chosenMaxDelta=-1;
+    int bestDistance=std::numeric_limits<int>::max();
+    for(int candidate=0;candidate<4;++candidate){
+     const int candidateStart=candidate*segmentWidth;
+     int minDelta=globalMinDelta,maxDelta=globalMaxDelta;
+     for(int i=0;i<4;++i){
+      minDelta=std::max(minDelta,candidateStart-oldAbsoluteX[i]);
+      maxDelta=std::min(maxDelta,candidateStart+255-oldAbsoluteX[i]);
+     }
+     if(minDelta>maxDelta)continue;
+     const int distance=std::abs(candidate-targetSegment);
+     const int oldDistance=std::abs(candidate-oldSegment);
+     const int bestOldDistance=chosenSegment<0?std::numeric_limits<int>::max():
+      std::abs(chosenSegment-oldSegment);
+     if(distance<bestDistance||(distance==bestDistance&&oldDistance<bestOldDistance)){
+      chosenSegment=candidate;chosenMinDelta=minDelta;chosenMaxDelta=maxDelta;
+      bestDistance=distance;
+     }
+    }
+    if(chosenSegment<0)return;
+    const int deltaX=std::clamp(requestedDeltaX,chosenMinDelta,chosenMaxDelta);
+
+    // The first three corners define the visible triangle region. Keep those
+    // inside the 128-row preview while allowing the fourth (quad) corner to
+    // retain any valid byte-sized V coordinate.
+    int minDeltaY=-255,maxDeltaY=255;
+    for(int i=0;i<4;++i){
+     minDeltaY=std::max(minDeltaY,-oldV[i]);
+     maxDeltaY=std::min(maxDeltaY,255-oldV[i]);
+    }
+    int visibleMinDeltaY=minDeltaY,visibleMaxDeltaY=maxDeltaY;
+    for(int i=0;i<3;++i){
+     visibleMinDeltaY=std::max(visibleMinDeltaY,-oldV[i]);
+     visibleMaxDeltaY=std::min(visibleMaxDeltaY,127-oldV[i]);
+    }
+    if(visibleMinDeltaY<=visibleMaxDeltaY){
+     minDeltaY=visibleMinDeltaY;maxDeltaY=visibleMaxDeltaY;
+    }
+    const int deltaY=std::clamp(requestedDeltaY,minDeltaY,maxDeltaY);
+    const int newSegmentStart=chosenSegment*segmentWidth;
+    edited.segment=static_cast<std::uint8_t>(chosenSegment);
+    edited.u1=static_cast<std::uint8_t>(oldAbsoluteX[0]+deltaX-newSegmentStart);
+    edited.u2=static_cast<std::uint8_t>(oldAbsoluteX[1]+deltaX-newSegmentStart);
+    edited.u3=static_cast<std::uint8_t>(oldAbsoluteX[2]+deltaX-newSegmentStart);
+    edited.u4=static_cast<std::uint8_t>(oldAbsoluteX[3]+deltaX-newSegmentStart);
+    edited.v1=static_cast<std::uint8_t>(oldV[0]+deltaY);
+    edited.v2=static_cast<std::uint8_t>(oldV[1]+deltaY);
+    edited.v3=static_cast<std::uint8_t>(oldV[2]+deltaY);
+    edited.v4=static_cast<std::uint8_t>(oldV[3]+deltaY);
+    descriptorChanged=descriptorChanged||deltaX!=0||deltaY!=0||chosenSegment!=oldSegment;
+
+    regionX0=std::clamp(chosenSegment*segmentWidth+
+     std::min(edited.u1,std::min(edited.u2,edited.u3)),0,textureWidth-1);
+    regionX1=std::clamp(chosenSegment*segmentWidth+
+     std::max(edited.u1,std::max(edited.u2,edited.u3))+1,regionX0+1,textureWidth);
+    regionY0=std::clamp(static_cast<int>(std::min(edited.v1,std::min(edited.v2,edited.v3))),0,127);
+    regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
+    selectionX=regionX0;selectionY=regionY0;
+    selectionWidth=regionX1-regionX0;selectionHeight=regionY1-regionY0;
+   };
    if(atlasHovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
     const ImVec2 mouse=ImGui::GetIO().MousePos;
     const int clickedX=std::clamp(static_cast<int>((mouse.x-atlasMin.x)/atlasSize.x*textureWidth),0,textureWidth-1);
     const int clickedY=std::clamp(static_cast<int>((mouse.y-atlasMin.y)/atlasSize.y*128.0f),0,127);
-    selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
-    selectionHeight=std::clamp(selectionHeight,1,128);
-    const int segment=std::clamp(clickedX/segmentWidth,0,3);
-    const int segmentStart=segment*segmentWidth;
-    selectionX=std::clamp(clickedX-selectionWidth/2,segmentStart,segmentStart+segmentWidth-selectionWidth);
-    selectionY=std::clamp(clickedY-selectionHeight/2,0,128-selectionHeight);
-    edited.segment=static_cast<std::uint8_t>(segment);
-    edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
-    edited.v1=static_cast<std::uint8_t>(selectionY);
-    edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-    edited.v2=static_cast<std::uint8_t>(selectionY);
-    edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
-    edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-    edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-    edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-    regionX0=selectionX;regionX1=selectionX+selectionWidth;
-    regionY0=selectionY;regionY1=selectionY+selectionHeight;
-    descriptorChanged=true;
+    moveUvRegion(std::clamp(clickedX-selectionWidth/2,0,textureWidth-1),
+     std::clamp(clickedY-selectionHeight/2,0,127));
    }
    const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
@@ -3943,35 +4010,19 @@ void EditorUI::drawFaceTextureSelector(){
    ImGui::TextUnformatted("Texture region");
    if(ImGui::BeginTable("##FaceTextureRegionFields",4,ImGuiTableFlags_SizingStretchSame,ImVec2(0,0))){
     ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("X");ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("X offset");ImGui::SetNextItemWidth(-FLT_MIN);
     const bool xChanged=ImGui::InputInt("##FaceTextureRegionX",&selectionX);
-    ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("Y");ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("Y offset");ImGui::SetNextItemWidth(-FLT_MIN);
     const bool yChanged=ImGui::InputInt("##FaceTextureRegionY",&selectionY);
-    ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("Width");ImGui::SetNextItemWidth(-FLT_MIN);
-    const bool widthChanged=ImGui::InputInt("##FaceTextureRegionWidth",&selectionWidth);
-    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("Height");ImGui::SetNextItemWidth(-FLT_MIN);
-    const bool heightChanged=ImGui::InputInt("##FaceTextureRegionHeight",&selectionHeight);
+    ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("UV width");
+    ImGui::Text("%d px",selectionWidth);
+    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("UV height");
+    ImGui::Text("%d px",selectionHeight);
     ImGui::EndTable();
-    if(xChanged||yChanged||widthChanged||heightChanged){
-     selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
-     selectionHeight=std::clamp(selectionHeight,1,128);
-     selectionX=std::clamp(selectionX,0,textureWidth-selectionWidth);
-     selectionY=std::clamp(selectionY,0,128-selectionHeight);
-     int segment=std::clamp(selectionX/segmentWidth,0,3);
-     const int segmentStart=segment*segmentWidth;
-     if(selectionX+selectionWidth>segmentStart+segmentWidth)
-      selectionX=segmentStart+segmentWidth-selectionWidth;
-     edited.segment=static_cast<std::uint8_t>(segment);
-     edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
-     edited.v1=static_cast<std::uint8_t>(selectionY);
-     edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-     edited.v2=static_cast<std::uint8_t>(selectionY);
-     edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
-     edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-     edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-     edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-     descriptorChanged=true;
-    }
+    if(xChanged||yChanged)
+     moveUvRegion(std::clamp(selectionX,0,textureWidth-1),std::clamp(selectionY,0,127));
+   }
+   ImGui::TextDisabled("Offsets move every UV corner together; the existing UV shape and dimensions are preserved.");
    }
   }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
   if(pageBytes&&colorMode<2){
