@@ -3922,8 +3922,13 @@ void EditorUI::drawFaceTextureSelector(){
     const int oldSegmentStart=static_cast<int>(edited.segment)*segmentWidth;
     int absoluteX[4]{};
     for(int i=0;i<4;++i)absoluteX[i]=oldSegmentStart+oldX[i]+deltaX;
-    const int allCornersMin=*std::min_element(absoluteX,absoluteX+4);
-    const int newSegment=std::clamp(allCornersMin/segmentWidth,0,3);
+    // The selector's origin is defined by U1/U2/U3 (the first triangle),
+    // not by U4. CrashEdit's ModelTexture.Left uses exactly those three
+    // corners; allowing U4 to choose the segment rebases the first triangle
+    // incorrectly on faces whose fourth corner lies outside that bounds.
+    const int newRegionMinX=oldMinX+deltaX;
+    const int newSegment=newRegionMinX/segmentWidth;
+    if(newSegment<0||newSegment>3)return;
     const int newSegmentStart=newSegment*segmentWidth;
     int newU[4]{},newV[4]{};
     for(int i=0;i<4;++i){
