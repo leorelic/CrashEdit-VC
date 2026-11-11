@@ -3929,8 +3929,10 @@ void EditorUI::drawFaceTextureSelector(){
     for(int i=0;i<4;++i){
      newU[i]=absoluteX[i]-newSegmentStart;
      newV[i]=oldY[i]+deltaY;
-     if(absoluteX[i]<0||absoluteX[i]>=textureWidth||newU[i]<0||newU[i]>255||
-      newV[i]<0||newV[i]>127)return;
+     // UV coordinates are stored as bytes. The atlas segment is a separate
+     // address component; do not compare the combined coordinate to the
+     // displayed logical atlas width (which incorrectly rejected valid moves).
+     if(absoluteX[i]<0||newU[i]<0||newU[i]>255||newV[i]<0||newV[i]>127)return;
     }
     edited.segment=static_cast<std::uint8_t>(newSegment);
     edited.u1=static_cast<std::uint8_t>(newU[0]);edited.v1=static_cast<std::uint8_t>(newV[0]);
