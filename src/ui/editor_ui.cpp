@@ -3892,7 +3892,12 @@ void EditorUI::drawFaceTextureSelector(){
   ImGui::Text("Texture atlas  |  %d x 128 pixels  |  Click to position the current selection",textureWidth);
   int selectionX=0,selectionY=0,selectionWidth=1,selectionHeight=1;
   if(pageBytes&&previewTexture){
-   const float displayWidth=std::max(240.0f,ImGui::GetContentRegionAvail().x);
+   // Fit the complete atlas inside the selector viewport. A fixed minimum width
+   // or width-only sizing can push part of 16-bit TPAGs outside the child clip rect;
+   // those pixels are visible only partially and cannot receive ImGui hit tests.
+   const ImVec2 atlasAvail=ImGui::GetContentRegionAvail();
+   const float displayWidth=std::max(1.0f,std::min(atlasAvail.x,
+    atlasAvail.y*static_cast<float>(textureWidth)/128.0f));
    const ImVec2 atlasSize(displayWidth,displayWidth*128.0f/static_cast<float>(textureWidth));
    const ImVec2 atlasMin=ImGui::GetCursorScreenPos();
    ImGui::InvisibleButton("##TextureAtlasPicker",atlasSize);
