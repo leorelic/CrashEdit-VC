@@ -4023,7 +4023,6 @@ void EditorUI::drawFaceTextureSelector(){
      moveUvRegion(std::clamp(selectionX,0,textureWidth-1),std::clamp(selectionY,0,127));
    }
    ImGui::TextDisabled("Offsets move every UV corner together; the existing UV shape and dimensions are preserved.");
-   }
   }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
   if(pageBytes&&colorMode<2){
    const int paletteCount=colorMode==0?16:256;
