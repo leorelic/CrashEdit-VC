@@ -3922,23 +3922,33 @@ void EditorUI::drawFaceTextureSelector(){
     const int oldSegmentStart=static_cast<int>(edited.segment)*segmentWidth;
     int absoluteX[4]{};
     for(int i=0;i<4;++i)absoluteX[i]=oldSegmentStart+oldX[i]+deltaX;
-    // The selector's origin is defined by U1/U2/U3 (the first triangle),
-    // not by U4. CrashEdit's ModelTexture.Left uses exactly those three
-    // corners; allowing U4 to choose the segment rebases the first triangle
-    // incorrectly on faces whose fourth corner lies outside that bounds.
-    const int newRegionMinX=oldMinX+deltaX;
-    const int newSegment=newRegionMinX/segmentWidth;
-    if(newSegment<0||newSegment>3)return;
-    const int newSegmentStart=newSegment*segmentWidth;
-    int newU[4]{},newV[4]{};
-    for(int i=0;i<4;++i){
-     newU[i]=absoluteX[i]-newSegmentStart;
-     newV[i]=oldY[i]+deltaY;
-     // UV coordinates are stored as bytes. The atlas segment is a separate
-     // address component; do not compare the combined coordinate to the
-     // displayed logical atlas width (which incorrectly rejected valid moves).
-     if(absoluteX[i]<0||newU[i]<0||newU[i]>255||newV[i]<0||newV[i]>127)return;
+    // Segment is a shared base offset, not a hard atlas tile boundary.
+    // Choose a segment that can encode every translated U byte. Deriving it
+    // from only the region's first three corners (or from all four corners)
+    // can push another corner outside 0..255 and reject otherwise valid faces.
+    int newSegment=-1,newU[4]{},newV[4]{};
+    int bestSegmentDistance=std::numeric_limits<int>::max();
+    for(int candidate=0;candidate<4;++candidate){
+     const int candidateStart=candidate*segmentWidth;
+     int candidateU[4]{};
+     bool fits=true;
+     for(int i=0;i<4;++i){
+      candidateU[i]=absoluteX[i]-candidateStart;
+      const int candidateV=oldY[i]+deltaY;
+      if(candidateU[i]<0||candidateU[i]>255||candidateV<0||candidateV>127){
+       fits=false;break;
+      }
+     }
+     const int distance=std::abs(candidate-static_cast<int>(edited.segment));
+     if(fits&&distance<bestSegmentDistance){
+      newSegment=candidate;bestSegmentDistance=distance;
+      for(int i=0;i<4;++i){
+       newU[i]=candidateU[i];
+       newV[i]=oldY[i]+deltaY;
+      }
+     }
     }
+    if(newSegment<0)return;
     edited.segment=static_cast<std::uint8_t>(newSegment);
     edited.u1=static_cast<std::uint8_t>(newU[0]);edited.v1=static_cast<std::uint8_t>(newV[0]);
     edited.u2=static_cast<std::uint8_t>(newU[1]);edited.v2=static_cast<std::uint8_t>(newV[1]);
