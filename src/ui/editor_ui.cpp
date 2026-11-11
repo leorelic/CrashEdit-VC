@@ -3909,29 +3909,42 @@ void EditorUI::drawFaceTextureSelector(){
    int regionY1=std::clamp(static_cast<int>(std::max(edited.v1,std::max(edited.v2,edited.v3)))+1,regionY0+1,128);
    selectionX=regionX0;selectionY=regionY0;
    selectionWidth=regionX1-regionX0;selectionHeight=regionY1-regionY0;
-   // A click repositions the existing rectangle; it never changes its dimensions.
+   // Reposition by translating the existing UVs. Never rebuild them as a rectangle:
+   // the four corners can encode a non-rectangular mapping across a triangle pair.
+   auto moveUvRegion=[&](int targetX,int targetY){
+    const int oldMinX=static_cast<int>(edited.segment)*segmentWidth+
+     std::min(edited.u1,std::min(edited.u2,edited.u3));
+    const int oldMinY=std::min(edited.v1,std::min(edited.v2,edited.v3));
+    const int deltaX=targetX-oldMinX,deltaY=targetY-oldMinY;
+    if(deltaX==0&&deltaY==0)return;
+    const int oldX[4]={edited.u1,edited.u2,edited.u3,edited.u4};
+    const int oldY[4]={edited.v1,edited.v2,edited.v3,edited.v4};
+    const int oldSegmentStart=static_cast<int>(edited.segment)*segmentWidth;
+    int absoluteX[4]{};
+    for(int i=0;i<4;++i)absoluteX[i]=oldSegmentStart+oldX[i]+deltaX;
+    const int firstThreeMin=std::min(absoluteX[0],std::min(absoluteX[1],absoluteX[2]));
+    const int newSegment=std::clamp(firstThreeMin/segmentWidth,0,3);
+    const int newSegmentStart=newSegment*segmentWidth;
+    int newU[4]{},newV[4]{};
+    for(int i=0;i<4;++i){
+     newU[i]=absoluteX[i]-newSegmentStart;
+     newV[i]=oldY[i]+deltaY;
+     if(absoluteX[i]<0||absoluteX[i]>=textureWidth||newU[i]<0||newU[i]>255||
+      newV[i]<0||newV[i]>127)return;
+    }
+    edited.segment=static_cast<std::uint8_t>(newSegment);
+    edited.u1=static_cast<std::uint8_t>(newU[0]);edited.v1=static_cast<std::uint8_t>(newV[0]);
+    edited.u2=static_cast<std::uint8_t>(newU[1]);edited.v2=static_cast<std::uint8_t>(newV[1]);
+    edited.u3=static_cast<std::uint8_t>(newU[2]);edited.v3=static_cast<std::uint8_t>(newV[2]);
+    edited.u4=static_cast<std::uint8_t>(newU[3]);edited.v4=static_cast<std::uint8_t>(newV[3]);
+    descriptorChanged=true;
+   };
    if(atlasHovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
     const ImVec2 mouse=ImGui::GetIO().MousePos;
     const int clickedX=std::clamp(static_cast<int>((mouse.x-atlasMin.x)/atlasSize.x*textureWidth),0,textureWidth-1);
     const int clickedY=std::clamp(static_cast<int>((mouse.y-atlasMin.y)/atlasSize.y*128.0f),0,127);
-    selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
-    selectionHeight=std::clamp(selectionHeight,1,128);
-    const int segment=std::clamp(clickedX/segmentWidth,0,3);
-    const int segmentStart=segment*segmentWidth;
-    selectionX=std::clamp(clickedX-selectionWidth/2,segmentStart,segmentStart+segmentWidth-selectionWidth);
-    selectionY=std::clamp(clickedY-selectionHeight/2,0,128-selectionHeight);
-    edited.segment=static_cast<std::uint8_t>(segment);
-    edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
-    edited.v1=static_cast<std::uint8_t>(selectionY);
-    edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-    edited.v2=static_cast<std::uint8_t>(selectionY);
-    edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
-    edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-    edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-    edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-    regionX0=selectionX;regionX1=selectionX+selectionWidth;
-    regionY0=selectionY;regionY1=selectionY+selectionHeight;
-    descriptorChanged=true;
+    moveUvRegion(std::clamp(clickedX-selectionWidth/2,0,textureWidth-1),
+     std::clamp(clickedY-selectionHeight/2,0,127));
    }
    const ImVec2 regionMin(atlasMin.x+atlasSize.x*static_cast<float>(regionX0)/static_cast<float>(textureWidth),
     atlasMin.y+atlasSize.y*static_cast<float>(regionY0)/128.0f);
@@ -3943,36 +3956,19 @@ void EditorUI::drawFaceTextureSelector(){
    ImGui::TextUnformatted("Texture region");
    if(ImGui::BeginTable("##FaceTextureRegionFields",4,ImGuiTableFlags_SizingStretchSame,ImVec2(0,0))){
     ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("X");ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::TableSetColumnIndex(0);ImGui::TextUnformatted("X offset");ImGui::SetNextItemWidth(-FLT_MIN);
     const bool xChanged=ImGui::InputInt("##FaceTextureRegionX",&selectionX);
-    ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("Y");ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::TableSetColumnIndex(1);ImGui::TextUnformatted("Y offset");ImGui::SetNextItemWidth(-FLT_MIN);
     const bool yChanged=ImGui::InputInt("##FaceTextureRegionY",&selectionY);
-    ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("Width");ImGui::SetNextItemWidth(-FLT_MIN);
-    const bool widthChanged=ImGui::InputInt("##FaceTextureRegionWidth",&selectionWidth);
-    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("Height");ImGui::SetNextItemWidth(-FLT_MIN);
-    const bool heightChanged=ImGui::InputInt("##FaceTextureRegionHeight",&selectionHeight);
+    ImGui::TableSetColumnIndex(2);ImGui::TextUnformatted("UV width");
+    ImGui::Text("%d px",selectionWidth);
+    ImGui::TableSetColumnIndex(3);ImGui::TextUnformatted("UV height");
+    ImGui::Text("%d px",selectionHeight);
     ImGui::EndTable();
-    if(xChanged||yChanged||widthChanged||heightChanged){
-     selectionWidth=std::clamp(selectionWidth,1,segmentWidth);
-     selectionHeight=std::clamp(selectionHeight,1,128);
-     selectionX=std::clamp(selectionX,0,textureWidth-selectionWidth);
-     selectionY=std::clamp(selectionY,0,128-selectionHeight);
-     int segment=std::clamp(selectionX/segmentWidth,0,3);
-     const int segmentStart=segment*segmentWidth;
-     if(selectionX+selectionWidth>segmentStart+segmentWidth)
-      selectionX=segmentStart+segmentWidth-selectionWidth;
-     edited.segment=static_cast<std::uint8_t>(segment);
-     edited.u1=static_cast<std::uint8_t>(selectionX-segmentStart);
-     edited.v1=static_cast<std::uint8_t>(selectionY);
-     edited.u2=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-     edited.v2=static_cast<std::uint8_t>(selectionY);
-     edited.u3=static_cast<std::uint8_t>(selectionX-segmentStart);
-     edited.v3=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-     edited.u4=static_cast<std::uint8_t>(selectionX+selectionWidth-1-segmentStart);
-     edited.v4=static_cast<std::uint8_t>(selectionY+selectionHeight-1);
-     descriptorChanged=true;
-    }
+    if(xChanged||yChanged)
+     moveUvRegion(std::clamp(selectionX,0,textureWidth-1),std::clamp(selectionY,0,127));
    }
+   ImGui::TextDisabled("Offsets move every UV corner together. Width and height are derived from the original UV layout.");
   }else ImGui::TextDisabled("The selected TPAG page is not present in this NSF.");
   if(pageBytes&&colorMode<2){
    const int paletteCount=colorMode==0?16:256;
