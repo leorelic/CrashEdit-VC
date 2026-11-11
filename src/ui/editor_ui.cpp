@@ -3922,8 +3922,8 @@ void EditorUI::drawFaceTextureSelector(){
     const int oldSegmentStart=static_cast<int>(edited.segment)*segmentWidth;
     int absoluteX[4]{};
     for(int i=0;i<4;++i)absoluteX[i]=oldSegmentStart+oldX[i]+deltaX;
-    const int firstThreeMin=std::min(absoluteX[0],std::min(absoluteX[1],absoluteX[2]));
-    const int newSegment=std::clamp(firstThreeMin/segmentWidth,0,3);
+    const int allCornersMin=*std::min_element(absoluteX,absoluteX+4);
+    const int newSegment=std::clamp(allCornersMin/segmentWidth,0,3);
     const int newSegmentStart=newSegment*segmentWidth;
     int newU[4]{},newV[4]{};
     for(int i=0;i<4;++i){
