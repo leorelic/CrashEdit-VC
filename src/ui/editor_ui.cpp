@@ -408,7 +408,7 @@ void EditorUI::draw(){
    ImGui::TextWrapped("Adding this frame exceeds the current 64 KiB chunk limit. Create a new chunk and move this entire entry there?");
    ImGui::TextDisabled("The entry EID, type, item payloads, and padding will be preserved.");
    if(ImGui::Button("Create New Chunk and Continue")){
-    NsfArchive backup=nsf_;
+    Crash::NsfArchive backup=nsf_;
     std::size_t destinationChunk=0;std::string moveError;
     bool completed=nsf_.moveEntryToNewChunk(static_cast<std::size_t>(chunkExpansionSourceChunk_),
                                              static_cast<std::size_t>(chunkExpansionSourceEntry_),

@@ -253,7 +253,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p16(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize,47);p32(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize+20,24);
  const std::size_t exFollowingSize=65536-exFollowingEntry;
  p32(expansionChunk,exFollowingEntry,0x0100ffff);p32(expansionChunk,exFollowingEntry+4,0x0200007e);p32(expansionChunk,exFollowingEntry+8,99);p32(expansionChunk,exFollowingEntry+12,1);
- p32(expansionChunk,exFollowingEntry+16,20);p32(expansionChunk,exFollowingEntry+20,static_cast<std::uint32_t>(exFollowingSize));
+ p32(expansionChunk,exFollowingEntry+16,24);p32(expansionChunk,exFollowingEntry+20,static_cast<std::uint32_t>(exFollowingSize));
  expansionChunk[exFollowingEntry+24]=0x5a;
  NsfArchive expansionArchive;assert(expansionArchive.loadBytes(expansionChunk,e));expansionArchive.decodeAnimationModels(false);
  assert(expansionArchive.animationFrameEditNeedsNewChunk(0,0,1));

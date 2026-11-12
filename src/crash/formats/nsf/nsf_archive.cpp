@@ -168,7 +168,7 @@ bool NsfArchive::load(const std::filesystem::path&f,std::string&e){
  auto z=static_cast<std::uintmax_t>(end);if(z>std::numeric_limits<std::size_t>::max()){e="NSF file too large.";return false;}
  std::vector<std::uint8_t>b(static_cast<std::size_t>(z));s.seekg(0);if(!b.empty()&&!s.read(reinterpret_cast<char*>(b.data()),static_cast<std::streamsize>(b.size()))){e="Could not read NSF file." ;return false;}return loadBytes(b,e);
 }
-bool NsfArchive::loadBytes(const std::vector<std::uint8_t>&in,std::string&e){crash3Retail_=false;std::vector<NsfChunk> parsed;std::size_t p=0;while(p<in.size()){NsfChunk c;if(!decodeChunk(in,p,c,e))return false;parsed.push_back(std::move(c));}chunks_=std::move(parsed);return true;}
+bool NsfArchive::loadBytes(const std::vector<std::uint8_t>&in,std::string&e){crash3Retail_=false;goolDecoded_=false;animationModelsDecoded_=false;animationModelsCrash3_=false;goolVersion_=NsfGoolVersion::Version2;std::vector<NsfChunk> parsed;std::size_t p=0;while(p<in.size()){NsfChunk c;if(!decodeChunk(in,p,c,e))return false;parsed.push_back(std::move(c));}chunks_=std::move(parsed);return true;}
 bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,NsfChunk&o,std::string&e){
  if(!has(in,p,2)){e="NSF truncated: missing chunk magic.";return false;}auto magic=u16(in,p);o.bytes.assign(NsfChunkSize,0);
  if(magic==0x1234||magic==0){if(!has(in,p,NsfChunkSize)){e="NSF truncated in raw 64 KiB chunk.";return false;}std::copy_n(in.begin()+static_cast<std::ptrdiff_t>(p),NsfChunkSize,o.bytes.begin());p+=NsfChunkSize;}
@@ -851,7 +851,6 @@ bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::siz
  const std::size_t oldPayloadEnd=entry.items.back().offset+entry.items.back().size;
  if(oldPayloadEnd>oldEntryEnd)return false;
  const std::size_t trailingPadding=oldEntryEnd-oldPayloadEnd;
- if(newCount==0U)return false;
  std::size_t payloadBytes=0;
  for(const auto&item:entry.items){if(item.size>NsfChunkSize-payloadBytes)return false;payloadBytes+=item.size;}
  if(entry.items[frameIndex].size>NsfChunkSize-payloadBytes)return false;
