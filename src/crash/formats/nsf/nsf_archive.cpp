@@ -858,7 +858,7 @@ bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::siz
  const std::size_t newCount=oldCount+1U;
  if(newCount>std::numeric_limits<std::uint32_t>::max())return false;
  const std::size_t newHeaderEnd=16U+(newCount+1U)*4U;
- if(prefixPadding>NsfChunkSize-newHeaderEnd)return true;
+ if(newHeaderEnd>NsfChunkSize||prefixPadding>NsfChunkSize-newHeaderEnd)return true;
  std::size_t newEntrySize=newHeaderEnd+prefixPadding;
  if(payloadBytes>NsfChunkSize-newEntrySize)return true;
  newEntrySize+=payloadBytes;
