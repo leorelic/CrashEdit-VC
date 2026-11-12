@@ -209,6 +209,7 @@ public:
  bool deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
  bool setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value);
+ bool setAnimationFrameCollisions(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>& collisionIndices,const std::vector<NsfAnimationCollision>& collisions);
  bool setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value);
  bool setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value);
  bool setAnimationFrameVertices(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>& vertexIndices,const std::vector<NsfAnimationVertex>& vertices);
