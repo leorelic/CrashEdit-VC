@@ -227,8 +227,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive timelineArchive;assert(timelineArchive.loadBytes(timelineChunk,e));timelineArchive.decodeAnimationModels(false);std::cerr<<"TL1\n";
  assert(timelineArchive.chunks()[0].entries[0].animation.decoded&&timelineArchive.chunks()[0].entries[0].animation.frames.size()==2);
  assert(timelineArchive.appendAnimationFrame(0,0));std::cerr<<"TL2\n";
+ std::cerr<<"TL2A\\n";
  auto timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
- assert(timelineFrames.size()==3&&timelineFrames[2].xOffset==22&&timelineFrames[2].rawSize==tlFrameSize);std::cerr<<"TL3 "+std::to_string(timelineFrames[1].rawOffset)+" "+std::to_string(timelineFrames[2].rawOffset)+"\\n";
+ std::cerr<<"TL2B size="+std::to_string(timelineFrames.size())+"\\n";
+ assert(timelineFrames.size()==3);std::cerr<<"TL3A\\n";
+ assert(timelineFrames[2].xOffset==22);std::cerr<<"TL3B\\n";
+ assert(timelineFrames[2].rawSize==tlFrameSize);std::cerr<<"TL3C offsets="+std::to_string(timelineFrames[1].rawOffset)+","+std::to_string(timelineFrames[2].rawOffset)+"\\n";
  assert(std::equal(timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[1].rawOffset),timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[1].rawOffset+tlFrameSize),timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[2].rawOffset)));std::cerr<<"TL4\\n";
  assert(timelineArchive.insertAnimationFrameAfter(0,0,0));std::cerr<<"TL5\\n";
  timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
