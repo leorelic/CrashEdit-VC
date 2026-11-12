@@ -891,7 +891,7 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
  std::vector<std::uint8_t> rebuiltSource(NsfChunkSize,0U);
  std::copy_n(source.bytes.begin(),16U,rebuiltSource.begin());
  if(prefixPadding)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(tableEnd),prefixPadding,
-                              rebuiltSource.begin()+static_cast<std::ptrdiff_t>(tableEnd));
+                              rebuiltSource.begin()+static_cast<std::ptrdiff_t>(newTableEnd));
  const std::size_t remainingCount=count-1U;
  const std::size_t newTableEnd=20U+remainingCount*4U;
  std::size_t cursor=newTableEnd+prefixPadding;
@@ -917,6 +917,10 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   cursor+=entry.size;++outputEntry;
  }
  for(unsigned b=0;b<4U;++b)rebuiltSource[16U+remainingCount*4U+b]=static_cast<std::uint8_t>(cursor>>(b*8U));
+ const std::size_t unusedTail=NsfChunkSize-usedEnd;
+ if(unusedTail>NsfChunkSize-cursor)return fail("The rebuilt source chunk has no room for its original trailing padding.");
+ if(unusedTail)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(usedEnd),unusedTail,
+                            rebuiltSource.begin()+static_cast<std::ptrdiff_t>(cursor));
  for(unsigned b=0;b<4U;++b)rebuiltSource[8U+b]=static_cast<std::uint8_t>(remainingCount>>(b*8U));
 
  // Normal entry chunks use the ordinary type-0 header; their ChunkId is not an

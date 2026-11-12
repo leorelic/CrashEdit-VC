@@ -246,15 +246,16 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // Append. The following opaque entry remains valid and the moved EID is unchanged.
  std::vector<std::uint8_t> expansionChunk(65536);p16(expansionChunk,0,0x1234);p16(expansionChunk,2,0);p32(expansionChunk,4,9);p32(expansionChunk,8,2);
  constexpr std::size_t exAnimationEntry=28,exAnimationHeader=24,exFrameSize=24,exAnimationSize=exAnimationHeader+exFrameSize*2,exFollowingEntry=exAnimationEntry+exAnimationSize;
- p32(expansionChunk,16,exAnimationEntry);p32(expansionChunk,20,exFollowingEntry);p32(expansionChunk,24,65536);
+ constexpr std::size_t exUsedEnd=65520;
+ p32(expansionChunk,16,exAnimationEntry);p32(expansionChunk,20,exFollowingEntry);p32(expansionChunk,24,exUsedEnd);
  p32(expansionChunk,exAnimationEntry,0x0100ffff);p32(expansionChunk,exAnimationEntry+4,0x0200007d);p32(expansionChunk,exAnimationEntry+8,1);p32(expansionChunk,exAnimationEntry+12,2);
  p32(expansionChunk,exAnimationEntry+16,exAnimationHeader);p32(expansionChunk,exAnimationEntry+20,exAnimationHeader+exFrameSize);p32(expansionChunk,exAnimationEntry+24,exAnimationSize);
  p16(expansionChunk,exAnimationEntry+exAnimationHeader,31);p32(expansionChunk,exAnimationEntry+exAnimationHeader+20,24);
  p16(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize,47);p32(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize+20,24);
- const std::size_t exFollowingSize=65536-exFollowingEntry;
+ const std::size_t exFollowingSize=exUsedEnd-exFollowingEntry;
  p32(expansionChunk,exFollowingEntry,0x0100ffff);p32(expansionChunk,exFollowingEntry+4,0x0200007e);p32(expansionChunk,exFollowingEntry+8,99);p32(expansionChunk,exFollowingEntry+12,1);
  p32(expansionChunk,exFollowingEntry+16,24);p32(expansionChunk,exFollowingEntry+20,static_cast<std::uint32_t>(exFollowingSize));
- expansionChunk[exFollowingEntry+24]=0x5a;
+ expansionChunk[exFollowingEntry+24]=0x5a;std::fill(expansionChunk.begin()+exUsedEnd,expansionChunk.end(),0xa5U);
  NsfArchive expansionArchive;assert(expansionArchive.loadBytes(expansionChunk,e));expansionArchive.decodeAnimationModels(false);
  assert(expansionArchive.animationFrameEditNeedsNewChunk(0,0,1));
  std::vector<std::uint8_t> unchangedBeforeCancel;assert(expansionArchive.saveUncompressedBytes(unchangedBeforeCancel,e));
@@ -266,6 +267,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expansionArchive.chunks()[1].entries.size()==1&&expansionArchive.chunks()[1].entries[0].eid==0x0200007dU);
  assert(expansionArchive.chunks()[1].entries[0].type==1&&expansionArchive.chunks()[1].entries[0].animation.frames.size()==2);
  assert(expansionArchive.chunks()[0].entries[0].items.size()==1&&expansionArchive.chunks()[0].bytes[expansionArchive.chunks()[0].entries[0].items[0].offset]==0x5a);
+ assert(expansionArchive.chunks()[0].bytes[65459]==0xa5U);
  assert(expansionArchive.appendAnimationFrame(relocatedChunk,0));
  assert(expansionArchive.chunks()[1].entries[0].animation.frames.size()==3);
  std::vector<std::uint8_t> expansionSaved;assert(expansionArchive.saveUncompressedBytes(expansionSaved,e));
