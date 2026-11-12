@@ -2,6 +2,17 @@
 
 This roadmap tracks the progression from reliable GOOL inspection toward readable decompilation and, eventually, safe editing and recompilation. Items are staged deliberately: later authoring features depend on understanding the instruction set and validating the underlying representation first.
 
+## Independent development and licensing boundary
+
+**Hard project constraint — preserve CrashEdit-VC's MIT license.** CrashEdit-VC must remain an independently implemented MIT-licensed project. The following repositories are deliberately excluded as sources of code, implementation, dependencies, design templates, feature checklists, or implementation inspiration:
+
+- **Airumu / Blender_CrashXform** — GPL-3.0. Do not inspect or restudy this project, use its video or repository as a design reference, port or adapt its code, reproduce its implementation, or incorporate its dependencies, assets, or generated output.
+- **ManDude / GOOC** — its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. Treat it as unavailable for reuse. Do not inspect it for GOOL decompilation guidance, copy or adapt its source, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns.
+
+These are deliberate exclusions, not tasks to revisit. Do not add features to CrashEdit-VC merely to match either project, and do not use either repository as a roadmap or comparison checklist. Build features from CrashEdit-VC's own code and accomplishments, independent analysis of Crash 2 data and runtime behavior, primary technical evidence that can be used consistently with the MIT goal, and our own regression fixtures and tests.
+
+When planning or implementing a feature, check this boundary first. If a proposed approach depends on either excluded project, stop and design an independent approach instead. Do not assume that public availability grants permission to reuse code or other copyrighted implementation material.
+
 ## Current editor/workspace status — 2026-11-08
 
 - The dedicated **GOOL Script Editor** workspace is implemented beside the 3D Zone Viewer. It includes a read-only, routine-oriented decompilation view and an editable scratch-script surface with indentation diagnostics. The selected GOOL decompilation is not yet directly editable or recompilable.
@@ -11,7 +22,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 
 # NSF resource support research
 
-Research reference: the original [cbhacks/CrashEdit source](https://github.com/cbhacks/CrashEdit/tree/deprecate), branch `deprecate`. The implementation notes below are based on its format loaders, resource models, controllers, and animation renderer. This is a format-analysis checkpoint, not a claim that these formats are implemented in CrashEdit-VC.
+Research reference: CrashEdit-RE, [airumu/CrashEdit](https://github.com/airumu/CrashEdit/tree/t/net9), branch `t/net9`. This roadmap's source comparisons must use the project's established CrashEdit-RE baseline, not cbhacks/CrashEdit or its deprecated branches. The implementation notes below are format-analysis findings, not a claim that every described format is implemented in CrashEdit-VC.
 
 ## Entry types versus chunk types
 
