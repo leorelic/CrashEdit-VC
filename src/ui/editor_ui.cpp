@@ -324,7 +324,7 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<7){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",bottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=7;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<8){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Bone List",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",bottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=8;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
  drawHierarchy();
  bool showAnimationWorkspace=false;
@@ -391,6 +391,7 @@ void EditorUI::draw(){
  if(showAnimationWorkspace)drawAnimationViewer();
  if(showAnimationWorkspace&&animationFaceEditing_)drawFaceEditor();
  drawModelEditor();
+ if(showAnimationWorkspace&&boneRigWindowOpen_)drawBoneRigEditor();
  if(animationFrameEditorOpen_&&showAnimationWorkspace)drawAnimationFrameEditor();
  if(editorPreferences.traditionalGoolInspection){drawGoolDataWindows();drawGoolInspector();drawGoolGraph();}
  else{drawGoolBlueprintGraph();drawGoolBlueprintInstructions();drawGoolScriptEditor();}
@@ -4590,6 +4591,64 @@ void EditorUI::drawFaceTextureSelector(){
  ImGui::SetCursorScreenPos(savedCursor);
  // Complete the parent layout after restoring the cursor to avoid Dear ImGui boundary warnings.
  ImGui::Dummy(ImVec2(1.0f,1.0f));
+}
+
+
+void EditorUI::drawBoneRigEditor(){
+ if(!nsfValid_||animationViewerChunk_<0||static_cast<std::size_t>(animationViewerChunk_)>=nsf_.chunks().size())return;
+ const auto&chunk=nsf_.chunks()[static_cast<std::size_t>(animationViewerChunk_)];
+ if(chunk.type!=0||animationViewerEntry_<0||static_cast<std::size_t>(animationViewerEntry_)>=chunk.entries.size())return;
+ const auto&entry=chunk.entries[static_cast<std::size_t>(animationViewerEntry_)];
+ if(!entry.valid||entry.type!=1||!entry.animation.decoded||entry.animation.frames.empty())return;
+ const auto&animation=entry.animation;
+ const std::size_t frameIndex=static_cast<std::size_t>(std::clamp(animationFrame_,0,static_cast<int>(animation.frames.size()-1U)));
+ const auto&frame=animation.frames[frameIndex];
+ const std::uint32_t modelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
+ if(!Crash::isValidEid(modelEid)||!frame.verticesDecoded)return;
+ if(boneRigModelEid_!=modelEid){boneRigModelEid_=modelEid;boneRigBones_.clear();boneRigSelectedBone_=-1;}
+ for(auto&bone:boneRigBones_)bone.vertices.erase(std::remove_if(bone.vertices.begin(),bone.vertices.end(),[&](int index){return index<0||static_cast<std::size_t>(index)>=frame.vertices.size();}),bone.vertices.end());
+ if(boneRigSelectedBone_>=static_cast<int>(boneRigBones_.size()))boneRigSelectedBone_=-1;
+ if(ImGuiWindow*properties=ImGui::FindWindowByName("Properties"))if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
+ if(!ImGui::Begin("Bone List",&boneRigWindowOpen_)){ImGui::End();return;}
+ ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
+ ImGui::Text("%s | %s",Crash::eidToEName(entry.eid).c_str(),Crash::eidToEName(modelEid).c_str());
+ ImGui::TextDisabled("Editor-only vertex groups. Nothing here is written as a skeleton to the NSF.");
+ ImGui::Separator();ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
+ if(ImGui::Button("Create Bone")){
+  std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
+  boneRigBones_.push_back(BoneRigBone{name,{}});boneRigSelectedBone_=static_cast<int>(boneRigBones_.size()-1U);std::snprintf(boneRigName_,sizeof(boneRigName_),"Bone");
+ }
+ ImGui::Separator();ImGui::Text("Bones (%zu)",boneRigBones_.size());
+ if(ImGui::BeginChild("BoneRigList",ImVec2(0.0f,130.0f),true)){
+  for(std::size_t i=0;i<boneRigBones_.size();++i){ImGui::PushID(static_cast<int>(i));const auto&bone=boneRigBones_[i];const std::string label=bone.name+"  ("+std::to_string(bone.vertices.size())+" vertices)";if(ImGui::Selectable(label.c_str(),boneRigSelectedBone_==static_cast<int>(i)))boneRigSelectedBone_=static_cast<int>(i);ImGui::PopID();}
+ }
+ ImGui::EndChild();
+ if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
+  auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
+  ImGui::Separator();ImGui::Text("Selected Bone");
+  char nameBuffer[128]{};std::snprintf(nameBuffer,sizeof(nameBuffer),"%s",bone.name.c_str());ImGui::SetNextItemWidth(-1.0f);if(ImGui::InputText("##RenameBone",nameBuffer,sizeof(nameBuffer)))bone.name=nameBuffer;
+  if(ImGui::Button("Assign Selected Vertices")){
+   for(const int index:animationSelectedVertices_){
+    if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
+    for(std::size_t other=0;other<boneRigBones_.size();++other){if(other==static_cast<std::size_t>(boneRigSelectedBone_))continue;auto&members=boneRigBones_[other].vertices;members.erase(std::remove(members.begin(),members.end(),index),members.end());}
+    if(std::find(bone.vertices.begin(),bone.vertices.end(),index)==bone.vertices.end())bone.vertices.push_back(index);
+   }
+  }
+  ImGui::SameLine();
+  if(ImGui::Button("Remove Selected"))for(const int index:animationSelectedVertices_)bone.vertices.erase(std::remove(bone.vertices.begin(),bone.vertices.end(),index),bone.vertices.end());
+  if(ImGui::Button("Select Bone Vertices")){
+   animationSelectedVertices_.clear();for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())animationSelectedVertices_.push_back(index);
+   animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
+   animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(frameIndex);animationFrame_=static_cast<int>(frameIndex);animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
+  }
+  ImGui::SameLine();
+  if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));}
+  ImGui::TextDisabled("A vertex belongs to one bone at a time. Select its vertices, then use Free Move, Axis Move or Scale in the 3D Animation Editor. Each edit affects the current frame only.");
+  ImGui::Text("Assigned vertex indices");
+  if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
+  ImGui::EndChild();
+ }else ImGui::TextDisabled("Create a bone, select vertices in the viewport, then assign them here.");
+ ImGui::PopTextWrapPos();ImGui::End();
 }
 
 void EditorUI::drawModelEditor(){
