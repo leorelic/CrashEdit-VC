@@ -52,6 +52,8 @@ The polygon stream is not a plain index buffer. It interleaves triangle/index co
 
 **Editing requirement:** the Model need not automatically open in the 3D viewer. Its editable decoded data must remain the authoritative source used by the Animation Viewer, so changes are visible there immediately.
 
+**Implementation milestone (2026-11-12):** CrashEdit-VC now has an in-viewport Face Texture Selector in the Animation Editor. On the user-tested TNT Box face, atlas selection can reposition the existing UV mapping while preserving its relative shape. The placement bounds are based on the triangle's UV1-UV3; auxiliary UV4 no longer blocks otherwise valid atlas positions. The existing fixed-size texture-descriptor setter remains the NSF write path. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md) for the implementation trail and remaining Cr10T / multi-color-mode validation.
+
 ## Type 4 — Sort List (SLST)
 
 Original source:
