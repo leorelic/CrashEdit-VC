@@ -3161,7 +3161,7 @@ void EditorUI::drawAnimationViewer(){
   enum class VertexToolMode{FreeMove,AxisMove,Scale};
   struct VertexDragState{
    bool active=false;
-   int mode=0,axis=-1,entry=-1,frame=-1;
+   int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;
    ImVec2 mouseStart{};
    float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f;
    float pivotDepth=0.0f;
@@ -3384,7 +3384,7 @@ void EditorUI::drawAnimationViewer(){
   // Mouse transforms are kept local to the viewport and always derive from
   // the immutable vertex snapshot captured at drag start. This avoids
   // cumulative quantization while editing compressed temporal streams.
-  if(vertexDrag.active&&(vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex||!ImGui::IsMouseDown(ImGuiMouseButton_Left)))vertexDrag.active=false;
+  if(vertexDrag.active&&(vertexDrag.chunk!=animationViewerChunk_||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex||!ImGui::IsMouseDown(ImGuiMouseButton_Left)))vertexDrag.active=false;
   const float rawModelScaleX=model?static_cast<float>(model->scaleX)/(3200.0f*128.0f):1.0f/128.0f;
   const float rawModelScaleY=model?static_cast<float>(model->scaleY)/(3200.0f*128.0f):1.0f/128.0f;
   const float rawModelScaleZ=model?static_cast<float>(model->scaleZ)/(3200.0f*128.0f):1.0f/128.0f;
@@ -3407,9 +3407,10 @@ void EditorUI::drawAnimationViewer(){
    return AnimationPoint(0.0f,1.0f,0.0f);
   };
   auto beginVertexDrag=[&](int axis){
-   if(animationSelectedVertices_.empty()||animationPlaying_||poseFrameIndex<0)return false;
+   if(animationSelectedVertices_.empty()||animationPlaying_||poseFrameIndex<0||
+      (vertexToolMode==VertexToolMode::Scale&&animationSelectedVertices_.size()<2U))return false;
    vertexDrag=VertexDragState{};vertexDrag.active=true;vertexDrag.mode=static_cast<int>(vertexToolMode);
-   vertexDrag.axis=axis;vertexDrag.entry=animationViewerEntry_;vertexDrag.frame=poseFrameIndex;
+   vertexDrag.axis=axis;vertexDrag.chunk=animationViewerChunk_;vertexDrag.entry=animationViewerEntry_;vertexDrag.frame=poseFrameIndex;
    vertexDrag.mouseStart=io.MousePos;
    const auto pivot=selectedVertexPivot();vertexDrag.pivotX=pivot.x;vertexDrag.pivotY=pivot.y;vertexDrag.pivotZ=pivot.z;
    vertexDrag.pivotDepth=toCamera(pivot.x,pivot.y,pivot.z).depth;
@@ -3548,7 +3549,8 @@ void EditorUI::drawAnimationViewer(){
   if(animationFaceEditing_&&hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
    animationSelectedFace_=hoveredFace;animationPlaying_=false;
   }
-  if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove){
+  if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
+     (vertexToolMode!=VertexToolMode::Scale||animationSelectedVertices_.size()>=2U)){
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(center.x>-99999.0f){
     const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);
