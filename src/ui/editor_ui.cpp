@@ -3407,7 +3407,7 @@ void EditorUI::drawAnimationViewer(){
    return AnimationPoint(0.0f,1.0f,0.0f);
   };
   auto beginVertexDrag=[&](int axis){
-   if(animationSelectedVertices_.empty()||animationPlaying_||poseFrameIndex<0||
+   if(animationSelectedVertices_.empty()||poseFrameIndex<0||
       (vertexToolMode==VertexToolMode::Scale&&animationSelectedVertices_.size()<2U))return false;
    vertexDrag=VertexDragState{};vertexDrag.active=true;vertexDrag.mode=static_cast<int>(vertexToolMode);
    vertexDrag.axis=axis;vertexDrag.chunk=animationViewerChunk_;vertexDrag.entry=animationViewerEntry_;vertexDrag.frame=poseFrameIndex;
