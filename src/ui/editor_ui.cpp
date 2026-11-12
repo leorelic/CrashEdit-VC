@@ -2720,7 +2720,7 @@ void EditorUI::drawAnimationTimeline(){
   ImGui::End();return;
  }
  const auto&frames=animationEntry->animation.frames;
- const int lastFrame=static_cast<int>(frames.size()-1U);
+ int lastFrame=static_cast<int>(frames.size()-1U);
  ImGui::Text("%s",Crash::eidToEName(animationEntry->eid).c_str());
  ImGui::SameLine();ImGui::TextDisabled("%zu frames",frames.size());
  ImGui::SameLine();
@@ -2735,6 +2735,34 @@ void EditorUI::drawAnimationTimeline(){
  if(ImGui::SmallButton(">|")){animationPlaying_=false;animationFrame_=lastFrame;animationPlaybackFrame_=static_cast<double>(lastFrame);animationFrameTimer_=0.0f;}
  ImGui::SameLine();
  if(ImGui::SmallButton("Edit")){animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;}
+ ImGui::SameLine();
+ if(ImGui::SmallButton("Append")){
+  if(nsf_.appendAnimationFrame(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_))){
+   animationFrame_=static_cast<int>(frames.size()-1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   lastFrame=static_cast<int>(frames.size()-1U);status_="Appended a duplicate of the last animation frame.";
+  }else status_="Could not append an animation frame; the NSF chunk may not have enough free space.";
+ }
+ ImGui::SameLine();
+ if(ImGui::SmallButton("Insert")){
+  const std::size_t selected=static_cast<std::size_t>(std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U)));
+  if(nsf_.insertAnimationFrameAfter(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
+   animationFrame_=static_cast<int>(selected+1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   lastFrame=static_cast<int>(frames.size()-1U);status_="Inserted a duplicate immediately after the selected animation frame.";
+  }else status_="Could not insert an animation frame; the NSF chunk may not have enough free space.";
+ }
+ ImGui::SameLine();
+ if(frames.size()<=1U)ImGui::BeginDisabled();
+ if(ImGui::SmallButton("Delete")){
+  const std::size_t selected=static_cast<std::size_t>(std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U)));
+  if(nsf_.deleteAnimationFrame(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
+   animationFrame_=std::min(static_cast<int>(selected),static_cast<int>(frames.size()-1U));animationPlaybackFrame_=static_cast<double>(animationFrame_);
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   lastFrame=static_cast<int>(frames.size()-1U);status_="Deleted the selected animation frame.";
+  }else status_="Could not delete the selected animation frame.";
+ }
+ if(frames.size()<=1U)ImGui::EndDisabled();
  ImGui::SameLine();
  ImGui::Text("Frame %d / %d",animationFrame_+1,lastFrame+1);
  const double fractionalFrame=animationPlaybackFrame_-std::floor(animationPlaybackFrame_);
