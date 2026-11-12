@@ -14,10 +14,16 @@ public:
  void handleDroppedFiles(int count,const char** paths);
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
- void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawFaceEditor(); void drawFaceTextureSelector(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
+ void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawBoneRigEditor(); void drawFaceEditor(); void drawFaceTextureSelector(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
+ struct BoneRigBone { std::string name; std::vector<int> vertices; };
+ std::vector<BoneRigBone> boneRigBones_;
+ int boneRigSelectedBone_=-1;
+ std::uint32_t boneRigModelEid_=0;
+ char boneRigName_[64]="Bone";
+ bool boneRigWindowOpen_=true;
  bool chunkExpansionDialog_=false;
  int chunkExpansionOperation_=0,chunkExpansionSourceChunk_=-1,chunkExpansionSourceEntry_=-1;
  std::size_t chunkExpansionFrame_=0;
