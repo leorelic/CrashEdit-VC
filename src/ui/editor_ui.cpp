@@ -3237,7 +3237,7 @@ void EditorUI::drawAnimationViewer(){
  bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false;
  if(showVertexTransformToolbar){
   ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
-  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag selected vertices or collision points in the view plane");
+  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag the selected collision face in the view plane");
   ImGui::SetCursorScreenPos(axisMoveMin);const bool axisMoveClicked=ImGui::InvisibleButton("##AnimationAxisMove",ImVec2(28.0f,26.0f));axisMoveHovered=ImGui::IsItemHovered();
   if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip("Axis Move — drag X/Y/Z gizmo handles for the selected points");
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
@@ -3933,68 +3933,52 @@ void EditorUI::drawAnimationViewer(){
    const char*message=!model?"No linked Model was found.":!model->polygonError.empty()?model->polygonError.c_str():"No triangles to display.";
    dl->AddText(ImVec2(canvasMin.x+16.0f,canvasMin.y+18.0f),IM_COL32(190,198,210,255),message);
   }
- // Match CrashEdit-RE: collision bounds use their own 102400-unit scale and
- // are positioned from the frame collision offset, independently of model scale.
+ // Draw each collision as a selectable rectangular volume. Selection is per face,
+ // not per corner: a face is one stored min/max boundary shared by four corners.
  if(animationCollisionViewer_&&animationWireframe_&&!frame.collisions.empty()){
-  constexpr float collisionScale=102400.0f;
-  const ImU32 collisionFill=IM_COL32(0,255,0,42);
-  const ImU32 collisionLine=IM_COL32(0,255,0,255);
-  const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
   const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
-  auto drawCollisionLine=[&](CameraPoint a,CameraPoint b){
-   constexpr float nearDepth=0.1f;
-   if(a.depth<=nearDepth&&b.depth<=nearDepth)return;
-   if(a.depth<=nearDepth||b.depth<=nearDepth){
-    const float t=(nearDepth-a.depth)/(b.depth-a.depth);
-    const CameraPoint clipped{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,nearDepth};
-    if(a.depth<=nearDepth)a=clipped;else b=clipped;
+  for(std::size_t ci=0;ci<frame.collisions.size();++ci){
+   CameraPoint corners[8];for(int corner=0;corner<8;++corner){const auto p=collisionPointPosition(static_cast<int>(ci),corner);corners[corner]=toCamera(p.x,p.y,p.z);}
+   for(int face=0;face<6;++face){
+    ImVec2 polygon[4];bool visible=true;
+    for(int k=0;k<4;++k){const auto&cam=corners[collisionFaceCorners[face][k]];if(cam.depth<=0.1f){visible=false;break;}polygon[k]=projectCamera(cam);}
+    if(!visible)continue;
+    const bool selected=collisionFaceSelected(static_cast<int>(ci),face),hot=hoveredCollisionIndex==static_cast<int>(ci)&&hoveredCollisionFace==face;
+    dl->AddConvexPolyFilled(polygon,4,selected?IM_COL32(35,220,105,105):hot?IM_COL32(255,65,65,90):IM_COL32(0,255,0,32));
+    if(selected||hot){const ImU32 outline=selected?IM_COL32(245,255,245,255):IM_COL32(255,100,100,255);for(int k=0;k<4;++k)dl->AddLine(polygon[k],polygon[(k+1)%4],outline,3.0f);}
    }
-   dl->AddLine(projectCamera(a),projectCamera(b),collisionLine,3.0f);
-  };
-  for(const auto&collision:frame.collisions){
-   const float x1=(static_cast<float>(collision.values[4])+static_cast<float>(collision.values[1]))/collisionScale;
-   const float y1=(static_cast<float>(collision.values[5])+static_cast<float>(collision.values[2]))/collisionScale;
-   const float z1=(static_cast<float>(collision.values[6])+static_cast<float>(collision.values[3]))/collisionScale;
-   const float x2=(static_cast<float>(collision.values[7])+static_cast<float>(collision.values[1]))/collisionScale;
-   const float y2=(static_cast<float>(collision.values[8])+static_cast<float>(collision.values[2]))/collisionScale;
-   const float z2=(static_cast<float>(collision.values[9])+static_cast<float>(collision.values[3]))/collisionScale;
-   const CameraPoint corners[8]={
-    toCamera(x1,y1,z1),toCamera(x2,y1,z1),toCamera(x1,y2,z1),toCamera(x2,y2,z1),
-    toCamera(x1,y1,z2),toCamera(x2,y1,z2),toCamera(x1,y2,z2),toCamera(x2,y2,z2)
-   };
-   for(const auto&face:boxFaces){
-    bool visible=true;ImVec2 points[4];
-    for(int i=0;i<4;++i){const auto&corner=corners[face[i]];if(corner.depth<=0.1f){visible=false;break;}points[i]=projectCamera(corner);}
-    if(visible)dl->AddConvexPolyFilled(points,4,collisionFill);
-   }
-   for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
-   for(int cornerIndex=0;cornerIndex<8;++cornerIndex){const auto&corner=corners[cornerIndex];if(corner.depth<=0.1f)continue;const int ci=static_cast<int>(&collision-&frame.collisions[0]);const bool selected=collisionFaceSelected(ci,cornerIndex),hot=hoveredCollisionIndex==ci&&hoveredCollisionFace==cornerIndex;const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):collisionLine;dl->AddCircleFilled(projectCamera(corner),selected?5.5f:4.0f,color,12);if(selected)dl->AddCircle(projectCamera(corner),7.0f,IM_COL32(245,245,245,255),12,1.2f);}
+   for(const auto&edge:boxEdges){const auto&a=corners[edge[0]],&b=corners[edge[1]];if(a.depth>0.1f&&b.depth>0.1f)dl->AddLine(projectCamera(a),projectCamera(b),IM_COL32(0,255,0,255),3.0f);}
   }
  }
- // In textured mode the collision geometry is rendered into the GPU viewport.
- // Add screen-space point markers afterward so hover and selection feedback stays
- // visible and clickable in both textured and wireframe viewing modes.
+ // Textured rendering draws collision geometry inside the GPU framebuffer. Overlay
+ // only the active face here so the same selection feedback is available in both modes.
  if(animationCollisionViewer_&&!animationWireframe_&&!frame.collisions.empty()){
-  ImDrawList*collisionOverlay=ImGui::GetForegroundDrawList();
-  collisionOverlay->PushClipRect(canvasMin,canvasMax,true);
-  for(std::size_t ci=0;ci<frame.collisions.size();++ci){
-   for(int corner=0;corner<8;++corner){
-    const auto point=collisionPointPosition(static_cast<int>(ci),corner);
-    const auto camera=toCamera(point.x,point.y,point.z);
-    if(camera.depth<=0.1f)continue;
-    const ImVec2 screen=projectCamera(camera);
-    const bool selected=collisionSelected(static_cast<int>(ci),corner);
-    const bool hot=hoveredCollisionIndex==static_cast<int>(ci)&&hoveredCollisionCorner==corner;
-    const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):IM_COL32(0,255,0,255);
-    collisionOverlay->AddCircleFilled(screen,selected?5.5f:hot?5.0f:4.0f,color,12);
-    if(selected)collisionOverlay->AddCircle(screen,7.5f,IM_COL32(245,245,245,255),12,1.2f);
-   }
+  ImDrawList*collisionOverlay=ImGui::GetForegroundDrawList();collisionOverlay->PushClipRect(canvasMin,canvasMax,true);
+  for(const auto&q:selectedCollisionFaces){
+   if(q.first<0||static_cast<std::size_t>(q.first)>=frame.collisions.size()||q.second<0||q.second>=6)continue;
+   ImVec2 polygon[4];bool visible=true;
+   for(int k=0;k<4;++k){const auto p=collisionPointPosition(q.first,collisionFaceCorners[q.second][k]);const auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f){visible=false;break;}polygon[k]=projectCamera(cam);}
+   if(visible){collisionOverlay->AddConvexPolyFilled(polygon,4,IM_COL32(35,220,105,95));for(int k=0;k<4;++k)collisionOverlay->AddLine(polygon[k],polygon[(k+1)%4],IM_COL32(245,255,245,255),3.0f);}
+  }
+  if(hoveredCollisionIndex>=0&&hoveredCollisionFace>=0&&!collisionFaceSelected(hoveredCollisionIndex,hoveredCollisionFace)){
+   ImVec2 polygon[4];bool visible=true;
+   for(int k=0;k<4;++k){const auto p=collisionPointPosition(hoveredCollisionIndex,collisionFaceCorners[hoveredCollisionFace][k]);const auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f){visible=false;break;}polygon[k]=projectCamera(cam);}
+   if(visible){collisionOverlay->AddConvexPolyFilled(polygon,4,IM_COL32(255,65,65,75));for(int k=0;k<4;++k)collisionOverlay->AddLine(polygon[k],polygon[(k+1)%4],IM_COL32(255,100,100,255),2.5f);}
   }
   collisionOverlay->PopClipRect();
  }
- 
- if(animationCollisionViewer_&&!selectedCollisionPoints.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&(vertexToolMode!=VertexToolMode::Scale||selectedCollisionPoints.size()>=2U)){
-  auto p=collisionPivot();auto center=project(p.x,p.y,p.z);if(center.x>-99999.0f){auto*d=ImGui::GetForegroundDrawList();d->PushClipRect(canvasMin,canvasMax,true);float len=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);if(vertexToolMode==VertexToolMode::AxisMove){const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};const char*names[3]={"X","Y","Z"};for(int a=0;a<3;++a){auto v=axisWorldVector(a);auto end=project(p.x+v.x*len,p.y+v.y*len,p.z+v.z*len);d->AddLine(center,end,colors[a],3);d->AddCircleFilled(end,5,colors[a],12);d->AddText(ImVec2(end.x+5,end.y-7),colors[a],names[a]);}}else{d->AddCircle(center,20,IM_COL32(235,190,70,230),32,2.5f);d->AddCircleFilled(ImVec2(center.x+14,center.y-14),5,IM_COL32(255,205,80,255),12);}d->PopClipRect();}
+ if(animationCollisionViewer_&&!selectedCollisionFaces.empty()&&vertexToolMode!=VertexToolMode::FreeMove){
+  const auto pivot=collisionPivot();const auto center=project(pivot.x,pivot.y,pivot.z);
+  if(center.x>-99999.0f){
+   auto*d=ImGui::GetForegroundDrawList();d->PushClipRect(canvasMin,canvasMax,true);
+   const float len=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);
+   if(vertexToolMode==VertexToolMode::AxisMove){
+    const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};const char*names[3]={"X","Y","Z"};
+    bool allowed[3]={false,false,false};for(const auto&face:selectedCollisionFaces)allowed[collisionFaceAxis(face.second)]=true;
+    for(int axis=0;axis<3;++axis)if(allowed[axis]){const auto v=axisWorldVector(axis);const auto end=project(pivot.x+v.x*len,pivot.y+v.y*len,pivot.z+v.z*len);d->AddLine(center,end,colors[axis],3.0f);d->AddCircleFilled(end,5.0f,colors[axis],12);d->AddText(ImVec2(end.x+5.0f,end.y-7.0f),colors[axis],names[axis]);}
+   }else{d->AddCircle(center,20.0f,IM_COL32(235,190,70,230),32,2.5f);d->AddCircleFilled(ImVec2(center.x+14.0f,center.y-14.0f),5.0f,IM_COL32(255,205,80,255),12);}
+   d->PopClipRect();
+  }
  }
  // Transform handles are a true viewport overlay: draw them after the model,
  // collision geometry, and depth-tested GPU image so they remain unobscured.
@@ -4028,7 +4012,7 @@ void EditorUI::drawAnimationViewer(){
   "Mouse Wheel - Zoom camera",
   "W / A / S / D - Move camera",
   "Q / E - Move camera down / up",
-  "Shift + Click - Select multiple points",
+  "Shift + Click - Select multiple collision faces",
   "C - Toggle collision display",
   "V - Toggle vertices",
   "X - Toggle wireframe",
