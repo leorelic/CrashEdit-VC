@@ -148,3 +148,61 @@ All future format and UI comparisons in this roadmap use CrashEdit-RE's t/net br
 
 
 **Real-game texture-mod validation (2026-11-12):** the user confirmed a complete TNT Box workflow: edit the face texture in CrashEdit-VC, save the NSF, reopen it successfully in CrashEdit-RE, and load it in the original Crash Bandicoot 2 game. The in-game screenshot confirms the modified box textures render correctly. This is a targeted real-archive/game compatibility result for the tested face-texture edit; it does not yet establish compatibility for every model or color mode. See the end-to-end milestone in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+
+---
+
+## NSF chunk capacity and whole-entry relocation — 2026-11-12
+
+### Confirmed container layout
+
+CrashEdit-VC decodes each NSF chunk to a fixed **64 KiB** byte buffer. A normal entry chunk has type \`0\` in the 16-bit field at byte offset 2. Its header fields used by the current parser are:
+
+| Offset | Size | Meaning |
+|---:|---:|---|
+| \`0x00\` | 2 | Chunk magic (\`0x1234\` for a raw chunk; \`0x1235\` for compressed input) |
+| \`0x02\` | 2 | Chunk type |
+| \`0x04\` | 4 | Chunk ID field |
+| \`0x08\` | 4 | Entry count for type-0 chunks |
+| \`0x0C\` | 4 | Retained header/reserved bytes |
+| \`0x10\` | \`4 * (count + 1)\` | Entry-offset table, including the terminal used-data offset |
+
+The type-0 offset table therefore ends at \`20 + 4 * entryCount\`. Each entry begins with the \`0x0100FFFF\` entry marker, followed by its EID, entry type, item count, and an item-offset table. Entry/item offsets are checked against their containing boundaries by the native parser.
+
+A type-1 texture page is not an entry inside this table; it is a separate chunk type. Do not move a type-1 texture chunk using the type-0 entry relocation path.
+
+### Why frame insertion can fail
+
+Animation entries are variable-size entry blocks. Their item table grows when a frame is appended or inserted, and the selected frame's complete raw item bytes are duplicated. Rebuilding the item table can enlarge the entry; the entry's new size shifts subsequent entries and advances the chunk's terminal used-data offset. The operation must fit all of the following inside the same 64 KiB chunk:
+
+- the enlarged type-0 entry-offset table;
+- the entry's enlarged frame-item-offset table;
+- any retained prefix padding before the first item;
+- every frame payload, including the duplicated frame;
+- retained trailing padding; and
+- all following entry blocks and the chunk's terminal used-data boundary.
+
+A frame edit must not silently truncate an entry, overwrite a following resource, or simply increase the chunk buffer beyond 64 KiB.
+
+### Implemented relocation behavior
+
+The 2026-11-12 implementation adds a capacity preflight for Animation Append/Insert and a generic \`moveEntryToNewChunk\` operation for valid entries in normal type-0 chunks.
+
+When the preflight proves the requested edit cannot fit:
+
+1. The UI asks whether to create a new chunk and move the complete entry.
+2. Cancel leaves the archive unchanged.
+3. Confirmation first works on a candidate archive copy, so validation failure does not partially mutate the live archive.
+4. The selected raw entry block is copied in full to a new normal type-0 chunk. Its EID, entry type, item data, and entry-internal offsets are retained.
+5. The original chunk is rebuilt with its remaining entries, updated entry count and offset table, while preserving its original header bytes, prefix padding, complete remaining entry blocks, and unused tail bytes.
+6. Both rebuilt chunks are decoded and their entry tables validated before the candidate replaces the live archive.
+7. The selected resource location is changed to the new chunk, then the original Append/Insert operation is retried against the relocated entry.
+8. GOOL, zone, and Animation/Model decoded structures are refreshed where their decoders had been active.
+
+The new chunk is currently emitted as a raw \`0x1234\`, type-0 chunk with one entry, a 24-byte initial entry offset, and a terminal offset immediately after the copied entry. Its Chunk ID field is currently written as zero; this is an implementation choice, not a proven universal Chunk ID allocation rule. The meaning/uniqueness requirements of nonzero Chunk ID values in normal type-0 chunks remain a separate research question. Do not invent a \`max ChunkId + 1\` rule without evidence.
+
+### Verification and remaining coverage
+
+- Synthetic regression coverage fills the source chunk close to its 64 KiB boundary, forces relocation, verifies the untouched following entry remains valid, checks retained trailing bytes, appends the duplicated frame, saves, reloads, and checks the resulting EID/type/frame count.
+- GitHub Actions workflow [#1020](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834) passed its build and test jobs on Windows, Ubuntu 22.04, and macOS.
+- User validation: the user confirmed the new expansion workflow works as intended in CrashEdit-VC on 2026-11-12.
+- Further research/testing: inspect Chunk ID values across a broader set of retail NSF files; validate relocation of additional entry types and cross-resource references; test save/reopen and retail-game loading for archives that actually gained a chunk. Current user validation is not a claim that every entry type or every expanded archive has been tested in the original game.
