@@ -278,14 +278,14 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 ### 2. Multi-vertex selection and editing
 
 - [x] Support Shift-click selection and deselection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
-- [x] Add visible vertex-edit toolbar modes beside the existing viewport controls:
+- [ ] Add visible vertex-edit toolbar modes beside the existing viewport controls (implemented; pending user interaction validation):
   - **Free movement:** drag selected vertices in the camera view plane.
   - **Axis movement:** display X/Y/Z gizmo axes and constrain movement to the selected axis.
   - **Scale:** drag the scale handle to scale selected vertices symmetrically around their shared center.
 - [x] Keep the existing numeric vertex controls as a precise fallback; editing a selected coordinate applies the same relative offset to every selected vertex, with a copied-archive preflight before live writes.
-- [x] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block.
+- [ ] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block (implemented; pending user interaction validation).
 - [x] Confirm the Crash 2 frame coordinate representation: observed animation vertex coordinates stay within 0–254, regardless of the object's apparent in-game size. Enforce 0–254 for Crash 2 writes; keep Crash 3's separate byte-space behavior unchanged pending its own research. Compressed-model temporal deltas impose additional per-vertex bit-width limits. Do not widen, clamp or wrap coordinates.
-- [x] Preserve the existing per-frame vertex encoding and re-decode the edited frame after each committed transform. Drag transforms are calculated from the immutable positions captured at drag start and submitted through the atomic batch setter; unrepresentable edits are rejected without partial writes.
+- [ ] Preserve the existing per-frame vertex encoding and re-decode the edited frame after each committed transform. Drag transforms are calculated from the immutable positions captured at drag start and submitted through the atomic batch setter; unrepresentable edits are rejected without partial writes (implemented; pending user interaction validation).
 
 ### 3. Collision editing
 
