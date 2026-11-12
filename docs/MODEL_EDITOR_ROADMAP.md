@@ -277,13 +277,13 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 
 ### 2. Multi-vertex selection and editing
 
-- [ ] Support Shift-click selection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
+- [x] Support Shift-click selection and deselection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
 - [ ] Add two visible vertex-edit toolbar modes beside the existing viewport controls:
   - **Free movement:** drag selected vertices freely in 3D.
   - **Axis movement:** display X/Y/Z gizmo axes and constrain movement or scaling to the selected axis.
-- [ ] Keep the existing numeric vertex controls as a precise fallback.
+- [x] Keep the existing numeric vertex controls as a precise fallback; editing a selected coordinate applies the same relative offset to every selected vertex, with a copied-archive preflight before live writes.
 - [ ] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block.
-- [ ] Investigate the existing 0–254 numeric range before changing it. Determine whether it reflects the Crash 2 encoded coordinate representation, a local face/offset representation, or only a UI restriction. Do not remove the range until the underlying encoding and save path are understood.
+- [x] Confirm the Crash 2 frame coordinate representation: decoded animation coordinates are byte values (0–255), and compressed-model temporal deltas impose additional per-vertex bit-width limits. Keep those encoding constraints enforced; do not widen or wrap coordinates.
 - [ ] Preserve the existing per-frame Crash 2 vertex encoding and re-decode the edited frame after each committed transform.
 
 ### 3. Collision editing

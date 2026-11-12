@@ -424,7 +424,7 @@ void EditorUI::draw(){
      animationViewerChunk_=static_cast<int>(destinationChunk);animationViewerEntry_=0;
      animationSelectionChunk_=static_cast<int>(destinationChunk);animationSelectionEntry_=0;
      animationPlaying_=false;animationFrameTimer_=0.0f;
-     animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+     animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationSelectedVertices_.clear();
      const auto&updatedFrames=nsf_.chunks()[destinationChunk].entries[0].animation.frames;
      animationFrame_=chunkExpansionOperation_==1?static_cast<int>(updatedFrames.size()-1U):static_cast<int>(chunkExpansionFrame_+1U);
      animationPlaybackFrame_=static_cast<double>(animationFrame_);
@@ -2779,7 +2779,7 @@ void EditorUI::drawAnimationTimeline(){
  if(ImGui::SmallButton("Append")){
   if(nsf_.appendAnimationFrame(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_))){
    animationFrame_=static_cast<int>(frames.size()-1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
-   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationSelectedVertices_.clear();
    lastFrame=static_cast<int>(frames.size()-1U);status_="Appended a duplicate of the last animation frame.";
   }else if(nsf_.animationFrameEditNeedsNewChunk(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),frames.size()-1U)){
    chunkExpansionDialog_=true;chunkExpansionOperation_=1;chunkExpansionSourceChunk_=animationViewerChunk_;chunkExpansionSourceEntry_=animationViewerEntry_;chunkExpansionFrame_=frames.size()-1U;
@@ -2790,7 +2790,7 @@ void EditorUI::drawAnimationTimeline(){
   const std::size_t selected=static_cast<std::size_t>(std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U)));
   if(nsf_.insertAnimationFrameAfter(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
    animationFrame_=static_cast<int>(selected+1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
-   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationSelectedVertices_.clear();
    lastFrame=static_cast<int>(frames.size()-1U);status_="Inserted a duplicate immediately after the selected animation frame.";
   }else if(nsf_.animationFrameEditNeedsNewChunk(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
    chunkExpansionDialog_=true;chunkExpansionOperation_=2;chunkExpansionSourceChunk_=animationViewerChunk_;chunkExpansionSourceEntry_=animationViewerEntry_;chunkExpansionFrame_=selected;
@@ -2802,7 +2802,7 @@ void EditorUI::drawAnimationTimeline(){
   const std::size_t selected=static_cast<std::size_t>(std::clamp(animationFrame_,0,static_cast<int>(frames.size()-1U)));
   if(nsf_.deleteAnimationFrame(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
    animationFrame_=std::min(static_cast<int>(selected),static_cast<int>(frames.size()-1U));animationPlaybackFrame_=static_cast<double>(animationFrame_);
-   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+   animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationSelectedVertices_.clear();
    lastFrame=static_cast<int>(frames.size()-1U);status_="Deleted the selected animation frame.";
   }else status_="Could not delete the selected animation frame.";
  }
@@ -2914,8 +2914,11 @@ void EditorUI::drawAnimationFrameEditor(){
   ImGui::Text("Selected Vertex");
   if(animationSelectedVertex_>=0&&static_cast<std::size_t>(animationSelectedVertex_)<frame.vertices.size()){
    const auto selectedVertex=frame.vertices[static_cast<std::size_t>(animationSelectedVertex_)];
+   if(animationSelectedVertices_.empty())animationSelectedVertices_.push_back(animationSelectedVertex_);
    ImGui::Text("Vertex Index: %d",animationSelectedVertex_);
+   if(animationSelectedVertices_.size()>1U)ImGui::TextDisabled("%zu vertices selected — Shift-click points to add or remove",animationSelectedVertices_.size());
    int vertexValues[3]={selectedVertex.x,selectedVertex.y,selectedVertex.z};
+   const int selectedCoordinate[3]={selectedVertex.x,selectedVertex.y,selectedVertex.z};
    const char*axisLabels[3]={"X","Y","Z"};
    const float vertexFieldWidth=ImGui::GetContentRegionAvail().x;
    for(std::size_t axis=0;axis<3U;++axis){
@@ -2923,7 +2926,22 @@ void EditorUI::drawAnimationFrameEditor(){
     ImGui::TextUnformatted(axisLabels[axis]);
     ImGui::SetNextItemWidth(vertexFieldWidth);
     if(ImGui::InputInt("##VertexCoordinate",&vertexValues[axis])){
-     if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(animationSelectedVertex_),axis,vertexValues[axis]))status_="Vertex value cannot be represented by this frame's packed temporal format.";
+     const int delta=vertexValues[axis]-selectedCoordinate[axis];
+     Crash::NsfArchive candidate=nsf_;
+     bool representable=true;
+     for(const int selectedIndex:animationSelectedVertices_){
+      if(selectedIndex<0||static_cast<std::size_t>(selectedIndex)>=frame.vertices.size()){representable=false;break;}
+      const auto&source=frame.vertices[static_cast<std::size_t>(selectedIndex)];
+      const int original=axis==0U?source.x:axis==1U?source.y:source.z;
+      if(!candidate.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(selectedIndex),axis,original+delta)){representable=false;break;}
+     }
+     if(representable){
+      for(const int selectedIndex:animationSelectedVertices_){
+       const auto&source=frame.vertices[static_cast<std::size_t>(selectedIndex)];
+       const int original=axis==0U?source.x:axis==1U?source.y:source.z;
+       if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(selectedIndex),axis,original+delta)){status_="A selected vertex could not be encoded; the multi-vertex edit was stopped.";break;}
+      }
+     }else status_="The multi-vertex edit is outside the 0–255 coordinate range or cannot be represented by the selected temporal deltas.";
     }
     ImGui::PopID();
    }
@@ -3340,8 +3358,19 @@ void EditorUI::drawAnimationViewer(){
     if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);}
    }
   }
+  auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
-   animationSelectedVertex_=hoveredVertex;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
+   if(io.KeyShift){
+    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
+    if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);
+    else if(animationSelectedVertices_.size()>1U)animationSelectedVertices_.erase(selectedIt);
+   }else{
+    animationSelectedVertices_.clear();
+    animationSelectedVertices_.push_back(hoveredVertex);
+   }
+   if(animationSelectedVertices_.empty())animationSelectedVertices_.push_back(hoveredVertex);
+   animationSelectedVertex_=isAnimationVertexSelected(hoveredVertex)?hoveredVertex:animationSelectedVertices_.back();
+   animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
   }
   int hoveredFace=-1;float nearestFaceDepth=std::numeric_limits<float>::max();
   if(animationFaceEditing_&&hovered&&!viewportToolbarOwnsMouse&&model&&model->polygonsDecoded){
@@ -3416,7 +3445,7 @@ void EditorUI::drawAnimationViewer(){
     if(animationShowVertices_&&frame.verticesDecoded){
      for(std::size_t vi=0;vi<displayPositions.size();++vi){
       if(!visible[vi])continue;
-      const ImU32 color=static_cast<int>(vi)==animationSelectedVertex_?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
+      const ImU32 color=isAnimationVertexSelected(static_cast<int>(vi))?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
       dl->AddCircleFilled(projected[vi],6.0f,color,16);
       dl->AddCircle(projected[vi],7.0f,IM_COL32(20,24,30,255),16,1.5f);
      }
@@ -3621,7 +3650,7 @@ void EditorUI::drawAnimationViewer(){
         const CameraPoint cam=toCamera(position.x,position.y,position.z);if(cam.depth<=0.05f)continue;
         constexpr float nearP=.05f,farP=200.0f;
         const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
-        const ImU32 color=static_cast<int>(vi)==animationSelectedVertex_?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
+        const ImU32 color=isAnimationVertexSelected(static_cast<int>(vi))?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
         vertexPoints.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),1.0f,0.0f,0.0f,1.0f});
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
