@@ -3384,7 +3384,7 @@ void EditorUI::drawAnimationViewer(){
   // Mouse transforms are kept local to the viewport and always derive from
   // the immutable vertex snapshot captured at drag start. This avoids
   // cumulative quantization while editing compressed temporal streams.
-  if(vertexDrag.active&&(vertexDrag.chunk!=animationViewerChunk_||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex||!ImGui::IsMouseDown(ImGuiMouseButton_Left)))vertexDrag.active=false;
+  if(vertexDrag.active&&(vertexDrag.chunk!=animationViewerChunk_||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex))vertexDrag.active=false;
   const float rawModelScaleX=model?static_cast<float>(model->scaleX)/(3200.0f*128.0f):1.0f/128.0f;
   const float rawModelScaleY=model?static_cast<float>(model->scaleY)/(3200.0f*128.0f):1.0f/128.0f;
   const float rawModelScaleZ=model?static_cast<float>(model->scaleZ)/(3200.0f*128.0f):1.0f/128.0f;
@@ -3508,8 +3508,9 @@ void EditorUI::drawAnimationViewer(){
    }
    if(canStart)vertexDragStarted=beginVertexDrag(dragAxis);
   }
-  if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
-  if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left))vertexDrag.active=false;
+  if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
+  else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
+  else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
   if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&
      (vertexToolMode==VertexToolMode::FreeMove||!isAnimationVertexSelected(hoveredVertex))){
    if(io.KeyShift){
