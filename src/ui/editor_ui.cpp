@@ -1605,6 +1605,7 @@ void EditorUI::drawViewport(){
  // own right-aligned line. Use ASCII separators for font compatibility.
  const char*viewerHelpLines[]={
   "Left Mouse - Orbit camera",
+  "Shift + Click - Select multiple points",
   "Right Mouse - Pan camera",
   "Mouse Wheel - Zoom camera",
   "W / A / S / D - Move camera relative to view",
@@ -3237,11 +3238,11 @@ void EditorUI::drawAnimationViewer(){
  bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false;
  if(showVertexTransformToolbar){
   ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
-  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag selected vertices in the view plane");
+  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag selected vertices or collision points in the view plane");
   ImGui::SetCursorScreenPos(axisMoveMin);const bool axisMoveClicked=ImGui::InvisibleButton("##AnimationAxisMove",ImVec2(28.0f,26.0f));axisMoveHovered=ImGui::IsItemHovered();
-  if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip("Axis Move — drag X/Y/Z gizmo handles");
+  if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip("Axis Move — drag X/Y/Z gizmo handles for the selected points");
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
-  if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip("Scale — drag to scale selected vertices symmetrically around their center");
+  if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip("Scale — drag to scale selected points symmetrically around their center");
  }
  const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
