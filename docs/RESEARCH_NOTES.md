@@ -267,14 +267,14 @@ The Animation Timeline's existing circle-dot presentation and Append/Insert/Dele
 ### Container facts confirmed in the native parser
 
 - NSF chunks decode to fixed 64 KiB buffers.
-- Type-0 chunks contain a count and an offset table at byte offset \`0x10\`; the table has one terminal offset in addition to the per-entry offsets.
+- Type-0 chunks contain a count and an offset table at byte offset `0x10`; the table has one terminal offset in addition to the per-entry offsets.
 - Each entry contains its own EID, type, item count, and item-offset table. Item offsets are relative to the entry block.
 - Texture pages use chunk type 1 and are not type-0 entries.
 - A growing Animation entry can force the containing type-0 chunk's terminal used-data offset beyond 64 KiB even though the frame-item data itself is valid.
 
 ### Relocation implementation
 
-Commit [\`c200773\`](https://github.com/leorelic/CrashEdit-VC/commit/c200773d4354096dcd84805b8868d1b0f8f8bb15) adds:
+Commit [`c200773`](https://github.com/leorelic/CrashEdit-VC/commit/c200773d4354096dcd84805b8868d1b0f8f8bb15) adds:
 - A preflight that calculates whether duplicating the selected frame can fit after accounting for item-table growth, payload bytes, entry padding, the entry's current position, and the chunk used-data boundary.
 - A confirmation prompt before moving an entry.
 - Candidate-copy relocation of the complete raw entry into a new normal type-0 chunk.
@@ -283,33 +283,33 @@ Commit [\`c200773\`](https://github.com/leorelic/CrashEdit-VC/commit/c200773d435
 - Selection/resource-location refresh and automatic retry of the requested Append or Insert.
 - A synthetic regression fixture that forces the overflow, checks the other entry and retained tail bytes, and verifies append plus save/reload.
 
-The new type-0 chunk is currently written with Chunk ID \`0\`. This is an explicit implementation value, not a general rule for allocating IDs; broader retail-file analysis is still needed to establish whether that field has additional semantics. The relocation API accepts normal type-0 entries, but the current user-facing overflow prompt is connected to Animation Append/Insert.
+The new type-0 chunk is currently written with Chunk ID `0`. This is an explicit implementation value, not a general rule for allocating IDs; broader retail-file analysis is still needed to establish whether that field has additional semantics. The relocation API accepts normal type-0 entries, but the current user-facing overflow prompt is connected to Animation Append/Insert.
 
-**Verification:** user confirmed the workflow works as intended. GitHub Actions workflow [#1020](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834) completed successful build and test jobs for Windows, Ubuntu 22.04, and macOS. Additional entry types and retail-game loading of an expanded archive remain future validation.
+**Verification:** user confirmed the workflow works as intended. GitHub Actions workflow [workflow run](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834) completed successful build and test jobs for Windows, Ubuntu 22.04, and macOS. Additional entry types and retail-game loading of an expanded archive remain future validation.
 
 ## TNT Box animation / GOOL relationship research — paused pending GOOL milestone
 
 The original, unmodified TNT Box resources are sufficient to research the resource relationships; no modified animation sample is required.
 
-Sample resources recorded in \`CrashEdit-VC-Game-Samples\`:
-- \`entry_13_2_BoxsC.bin\` — BoxSC GOOL executable.
-- \`entry_3_0_BT10G.bin\` — TNT Box Model.
-- \`entry_3_1_BT10V.bin\` — original BT10V Animation (one frame, intentionally unmodified).
+Sample resources recorded in `CrashEdit-VC-Game-Samples`:
+- `entry_13_2_BoxsC.bin` — BoxSC GOOL executable.
+- `entry_3_0_BT10G.bin` — TNT Box Model.
+- `entry_3_1_BT10V.bin` — original BT10V Animation (one frame, intentionally unmodified).
 
 ### Confirmed observations
 
 - BoxSC contains 36 state descriptors. All 36 have Code hook locations; there are 33 unique Code-hook instruction locations.
-- 14 Event-hook slots are absent (\`0x3FFF\`); the remaining descriptors refer to 16 unique Event-hook locations.
+- 14 Event-hook slots are absent (`0x3FFF`); the remaining descriptors refer to 16 unique Event-hook locations.
 - Five Transition-hook slots are absent; the remaining descriptors refer to five unique Transition-hook locations.
 - All 36 descriptors refer to GOOL index 0.
-- The instruction stream contains 2,764 words. The observed counts include 32 \`GO\`, eight \`GNEZ\`, and one \`GEQZ\`; these instructions collectively reference 17 different descriptor indices.
-- The stream contains 63 \`ANIM\` and 40 \`ANIF\` instructions. Their operands and runtime invocation semantics are not sufficiently established to infer a complete animation state machine.
+- The instruction stream contains 2,764 words. The observed counts include 32 `GO`, eight `GNEZ`, and one `GEQZ`; these instructions collectively reference 17 different descriptor indices.
+- The stream contains 63 `ANIM` and 40 `ANIF` instructions. Their operands and runtime invocation semantics are not sufficiently established to infer a complete animation state machine.
 - The BoxSC frame-group data references BT10V, and BT10V references BT10G. The uploaded BT10V is the original unmodified animation and is intentionally retained as the relationship sample.
 
-These counts are sample observations, not a complete interpretation of BoxSC's state machine. In particular, do not infer transition direction or runtime meaning from descriptor order, hook indices, or the \`GO\`/\`GNEZ\`/\`GEQZ\` counts alone.
+These counts are sample observations, not a complete interpretation of BoxSC's state machine. In particular, do not infer transition direction or runtime meaning from descriptor order, hook indices, or the `GO`/`GNEZ`/`GEQZ` counts alone.
 
 ### Decision and next step
 
-The temporary GOOL State Machine viewer experiment is paused. Keep the existing State Descriptions and GOOL Inspector unchanged; do not build a throwaway viewer or modify the decompiler/Script Editor solely to investigate the TNT Box animation. The resource-link relationship is documented, but explaining why a newly created animation is or is not played by the retail game requires tracing the relevant \`ANIM\`/\`ANIF\` behavior and GOOL execution. Resume this investigation when the planned GOOL decompilation / readable GOOL Script work is ready to handle those semantics. Continue the independent Animation/Model editor roadmap in the meantime.
+The temporary GOOL State Machine viewer experiment is paused. Keep the existing State Descriptions and GOOL Inspector unchanged; do not build a throwaway viewer or modify the decompiler/Script Editor solely to investigate the TNT Box animation. The resource-link relationship is documented, but explaining why a newly created animation is or is not played by the retail game requires tracing the relevant `ANIM`/`ANIF` behavior and GOOL execution. Resume this investigation when the planned GOOL decompilation / readable GOOL Script work is ready to handle those semantics. Continue the independent Animation/Model editor roadmap in the meantime.
 
 This pause does not mean the original BT10V is inadequate or that it should be modified. It is the correct unmodified reference sample for the current resource-relationship investigation.

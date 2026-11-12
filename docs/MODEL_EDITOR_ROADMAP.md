@@ -270,14 +270,14 @@ This is the agreed implementation order for the next stage of Crash 2 animation/
 - [x] Preserve complete raw entry data, frame payloads, and retained padding; validate the rebuilt source and destination chunks before committing the change in memory.
 - [x] Update the selected resource location and animation editor after relocation.
 - [x] Add a synthetic regression fixture covering a nearly full chunk, following-entry preservation, trailing padding, append-after-relocation, and save/reload.
-- [x] User-confirmed working in CrashEdit-VC. GitHub Actions build and test jobs passed on Windows, Ubuntu 22.04, and macOS (workflow [#1020](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834)).
+- [x] User-confirmed working in CrashEdit-VC. GitHub Actions build and test jobs passed on Windows, Ubuntu 22.04, and macOS (workflow [workflow run](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834)).
 - [ ] Exercise relocation with additional entry types and representative real archives; validate game loading for expanded archives before treating every resource type as proven safe.
 
 The archive relocation API is generic for valid entries in normal type-0 chunks, while the current capacity preflight and confirmation workflow is connected to Animation Append/Insert. See the NSF chunk research section in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md).
 
 ### 2. Multi-vertex selection and editing
 
-- [ ] Support Shift-click selection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the \`V\` visibility shortcut.
+- [ ] Support Shift-click selection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
 - [ ] Add two visible vertex-edit toolbar modes beside the existing viewport controls:
   - **Free movement:** drag selected vertices freely in 3D.
   - **Axis movement:** display X/Y/Z gizmo axes and constrain movement or scaling to the selected axis.
@@ -288,7 +288,7 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 
 ### 3. Collision editing
 
-- [ ] Extend the existing depth-aware collision viewer into an editing mode activated alongside the \`C\` collision toggle.
+- [ ] Extend the existing depth-aware collision viewer into an editing mode activated alongside the `C` collision toggle.
 - [ ] Provide visible free-movement and axis-constrained toolbar modes, matching the vertex-edit workflow.
 - [ ] Allow selecting collision points/handles and moving or resizing the selected collision geometry with the mouse.
 - [ ] Keep numeric collision-field editing available as a precise fallback.
@@ -296,7 +296,7 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 
 ### 4. Optional editor-only Bone Rig Creator
 
-- [ ] Open the Bone Rig Creator with \`B\` and provide a visible bone toolbar icon.
+- [ ] Open the Bone Rig Creator with `B` and provide a visible bone toolbar icon.
 - [ ] Place its UI in a dock beside Properties.
 - [ ] Allow creating bones and assigning selected vertices and faces to each bone through clear lists/selection workflows.
 - [ ] Treat bones strictly as an optional, temporary authoring helper. They are not part of the Crash 2 animation format, are not written to NSF, and are never exported as a game skeleton.
