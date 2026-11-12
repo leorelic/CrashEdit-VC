@@ -3332,7 +3332,7 @@ void EditorUI::drawAnimationViewer(){
   }
   const ImGuiIO&io=ImGui::GetIO();
   if(hovered&&!viewportToolbarOwnsMouse&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
-  if(active&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
   }
