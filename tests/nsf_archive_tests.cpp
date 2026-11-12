@@ -228,8 +228,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(timelineArchive.chunks()[0].entries[0].animation.decoded&&timelineArchive.chunks()[0].entries[0].animation.frames.size()==2);
  assert(timelineArchive.appendAnimationFrame(0,0));std::cerr<<"TL2\n";
  std::cerr<<"TL2A\\n";
- auto timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
- std::cerr<<"TL2B size="+std::to_string(timelineFrames.size())+"\\n";
+ const auto&  std::cerr<<"TL2B size="+std::to_string(timelineFrames.size())+"\\n";
  assert(timelineFrames.size()==3);std::cerr<<"TL3A\\n";
  assert(timelineFrames[2].xOffset==22);std::cerr<<"TL3B\\n";
  assert(timelineFrames[2].rawSize==tlFrameSize);std::cerr<<"TL3C offsets="+std::to_string(timelineFrames[1].rawOffset)+","+std::to_string(timelineFrames[2].rawOffset)+"\\n";
