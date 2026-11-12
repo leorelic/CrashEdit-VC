@@ -3170,6 +3170,10 @@ void EditorUI::drawAnimationViewer(){
   };
   static VertexToolMode vertexToolMode=VertexToolMode::FreeMove;
   static VertexDragState vertexDrag;
+  struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>points;std::vector<Crash::NsfAnimationCollision>original;};
+  static CollisionDragState collisionDrag;
+  static std::vector<std::pair<int,int>>selectedCollisionPoints;
+
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
@@ -3336,9 +3340,9 @@ void EditorUI::drawAnimationViewer(){
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
-  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
-  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
-  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active){
+  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
+  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
+  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active){
    const float moveSpeed=(2.0f*float(editorPreferences.animationMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
    const bool shift=ImGui::IsKeyDown(ImGuiKey_LeftShift)||ImGui::IsKeyDown(ImGuiKey_RightShift);
    const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
@@ -3473,6 +3477,59 @@ void EditorUI::drawAnimationViewer(){
     if(status_!="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.";
    }
   };
+
+  constexpr float collisionPointScale=102400.0f;
+  auto collisionPointPosition=[&](int ci,int corner){
+   const auto&c=frame.collisions[static_cast<std::size_t>(ci)];
+   const std::size_t xf=(corner&1)?7U:4U,yf=(corner&2)?8U:5U,zf=(corner&4)?9U:6U;
+   return AnimationPoint(float(c.values[1]+c.values[xf])/collisionPointScale,float(c.values[3]+c.values[zf])/collisionPointScale,float(c.values[2]+c.values[yf])/collisionPointScale);
+  };
+  auto collisionSelected=[&](int ci,int corner){return std::find(selectedCollisionPoints.begin(),selectedCollisionPoints.end(),std::pair<int,int>{ci,corner})!=selectedCollisionPoints.end();};
+  auto collisionPivot=[&](){AnimationPoint p(0,0,0);for(const auto&q:selectedCollisionPoints){auto v=collisionPointPosition(q.first,q.second);p.x+=v.x;p.y+=v.y;p.z+=v.z;}if(!selectedCollisionPoints.empty()){float n=1.0f/float(selectedCollisionPoints.size());p.x*=n;p.y*=n;p.z*=n;}return p;};
+  auto beginCollisionDrag=[&](int axis){
+   if(selectedCollisionPoints.empty()||(vertexToolMode==VertexToolMode::Scale&&selectedCollisionPoints.size()<2U))return false;
+   collisionDrag=CollisionDragState{};collisionDrag.active=true;collisionDrag.mode=int(vertexToolMode);collisionDrag.axis=axis;collisionDrag.chunk=animationViewerChunk_;collisionDrag.entry=animationViewerEntry_;collisionDrag.frame=poseFrameIndex;collisionDrag.mouseStart=io.MousePos;collisionDrag.original=frame.collisions;collisionDrag.points=selectedCollisionPoints;
+   auto p=collisionPivot();collisionDrag.px=p.x;collisionDrag.py=p.y;collisionDrag.pz=p.z;collisionDrag.depth=toCamera(p.x,p.y,p.z).depth;
+   animationPlaying_=false;animationPlaybackFrame_=double(poseFrameIndex);animationFrame_=poseFrameIndex;return true;
+  };
+  auto applyCollisionDrag=[&](){
+   if(!collisionDrag.active||collisionDrag.entry!=animationViewerEntry_||collisionDrag.frame!=poseFrameIndex)return;
+   ImVec2 delta(io.MousePos.x-collisionDrag.mouseStart.x,io.MousePos.y-collisionDrag.mouseStart.y);float dx=0,dy=0,dz=0;
+   if(collisionDrag.mode==int(VertexToolMode::FreeMove)){
+    float units=collisionDrag.depth/std::max(1.0f,focal),cy=std::cos(animationYaw_),sy=std::sin(animationYaw_);
+    float upX=-sy*std::sin(animationPitch_),upY=std::cos(animationPitch_),upZ=-cy*std::sin(animationPitch_);
+    dx=(cy*delta.x-upX*delta.y)*units;dy=(-sy*delta.x-upZ*delta.y)*units;dz=-upY*delta.y*units;
+   }else if(collisionDrag.mode==int(VertexToolMode::AxisMove)&&collisionDrag.axis>=0){
+    auto a=axisWorldVector(collisionDrag.axis);auto p=project(collisionDrag.px,collisionDrag.py,collisionDrag.pz),q=project(collisionDrag.px+a.x,collisionDrag.py+a.y,collisionDrag.pz+a.z);
+    float vx=q.x-p.x,vy=q.y-p.y,l=vx*vx+vy*vy;if(l>0.01f){float amount=(delta.x*vx+delta.y*vy)/l;if(collisionDrag.axis==0)dx=amount;else if(collisionDrag.axis==1)dz=amount;else dy=amount;}
+   }
+   float factor=collisionDrag.mode==int(VertexToolMode::Scale)?std::clamp(1.0f+(delta.x-delta.y)/20.0f,0.05f,8.0f):1.0f;
+   auto updated=collisionDrag.original;
+   for(const auto&q:collisionDrag.points){
+    if(q.first<0||static_cast<std::size_t>(q.first)>=updated.size()||q.second<0||q.second>7)continue;
+    auto p=collisionPointPosition(q.first,q.second);auto&v=updated[static_cast<std::size_t>(q.first)];
+    const std::size_t xf=(q.second&1)?7U:4U,yf=(q.second&2)?8U:5U,zf=(q.second&4)?9U:6U;
+    auto set=[&](std::size_t field,float original,float pivot,float move,std::size_t offset){float target=collisionDrag.mode==int(VertexToolMode::Scale)?pivot+(original-pivot)*factor:original+move;std::int64_t raw=std::llround(target*collisionPointScale)-v.values[offset];v.values[field]=static_cast<std::int32_t>(std::clamp<std::int64_t>(raw,INT32_MIN,INT32_MAX));};
+    set(xf,p.x,collisionDrag.px,dx,1U);set(zf,p.y,collisionDrag.py,dy,3U);set(yf,p.z,collisionDrag.pz,dz,2U);
+   }
+   std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationCollision>values;
+   for(const auto&q:collisionDrag.points){auto i=static_cast<std::size_t>(q.first);if(q.first>=0&&i<updated.size()&&std::find(indices.begin(),indices.end(),i)==indices.end()){indices.push_back(i);values.push_back(updated[i]);}}
+   if(!indices.empty()&&!nsf_.setAnimationFrameCollisions(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,values))status_="Collision transform rejected; last valid bounds kept until mouse release.";
+  };
+  int hoveredCollisionIndex=-1,hoveredCollisionCorner=-1;
+  if(animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse){float best=11.0f;for(std::size_t ci=0;ci<frame.collisions.size();++ci)for(int corner=0;corner<8;++corner){auto p=collisionPointPosition(int(ci),corner);auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f)continue;auto screen=projectCamera(cam);float d=std::hypot(screen.x-io.MousePos.x,screen.y-io.MousePos.y);if(d<=best){best=d;hoveredCollisionIndex=int(ci);hoveredCollisionCorner=corner;}}}
+  bool collisionDragStarted=false;
+  if(animationCollisionViewer_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
+   int axis=-1;bool canStart=false;auto p=collisionPivot();auto center=project(p.x,p.y,p.z);
+   if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::FreeMove)canStart=hoveredCollisionIndex>=0&&collisionSelected(hoveredCollisionIndex,hoveredCollisionCorner);
+   else if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::AxisMove){float length=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f),best=10.0f;for(int a=0;a<3;++a){auto d=axisWorldVector(a);auto end=project(p.x+d.x*length,p.y+d.y*length,p.z+d.z*length);float vx=end.x-center.x,vy=end.y-center.y,l=vx*vx+vy*vy;if(l<1.0f)continue;float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/l,0.0f,1.0f),dist=std::hypot(io.MousePos.x-center.x-vx*t,io.MousePos.y-center.y-vy*t);if(t>0.55f&&dist<best){best=dist;axis=a;}}canStart=axis>=0;}
+   else if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::Scale)canStart=std::hypot(io.MousePos.x-center.x-14.0f,io.MousePos.y-center.y+14.0f)<=10.0f;
+   if(canStart)collisionDragStarted=beginCollisionDrag(axis);
+   if(!collisionDragStarted&&hoveredCollisionIndex>=0){std::pair<int,int>pnt{hoveredCollisionIndex,hoveredCollisionCorner};if(io.KeyShift){auto it=std::find(selectedCollisionPoints.begin(),selectedCollisionPoints.end(),pnt);if(it==selectedCollisionPoints.end())selectedCollisionPoints.push_back(pnt);else selectedCollisionPoints.erase(it);}else{selectedCollisionPoints.clear();selectedCollisionPoints.push_back(pnt);}}
+   else if(!collisionDragStarted&&hoveredCollisionIndex<0&&!io.KeyShift)selectedCollisionPoints.clear();
+  }
+  if(collisionDrag.active&&(collisionDrag.chunk!=animationViewerChunk_||collisionDrag.entry!=animationViewerEntry_||collisionDrag.frame!=poseFrameIndex))collisionDrag.active=false;
+  if(collisionDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyCollisionDrag();collisionDrag.active=false;}else if(collisionDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyCollisionDrag();else if(collisionDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))collisionDrag.active=false;
   int hoveredVertex=-1;
   if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse){
    float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();
@@ -3502,11 +3559,11 @@ void EditorUI::drawAnimationViewer(){
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
-  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!vertexDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
   }
-  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!vertexDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
    const float pan=animationDistance_*0.0018f;
    const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
@@ -3885,12 +3942,13 @@ void EditorUI::drawAnimationViewer(){
     if(visible)dl->AddConvexPolyFilled(points,4,collisionFill);
    }
    for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
-   for(const auto&corner:corners){
-    if(corner.depth>0.1f)dl->AddCircleFilled(projectCamera(corner),3.5f,collisionLine,12);
-   }
+   for(int cornerIndex=0;cornerIndex<8;++cornerIndex){const auto&corner=corners[cornerIndex];if(corner.depth<=0.1f)continue;const int ci=static_cast<int>(&collision-&frame.collisions[0]);const bool selected=collisionSelected(ci,cornerIndex),hot=hoveredCollisionIndex==ci&&hoveredCollisionCorner==cornerIndex;const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):collisionLine;dl->AddCircleFilled(projectCamera(corner),selected?5.5f:4.0f,color,12);if(selected)dl->AddCircle(projectCamera(corner),7.0f,IM_COL32(245,245,245,255),12,1.2f);}
   }
  }
  
+ if(animationCollisionViewer_&&!selectedCollisionPoints.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&(vertexToolMode!=VertexToolMode::Scale||selectedCollisionPoints.size()>=2U)){
+  auto p=collisionPivot();auto center=project(p.x,p.y,p.z);if(center.x>-99999.0f){auto*d=ImGui::GetForegroundDrawList();d->PushClipRect(canvasMin,canvasMax,true);float len=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);if(vertexToolMode==VertexToolMode::AxisMove){const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};const char*names[3]={"X","Y","Z"};for(int a=0;a<3;++a){auto v=axisWorldVector(a);auto end=project(p.x+v.x*len,p.y+v.y*len,p.z+v.z*len);d->AddLine(center,end,colors[a],3);d->AddCircleFilled(end,5,colors[a],12);d->AddText(ImVec2(end.x+5,end.y-7),colors[a],names[a]);}}else{d->AddCircle(center,20,IM_COL32(235,190,70,230),32,2.5f);d->AddCircleFilled(ImVec2(center.x+14,center.y-14),5,IM_COL32(255,205,80,255),12);}d->PopClipRect();}
+ }
  // Transform handles are a true viewport overlay: draw them after the model,
  // collision geometry, and depth-tested GPU image so they remain unobscured.
  if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
