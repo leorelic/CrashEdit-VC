@@ -1130,6 +1130,27 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
  return decodeAnimationVertices(frame,model,crash3);
 }
 
+
+bool NsfArchive::setAnimationFrameVertices(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>&vertexIndices,const std::vector<NsfAnimationVertex>&vertices){
+ if(vertexIndices.empty()||vertexIndices.size()!=vertices.size()||chunkIndex>=chunks_.size())return false;
+ for(std::size_t i=0;i<vertexIndices.size();++i)
+  if(std::find(vertexIndices.begin(),vertexIndices.begin()+static_cast<std::ptrdiff_t>(i),vertexIndices[i])!=vertexIndices.begin()+static_cast<std::ptrdiff_t>(i))return false;
+ NsfArchive candidate=*this;
+ for(std::size_t i=0;i<vertexIndices.size();++i){
+  const auto&target=vertices[i];
+  const std::int32_t values[3]={target.x,target.y,target.z};
+  for(std::size_t axis=0;axis<3U;++axis)
+   if(!candidate.setAnimationFrameVertex(chunkIndex,entryIndex,frameIndex,vertexIndices[i],axis,values[axis]))return false;
+ }
+ if(entryIndex>=candidate.chunks_[chunkIndex].entries.size())return false;
+ auto&destinationEntry=chunks_[chunkIndex].entries[entryIndex];
+ const auto&sourceEntry=candidate.chunks_[chunkIndex].entries[entryIndex];
+ if(frameIndex>=destinationEntry.animation.frames.size()||frameIndex>=sourceEntry.animation.frames.size())return false;
+ chunks_[chunkIndex].bytes=candidate.chunks_[chunkIndex].bytes;
+ destinationEntry.animation.frames[frameIndex]=sourceEntry.animation.frames[frameIndex];
+ return true;
+}
+
 bool NsfArchive::setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value){
  if(chunkIndex>=chunks_.size()||axis>=3U)return false;
  auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;

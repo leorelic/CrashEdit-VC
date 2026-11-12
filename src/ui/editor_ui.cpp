@@ -2927,21 +2927,18 @@ void EditorUI::drawAnimationFrameEditor(){
     ImGui::SetNextItemWidth(vertexFieldWidth);
     if(ImGui::InputInt("##VertexCoordinate",&vertexValues[axis])){
      const int delta=vertexValues[axis]-selectedCoordinate[axis];
-     Crash::NsfArchive candidate=nsf_;
-     bool representable=true;
+     std::vector<std::size_t> indices;
+     std::vector<Crash::NsfAnimationVertex> targets;
+     indices.reserve(animationSelectedVertices_.size());targets.reserve(animationSelectedVertices_.size());
      for(const int selectedIndex:animationSelectedVertices_){
-      if(selectedIndex<0||static_cast<std::size_t>(selectedIndex)>=frame.vertices.size()){representable=false;break;}
+      if(selectedIndex<0||static_cast<std::size_t>(selectedIndex)>=frame.vertices.size())continue;
       const auto&source=frame.vertices[static_cast<std::size_t>(selectedIndex)];
-      const int original=axis==0U?source.x:axis==1U?source.y:source.z;
-      if(!candidate.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(selectedIndex),axis,original+delta)){representable=false;break;}
+      auto target=source;
+      if(axis==0U)target.x+=delta;else if(axis==1U)target.y+=delta;else target.z+=delta;
+      indices.push_back(static_cast<std::size_t>(selectedIndex));targets.push_back(target);
      }
-     if(representable){
-      for(const int selectedIndex:animationSelectedVertices_){
-       const auto&source=frame.vertices[static_cast<std::size_t>(selectedIndex)];
-       const int original=axis==0U?source.x:axis==1U?source.y:source.z;
-       if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),static_cast<std::size_t>(selectedIndex),axis,original+delta)){status_="A selected vertex could not be encoded; the multi-vertex edit was stopped.";break;}
-      }
-     }else status_="The multi-vertex edit is outside the 0–255 coordinate range or cannot be represented by the selected temporal deltas.";
+     if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
+      status_="The multi-vertex edit is outside the 0–255 coordinate range or cannot be represented by the selected temporal deltas; no vertices were changed.";
     }
     ImGui::PopID();
    }
