@@ -3336,7 +3336,6 @@ void EditorUI::drawAnimationViewer(){
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
-  if(hovered&&!viewportToolbarOwnsMouse&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active){
