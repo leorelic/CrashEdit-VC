@@ -3544,12 +3544,12 @@ void EditorUI::drawAnimationViewer(){
   bool collisionDragStarted=false;
   if(animationCollisionViewer_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
    int axis=-1;bool canStart=false;const auto pivot=collisionPivot();const auto center=project(pivot.x,pivot.y,pivot.z);
-   if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::FreeMove)canStart=hoveredCollisionIndex>=0&&collisionFaceSelected(hoveredCollisionIndex,hoveredCollisionFace);
-   else if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::AxisMove){
+   if(!io.KeyShift&&!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::FreeMove)canStart=hoveredCollisionIndex>=0&&collisionFaceSelected(hoveredCollisionIndex,hoveredCollisionFace);
+   else if(!io.KeyShift&&!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::AxisMove){
     float length=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f),best=10.0f;
     for(int a=0;a<3;++a){bool allowed=false;for(const auto&face:selectedCollisionFaces)if(collisionFaceAxis(face.second)==a)allowed=true;if(!allowed)continue;const auto d=axisWorldVector(a);const auto end=project(pivot.x+d.x*length,pivot.y+d.y*length,pivot.z+d.z*length);const float vx=end.x-center.x,vy=end.y-center.y,l=vx*vx+vy*vy;if(l<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/l,0.0f,1.0f);const float dist=std::hypot(io.MousePos.x-center.x-vx*t,io.MousePos.y-center.y-vy*t);if(t>0.55f&&dist<best){best=dist;axis=a;}}
     canStart=axis>=0;
-   }else if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::Scale)canStart=std::hypot(io.MousePos.x-center.x-14.0f,io.MousePos.y-center.y+14.0f)<=10.0f;
+   }else if(!io.KeyShift&&!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::Scale)canStart=std::hypot(io.MousePos.x-center.x-14.0f,io.MousePos.y-center.y+14.0f)<=10.0f;
    if(canStart)collisionDragStarted=beginCollisionDrag(axis);
    if(!collisionDragStarted&&hoveredCollisionIndex>=0){const std::pair<int,int>face{hoveredCollisionIndex,hoveredCollisionFace};if(io.KeyShift){auto it=std::find(selectedCollisionFaces.begin(),selectedCollisionFaces.end(),face);if(it==selectedCollisionFaces.end())selectedCollisionFaces.push_back(face);else selectedCollisionFaces.erase(it);}else{selectedCollisionFaces.clear();selectedCollisionFaces.push_back(face);}}
    else if(!collisionDragStarted&&hoveredCollisionIndex<0&&!io.KeyShift)selectedCollisionFaces.clear();
