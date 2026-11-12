@@ -884,16 +884,16 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
  if(!selected.valid||selected.offset<tableEnd||selected.offset>NsfChunkSize||selected.size>NsfChunkSize-selected.offset||
     selected.offset+selected.size>usedEnd)return fail("The selected entry has invalid bounds and cannot be relocated.");
  if(selected.size>NsfChunkSize-24U)return fail("This entry is too large to fit in a new 64 KiB chunk.");
- const std::size_t prefixPadding=source.entries.front().offset-tableEnd;
  if(source.entries.front().offset<tableEnd||source.entries.front().offset>usedEnd)return fail("The source chunk's first-entry boundary is invalid.");
+ const std::size_t prefixPadding=source.entries.front().offset-tableEnd;
+ const std::size_t remainingCount=count-1U;
+ const std::size_t newTableEnd=20U+remainingCount*4U;
 
  NsfArchive candidate=*this;
  std::vector<std::uint8_t> rebuiltSource(NsfChunkSize,0U);
  std::copy_n(source.bytes.begin(),16U,rebuiltSource.begin());
  if(prefixPadding)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(tableEnd),prefixPadding,
                               rebuiltSource.begin()+static_cast<std::ptrdiff_t>(newTableEnd));
- const std::size_t remainingCount=count-1U;
- const std::size_t newTableEnd=20U+remainingCount*4U;
  std::size_t cursor=newTableEnd+prefixPadding;
  if(cursor>NsfChunkSize)return fail("The source chunk header and padding exceed its capacity.");
  for(std::size_t i=0;i<count;++i){

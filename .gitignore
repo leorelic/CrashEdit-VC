@@ -1,7 +1,0 @@
-/build/
-/cmake-build-*/
-.vs/
-.idea/
-*.user
-*.suo
-imgui.ini
