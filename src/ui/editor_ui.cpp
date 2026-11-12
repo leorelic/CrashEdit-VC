@@ -2938,7 +2938,7 @@ void EditorUI::drawAnimationFrameEditor(){
       indices.push_back(static_cast<std::size_t>(selectedIndex));targets.push_back(target);
      }
      if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
-      status_="The multi-vertex edit is outside the 0–255 coordinate range or cannot be represented by the selected temporal deltas; no vertices were changed.";
+      status_="The multi-vertex edit is outside the Crash 2 0–254 coordinate range or cannot be represented by the selected temporal deltas; no vertices were changed.";
     }
     ImGui::PopID();
    }
@@ -3415,7 +3415,12 @@ void EditorUI::drawAnimationViewer(){
    animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
    return true;
   };
-  auto applyVertexDrag=[&](){
+  auto restoreVertexDragSnapshot=[&](){
+    std::vector<std::size_t> indices;indices.reserve(vertexDrag.indices.size());
+    for(const int index:vertexDrag.indices)indices.push_back(static_cast<std::size_t>(index));
+    nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),indices,vertexDrag.original);
+   };
+   auto applyVertexDrag=[&](){
    if(!vertexDrag.active||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex)return;
    const float sx=vertexDrag.pivotX,sy=vertexDrag.pivotY,sz=vertexDrag.pivotZ;
    const ImVec2 delta(io.MousePos.x-vertexDrag.mouseStart.x,io.MousePos.y-vertexDrag.mouseStart.y);
@@ -3454,7 +3459,7 @@ void EditorUI::drawAnimationViewer(){
      targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
-     status_="The scale exceeds the Crash 2 coordinate or temporal-delta limits; no vertices were changed.";vertexDrag.active=false;
+     restoreVertexDragSnapshot();status_="The scale exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
     }
     return;
    }
@@ -3468,7 +3473,7 @@ void EditorUI::drawAnimationViewer(){
     indices.push_back(static_cast<std::size_t>(vertexDrag.indices[i]));targets.push_back(target);
    }
    if(!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-    status_="The move exceeds the Crash 2 coordinate or temporal-delta limits; no vertices were changed.";vertexDrag.active=false;
+    restoreVertexDragSnapshot();status_="The move exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
    }
   };
   int hoveredVertex=-1;
