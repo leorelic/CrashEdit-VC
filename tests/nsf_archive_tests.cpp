@@ -230,7 +230,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(std::equal(timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[1].rawOffset),timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[1].rawOffset+tlFrameSize),timelineArchive.chunks()[0].bytes.begin()+static_cast<std::ptrdiff_t>(timelineFrames[2].rawOffset)));
  assert(timelineArchive.insertAnimationFrameAfter(0,0,0));
  timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
- assert(timelineFrames.size()==4&&timelineFrames[1].xOffset==11&&timelineFrames[2].xOffset==11&&timelineFrames[3].xOffset==22);
+ assert(timelineFrames.size()==4&&timelineFrames[1].xOffset==11&&timelineFrames[2].xOffset==22&&timelineFrames[3].xOffset==22);
  assert(timelineArchive.deleteAnimationFrame(0,0,2));
  timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
  assert(timelineFrames.size()==3&&timelineFrames[0].xOffset==11&&timelineFrames[1].xOffset==11&&timelineFrames[2].xOffset==22);
