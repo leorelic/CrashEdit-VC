@@ -1061,7 +1061,10 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
  auto&frame=entry.animation.frames[frameIndex];if(!frame.verticesDecoded||vertexIndex>=frame.vertexCount)return false;
  const bool crash3=entry.animation.isCrash3;
  if(crash3){if(value%8!=0)return false;value/=8;}
- if(value<0||value>255)return false;
+ // Crash 2's observed animation coordinate space is 0-254. Keep the
+ // Crash 3 byte-space behavior separate until its authoring rules are verified.
+ const std::int32_t maximumCoordinate=crash3?255:254;
+ if(value<0||value>maximumCoordinate)return false;
  const std::size_t fixedHeader=crash3?28U:24U;
  const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U;
  if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize))return false;
@@ -1082,7 +1085,7 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
  if(model&&model->compressed){
   if(vertexIndex>=model->positions.size()||model->positions.size()>frame.vertices.size())return false;
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
-  auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>255)return false;target=source;return true;};
+  auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
    if(bit>=bits.size())return false;const std::int32_t minValue=-(1<<width),maxValue=(1<<width)-1;
    if(delta<minValue||delta>maxValue)return false;
@@ -1114,7 +1117,7 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
   const std::int32_t current[3]={frame.vertices[vertexIndex].x,frame.vertices[vertexIndex].y,frame.vertices[vertexIndex].z};
   for(std::size_t component=0;component<3U;++component){
    const std::int32_t v=component==axis?value:(crash3?current[component]/8:current[component]);
-   if(v<0||v>255)return false;
+   if(v<0||v>maximumCoordinate)return false;
    for(unsigned b=0;b<8U;++b)reordered[bit++]=static_cast<std::uint8_t>((static_cast<std::uint32_t>(v)>>(7U-b))&1U);
   }
   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
