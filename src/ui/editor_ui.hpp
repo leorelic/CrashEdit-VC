@@ -18,6 +18,9 @@ private:
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
+ bool chunkExpansionDialog_=false;
+ int chunkExpansionOperation_=0,chunkExpansionSourceChunk_=-1,chunkExpansionSourceEntry_=-1;
+ std::size_t chunkExpansionFrame_=0;
  char animationFrameModelEname_[6]{}; std::uint32_t animationFrameModelEid_=0,animationFrameModelEnameAnimationEid_=0; int animationFrameModelEnameFrame_=-1; bool animationFrameModelEnameInitialized_=false;
  bool animationSelectionModel_=false,animationEditorFocus_=false,animationWorkspaceWasVisible_=false;
  int animationSelectionChunk_=-1,animationSelectionEntry_=-1;

@@ -180,6 +180,7 @@ struct NsfEntry {
  bool valid=false; std::string error;
  std::vector<NsfItem> items; NsfZone zone; NsfScenery scenery; NsfGool gool; NsfAnimation animation; NsfModel model;
 };
+enum class NsfAnimationFrameEditStatus : std::uint8_t { Success, Invalid, RequiresNewChunk, CannotExpand };
 struct NsfEntryLocation { std::size_t chunkIndex=0, entryIndex=0; };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
@@ -202,6 +203,8 @@ public:
  bool setGoolFrameGroupFrameCount(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint16_t frameCount);
  bool setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,bool interpolated);
  bool appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex);
+ bool animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex) const;
+ bool moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t& newChunkIndex,std::string& error);
  bool insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
@@ -218,6 +221,8 @@ public:
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  bool crash3Retail_=false;
+ bool goolDecoded_=false,animationModelsDecoded_=false,animationModelsCrash3_=false;
+ NsfGoolVersion goolVersion_=NsfGoolVersion::Version2;
  std::vector<NsfChunk> chunks_;
 };
 int resolveNsfModelTextureIndex(const NsfModel& model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool& valid,std::uint8_t lodLevel=0);

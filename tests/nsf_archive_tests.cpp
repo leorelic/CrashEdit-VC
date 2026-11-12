@@ -242,6 +242,39 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const auto&followingEntry=timelineReloaded.chunks()[0].entries[1];
  assert(followingEntry.type==99&&followingEntry.items.size()==1&&timelineReloaded.chunks()[0].bytes[followingEntry.items[0].offset]==0xef);
  assert(timelineReloaded.chunks()[0].bytes[followingEntry.offset-4U]==0xdd);
+ // A full source chunk must relocate the whole Animation entry before retrying
+ // Append. The following opaque entry remains valid and the moved EID is unchanged.
+ std::vector<std::uint8_t> expansionChunk(65536);p16(expansionChunk,0,0x1234);p16(expansionChunk,2,0);p32(expansionChunk,4,9);p32(expansionChunk,8,2);
+ constexpr std::size_t exAnimationEntry=28,exAnimationHeader=24,exFrameSize=24,exAnimationSize=exAnimationHeader+exFrameSize*2,exFollowingEntry=exAnimationEntry+exAnimationSize;
+ p32(expansionChunk,16,exAnimationEntry);p32(expansionChunk,20,exFollowingEntry);p32(expansionChunk,24,65536);
+ p32(expansionChunk,exAnimationEntry,0x0100ffff);p32(expansionChunk,exAnimationEntry+4,0x0200007d);p32(expansionChunk,exAnimationEntry+8,1);p32(expansionChunk,exAnimationEntry+12,2);
+ p32(expansionChunk,exAnimationEntry+16,exAnimationHeader);p32(expansionChunk,exAnimationEntry+20,exAnimationHeader+exFrameSize);p32(expansionChunk,exAnimationEntry+24,exAnimationSize);
+ p16(expansionChunk,exAnimationEntry+exAnimationHeader,31);p32(expansionChunk,exAnimationEntry+exAnimationHeader+20,24);
+ p16(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize,47);p32(expansionChunk,exAnimationEntry+exAnimationHeader+exFrameSize+20,24);
+ const std::size_t exFollowingSize=65536-exFollowingEntry;
+ p32(expansionChunk,exFollowingEntry,0x0100ffff);p32(expansionChunk,exFollowingEntry+4,0x0200007e);p32(expansionChunk,exFollowingEntry+8,99);p32(expansionChunk,exFollowingEntry+12,1);
+ p32(expansionChunk,exFollowingEntry+16,20);p32(expansionChunk,exFollowingEntry+20,static_cast<std::uint32_t>(exFollowingSize));
+ expansionChunk[exFollowingEntry+24]=0x5a;
+ NsfArchive expansionArchive;assert(expansionArchive.loadBytes(expansionChunk,e));expansionArchive.decodeAnimationModels(false);
+ assert(expansionArchive.animationFrameEditNeedsNewChunk(0,0,1));
+ std::vector<std::uint8_t> unchangedBeforeCancel;assert(expansionArchive.saveUncompressedBytes(unchangedBeforeCancel,e));
+ assert(expansionArchive.animationFrameEditNeedsNewChunk(0,0,1));
+ std::vector<std::uint8_t> unchangedAfterCancel;assert(expansionArchive.saveUncompressedBytes(unchangedAfterCancel,e));assert(unchangedBeforeCancel==unchangedAfterCancel);
+ std::size_t relocatedChunk=0;assert(expansionArchive.moveEntryToNewChunk(0,0,relocatedChunk,e));
+ assert(relocatedChunk==1&&expansionArchive.chunks().size()==2);
+ assert(expansionArchive.chunks()[0].entries.size()==1&&expansionArchive.chunks()[0].entries[0].eid==0x0200007eU);
+ assert(expansionArchive.chunks()[1].entries.size()==1&&expansionArchive.chunks()[1].entries[0].eid==0x0200007dU);
+ assert(expansionArchive.chunks()[1].entries[0].type==1&&expansionArchive.chunks()[1].entries[0].animation.frames.size()==2);
+ assert(expansionArchive.chunks()[0].entries[0].items.size()==1&&expansionArchive.chunks()[0].bytes[expansionArchive.chunks()[0].entries[0].items[0].offset]==0x5a);
+ assert(expansionArchive.appendAnimationFrame(relocatedChunk,0));
+ assert(expansionArchive.chunks()[1].entries[0].animation.frames.size()==3);
+ std::vector<std::uint8_t> expansionSaved;assert(expansionArchive.saveUncompressedBytes(expansionSaved,e));
+ NsfArchive expansionReloaded;assert(expansionReloaded.loadBytes(expansionSaved,e));expansionReloaded.decodeAnimationModels(false);
+ assert(expansionReloaded.chunks().size()==2&&expansionReloaded.chunks()[1].entries[0].eid==0x0200007dU);
+ assert(expansionReloaded.chunks()[1].entries[0].animation.frames.size()==3);
+ assert(expansionReloaded.chunks()[0].entries[0].eid==0x0200007eU&&expansionReloaded.chunks()[0].entries[0].type==99);
+ assert(expansionReloaded.chunks()[0].entries[0].items[0].size==exFollowingSize-24U);
+ 
  NsfArchive oneFrameGuard=timelineArchive;
  assert(oneFrameGuard.deleteAnimationFrame(0,0,0));
  assert(oneFrameGuard.deleteAnimationFrame(0,0,0));

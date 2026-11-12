@@ -427,6 +427,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
 }
 
 void NsfArchive::decodeAnimationModels(bool crash3){
+ animationModelsDecoded_=true;animationModelsCrash3_=crash3;
  auto findAnimationModel=[&](std::uint32_t animationEid,std::size_t frameIndex,std::size_t frameCount)->std::uint32_t{
   std::vector<std::uint32_t> models;
   for(const auto&goolChunk:chunks_)if(goolChunk.type==0&&goolChunk.entryTableValid)
@@ -474,6 +475,7 @@ void NsfArchive::decodeAnimationModels(bool crash3){
 }
 
 void NsfArchive::decodeGools(NsfGoolVersion version){
+ goolVersion_=version;goolDecoded_=true;
  for(auto&chunk:chunks_){
   if(chunk.type!=0||!chunk.entryTableValid)continue;
   for(auto&entry:chunk.entries){
@@ -824,6 +826,129 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
   animation.frames[i].rawSize=entry.items[i].size;
  }
  return true;
+}
+
+bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex)const{
+ if(chunkIndex>=chunks_.size())return false;
+ const auto&chunk=chunks_[chunkIndex];
+ if(chunk.type!=0U||!chunk.entryTableValid||entryIndex>=chunk.entries.size())return false;
+ const auto&entry=chunk.entries[entryIndex];
+ const auto&animation=entry.animation;
+ const std::size_t oldCount=entry.items.size();
+ if(!entry.valid||entry.type!=1U||!animation.decoded||oldCount==0U||oldCount!=animation.frames.size()||frameIndex>=oldCount)return false;
+ const std::uint32_t entryCount=u32(chunk.bytes,8U);
+ if(entryCount!=chunk.entries.size()||entryCount==0U)return false;
+ const std::size_t oldEntryEnd=entry.offset+entry.size;
+ const std::size_t tableEnd=16U+(static_cast<std::size_t>(entryCount)+1U)*4U;
+ if(entry.offset<tableEnd||oldEntryEnd>NsfChunkSize)return false;
+ const std::size_t usedEnd=u32(chunk.bytes,16U+static_cast<std::size_t>(entryCount)*4U);
+ if(usedEnd<oldEntryEnd||usedEnd>NsfChunkSize)return false;
+ const std::size_t oldHeaderEnd=16U+(oldCount+1U)*4U;
+ if(entry.size<oldHeaderEnd||entry.items.empty())return false;
+ const std::size_t firstItemOffset=entry.items.front().offset-entry.offset;
+ if(firstItemOffset<oldHeaderEnd||firstItemOffset>entry.size)return false;
+ const std::size_t prefixPadding=firstItemOffset-oldHeaderEnd;
+ const std::size_t oldPayloadEnd=entry.items.back().offset+entry.items.back().size;
+ if(oldPayloadEnd>oldEntryEnd)return false;
+ const std::size_t trailingPadding=oldEntryEnd-oldPayloadEnd;
+ if(newCount==0U)return false;
+ std::size_t payloadBytes=0;
+ for(const auto&item:entry.items){if(item.size>NsfChunkSize-payloadBytes)return false;payloadBytes+=item.size;}
+ if(entry.items[frameIndex].size>NsfChunkSize-payloadBytes)return false;
+ payloadBytes+=entry.items[frameIndex].size;
+ const std::size_t newCount=oldCount+1U;
+ if(newCount>std::numeric_limits<std::uint32_t>::max())return false;
+ const std::size_t newHeaderEnd=16U+(newCount+1U)*4U;
+ if(prefixPadding>NsfChunkSize-newHeaderEnd)return true;
+ std::size_t newEntrySize=newHeaderEnd+prefixPadding;
+ if(payloadBytes>NsfChunkSize-newEntrySize)return true;
+ newEntrySize+=payloadBytes;
+ if(trailingPadding>NsfChunkSize-newEntrySize)return true;
+ newEntrySize+=trailingPadding;
+ if(entry.offset>NsfChunkSize||newEntrySize>NsfChunkSize-entry.offset)return true;
+ const std::ptrdiff_t delta=static_cast<std::ptrdiff_t>(newEntrySize)-static_cast<std::ptrdiff_t>(entry.size);
+ const std::ptrdiff_t newUsedEnd=static_cast<std::ptrdiff_t>(usedEnd)+delta;
+ return newUsedEnd<0||newUsedEnd>static_cast<std::ptrdiff_t>(NsfChunkSize);
+}
+
+bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t&newChunkIndex,std::string&error){
+ auto fail=[&](const char*message){error=message;return false;};
+ if(chunkIndex>=chunks_.size())return fail("The source chunk no longer exists.");
+ const auto&source=chunks_[chunkIndex];
+ if(source.type!=0U||!source.entryTableValid||entryIndex>=source.entries.size())return fail("The selected resource is not a valid entry in a normal NSF chunk.");
+ const std::size_t count=source.entries.size();
+ if(count==0U||u32(source.bytes,8U)!=count)return fail("The source chunk entry table is inconsistent.");
+ const std::size_t tableEnd=20U+count*4U;
+ const std::size_t usedEnd=u32(source.bytes,16U+count*4U);
+ if(usedEnd>NsfChunkSize||usedEnd<tableEnd)return fail("The source chunk's used-data boundary is invalid.");
+ const auto&selected=source.entries[entryIndex];
+ if(!selected.valid||selected.offset<tableEnd||selected.offset>NsfChunkSize||selected.size>NsfChunkSize-selected.offset||
+    selected.offset+selected.size>usedEnd)return fail("The selected entry has invalid bounds and cannot be relocated.");
+ if(selected.size>NsfChunkSize-24U)return fail("This entry is too large to fit in a new 64 KiB chunk.");
+ const std::size_t prefixPadding=source.entries.front().offset-tableEnd;
+ if(source.entries.front().offset<tableEnd||source.entries.front().offset>usedEnd)return fail("The source chunk's first-entry boundary is invalid.");
+
+ NsfArchive candidate=*this;
+ std::vector<std::uint8_t> rebuiltSource(NsfChunkSize,0U);
+ std::copy_n(source.bytes.begin(),16U,rebuiltSource.begin());
+ if(prefixPadding)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(tableEnd),prefixPadding,
+                              rebuiltSource.begin()+static_cast<std::ptrdiff_t>(tableEnd));
+ const std::size_t remainingCount=count-1U;
+ const std::size_t newTableEnd=20U+remainingCount*4U;
+ std::size_t cursor=newTableEnd+prefixPadding;
+ if(cursor>NsfChunkSize)return fail("The source chunk header and padding exceed its capacity.");
+ for(std::size_t i=0;i<count;++i){
+  if(i==entryIndex)continue;
+  const auto&entry=source.entries[i];
+  if(!entry.valid||entry.offset>usedEnd||entry.size>usedEnd-entry.offset||entry.size>NsfChunkSize-cursor)
+   return fail("Another entry in the source chunk has invalid bounds.");
+  cursor+=entry.size;
+ }
+ // Repack all remaining entries while retaining each complete raw entry block and the
+ // original prefix padding. Entry-internal offsets remain relative to their own block.
+ cursor=newTableEnd+prefixPadding;
+ std::size_t outputEntry=0;
+ for(std::size_t i=0;i<count;++i){
+  if(i==entryIndex)continue;
+  const auto&entry=source.entries[i];
+  const std::size_t oldOffset=entry.offset;
+  if(entry.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(oldOffset),entry.size,
+                            rebuiltSource.begin()+static_cast<std::ptrdiff_t>(cursor));
+  for(unsigned b=0;b<4U;++b)rebuiltSource[16U+outputEntry*4U+b]=static_cast<std::uint8_t>(cursor>>(b*8U));
+  cursor+=entry.size;++outputEntry;
+ }
+ for(unsigned b=0;b<4U;++b)rebuiltSource[16U+remainingCount*4U+b]=static_cast<std::uint8_t>(cursor>>(b*8U));
+ for(unsigned b=0;b<4U;++b)rebuiltSource[8U+b]=static_cast<std::uint8_t>(remainingCount>>(b*8U));
+
+ // Normal entry chunks use the ordinary type-0 header; their ChunkId is not an
+ // entry identifier (type-1 texture chunks use that field for their EID).
+ std::vector<std::uint8_t> newBytes(NsfChunkSize,0U);
+ newBytes[0]=0x34U;newBytes[1]=0x12U;newBytes[2]=0U;newBytes[3]=0U;
+ for(unsigned b=0;b<4U;++b)newBytes[4U+b]=0U;
+ newBytes[8]=1U;newBytes[9]=newBytes[10]=newBytes[11]=0U;
+ newBytes[16]=24U;newBytes[17]=newBytes[18]=newBytes[19]=0U;
+ const std::size_t newUsedEnd=24U+selected.size;
+ for(unsigned b=0;b<4U;++b)newBytes[20U+b]=static_cast<std::uint8_t>(newUsedEnd>>(b*8U));
+ if(selected.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(selected.offset),selected.size,newBytes.begin()+24);
+
+ std::string parseError;
+ std::size_t parseOffset=0;NsfChunk parsedSource;
+ if(!decodeChunk(rebuiltSource,parseOffset,parsedSource,parseError)||parseOffset!=NsfChunkSize||!parsedSource.entryTableValid)
+  return fail("Could not rebuild the source chunk's entry table safely.");
+ parsedSource.wasCompressed=source.wasCompressed;
+ parseOffset=0;NsfChunk parsedDestination;
+ if(!decodeChunk(newBytes,parseOffset,parsedDestination,parseError)||parseOffset!=NsfChunkSize||
+    !parsedDestination.entryTableValid||parsedDestination.entries.size()!=1U||!parsedDestination.entries[0].valid)
+  return fail("Could not validate the new chunk after relocating the entry.");
+
+ candidate.chunks_[chunkIndex]=std::move(parsedSource);
+ candidate.chunks_.push_back(std::move(parsedDestination));
+ if(candidate.goolDecoded_)candidate.decodeGools(candidate.goolVersion_);
+ candidate.decodeZones(candidate.crash3Retail_);
+ if(candidate.animationModelsDecoded_)candidate.decodeAnimationModels(candidate.animationModelsCrash3_);
+ *this=std::move(candidate);
+ newChunkIndex=chunks_.size()-1U;
+ error.clear();return true;
 }
 
 bool NsfArchive::appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex){

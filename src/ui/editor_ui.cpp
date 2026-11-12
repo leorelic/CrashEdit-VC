@@ -402,6 +402,46 @@ void EditorUI::draw(){
  // restore focus to the main animation editor (new bottom-dock windows can
  // otherwise steal focus when they are first submitted).
  if(showAnimationWorkspace)drawAnimationTimeline();
+ if(chunkExpansionDialog_){
+  ImGui::OpenPopup("NSF Chunk Capacity");
+  if(ImGui::BeginPopupModal("NSF Chunk Capacity",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings)){
+   ImGui::TextWrapped("Adding this frame exceeds the current 64 KiB chunk limit. Create a new chunk and move this entire entry there?");
+   ImGui::TextDisabled("The entry EID, type, item payloads, and padding will be preserved.");
+   if(ImGui::Button("Create New Chunk and Continue")){
+    NsfArchive backup=nsf_;
+    std::size_t destinationChunk=0;std::string moveError;
+    bool completed=nsf_.moveEntryToNewChunk(static_cast<std::size_t>(chunkExpansionSourceChunk_),
+                                             static_cast<std::size_t>(chunkExpansionSourceEntry_),
+                                             destinationChunk,moveError);
+    if(completed){
+     const bool edited=chunkExpansionOperation_==1?
+      nsf_.appendAnimationFrame(destinationChunk,0U):
+      nsf_.insertAnimationFrameAfter(destinationChunk,0U,chunkExpansionFrame_);
+     if(!edited){nsf_=std::move(backup);completed=false;moveError="The entry was moved in memory, but the requested frame would still exceed a fresh chunk's capacity. No changes were kept.";}
+    }
+    if(completed){
+     selectedChunk_=static_cast<int>(destinationChunk);selectedEntry_=0;selectedItem_=-1;
+     animationViewerChunk_=static_cast<int>(destinationChunk);animationViewerEntry_=0;
+     animationSelectionChunk_=static_cast<int>(destinationChunk);animationSelectionEntry_=0;
+     animationPlaying_=false;animationFrameTimer_=0.0f;
+     animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
+     const auto&updatedFrames=nsf_.chunks()[destinationChunk].entries[0].animation.frames;
+     animationFrame_=chunkExpansionOperation_==1?static_cast<int>(updatedFrames.size()-1U):static_cast<int>(chunkExpansionFrame_+1U);
+     animationPlaybackFrame_=static_cast<double>(animationFrame_);
+     status_="Created a new NSF chunk, moved the animation entry, and completed the frame edit.";
+    }else{
+     status_="Could not expand the NSF chunk: "+moveError;
+    }
+    chunkExpansionDialog_=false;ImGui::CloseCurrentPopup();
+   }
+   ImGui::SameLine();
+   if(ImGui::Button("Cancel")){
+    chunkExpansionDialog_=false;ImGui::CloseCurrentPopup();
+    status_="Frame edit cancelled; the NSF archive was not changed.";
+   }
+   ImGui::EndPopup();
+  }
+ }
  if(showAnimationWorkspace&&animationEditorFocus_){
   // Select the editor's tab in its central dock node after every other
   // window (especially the bottom Animation Timeline) has been submitted.
@@ -2741,7 +2781,9 @@ void EditorUI::drawAnimationTimeline(){
    animationFrame_=static_cast<int>(frames.size()-1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
    animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
    lastFrame=static_cast<int>(frames.size()-1U);status_="Appended a duplicate of the last animation frame.";
-  }else status_="Could not append an animation frame; the NSF chunk may not have enough free space.";
+  }else if(nsf_.animationFrameEditNeedsNewChunk(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),frames.size()-1U)){
+   chunkExpansionDialog_=true;chunkExpansionOperation_=1;chunkExpansionSourceChunk_=animationViewerChunk_;chunkExpansionSourceEntry_=animationViewerEntry_;chunkExpansionFrame_=frames.size()-1U;
+  }else status_="Could not append an animation frame; the entry or chunk data is invalid.";
  }
  ImGui::SameLine();
  if(ImGui::SmallButton("Insert")){
@@ -2750,7 +2792,9 @@ void EditorUI::drawAnimationTimeline(){
    animationFrame_=static_cast<int>(selected+1U);animationPlaybackFrame_=static_cast<double>(animationFrame_);
    animationPlaying_=false;animationFrameTimer_=0.0f;animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
    lastFrame=static_cast<int>(frames.size()-1U);status_="Inserted a duplicate immediately after the selected animation frame.";
-  }else status_="Could not insert an animation frame; the NSF chunk may not have enough free space.";
+  }else if(nsf_.animationFrameEditNeedsNewChunk(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),selected)){
+   chunkExpansionDialog_=true;chunkExpansionOperation_=2;chunkExpansionSourceChunk_=animationViewerChunk_;chunkExpansionSourceEntry_=animationViewerEntry_;chunkExpansionFrame_=selected;
+  }else status_="Could not insert an animation frame; the entry or chunk data is invalid.";
  }
  ImGui::SameLine();
  if(frames.size()<=1U)ImGui::BeginDisabled();
