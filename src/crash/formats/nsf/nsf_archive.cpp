@@ -765,6 +765,12 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
   if(payload.size()>NsfChunkSize-newEntrySize)return false;
   newEntrySize+=payload.size();
  }
+ const std::size_t oldPayloadEnd=entry.items.back().offset+entry.items.back().size;
+ if(oldPayloadEnd>oldEntryEnd)return false;
+ const std::size_t trailingPadding=oldEntryEnd-oldPayloadEnd;
+ const std::size_t newPayloadEnd=newEntrySize;
+ if(trailingPadding>NsfChunkSize-newEntrySize)return false;
+ newEntrySize+=trailingPadding;
  if(entry.offset>NsfChunkSize||newEntrySize>NsfChunkSize-entry.offset)return false;
  const std::ptrdiff_t delta=static_cast<std::ptrdiff_t>(newEntrySize)-static_cast<std::ptrdiff_t>(entry.size);
  const std::ptrdiff_t newUsedEndSigned=static_cast<std::ptrdiff_t>(usedEnd)+delta;
@@ -783,8 +789,11 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
   cursor+=payloads[i].size();
  }
  write32(newEntry,16U+newCount*4U,static_cast<std::uint32_t>(cursor));
+ if(trailingPadding>0U)
+  std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(oldPayloadEnd),trailingPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(newPayloadEnd));
  const std::size_t suffixSize=usedEnd-oldEntryEnd;
- if(suffixSize>0U)std::memmove(chunk.bytes.data()+static_cast<std::ptrdiff_t>(static_cast<std::size_t>(static_cast<std::ptrdiff_t>(oldEntryEnd)+delta)),chunk.bytes.data()+static_cast<std::ptrdiff_t>(oldEntryEnd),suffixSize);
+ const std::size_t newEntryEnd=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(oldEntryEnd)+delta);
+ if(suffixSize>0U)std::memmove(chunk.bytes.data()+static_cast<std::ptrdiff_t>(newEntryEnd),chunk.bytes.data()+static_cast<std::ptrdiff_t>(oldEntryEnd),suffixSize);
  std::copy(newEntry.begin(),newEntry.end(),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset));
  entry.size=newEntrySize;
  entry.itemCount=static_cast<std::uint32_t>(newCount);
