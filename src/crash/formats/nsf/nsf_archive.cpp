@@ -739,7 +739,7 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
  if(firstItemOffset<oldHeaderEnd||firstItemOffset>entry.size)return false;
  const std::size_t prefixPadding=firstItemOffset-oldHeaderEnd;
  std::vector<std::vector<std::uint8_t>>payloads;
- payloads.reserve(oldCount+(insert?1U:static_cast<std::size_t>(-1)));
+ payloads.reserve(insert?oldCount+1U:oldCount-1U);
  for(std::size_t i=0;i<oldCount;++i){
   const auto&item=entry.items[i];
   if(item.offset<entry.offset||item.offset+item.size>oldEntryEnd||!has(chunk.bytes,item.offset,item.size))return false;
@@ -747,8 +747,10 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
  }
  std::vector<NsfAnimationFrame>newFrames=animation.frames;
  if(insert){
-  payloads.insert(payloads.begin()+static_cast<std::ptrdiff_t>(insertAt),payloads[frameIndex]);
-  newFrames.insert(newFrames.begin()+static_cast<std::ptrdiff_t>(insertAt),newFrames[frameIndex]);
+  auto duplicatePayload=payloads[frameIndex];
+  auto duplicateFrame=newFrames[frameIndex];
+  payloads.insert(payloads.begin()+static_cast<std::ptrdiff_t>(insertAt),std::move(duplicatePayload));
+  newFrames.insert(newFrames.begin()+static_cast<std::ptrdiff_t>(insertAt),std::move(duplicateFrame));
  }else{
   payloads.erase(payloads.begin()+static_cast<std::ptrdiff_t>(frameIndex));
   newFrames.erase(newFrames.begin()+static_cast<std::ptrdiff_t>(frameIndex));
