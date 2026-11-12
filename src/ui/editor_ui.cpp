@@ -3895,8 +3895,6 @@ void EditorUI::drawAnimationViewer(){
   }
  }
  
- }
- dl->PopClipRect();
  // Transform handles are a true viewport overlay: draw them after the model,
  // collision geometry, and depth-tested GPU image so they remain unobscured.
  if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
@@ -3918,6 +3916,9 @@ void EditorUI::drawAnimationViewer(){
    gizmoOverlay->PopClipRect();
   }
  }
+
+ }
+ dl->PopClipRect();
  // Keep concise, individually aligned control hints inside the viewport.
  // Right-align every line so the help reads as a tidy control list.
  const char*viewerHelpLines[]={
