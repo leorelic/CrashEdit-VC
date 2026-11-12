@@ -3522,7 +3522,7 @@ void EditorUI::drawAnimationViewer(){
    if(!indices.empty()&&!nsf_.setAnimationFrameCollisions(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,values))status_="Collision transform rejected; last valid bounds kept until mouse release.";
   };
   int hoveredCollisionIndex=-1,hoveredCollisionCorner=-1;
-  if(animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse){float best=11.0f;for(std::size_t ci=0;ci<frame.collisions.size();++ci)for(int corner=0;corner<8;++corner){auto p=collisionPointPosition(int(ci),corner);auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f)continue;auto screen=projectCamera(cam);float d=std::hypot(screen.x-io.MousePos.x,screen.y-io.MousePos.y);if(d<=best){best=d;hoveredCollisionIndex=int(ci);hoveredCollisionCorner=corner;}}}
+  if(animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse){float best=14.0f;for(std::size_t ci=0;ci<frame.collisions.size();++ci)for(int corner=0;corner<8;++corner){auto p=collisionPointPosition(int(ci),corner);auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f)continue;auto screen=projectCamera(cam);float d=std::hypot(screen.x-io.MousePos.x,screen.y-io.MousePos.y);if(d<=best){best=d;hoveredCollisionIndex=int(ci);hoveredCollisionCorner=corner;}}}
   bool collisionDragStarted=false;
   if(animationCollisionViewer_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
    int axis=-1;bool canStart=false;auto p=collisionPivot();auto center=project(p.x,p.y,p.z);
@@ -3949,6 +3949,27 @@ void EditorUI::drawAnimationViewer(){
    for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
    for(int cornerIndex=0;cornerIndex<8;++cornerIndex){const auto&corner=corners[cornerIndex];if(corner.depth<=0.1f)continue;const int ci=static_cast<int>(&collision-&frame.collisions[0]);const bool selected=collisionSelected(ci,cornerIndex),hot=hoveredCollisionIndex==ci&&hoveredCollisionCorner==cornerIndex;const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):collisionLine;dl->AddCircleFilled(projectCamera(corner),selected?5.5f:4.0f,color,12);if(selected)dl->AddCircle(projectCamera(corner),7.0f,IM_COL32(245,245,245,255),12,1.2f);}
   }
+ }
+ // In textured mode the collision geometry is rendered into the GPU viewport.
+ // Add screen-space point markers afterward so hover and selection feedback stays
+ // visible and clickable in both textured and wireframe viewing modes.
+ if(animationCollisionViewer_&&!animationWireframe_&&!frame.collisions.empty()){
+  ImDrawList*collisionOverlay=ImGui::GetForegroundDrawList();
+  collisionOverlay->PushClipRect(canvasMin,canvasMax,true);
+  for(std::size_t ci=0;ci<frame.collisions.size();++ci){
+   for(int corner=0;corner<8;++corner){
+    const auto point=collisionPointPosition(static_cast<int>(ci),corner);
+    const auto camera=toCamera(point.x,point.y,point.z);
+    if(camera.depth<=0.1f)continue;
+    const ImVec2 screen=projectCamera(camera);
+    const bool selected=collisionSelected(static_cast<int>(ci),corner);
+    const bool hot=hoveredCollisionIndex==static_cast<int>(ci)&&hoveredCollisionCorner==corner;
+    const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):IM_COL32(0,255,0,255);
+    collisionOverlay->AddCircleFilled(screen,selected?5.5f:hot?5.0f:4.0f,color,12);
+    if(selected)collisionOverlay->AddCircle(screen,7.5f,IM_COL32(245,245,245,255),12,1.2f);
+   }
+  }
+  collisionOverlay->PopClipRect();
  }
  
  if(animationCollisionViewer_&&!selectedCollisionPoints.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&(vertexToolMode!=VertexToolMode::Scale||selectedCollisionPoints.size()>=2U)){
