@@ -3158,6 +3158,18 @@ void EditorUI::drawAnimationViewer(){
  else if(!model->polygonsDecoded)ImGui::TextDisabled("Model topology unavailable: %s",model->polygonError.c_str());
  else ImGui::TextDisabled("%zu vertices | %zu triangles | %zu collisions",frame.vertices.size(),model->triangles.size(),frame.collisions.size());
  // The mode controls are viewport overlays; keep the canvas origin unchanged.
+  enum class VertexToolMode{FreeMove,AxisMove,Scale};
+  struct VertexDragState{
+   bool active=false;
+   int mode=0,axis=-1,entry=-1,frame=-1;
+   ImVec2 mouseStart{};
+   float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f;
+   float pivotDepth=0.0f;
+   std::vector<int> indices;
+   std::vector<Crash::NsfAnimationVertex> original;
+  };
+  static VertexToolMode vertexToolMode=VertexToolMode::FreeMove;
+  static VertexDragState vertexDrag;
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
@@ -3372,18 +3384,6 @@ void EditorUI::drawAnimationViewer(){
   // Mouse transforms are kept local to the viewport and always derive from
   // the immutable vertex snapshot captured at drag start. This avoids
   // cumulative quantization while editing compressed temporal streams.
-  enum class VertexToolMode{FreeMove,AxisMove,Scale};
-  struct VertexDragState{
-   bool active=false;
-   int mode=0,axis=-1,entry=-1,frame=-1;
-   ImVec2 mouseStart{};
-   float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f;
-   float pivotDepth=0.0f;
-   std::vector<int> indices;
-   std::vector<Crash::NsfAnimationVertex> original;
-  };
-  static VertexToolMode vertexToolMode=VertexToolMode::FreeMove;
-  static VertexDragState vertexDrag;
   if(vertexDrag.active&&(vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex||!ImGui::IsMouseDown(ImGuiMouseButton_Left)))vertexDrag.active=false;
   const float modelScaleX=model?static_cast<float>(model->scaleX)/(3200.0f*128.0f):1.0f/128.0f;
   const float modelScaleY=model?static_cast<float>(model->scaleY)/(3200.0f*128.0f):1.0f/128.0f;
@@ -3440,14 +3440,17 @@ void EditorUI::drawAnimationViewer(){
      else rawDz=amount/modelScaleY;
     }
    }else{
-    const float startRadius=std::max(18.0f,std::sqrt(std::pow(vertexDrag.mouseStart.x-project(sx,sy,sz).x,2.0f)+std::pow(vertexDrag.mouseStart.y-project(sx,sy,sz).y,2.0f)));
+    const float startRadius=20.0f;
     const float factor=std::clamp(1.0f+(delta.x-delta.y)/startRadius,0.05f,8.0f);
     std::vector<Crash::NsfAnimationVertex> targets;targets.reserve(vertexDrag.original.size());
     for(const auto&v:vertexDrag.original){
      Crash::NsfAnimationVertex target=v;
-     target.x=static_cast<int>(std::lround(sx/modelScaleX+(static_cast<float>(v.x)-sx/modelScaleX)*factor));
-     target.y=static_cast<int>(std::lround(sz/modelScaleZ+(static_cast<float>(v.y)-sz/modelScaleZ)*factor));
-     target.z=static_cast<int>(std::lround(sy/modelScaleY+(static_cast<float>(v.z)-sy/modelScaleY)*factor));
+     const float pivotRawX=sx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f;
+     const float pivotRawY=sz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f;
+     const float pivotRawZ=sy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f;
+     target.x=static_cast<int>(std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor));
+     target.y=static_cast<int>(std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor));
+     target.z=static_cast<int>(std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor));
      targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
@@ -3479,14 +3482,18 @@ void EditorUI::drawAnimationViewer(){
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex)&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
-   int dragAxis=-1;bool canStart=vertexToolMode!=VertexToolMode::AxisMove;
-   if(vertexToolMode==VertexToolMode::AxisMove){
-    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
-    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);
-    float best=12.0f;
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.12f&&distance<best){best=distance;dragAxis=axis;}}
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
+   int dragAxis=-1;bool canStart=false;
+   const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
+   if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
+    canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
+   else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
+    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);float best=10.0f;
+    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.55f&&distance<best){best=distance;dragAxis=axis;}}
     canStart=dragAxis>=0;
+   }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
+    const ImVec2 handle(center.x+14.0f,center.y-14.0f);const float dx=io.MousePos.x-handle.x,dy=io.MousePos.y-handle.y;
+    canStart=std::sqrt(dx*dx+dy*dy)<=10.0f;
    }
    if(canStart)vertexDragStarted=beginVertexDrag(dragAxis);
   }
