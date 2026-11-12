@@ -207,3 +207,32 @@ The t/net9 source confirms the following Model implementation details:
 - The CrashEdit-RE ModelBox has General, Polygons, Colors, Textures, Extended Textures and (for compressed models) Positions pages. The model's polygon page exposes both the raw command stream and reconstructed triangles. The ModelBox removes its separate Vertices page for Model entries; that page is for Scenery.
 
 These are **source-confirmed for t/net9**, not yet sample-confirmed against multiple Crash 2 NSF files and not proof that the native implementation already matches every edge case.
+
+## Major milestone — Face Texture Selector and unrestricted triangle UV placement
+
+**Implemented/tested — user-confirmed on 2026-11-12 (TNT Box):** the Animation Editor's in-viewport Face Texture Selector can now select previously inaccessible regions of a model's texture atlas and reposition the selected face's texture mapping there. This is the first user-confirmed completion of the direct atlas-based face UV workflow. The same test on Cr10T and additional models/color modes remains pending; do not generalize the TNT Box result to every model yet.
+
+### What the implementation does
+
+- The atlas is displayed inside the selector's available viewport, and its image and click target use the same fitted rectangle. This prevents visible atlas regions from falling outside the selector's hit-test area.
+- A click is converted into a target atlas position. The existing face UV mapping is translated to that position rather than replacing its four UV corners with an axis-aligned rectangle. Relative UV shape is therefore preserved.
+- The selected triangle's visible mapping is defined by UV1, UV2 and UV3. The auxiliary fourth UV corner (UV4) is not allowed to restrict otherwise valid triangle placement.
+- UV4 is translated along with the mapping when its local byte coordinates remain representable. If it cannot be represented at the translated position, its previous raw values are retained rather than clamping the triangle's selection back toward an unrelated region.
+- The existing texture descriptor assignment and fixed-size NSF write path remain in use; this milestone does not introduce a separate or alternate serializer.
+
+### Root-cause correction trail
+
+The first attempted repair only changed atlas sizing. It did not solve the underlying coordinate restriction and produced a misleading result where clicks in the unavailable area snapped to the nearest legal square. The actual restriction was in the UV translation constraints: UV4 was included in the bounds used to decide whether UV1-UV3 could move. Since UV4 is not one of the selected triangle's three visible corners, it must not constrain that triangle's atlas placement.
+
+The final correction narrows the horizontal segment-fit and vertical byte-range constraints to UV1-UV3, while preserving UV4 when safely representable. The viewport-fit correction is retained as a separate hit-testing safeguard, not treated as the core UV fix.
+
+### Implementation and verification trail
+
+- `2d4b731` — preserve the face's existing UV shape when moving its atlas selection.
+- `7043352` — fit the atlas to the selector viewport so the visible image and clickable area agree.
+- `1e6a172` — remove UV4 from the triangle placement constraints and retain it safely when possible.
+- GitHub Actions workflow [#1017](https://github.com/leorelic/CrashEdit-VC/actions/runs/43113110594) passed on Windows, Ubuntu 22.04 and macOS.
+- **User validation:** TNT Box face atlas selection confirmed working on 2026-11-12.
+- **Still pending:** repeat the full-atlas click/selection test on Cr10T, especially the regions that were previously inaccessible, and verify representative 4-bit, 8-bit and 16-bit descriptors. Also verify save/reopen behavior with a real edited NSF before claiming archive-wide validation.
+
+This milestone establishes the direct UV-selection workflow for the tested TNT Box case. It does not complete variable-size Model serialization, topology editing, universal TPAG/CLUT resolution, or broad real-sample round-trip validation.
