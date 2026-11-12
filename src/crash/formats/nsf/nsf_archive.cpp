@@ -2,6 +2,7 @@
 #include "crash/formats/eid.hpp"
 #include "crash/formats/gool/gool_opcodes.hpp"
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <unordered_map>
@@ -714,6 +715,125 @@ bool NsfArchive::setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_
  entry.gool.frameGroups[groupIndex].interpolated=interpolated;
  return true;
 }
+
+static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t frameIndex,bool insert,std::size_t insertAt){
+ auto&animation=entry.animation;
+ const std::size_t oldCount=entry.items.size();
+ if(!entry.valid||entry.type!=1U||!animation.decoded||oldCount==0U||oldCount!=animation.frames.size())return false;
+ if(insert){
+  if(frameIndex>=oldCount||insertAt>oldCount)return false;
+ }else if(oldCount<=1U||frameIndex>=oldCount)return false;
+ const std::uint32_t entryCount=u32(chunk.bytes,8U);
+ if(entryCount!=chunk.entries.size()||entryCount==0U)return false;
+ const std::size_t entryIndex=static_cast<std::size_t>(&entry-chunk.entries.data());
+ if(entryIndex>=chunk.entries.size())return false;
+ const std::size_t oldEntryEnd=entry.offset+entry.size;
+ const std::size_t offsetTableEnd=16U+(static_cast<std::size_t>(entryCount)+1U)*4U;
+ if(entry.offset<offsetTableEnd||oldEntryEnd>NsfChunkSize)return false;
+ const std::size_t sentinelOffset=16U+static_cast<std::size_t>(entryCount)*4U;
+ const std::size_t usedEnd=u32(chunk.bytes,sentinelOffset);
+ if(usedEnd<oldEntryEnd||usedEnd>NsfChunkSize)return false;
+ const std::size_t oldHeaderEnd=16U+(oldCount+1U)*4U;
+ if(entry.size<oldHeaderEnd)return false;
+ const std::size_t firstItemOffset=entry.items.front().offset-entry.offset;
+ if(firstItemOffset<oldHeaderEnd||firstItemOffset>entry.size)return false;
+ const std::size_t prefixPadding=firstItemOffset-oldHeaderEnd;
+ std::vector<std::vector<std::uint8_t>>payloads;
+ payloads.reserve(oldCount+(insert?1U:static_cast<std::size_t>(-1)));
+ for(std::size_t i=0;i<oldCount;++i){
+  const auto&item=entry.items[i];
+  if(item.offset<entry.offset||item.offset+item.size>oldEntryEnd||!has(chunk.bytes,item.offset,item.size))return false;
+  payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(item.offset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(item.offset+item.size));
+ }
+ std::vector<NsfAnimationFrame>newFrames=animation.frames;
+ if(insert){
+  payloads.insert(payloads.begin()+static_cast<std::ptrdiff_t>(insertAt),payloads[frameIndex]);
+  newFrames.insert(newFrames.begin()+static_cast<std::ptrdiff_t>(insertAt),newFrames[frameIndex]);
+ }else{
+  payloads.erase(payloads.begin()+static_cast<std::ptrdiff_t>(frameIndex));
+  newFrames.erase(newFrames.begin()+static_cast<std::ptrdiff_t>(frameIndex));
+ }
+ const std::size_t newCount=payloads.size();
+ if(newCount==0U||newCount>std::numeric_limits<std::uint32_t>::max())return false;
+ const std::size_t newHeaderEnd=16U+(newCount+1U)*4U;
+ const std::size_t newFirstItemOffset=newHeaderEnd+prefixPadding;
+ std::size_t newEntrySize=newFirstItemOffset;
+ for(const auto&payload:payloads){
+  if(payload.size()>NsfChunkSize-newEntrySize)return false;
+  newEntrySize+=payload.size();
+ }
+ if(entry.offset>NsfChunkSize||newEntrySize>NsfChunkSize-entry.offset)return false;
+ const std::ptrdiff_t delta=static_cast<std::ptrdiff_t>(newEntrySize)-static_cast<std::ptrdiff_t>(entry.size);
+ const std::ptrdiff_t newUsedEndSigned=static_cast<std::ptrdiff_t>(usedEnd)+delta;
+ if(newUsedEndSigned<0||newUsedEndSigned>static_cast<std::ptrdiff_t>(NsfChunkSize))return false;
+ std::vector<std::uint8_t>newEntry(newEntrySize,0U);
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset),16U,newEntry.begin());
+ auto write32=[](std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32_t value){
+  for(unsigned i=0;i<4U;++i)bytes[offset+i]=static_cast<std::uint8_t>(value>>(i*8U));
+ };
+ write32(newEntry,12U,static_cast<std::uint32_t>(newCount));
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset+oldHeaderEnd),prefixPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(newHeaderEnd));
+ std::size_t cursor=newFirstItemOffset;
+ for(std::size_t i=0;i<newCount;++i){
+  write32(newEntry,16U+i*4U,static_cast<std::uint32_t>(cursor));
+  if(!payloads[i].empty())std::copy(payloads[i].begin(),payloads[i].end(),newEntry.begin()+static_cast<std::ptrdiff_t>(cursor));
+  cursor+=payloads[i].size();
+ }
+ write32(newEntry,16U+newCount*4U,static_cast<std::uint32_t>(cursor));
+ const std::size_t suffixSize=usedEnd-oldEntryEnd;
+ if(suffixSize>0U)std::memmove(chunk.bytes.data()+static_cast<std::ptrdiff_t>(static_cast<std::size_t>(static_cast<std::ptrdiff_t>(oldEntryEnd)+delta)),chunk.bytes.data()+static_cast<std::ptrdiff_t>(oldEntryEnd),suffixSize);
+ std::copy(newEntry.begin(),newEntry.end(),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset));
+ entry.size=newEntrySize;
+ entry.itemCount=static_cast<std::uint32_t>(newCount);
+ entry.items.clear();
+ entry.items.reserve(newCount);
+ for(std::size_t i=0;i<newCount;++i){
+  const std::size_t start=u32(chunk.bytes,entry.offset+16U+i*4U);
+  const std::size_t end=u32(chunk.bytes,entry.offset+16U+(i+1U)*4U);
+  entry.items.push_back({entry.offset+start,end-start});
+ }
+ for(std::size_t i=entryIndex+1U;i<chunk.entries.size();++i){
+  auto&following=chunk.entries[i];
+  following.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(following.offset)+delta);
+  for(auto&item:following.items)item.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(item.offset)+delta);
+ }
+ for(std::size_t i=0;i<chunk.entries.size();++i)
+  write32(chunk.bytes,16U+i*4U,static_cast<std::uint32_t>(chunk.entries[i].offset));
+ write32(chunk.bytes,sentinelOffset,static_cast<std::uint32_t>(newUsedEndSigned));
+ animation.frames=std::move(newFrames);
+ for(std::size_t i=0;i<animation.frames.size();++i){
+  animation.frames[i].rawOffset=entry.items[i].offset;
+  animation.frames[i].rawSize=entry.items[i].size;
+ }
+ return true;
+}
+
+bool NsfArchive::appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex){
+ if(chunkIndex>=chunks_.size())return false;
+ auto&chunk=chunks_[chunkIndex];
+ if(chunk.type!=0U||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];
+ if(entry.animation.frames.empty())return false;
+ const std::size_t last=entry.animation.frames.size()-1U;
+ return rebuildAnimationFrameItems(chunk,entry,last,true,entry.animation.frames.size());
+}
+bool NsfArchive::insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex){
+ if(chunkIndex>=chunks_.size())return false;
+ auto&chunk=chunks_[chunkIndex];
+ if(chunk.type!=0U||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];
+ if(frameIndex>=entry.animation.frames.size())return false;
+ return rebuildAnimationFrameItems(chunk,entry,frameIndex,true,frameIndex+1U);
+}
+bool NsfArchive::deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex){
+ if(chunkIndex>=chunks_.size())return false;
+ auto&chunk=chunks_[chunkIndex];
+ if(chunk.type!=0U||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];
+ if(entry.animation.frames.size()<=1U||frameIndex>=entry.animation.frames.size())return false;
+ return rebuildAnimationFrameItems(chunk,entry,frameIndex,false,0U);
+}
+
 bool NsfArchive::setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value){
  if(chunkIndex>=chunks_.size())return false;
  auto& chunk=chunks_[chunkIndex];
