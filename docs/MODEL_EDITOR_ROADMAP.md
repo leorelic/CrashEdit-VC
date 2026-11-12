@@ -204,7 +204,7 @@ The private companion repository `leorelic/CrashEdit-VC-Game-Samples` contains:
 
 The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture descriptors, 90 color records, 14 extended-texture records and one TPAG EID. All 14 extended records are flipbook-style (not LOD); animated triangles resolve through texture indices 0–13. The Cr10V sample has 11 frames, each with 309 vertices, and every frame links to Cr10G. The decoded model triangle count matches the Model header. Preserve these sample facts as regression expectations, but continue investigating the exact descriptor-index boundary semantics rather than assuming the final offset/mask range is invalid.
 
-## Current implementation status (2026-11-12)
+## Current implementation status (2026-11-13)
 
 - [x] Animation vertex point display, V shortcut, depth-aware overlay, hover/selection and selected-vertex inspection — user-confirmed working before this implementation.
 - [x] Shared decoded Model data supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
@@ -257,7 +257,7 @@ Implementation trail:
 
 ---
 
-## Animation and Model authoring roadmap — 2026-11-12
+## Animation and Model authoring roadmap — updated 2026-11-13
 
 This is the agreed implementation order for the next stage of Crash 2 animation/model authoring. The existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, and face texture workflow are foundations to extend—not replace. Preserve working controls and rendering behavior while adding each capability as a small, independently testable step.
 
@@ -278,22 +278,35 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 ### 2. Multi-vertex selection and editing
 
 - [x] Support Shift-click selection and deselection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
-- [ ] Add visible vertex-edit toolbar modes beside the existing viewport controls (implemented; pending user interaction validation):
+- [x] Add visible vertex-edit toolbar modes beside the existing viewport controls; Free Move, Axis Move and Scale have been built and user-validated:
   - **Free movement:** drag selected vertices in the camera view plane.
   - **Axis movement:** display X/Y/Z gizmo axes and constrain movement to the selected axis.
   - **Scale:** drag the scale handle to scale selected vertices symmetrically around their shared center.
 - [x] Keep the existing numeric vertex controls as a precise fallback; editing a selected coordinate applies the same relative offset to every selected vertex, with a copied-archive preflight before live writes.
-- [ ] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block (implemented; pending user interaction validation).
+- [x] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block; user-confirmed working.
 - [x] Confirm the Crash 2 frame coordinate representation: observed animation vertex coordinates stay within 0–254, regardless of the object's apparent in-game size. Enforce 0–254 for Crash 2 writes; keep Crash 3's separate byte-space behavior unchanged pending its own research. Compressed-model temporal deltas impose additional per-vertex bit-width limits. Do not widen, clamp or wrap coordinates.
-- [ ] Preserve the existing per-frame vertex encoding and re-decode the edited frame after each committed transform. Drag transforms are calculated from the immutable positions captured at drag start and submitted through the atomic batch setter; unrepresentable edits are rejected without partial writes (implemented; pending user interaction validation).
+- [x] Preserve the existing per-frame vertex encoding and re-decode the edited frame after each committed transform. Drag transforms are calculated from the immutable positions captured at drag start and submitted through the atomic batch setter; out-of-range coordinates retain the last valid value until mouse release. User-confirmed working.
 
-### 3. Collision editing
+### 3. Collision editing — completed major milestone (2026-11-13)
 
-- [ ] Extend the existing depth-aware collision viewer into an editing mode activated alongside the `C` collision toggle.
-- [ ] Provide visible free-movement and axis-constrained toolbar modes, matching the vertex-edit workflow.
-- [ ] Allow selecting collision points/handles and moving or resizing the selected collision geometry with the mouse.
-- [ ] Keep numeric collision-field editing available as a precise fallback.
-- [ ] Preserve the existing collision rendering order, visibility, and raw 0x28-byte collision record representation.
+<badge color="success">User-confirmed complete</badge>
+
+The user has built and tested the collision editor and explicitly confirmed that the final interaction fixes work perfectly. The implementation uses six selectable rectangular faces rather than independently selectable corner points.
+
+- [x] Extend the existing depth-aware collision viewer into a selectable, editable collision-face workflow activated alongside the `C` collision toggle.
+- [x] Correct collision face picking to use the same X/Y/Z coordinate mapping as the renderer.
+- [x] Select any of the six rectangle faces; highlight hovered and selected faces in textured and wireframe modes.
+- [x] Shift-click add multiple faces to the selection without toggling earlier selections off. This supports selecting opposite sides of a box.
+- [x] Axis Move updates the selected face boundary; the shared stored boundary moves all four corners together while the opposite side remains fixed.
+- [x] Scale requires the corresponding opposite faces to be selected and scales both boundaries symmetrically around their shared center.
+- [x] Give gizmo handles and scale controls mouse-input priority over camera orbit, with forgiving hit regions.
+- [x] Remove Free Move from Collision Editing; it remains available for vertex editing.
+- [x] Preserve the existing collision rendering, raw 0x28-byte collision record representation, and transactional frame/archive write path.
+- [x] User-confirmed working after local build and interaction testing (2026-11-13).
+
+Implementation trail:
+- `10d07b5` — six-face selection, corrected collision coordinate mapping, shared-boundary transforms, and face overlays.
+- `f058b2e` — reliable gizmo input priority, additive Shift selection, removal of collision Free Move, and symmetric two-sided scaling.
 
 ### 4. Optional editor-only Bone Rig Creator
 
