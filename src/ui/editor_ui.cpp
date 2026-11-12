@@ -3834,7 +3834,7 @@ void EditorUI::drawAnimationViewer(){
        constexpr float collisionScale=102400.0f;
        const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
        const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
-       std::vector<Vertex> collisionFaces,collisionLines,collisionPoints;
+       std::vector<Vertex> collisionFaces,collisionLines;
        auto appendCollisionVertex=[&](std::vector<Vertex>&out,const CameraPoint&cam,ImU32 color){
         if(cam.depth<=0.05f)return false;
         const float nx=(cam.x*focal/cam.depth)/canvasSize.x*2.0f;
@@ -3875,8 +3875,6 @@ void EditorUI::drawAnimationViewer(){
          appendCollisionVertex(collisionLines,a,IM_COL32(0,255,0,255));
          appendCollisionVertex(collisionLines,b,IM_COL32(0,255,0,255));
         }
-        for(const auto&corner:corners)
-         appendCollisionVertex(collisionPoints,corner,IM_COL32(0,255,0,255));
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);
        GL::DepthFunc(0x0203U);GL::DepthMask(0);GL::BlendEquation(0x8006U);GL::BlendFuncSeparate(0x0302U,0x0303U,1U,0x0303U);
@@ -3886,12 +3884,6 @@ void EditorUI::drawAnimationViewer(){
         GL::BufferData(0x8892U,GL::SizePtr(collisionLines.size()*sizeof(Vertex)),collisionLines.data(),0x88E8U);
         GL::DrawArrays(0x0001U,0,int(collisionLines.size()));
         GL::LineWidth(1.0f);
-       }
-       if(!collisionPoints.empty()){
-        GL::PointSize(7.0f);
-        GL::BufferData(0x8892U,GL::SizePtr(collisionPoints.size()*sizeof(Vertex)),collisionPoints.data(),0x88E8U);
-        GL::DrawArrays(0x0000U,0,int(collisionPoints.size()));
-        GL::PointSize(1.0f);
        }
        GL::DepthFunc(0x0201U);GL::DepthMask(1);
       }
