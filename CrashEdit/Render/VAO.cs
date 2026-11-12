@@ -1,0 +1,258 @@
+﻿using CrashEdit.Crash;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+namespace CrashEdit.CE
+{
+    public sealed class VAO : IDisposable
+    {
+        private readonly Stopwatch watch = new();
+
+        public int ID { get; }
+
+        public VBO VBO { get; }
+
+        public Shader Shader { get; }
+
+        public PrimitiveType Primitive { get; set; }
+
+        public Vertex[] Verts => VBO.Verts;
+        public int CurVert { get => VBO.CurVert; set => VBO.CurVert = value; }
+
+        private static readonly HashSet<string> WarnedShaders = [];
+
+        private void EnableAttrib(string attrib_name, int size, VertexAttribPointerType type, bool normalized, string field_name)
+        {
+            int temp = GL.GetAttribLocation(Shader.ID, attrib_name);
+            if (temp == -1)
+            {
+                if (!WarnedShaders.Contains(Shader.Name))
+                    Console.WriteLine($"in shader {Shader.Name} did not find attrib {attrib_name}");
+            }
+            else
+            {
+                GL.EnableVertexAttribArray(temp);
+                GL.VertexAttribPointer(temp, size, type, normalized, Vertex.SIZEOF, Marshal.OffsetOf<Vertex>(field_name));
+            }
+        }
+
+        private void EnableAttribI(string attrib_name, int size, VertexAttribIntegerType type, string field_name)
+        {
+            int temp = GL.GetAttribLocation(Shader.ID, attrib_name);
+            if (temp == -1)
+            {
+                if (!WarnedShaders.Contains(Shader.Name))
+                    Console.WriteLine($"in shader {Shader.Name} did not find attrib {attrib_name}");
+            }
+            else
+            {
+                GL.EnableVertexAttribArray(temp);
+                GL.VertexAttribIPointer(temp, size, type, Vertex.SIZEOF, Marshal.OffsetOf<Vertex>(field_name));
+            }
+        }
+
+        private void EnableCommonAttribs()
+        {
+            // set up the array
+            GL.BindVertexArray(ID);
+            VBO.Bind();
+            EnableAttrib("position", 3, VertexAttribPointerType.Float, false, "trans");
+            EnableAttrib("uv", 2, VertexAttribPointerType.Float, false, "st");
+            EnableAttrib("normal", 4, VertexAttribPointerType.Int2101010Rev, true, "normal");
+            EnableAttrib("color", 4, VertexAttribPointerType.UnsignedByte, true, "rgba");
+            EnableAttribI("tex", 2, VertexAttribIntegerType.Short, "tex");
+            EnableAttrib("misc", 4, VertexAttribPointerType.Float, false, "misc");
+        }
+
+        public VAO(Shader shader, PrimitiveType prim, VBO buffer)
+        {
+            Shader = shader;
+            Primitive = prim;
+
+            // Create the vertex array object (VAO) and assign VBO
+            ID = GL.GenVertexArray();
+            VBO = buffer;
+
+            // set up the array
+            EnableCommonAttribs();
+            WarnedShaders.Add(Shader.Name);
+        }
+
+        public void TestRealloc() => VBO.TestRealloc();
+        public void TestRealloc(int vert_count)
+        {
+            VBO.TestRealloc(vert_count);
+        }
+        public void TestReallocExtra(int extra_verts) => VBO.TestRealloc(CurVert + extra_verts);
+
+        public ref Vertex GetCurrentVert() => ref Verts[VBO.CurVert];
+
+        public void CopyAttrib(int idx)
+        {
+            TestRealloc();
+            Verts[VBO.CurVert] = Verts[idx];
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, Rgba rgba = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.rgba = rgba;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, Vector2 st = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.st = st;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, Vector2 st = default, Rgba rgba = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.st = st;
+            v.rgba = rgba;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, Vector2 st = default, Rgba rgba = default, Vector4 misc = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.st = st;
+            v.rgba = rgba;
+            v.misc = misc;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, Vector4 misc = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.misc = misc;
+            VBO.CurVert++;
+        }
+
+        public void PushAttrib(Vector3 trans = default, int normal = default, Vector2 st = default, Rgba rgba = default, VertexTexInfo tex = default, Vector4 misc = default)
+        {
+            TestRealloc();
+            ref var v = ref GetCurrentVert();
+            v.trans = trans;
+            v.normal = normal;
+            v.st = st;
+            v.rgba = rgba;
+            v.tex = tex;
+            v.misc = misc;
+            VBO.CurVert++;
+        }
+
+        public void Dispose()
+        {
+            GL.DeleteVertexArray(ID);
+        }
+
+        public void DiscardVerts()
+        {
+            VBO.CurVert = 0;
+        }
+
+        public void Render(RenderInfo ri)
+        {
+            if (VBO.CurVert <= 0)
+                return;
+
+            if (ri == null)
+            {
+                throw new ArgumentException("null render context");
+            }
+
+            watch.Restart();
+
+            GLViewer.dbgContextDir.Add(Shader.Name);
+
+            GL.GetFloat(GetPName.LineWidth, out float glLineWidth);
+            GL.GetBoolean(GetPName.DepthTest, out bool glZBufRead);
+            GL.GetBoolean(GetPName.DepthWritemask, out bool glZBufWrite);
+            if (LineWidth > 0)
+            {
+                GL.LineWidth(LineWidth);
+            }
+            if (glZBufRead && ZBufDisableRead)
+            {
+                GL.Disable(EnableCap.DepthTest);
+            }
+            if (glZBufWrite && ZBufDisable)
+            {
+                GL.DepthMask(false);
+            }
+
+            // Bind the VAO
+            GL.BindVertexArray(ID);
+            VBO.Upload();
+            Shader.Render(ri, this);
+            GL.DrawArrays(Primitive, 0, VBO.CurVert);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.BindVertexArray(0);
+
+            if (glZBufWrite && ZBufDisable)
+            {
+                GL.DepthMask(true);
+            }
+            if (glZBufRead && ZBufDisableRead)
+            {
+                GL.Enable(EnableCap.DepthTest);
+            }
+            if (LineWidth > 0)
+            {
+                GL.LineWidth(glLineWidth);
+            }
+
+            GLViewer.dbgContextDir.RemoveLast();
+
+            ri.DebugRenderMs += watch.StopAndElapsedMillisecondsFull();
+        }
+
+        public void RenderAndDiscard(RenderInfo ri)
+        {
+            Render(ri);
+            DiscardVerts();
+        }
+
+        #region USER DATA (these can be whatever you want)
+        public Vector3 UserTrans;
+        public Vector3 UserRot;
+        public Vector3 UserScale;
+        public int UserCullMode; // 0 - no cull, 1 - backface (default), 2 - frontface
+        public float UserFloat;
+        public float UserFloat2;
+
+        public BlendMode BlendModes;
+        public int BlendMask;
+
+        public bool ZBufDisable;
+        public bool ZBufDisableRead;
+        public bool ZBufDisableWrite;
+        public float LineWidth;
+        #endregion
+    }
+}

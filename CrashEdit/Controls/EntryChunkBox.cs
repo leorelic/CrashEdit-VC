@@ -1,0 +1,59 @@
+using AltUI.Controls;
+using CrashEdit.Crash;
+
+namespace CrashEdit.CE
+{
+    public sealed class EntryChunkBox : UserControl
+    {
+        private EntryChunkController controller;
+
+        private int totalsize;
+
+        private DarkListBox lstEntryList;
+
+        public EntryChunkBox(EntryChunkController controller)
+        {
+            this.controller = controller;
+
+            BackColor = Color.FromArgb(31, 31, 32);
+            lstEntryList = new DarkListBox
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(31, 31, 32)
+            };
+
+            Controls.Add(lstEntryList);
+
+            Invalidated += EntryChunkBox_Invalidated;
+
+            PopulateList();
+        }
+
+        private void EntryChunkBox_Invalidated(object sender, InvalidateEventArgs e)
+        {
+            PopulateList();
+        }
+
+        private void PopulateList()
+        {
+            totalsize = 0;
+            lstEntryList.Items.Clear();
+            foreach (Entry entry in controller.EntryChunk.Entries)
+            {
+                var this_size = Aligner.Align(entry.Save().Length, controller.EntryChunk.Alignment);
+                lstEntryList.Items.Add(string.Format("{0}: {1} bytes", entry.EName, this_size));
+                totalsize += this_size;
+            }
+            lstEntryList.Items.Add(string.Format("Total size: {2} entries, {0} bytes ({1} remaining)", totalsize + 16 + ((controller.EntryChunk.Entries.Count + 1) * 4), Chunk.Length - (totalsize + 16 + ((controller.EntryChunk.Entries.Count + 1) * 4)), controller.EntryChunk.Entries.Count));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                lstEntryList.Dispose();
+            }
+        }
+    }
+}

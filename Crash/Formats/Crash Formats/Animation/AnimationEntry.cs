@@ -1,0 +1,55 @@
+namespace CrashEdit.Crash
+{
+    public sealed class AnimationEntry : Entry
+    {
+        public AnimationEntry(IEnumerable<Frame> frames, bool isnew, int eid) : base(eid)
+        {
+            Frames.AddRange(frames);
+            IsNew = isnew;
+        }
+
+        public override string Title => $"Animation ({EName})";
+        public override string ImageKey => "ThingLime";
+
+        public int SelectedVertex = -1;
+        public int HoveredVertex = -1;
+
+        public override int Type => 1;
+
+        [SubresourceList]
+        public List<Frame> Frames { get; } = new List<Frame>();
+
+        public bool IsNew { get; }
+
+        public override UnprocessedEntry Unprocess()
+        {
+            byte[][] items = new byte[Frames.Count][];
+            for (int i = 0; i < Frames.Count; i++)
+            {
+                items[i] = Frames[i].Save();
+            }
+            return new UnprocessedEntry(items, EID, Type);
+        }
+
+        public bool IsLerped(NSF nsf)
+        {
+            foreach (var gool in nsf.GetEntries<GOOLEntry>())
+            {
+                foreach (var group in gool.FrameGroups)
+                {
+                    if (group is VertexGroup3 vgroup3)
+                    {
+                        if (EID == vgroup3.EID)
+                            return vgroup3.Interpolated;
+                    }
+                    else if (group is VertexGroup2 vgroup2)
+                    {
+                        if (EID == vgroup2.EID)
+                            return vgroup2.Interpolated;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+}

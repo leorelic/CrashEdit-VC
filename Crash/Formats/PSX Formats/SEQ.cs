@@ -1,0 +1,147 @@
+namespace CrashEdit.Crash
+{
+    public sealed class SEQ
+    {
+        public const int Magic = 0x70514553;
+        public const int Version = 1;
+
+        public static SEQ Load(byte[] data)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            // All SEP/SEQ stuff is big-endian, like MIDI
+            if (data.Length < 15)
+            {
+                ErrorManager.SignalError("SEQ: Data is too short");
+            }
+            int magic = BEBitConv.FromInt32(data, 0);
+            int version = BEBitConv.FromInt32(data, 4);
+            if (magic != Magic)
+            {
+                ErrorManager.SignalIgnorableError("SEQ: Magic number is wrong");
+            }
+            if (version != Version)
+            {
+                ErrorManager.SignalIgnorableError("SEQ: Version number is wrong");
+            }
+            short resolution = BEBitConv.FromInt16(data, 8);
+            int tempo = MIDIConv.From3BE(data, 10);
+            short rhythm = BEBitConv.FromInt16(data, 13);
+            byte[] scoredata = new byte[data.Length - 15];
+            Array.Copy(data, 15, scoredata, 0, scoredata.Length);
+            return new SEQ(resolution, tempo, rhythm, scoredata);
+        }
+
+        public SEQ(short resolution, int tempo, short rhythm, byte[] data)
+        {
+            if ((tempo & 0xFF000000) != 0)
+                throw new ArgumentOutOfRangeException(nameof(tempo));
+            Resolution = resolution;
+            Tempo = tempo;
+            Rhythm = rhythm;
+            Data = data ?? throw new ArgumentNullException(nameof(data));
+        }
+
+        public short Resolution { get; }
+        public int Tempo { get; }
+        public short Rhythm { get; }
+        public byte[] Data { get; }
+
+        // A tempo that will be set by the last tempo change event in the SEQ.
+        public int FakeTempo { get; set; }
+
+        public byte[] Save()
+        {
+            byte[] result = new byte[15 + Data.Length];
+            BEBitConv.ToInt32(result, 0, Magic);
+            BEBitConv.ToInt32(result, 4, Version);
+            BEBitConv.ToInt16(result, 8, Resolution);
+            MIDIConv.To3BE(result, 10, Tempo);
+            BEBitConv.ToInt16(result, 13, Rhythm);
+            Data.CopyTo(result, 15);
+            return result;
+        }
+
+        public byte[] ToMIDI()
+        {
+            byte[] Data = FixSEQ(this.Data);
+
+            RIFF riff = new RIFF("MIDI");
+
+            // MThd
+            byte[] mthd = new byte[6];
+            BEBitConv.ToInt16(mthd, 0, 0);
+            BEBitConv.ToInt16(mthd, 2, 1);
+            BEBitConv.ToInt16(mthd, 4, Resolution);
+            riff.Items.Add(new RIFFData("MThd", mthd));
+            byte[] mtrk = new byte[15 + Data.Length];
+            mtrk[0] = 0;
+            mtrk[1] = 0xFF;
+            mtrk[2] = 0x51;
+            mtrk[3] = 0x03;
+            MIDIConv.To3BE(mtrk, 4, Tempo);
+            mtrk[7] = 0;
+            mtrk[8] = 0xFF;
+            mtrk[9] = 0x58;
+            mtrk[10] = 0x04;
+            BEBitConv.ToInt16(mtrk, 11, Rhythm);
+            mtrk[13] = 0x18;
+            mtrk[14] = 0x08;
+            Data.CopyTo(mtrk, 15);
+
+            // MTrk
+            riff.Items.Add(new RIFFData("MTrk", mtrk));
+
+            return riff.SaveBody(Endianness.BigEndian);
+        }
+
+        private byte[] FixSEQ(byte[] data)
+        {
+            // Convert SEQ tempo to midi tempo.
+            byte[] pattern = new byte[] { 0xFF, 0x51 };
+            byte byteToInsert = 0x03;
+
+            List<byte> list = new List<byte>(data);
+            int pos = 0;
+            while (pos <= list.Count - pattern.Length)
+            {
+                int index = -1;
+                for (int i = pos; i <= list.Count - pattern.Length; i++)
+                {
+                    bool found = true;
+                    for (int j = 0; j < pattern.Length; j++)
+                    {
+                        if (list[i + j] != pattern[j])
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+                    if (found)
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index == -1) break;
+                else
+                {
+                    int insertIndex = index + pattern.Length;
+
+                    if (insertIndex < list.Count && list[insertIndex] == byteToInsert)
+                    {
+                        pos = insertIndex + 1;
+                    }
+                    else
+                    {
+                        FakeTempo = MIDIConv.From3BE(list.ToArray(), insertIndex);
+                        list.Insert(insertIndex, byteToInsert);
+                        Console.WriteLine($"  SEQ: Fixed Tempo event at 0x{index:X}, {FakeTempo:X}.");
+                        pos = insertIndex + 1;
+                    }
+                }
+            }
+            return list.ToArray();
+        }
+    }
+}

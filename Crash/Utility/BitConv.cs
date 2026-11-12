@@ -1,0 +1,183 @@
+namespace CrashEdit.Crash
+{
+    public static class BitConv
+    {
+        public static short FromInt16(byte[] str, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 2 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            int result = 0;
+            result |= str[offset + 0] << 8 * 0;
+            result |= str[offset + 1] << 8 * 1;
+            return (short)result;
+        }
+
+        public static ushort FromUInt16(byte[] str, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 2 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            int result = 0;
+            result |= str[offset + 0] << 8 * 0;
+            result |= str[offset + 1] << 8 * 1;
+            return (ushort)result;
+        }
+
+        public static int FromInt24(byte[] str, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 3 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            int result = 0;
+            result |= str[offset + 0] << 8 * 0;
+            result |= str[offset + 1] << 8 * 1;
+            result |= str[offset + 2] << 8 * 2;
+            if ((result & 0x800000) != 0)
+            {
+                unchecked
+                {
+                    result |= (int)0xFF000000;
+                }
+            }
+            return result;
+        }
+
+        public static int FromInt32(byte[] str, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 4 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            int result = 0;
+            result |= str[offset + 0] << 8 * 0;
+            result |= str[offset + 1] << 8 * 1;
+            result |= str[offset + 2] << 8 * 2;
+            result |= str[offset + 3] << 8 * 3;
+            return result;
+        }
+
+        public static int FromInt32(ReadOnlySpan<byte> str, int offset)
+        {
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 4 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            int result = 0;
+            result |= str[offset + 0] << 8 * 0;
+            result |= str[offset + 1] << 8 * 1;
+            result |= str[offset + 2] << 8 * 2;
+            result |= str[offset + 3] << 8 * 3;
+            return result;
+        }
+
+        public static long FromInt64(byte[] str, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 8 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            long result = 0;
+            result |= (long)str[offset + 0] << 8 * 0;
+            result |= (long)str[offset + 1] << 8 * 1;
+            result |= (long)str[offset + 2] << 8 * 2;
+            result |= (long)str[offset + 3] << 8 * 3;
+            result |= (long)str[offset + 4] << 8 * 4;
+            result |= (long)str[offset + 5] << 8 * 5;
+            result |= (long)str[offset + 6] << 8 * 6;
+            result |= (long)str[offset + 7] << 8 * 7;
+            return result;
+        }
+
+        public static void ToInt16(byte[] str, int offset, short value)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 2 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            str[offset] = (byte)value;
+            str[offset + 1] = (byte)(value >> 8);
+        }
+
+        public static void ToUInt16(byte[] str, int offset, ushort value)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 2 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            str[offset] = (byte)value;
+            str[offset + 1] = (byte)(value >> 8);
+        }
+
+
+        public static void ToInt24(byte[] str, int offset, int value)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 3 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (value < -8388608 || value > 8388607)
+                throw new ArgumentOutOfRangeException(nameof(value));
+            str[offset] = (byte)value;
+            str[offset + 1] = (byte)(value >> 8);
+            str[offset + 2] = (byte)(value >> 8 * 2);
+        }
+
+        public static void ToInt32(byte[] str, int offset, int value)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 4 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            str[offset] = (byte)value;
+            str[offset + 1] = (byte)(value >> 8);
+            str[offset + 2] = (byte)(value >> 8 * 2);
+            str[offset + 3] = (byte)(value >> 8 * 3);
+        }
+
+        public static void ToInt64(byte[] str, int offset, long value)
+        {
+            ArgumentNullException.ThrowIfNull(str);
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            if (offset + 8 > str.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            str[offset] = (byte)value;
+            str[offset + 1] = (byte)(value >> 8);
+            str[offset + 2] = (byte)(value >> 8 * 2);
+            str[offset + 3] = (byte)(value >> 8 * 3);
+            str[offset + 4] = (byte)(value >> 8 * 4);
+            str[offset + 5] = (byte)(value >> 8 * 5);
+            str[offset + 6] = (byte)(value >> 8 * 6);
+            str[offset + 7] = (byte)(value >> 8 * 7);
+        }
+
+        public static int FlipInt32(int value)
+        {
+            int result = 0;
+            result |= (value & 0xFF << 8 * 0) << 8 * 3;
+            result |= (value & 0xFF << 8 * 1) << 8 * 2;
+            result |= (value & 0xFF << 8 * 2) << 8 * 1;
+            result |= (value & 0xFF << 8 * 3) << 8 * 0;
+            return result;
+        }
+
+        // sign-extend values with nonconventional bit lengths
+        public static int SignExtendInt32(int value, int bitlength)
+        {
+            return value << (32 - bitlength) >> (32 - bitlength);
+        }
+    }
+}

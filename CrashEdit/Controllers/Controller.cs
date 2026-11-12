@@ -1,0 +1,47 @@
+using CrashEdit.Crash;
+
+namespace CrashEdit.CE
+{
+    public abstract class LegacyController : CrashEdit.LegacyController
+    {
+        public LegacyController(SubcontrollerGroup parentGroup, object resource) : base(parentGroup, resource) { }
+
+        protected void AddMenu(string text, ControllerMenuDelegate proc)
+        {
+            LegacyVerbs.Add(new LegacyVerb(text, new Action(proc)));
+        }
+
+        protected void AddMenu(string text, string imageKey, ControllerMenuDelegate proc)
+        {
+            LegacyVerbs.Add(new LegacyVerb(text, imageKey, new Action(proc)));
+        }
+
+        protected void AddMenuSeparator()
+        {
+            LegacyVerbs.Add(new LegacyVerb("-", () => { }));
+        }
+
+        public GameVersion GameVersion =>
+            (Modern.Root.Resource as LevelWorkspace)?.GameVersion ?? GameVersion.None;
+
+        public NSF GetNSF()
+        {
+            return (Modern.Root.Resource as LevelWorkspace)?.NSF;
+        }
+
+        public T? GetEntry<T>(int eid) where T : class, IEntry
+        {
+            return (Modern.Root?.Resource as LevelWorkspace)?.NSF?.GetEntry<T>(eid);
+        }
+
+        public IEnumerable<T> GetEntries<T>() where T : class, IEntry
+        {
+            return (Modern.Root.Resource as LevelWorkspace)?.NSF?.GetEntries<T>();
+        }
+
+        public string GetFileName()
+        {
+            return (Modern.Root.Resource as LevelWorkspace)?.FileName;
+        }
+    }
+}

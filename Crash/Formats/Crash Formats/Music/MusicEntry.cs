@@ -1,0 +1,67 @@
+namespace CrashEdit.Crash
+{
+    public sealed class MusicEntry : Entry
+    {
+        public MusicEntry(int vheid, int vb0eid, int vb1eid, int vb2eid, int vb3eid, int vb4eid, int vb5eid, int vb6eid, VH vh, SEP sep, int eid) : base(eid)
+        {
+            Tracks.AddRange(sep.SEQs);
+            VHEID = vheid;
+            VB0EID = vb0eid;
+            VB1EID = vb1eid;
+            VB2EID = vb2eid;
+            VB3EID = vb3eid;
+            VB4EID = vb4eid;
+            VB5EID = vb5eid;
+            VB6EID = vb6eid;
+            VH = vh;
+        }
+
+        public override string Title => $"Music ({EName})";
+        public override string ImageKey => "MusicNoteBlue";
+
+        public override int Type => 13;
+        public int VHEID { get; set; }
+        public int VB0EID { get; set; }
+        public int VB1EID { get; set; }
+        public int VB2EID { get; set; }
+        public int VB3EID { get; set; }
+        public int VB4EID { get; set; }
+        public int VB5EID { get; set; }
+        public int VB6EID { get; set; }
+
+        [SubresourceSlot(AllowNull = true)]
+        public VH VH { get; set; }
+
+        [SubresourceList]
+        public List<SEQ> Tracks { get; } = new List<SEQ>();
+
+        // FIXME? - resaving of unused instrument metadata causes mismatches in
+        // various game versions
+        public override bool IgnoreResaveErrors => true;
+
+        public override UnprocessedEntry Unprocess()
+        {
+            byte[][] items = new byte[3][];
+            items[0] = new byte[36];
+            BitConv.ToInt32(items[0], 0, Tracks.Count);
+            BitConv.ToInt32(items[0], 4, VHEID);
+            BitConv.ToInt32(items[0], 8, VB0EID);
+            BitConv.ToInt32(items[0], 12, VB1EID);
+            BitConv.ToInt32(items[0], 16, VB2EID);
+            BitConv.ToInt32(items[0], 20, VB3EID);
+            BitConv.ToInt32(items[0], 24, VB4EID);
+            BitConv.ToInt32(items[0], 28, VB5EID);
+            BitConv.ToInt32(items[0], 32, VB6EID);
+            if (VH != null)
+            {
+                items[1] = VH.Save();
+            }
+            else
+            {
+                items[1] = new byte[0];
+            }
+            items[2] = new SEP(Tracks).Save();
+            return new UnprocessedEntry(items, EID, Type);
+        }
+    }
+}
