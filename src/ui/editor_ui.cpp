@@ -3416,13 +3416,9 @@ void EditorUI::drawAnimationViewer(){
    animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
    return true;
   };
-  auto restoreVertexDragSnapshot=[&](){
-    std::vector<std::size_t> indices;indices.reserve(vertexDrag.indices.size());
-    for(const int index:vertexDrag.indices)indices.push_back(static_cast<std::size_t>(index));
-    nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,vertexDrag.original);
-   };
    auto applyVertexDrag=[&](){
    if(!vertexDrag.active||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex)return;
+   const int maximumCoordinate=animation.isCrash3?255:254;
    const float sx=vertexDrag.pivotX,sy=vertexDrag.pivotY,sz=vertexDrag.pivotZ;
    const ImVec2 delta(io.MousePos.x-vertexDrag.mouseStart.x,io.MousePos.y-vertexDrag.mouseStart.y);
    float rawDx=0.0f,rawDy=0.0f,rawDz=0.0f;
@@ -3454,13 +3450,13 @@ void EditorUI::drawAnimationViewer(){
      const float pivotRawX=sx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f;
      const float pivotRawY=sz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f;
      const float pivotRawZ=sy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f;
-     target.x=static_cast<int>(std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor));
-     target.y=static_cast<int>(std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor));
-     target.z=static_cast<int>(std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor));
+     target.x=std::clamp(static_cast<int>(std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor)),0,maximumCoordinate);
+     target.y=std::clamp(static_cast<int>(std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor)),0,maximumCoordinate);
+     target.z=std::clamp(static_cast<int>(std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor)),0,maximumCoordinate);
      targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
-     restoreVertexDragSnapshot();status_="The scale exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
+     if(status_!="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.";
     }
     return;
    }
@@ -3468,13 +3464,13 @@ void EditorUI::drawAnimationViewer(){
    indices.reserve(vertexDrag.indices.size());targets.reserve(vertexDrag.original.size());
    for(std::size_t i=0;i<vertexDrag.original.size();++i){
     auto target=vertexDrag.original[i];
-    target.x=static_cast<int>(std::lround(static_cast<float>(target.x)+rawDx));
-    target.y=static_cast<int>(std::lround(static_cast<float>(target.y)+rawDy));
-    target.z=static_cast<int>(std::lround(static_cast<float>(target.z)+rawDz));
+    target.x=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.x)+rawDx)),0,maximumCoordinate);
+    target.y=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.y)+rawDy)),0,maximumCoordinate);
+    target.z=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.z)+rawDz)),0,maximumCoordinate);
     indices.push_back(static_cast<std::size_t>(vertexDrag.indices[i]));targets.push_back(target);
    }
    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-    restoreVertexDragSnapshot();status_="The move exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
+    if(status_!="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.";
    }
   };
   int hoveredVertex=-1;
