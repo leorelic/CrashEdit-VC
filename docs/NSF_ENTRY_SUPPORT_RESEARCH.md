@@ -134,3 +134,6 @@ The currently completed vertex-marker milestone is recorded in [RESEARCH_NOTES.m
 ## Source-baseline correction
 
 All future format and UI comparisons in this roadmap use CrashEdit-RE's t/net branch. The previous research note that cited cbhacks/CrashEdit was an incorrect source selection and has been corrected in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). The Model Editor roadmap now cites the exact CrashEdit-RE source files and branch used for its findings.
+
+
+**Real-game texture-mod validation (2026-11-12):** the user confirmed a complete TNT Box workflow: edit the face texture in CrashEdit-VC, save the NSF, reopen it successfully in CrashEdit-RE, and load it in the original Crash Bandicoot 2 game. The in-game screenshot confirms the modified box textures render correctly. This is a targeted real-archive/game compatibility result for the tested face-texture edit; it does not yet establish compatibility for every model or color mode. See the end-to-end milestone in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
