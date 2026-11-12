@@ -3173,6 +3173,7 @@ void EditorUI::drawAnimationViewer(){
   struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>points;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
   static std::vector<std::pair<int,int>>selectedCollisionPoints;
+  static int selectedCollisionChunk=-1,selectedCollisionEntry=-1,selectedCollisionFrame=-1;
 
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
@@ -3478,6 +3479,7 @@ void EditorUI::drawAnimationViewer(){
    }
   };
 
+  if(selectedCollisionChunk!=animationViewerChunk_||selectedCollisionEntry!=animationViewerEntry_||selectedCollisionFrame!=poseFrameIndex){selectedCollisionPoints.clear();selectedCollisionChunk=animationViewerChunk_;selectedCollisionEntry=animationViewerEntry_;selectedCollisionFrame=poseFrameIndex;}
   constexpr float collisionPointScale=102400.0f;
   auto collisionPointPosition=[&](int ci,int corner){
    const auto&c=frame.collisions[static_cast<std::size_t>(ci)];
@@ -3544,7 +3546,7 @@ void EditorUI::drawAnimationViewer(){
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
@@ -3572,7 +3574,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&
      (vertexToolMode==VertexToolMode::FreeMove||!isAnimationVertexSelected(hoveredVertex))){
    if(io.KeyShift){
     const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
