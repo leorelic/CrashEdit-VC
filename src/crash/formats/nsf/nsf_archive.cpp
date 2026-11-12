@@ -168,7 +168,7 @@ bool NsfArchive::load(const std::filesystem::path&f,std::string&e){
  auto z=static_cast<std::uintmax_t>(end);if(z>std::numeric_limits<std::size_t>::max()){e="NSF file too large.";return false;}
  std::vector<std::uint8_t>b(static_cast<std::size_t>(z));s.seekg(0);if(!b.empty()&&!s.read(reinterpret_cast<char*>(b.data()),static_cast<std::streamsize>(b.size()))){e="Could not read NSF file." ;return false;}return loadBytes(b,e);
 }
-bool NsfArchive::loadBytes(const std::vector<std::uint8_t>&in,std::string&e){std::vector<NsfChunk> parsed;std::size_t p=0;while(p<in.size()){NsfChunk c;if(!decodeChunk(in,p,c,e))return false;parsed.push_back(std::move(c));}chunks_=std::move(parsed);return true;}
+bool NsfArchive::loadBytes(const std::vector<std::uint8_t>&in,std::string&e){crash3Retail_=false;std::vector<NsfChunk> parsed;std::size_t p=0;while(p<in.size()){NsfChunk c;if(!decodeChunk(in,p,c,e))return false;parsed.push_back(std::move(c));}chunks_=std::move(parsed);return true;}
 bool NsfArchive::decodeChunk(const std::vector<std::uint8_t>&in,std::size_t&p,NsfChunk&o,std::string&e){
  if(!has(in,p,2)){e="NSF truncated: missing chunk magic.";return false;}auto magic=u16(in,p);o.bytes.assign(NsfChunkSize,0);
  if(magic==0x1234||magic==0){if(!has(in,p,NsfChunkSize)){e="NSF truncated in raw 64 KiB chunk.";return false;}std::copy_n(in.begin()+static_cast<std::ptrdiff_t>(p),NsfChunkSize,o.bytes.begin());p+=NsfChunkSize;}
@@ -356,7 +356,7 @@ static bool parseModel(const std::vector<std::uint8_t>&bytes,const NsfEntry&entr
  out.decoded=true;return true;
 }
 
-void NsfArchive::decodeZones(bool crash3Retail){
+void NsfArchive::decodeZones(bool crash3Retail){crash3Retail_=crash3Retail;
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==3){NsfScenery scenery;if(!parseScenery(chunk.bytes,entry,crash3Retail,scenery)&&scenery.error.empty())scenery.error="Scenery could not be decoded.";entry.scenery=std::move(scenery);}
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)if(entry.valid&&entry.type==7){
   NsfZone z;z.isCrash3Retail=crash3Retail;
@@ -833,7 +833,9 @@ bool NsfArchive::appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIn
  auto&entry=chunk.entries[entryIndex];
  if(entry.animation.frames.empty())return false;
  const std::size_t last=entry.animation.frames.size()-1U;
- return rebuildAnimationFrameItems(chunk,entry,last,true,entry.animation.frames.size());
+ const bool changed=rebuildAnimationFrameItems(chunk,entry,last,true,entry.animation.frames.size());
+ if(changed)decodeZones(crash3Retail_);
+ return changed;
 }
 bool NsfArchive::insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex){
  if(chunkIndex>=chunks_.size())return false;
@@ -841,7 +843,9 @@ bool NsfArchive::insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t en
  if(chunk.type!=0U||entryIndex>=chunk.entries.size())return false;
  auto&entry=chunk.entries[entryIndex];
  if(frameIndex>=entry.animation.frames.size())return false;
- return rebuildAnimationFrameItems(chunk,entry,frameIndex,true,frameIndex+1U);
+ const bool changed=rebuildAnimationFrameItems(chunk,entry,frameIndex,true,frameIndex+1U);
+ if(changed)decodeZones(crash3Retail_);
+ return changed;
 }
 bool NsfArchive::deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex){
  if(chunkIndex>=chunks_.size())return false;
@@ -849,7 +853,9 @@ bool NsfArchive::deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIn
  if(chunk.type!=0U||entryIndex>=chunk.entries.size())return false;
  auto&entry=chunk.entries[entryIndex];
  if(entry.animation.frames.size()<=1U||frameIndex>=entry.animation.frames.size())return false;
- return rebuildAnimationFrameItems(chunk,entry,frameIndex,false,0U);
+ const bool changed=rebuildAnimationFrameItems(chunk,entry,frameIndex,false,0U);
+ if(changed)decodeZones(crash3Retail_);
+ return changed;
 }
 
 bool NsfArchive::setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value){

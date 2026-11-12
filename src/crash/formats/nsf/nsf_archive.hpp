@@ -217,6 +217,7 @@ public:
  bool setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::size_t corner,std::uint8_t colorIndex);
 private:
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
+ bool crash3Retail_=false;
  std::vector<NsfChunk> chunks_;
 };
 int resolveNsfModelTextureIndex(const NsfModel& model,std::uint8_t textureIndex,bool animated,std::uint32_t realFrame,bool& valid,std::uint8_t lodLevel=0);
