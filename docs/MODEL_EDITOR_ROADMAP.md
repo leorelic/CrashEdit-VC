@@ -223,3 +223,22 @@ Implementation trail:
 - `2d4b731` — preserve the existing four-corner UV shape while translating the selection.
 - `7043352` — fit the full atlas inside the selector viewport and clickable area.
 - `1e6a172` — stop auxiliary UV4 from restricting the triangle's selectable atlas range.
+
+
+## Major milestone — first in-game NSF texture mod validated
+
+**Implemented and end-to-end tested — user-confirmed on 2026-11-12 (TNT Box, Crash Bandicoot 2):** the user edited the TNT Box face texture in CrashEdit-VC, saved the modified NSF, opened that saved NSF successfully in the original CrashEdit-RE, and then loaded it in the original game. The in-game screenshot confirms the changed box textures render correctly. This is the first confirmed end-to-end proof that CrashEdit-VC's face texture editing and NSF save path produce a working Crash 2 game mod.
+
+### Verified chain
+
+1. Face Texture Selector edits the selected TNT Box face's UV mapping in CrashEdit-VC.
+2. CrashEdit-VC saves the modified NSF successfully.
+3. The saved NSF is accepted and displayed correctly by CrashEdit-RE.
+4. The modified content is loaded in the original Crash Bandicoot 2 game, where the changed box textures render correctly.
+
+### Scope and remaining validation
+
+- This is a real-game compatibility pass for the tested TNT Box texture edit, not proof that every Model, texture descriptor/color mode, or resource-editing workflow is game-safe.
+- Keep Cr10T, other models and representative 4-bit/8-bit/16-bit descriptor validation pending.
+- Keep broader archive-preservation, variable-size Model serialization, topology editing, and unrelated resource-editing validation pending.
+- The existing fixed-size texture-descriptor setter and NSF save path were used; this milestone does not imply variable-size Model serialization is complete.
