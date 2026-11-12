@@ -3385,9 +3385,14 @@ void EditorUI::drawAnimationViewer(){
   // the immutable vertex snapshot captured at drag start. This avoids
   // cumulative quantization while editing compressed temporal streams.
   if(vertexDrag.active&&(vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex||!ImGui::IsMouseDown(ImGuiMouseButton_Left)))vertexDrag.active=false;
-  const float modelScaleX=model?static_cast<float>(model->scaleX)/(3200.0f*128.0f):1.0f/128.0f;
-  const float modelScaleY=model?static_cast<float>(model->scaleY)/(3200.0f*128.0f):1.0f/128.0f;
-  const float modelScaleZ=model?static_cast<float>(model->scaleZ)/(3200.0f*128.0f):1.0f/128.0f;
+  const float rawModelScaleX=model?static_cast<float>(model->scaleX)/(3200.0f*128.0f):1.0f/128.0f;
+  const float rawModelScaleY=model?static_cast<float>(model->scaleY)/(3200.0f*128.0f):1.0f/128.0f;
+  const float rawModelScaleZ=model?static_cast<float>(model->scaleZ)/(3200.0f*128.0f):1.0f/128.0f;
+  const float modelScaleX=std::fabs(rawModelScaleX)>1.0e-8f?rawModelScaleX:1.0f/128.0f;
+  const float modelScaleY=std::fabs(rawModelScaleY)>1.0e-8f?rawModelScaleY:1.0f/128.0f;
+  const float modelScaleZ=std::fabs(rawModelScaleZ)>1.0e-8f?rawModelScaleZ:1.0f/128.0f;
+  const std::size_t animationChunkIndex=static_cast<std::size_t>(animationViewerChunk_);
+  const std::size_t animationEntryIndex=static_cast<std::size_t>(animationViewerEntry_);
   auto selectedVertexPivot=[&](){
    AnimationPoint pivot(0.0f,0.0f,0.0f);std::size_t count=0;
    for(const int index:animationSelectedVertices_)if(index>=0&&static_cast<std::size_t>(index)<displayPositions.size()){
@@ -3418,7 +3423,7 @@ void EditorUI::drawAnimationViewer(){
   auto restoreVertexDragSnapshot=[&](){
     std::vector<std::size_t> indices;indices.reserve(vertexDrag.indices.size());
     for(const int index:vertexDrag.indices)indices.push_back(static_cast<std::size_t>(index));
-    nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),indices,vertexDrag.original);
+    nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,vertexDrag.original);
    };
    auto applyVertexDrag=[&](){
    if(!vertexDrag.active||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex)return;
@@ -3458,7 +3463,7 @@ void EditorUI::drawAnimationViewer(){
      target.z=static_cast<int>(std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor));
      targets.push_back(target);
     }
-    if(!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
+    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
      restoreVertexDragSnapshot();status_="The scale exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
     }
     return;
@@ -3472,7 +3477,7 @@ void EditorUI::drawAnimationViewer(){
     target.z=static_cast<int>(std::lround(static_cast<float>(target.z)+rawDz));
     indices.push_back(static_cast<std::size_t>(vertexDrag.indices[i]));targets.push_back(target);
    }
-   if(!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+   if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
     restoreVertexDragSnapshot();status_="The move exceeds the Crash 2 coordinate or temporal-delta limits; the drag was reverted.";vertexDrag.active=false;
    }
   };
