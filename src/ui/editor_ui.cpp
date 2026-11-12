@@ -3237,11 +3237,11 @@ void EditorUI::drawAnimationViewer(){
  bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false;
  if(showVertexTransformToolbar){
   ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
-  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag the selected collision face in the view plane");
+  if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Free Move — drag the selected collision face along its normal":"Free Move — drag selected vertices in the view plane");
   ImGui::SetCursorScreenPos(axisMoveMin);const bool axisMoveClicked=ImGui::InvisibleButton("##AnimationAxisMove",ImVec2(28.0f,26.0f));axisMoveHovered=ImGui::IsItemHovered();
-  if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip("Axis Move — drag X/Y/Z gizmo handles for the selected points");
+  if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Axis Move — drag the selected face along its matching axis":"Axis Move — drag X/Y/Z gizmo handles for the selected vertices");
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
-  if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip("Scale — drag to scale selected points symmetrically around their center");
+  if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize the selected face relative to its opposite side":"Scale — scale selected vertices symmetrically around their center");
  }
  const bool viewportToolbarOwnsMouse=toolbarHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
