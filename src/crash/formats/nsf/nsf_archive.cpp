@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <utility>
 #include <unordered_map>
 namespace CrashEdit::Crash {
 static std::uint16_t u16(const std::vector<std::uint8_t>&d,std::size_t p){return std::uint16_t(d[p])|std::uint16_t(std::uint16_t(d[p+1])<<8);}
@@ -798,6 +799,12 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
   auto&following=chunk.entries[i];
   following.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(following.offset)+delta);
   for(auto&item:following.items)item.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(item.offset)+delta);
+  if(following.type==1U&&following.animation.frames.size()==following.items.size()){
+   for(std::size_t frame=0;frame<following.animation.frames.size();++frame){
+    following.animation.frames[frame].rawOffset=following.items[frame].offset;
+    following.animation.frames[frame].rawSize=following.items[frame].size;
+   }
+  }
  }
  for(std::size_t i=0;i<chunk.entries.size();++i)
   write32(chunk.bytes,16U+i*4U,static_cast<std::uint32_t>(chunk.entries[i].offset));
