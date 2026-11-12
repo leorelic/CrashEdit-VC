@@ -1605,7 +1605,6 @@ void EditorUI::drawViewport(){
  // own right-aligned line. Use ASCII separators for font compatibility.
  const char*viewerHelpLines[]={
   "Left Mouse - Orbit camera",
-  "Shift + Click - Select multiple points",
   "Right Mouse - Pan camera",
   "Mouse Wheel - Zoom camera",
   "W / A / S / D - Move camera relative to view",
@@ -3987,6 +3986,7 @@ void EditorUI::drawAnimationViewer(){
   "Mouse Wheel - Zoom camera",
   "W / A / S / D - Move camera",
   "Q / E - Move camera down / up",
+  "Shift + Click - Select multiple points",
   "C - Toggle collision display",
   "V - Toggle vertices",
   "X - Toggle wireframe",
