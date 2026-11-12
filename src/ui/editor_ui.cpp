@@ -3507,9 +3507,12 @@ void EditorUI::drawAnimationViewer(){
    auto updated=collisionDrag.original;
    for(const auto&q:collisionDrag.points){
     if(q.first<0||static_cast<std::size_t>(q.first)>=updated.size()||q.second<0||q.second>7)continue;
-    auto p=collisionPointPosition(q.first,q.second);auto&v=updated[static_cast<std::size_t>(q.first)];
+    const auto&source=collisionDrag.original[static_cast<std::size_t>(q.first)];
+    const std::size_t sourceX=(q.second&1)?7U:4U,sourceY=(q.second&2)?8U:5U,sourceZ=(q.second&4)?9U:6U;
+    AnimationPoint p(float(source.values[1]+source.values[sourceX])/collisionPointScale,float(source.values[3]+source.values[sourceZ])/collisionPointScale,float(source.values[2]+source.values[sourceY])/collisionPointScale);
+    auto&v=updated[static_cast<std::size_t>(q.first)];
     const std::size_t xf=(q.second&1)?7U:4U,yf=(q.second&2)?8U:5U,zf=(q.second&4)?9U:6U;
-    auto set=[&](std::size_t field,float original,float pivot,float move,std::size_t offset){float target=collisionDrag.mode==int(VertexToolMode::Scale)?pivot+(original-pivot)*factor:original+move;std::int64_t raw=std::llround(target*collisionPointScale)-v.values[offset];v.values[field]=static_cast<std::int32_t>(std::clamp<std::int64_t>(raw,INT32_MIN,INT32_MAX));};
+    auto set=[&](std::size_t field,float original,float pivot,float move,std::size_t offset){float target=collisionDrag.mode==int(VertexToolMode::Scale)?pivot+(original-pivot)*factor:original+move;std::int64_t raw=std::llround(target*collisionPointScale)-v.values[offset];v.values[field]=static_cast<std::int32_t>(std::clamp<std::int64_t>(raw,std::numeric_limits<std::int32_t>::min(),std::numeric_limits<std::int32_t>::max()));};
     set(xf,p.x,collisionDrag.px,dx,1U);set(zf,p.y,collisionDrag.py,dy,3U);set(yf,p.z,collisionDrag.pz,dz,2U);
    }
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationCollision>values;
