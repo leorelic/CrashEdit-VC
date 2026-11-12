@@ -213,13 +213,15 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
- std::vector<std::uint8_t> timelineChunk(65536);p16(timelineChunk,0,0x1234);p16(timelineChunk,2,0);p32(timelineChunk,4,8);p32(timelineChunk,8,1);
- constexpr std::size_t tlEntry=24,tlHeader=28,tlFrameSize=24,tlEntrySize=tlHeader+tlFrameSize*2;
- p32(timelineChunk,16,tlEntry);p32(timelineChunk,20,tlEntry+tlEntrySize);
+ std::vector<std::uint8_t> timelineChunk(65536);p16(timelineChunk,0,0x1234);p16(timelineChunk,2,0);p32(timelineChunk,4,8);p32(timelineChunk,8,2);
+ constexpr std::size_t tlEntry=28,tlHeader=28,tlFrameSize=24,tlEntrySize=tlHeader+tlFrameSize*2,tlSecondEntry=tlEntry+tlEntrySize,tlSecondEntrySize=28;
+ p32(timelineChunk,16,tlEntry);p32(timelineChunk,20,tlSecondEntry);p32(timelineChunk,24,tlSecondEntry+tlSecondEntrySize);
  p32(timelineChunk,tlEntry,0x0100ffff);p32(timelineChunk,tlEntry+4,0x0200007b);p32(timelineChunk,tlEntry+8,1);p32(timelineChunk,tlEntry+12,2);
  p32(timelineChunk,tlEntry+16,tlHeader);p32(timelineChunk,tlEntry+20,tlHeader+tlFrameSize);p32(timelineChunk,tlEntry+24,tlEntrySize);
  p16(timelineChunk,tlEntry+tlHeader,11);p32(timelineChunk,tlEntry+tlHeader+20,24);
  p16(timelineChunk,tlEntry+tlHeader+tlFrameSize,22);p32(timelineChunk,tlEntry+tlHeader+tlFrameSize+20,24);
+ p32(timelineChunk,tlSecondEntry,0x0100ffff);p32(timelineChunk,tlSecondEntry+4,0x0200007c);p32(timelineChunk,tlSecondEntry+8,99);p32(timelineChunk,tlSecondEntry+12,1);
+ p32(timelineChunk,tlSecondEntry+16,24);p32(timelineChunk,tlSecondEntry+20,28);p32(timelineChunk,tlSecondEntry+24,0xdeadbeefU);
  NsfArchive timelineArchive;assert(timelineArchive.loadBytes(timelineChunk,e));timelineArchive.decodeAnimationModels(false);
  assert(timelineArchive.chunks()[0].entries[0].animation.decoded&&timelineArchive.chunks()[0].entries[0].animation.frames.size()==2);
  assert(timelineArchive.appendAnimationFrame(0,0));
@@ -237,5 +239,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive timelineReloaded;assert(timelineReloaded.loadBytes(timelineSaved,e));timelineReloaded.decodeAnimationModels(false);
  const auto&reloadedFrames=timelineReloaded.chunks()[0].entries[0].animation.frames;
  assert(reloadedFrames.size()==3&&reloadedFrames[0].xOffset==11&&reloadedFrames[1].xOffset==11&&reloadedFrames[2].xOffset==22);
+ assert(timelineReloaded.chunks()[0].entries.size()==2&&timelineReloaded.chunks()[0].entries[1].valid);
+ const auto&followingEntry=timelineReloaded.chunks()[0].entries[1];
+ assert(followingEntry.type==99&&followingEntry.items.size()==1&&timelineReloaded.chunks()[0].bytes[followingEntry.items[0].offset]==0xef);
+ NsfArchive oneFrameGuard=timelineArchive;
+ assert(oneFrameGuard.deleteAnimationFrame(0,0,0));
+ assert(oneFrameGuard.deleteAnimationFrame(0,0,0));
+ assert(!oneFrameGuard.deleteAnimationFrame(0,0,0));
 
  std::cout<<"NSF raw, 64 KiB chunk, entry-table, and truncation checks passed\\n";}
