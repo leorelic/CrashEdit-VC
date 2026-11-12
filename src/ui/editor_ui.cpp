@@ -3170,9 +3170,9 @@ void EditorUI::drawAnimationViewer(){
   };
   static VertexToolMode vertexToolMode=VertexToolMode::FreeMove;
   static VertexDragState vertexDrag;
-  struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>points;std::vector<Crash::NsfAnimationCollision>original;};
+  struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>faces;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
-  static std::vector<std::pair<int,int>>selectedCollisionPoints;
+  static std::vector<std::pair<int,int>>selectedCollisionFaces;
   static int selectedCollisionChunk=-1,selectedCollisionEntry=-1,selectedCollisionFrame=-1;
 
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
@@ -3479,18 +3479,26 @@ void EditorUI::drawAnimationViewer(){
    }
   };
 
-  if(selectedCollisionChunk!=animationViewerChunk_||selectedCollisionEntry!=animationViewerEntry_||selectedCollisionFrame!=poseFrameIndex){selectedCollisionPoints.clear();selectedCollisionChunk=animationViewerChunk_;selectedCollisionEntry=animationViewerEntry_;selectedCollisionFrame=poseFrameIndex;}
+  if(selectedCollisionChunk!=animationViewerChunk_||selectedCollisionEntry!=animationViewerEntry_||selectedCollisionFrame!=poseFrameIndex){selectedCollisionFaces.clear();selectedCollisionChunk=animationViewerChunk_;selectedCollisionEntry=animationViewerEntry_;selectedCollisionFrame=poseFrameIndex;}
   constexpr float collisionPointScale=102400.0f;
+  const int collisionFaceCorners[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
   auto collisionPointPosition=[&](int ci,int corner){
    const auto&c=frame.collisions[static_cast<std::size_t>(ci)];
    const std::size_t xf=(corner&1)?7U:4U,yf=(corner&2)?8U:5U,zf=(corner&4)?9U:6U;
-   return AnimationPoint(float(c.values[1]+c.values[xf])/collisionPointScale,float(c.values[3]+c.values[zf])/collisionPointScale,float(c.values[2]+c.values[yf])/collisionPointScale);
+   // Collision data stores the vertical axes as Y/Z; the viewport uses X/Y/Z.
+   return AnimationPoint(float(c.values[1]+c.values[xf])/collisionPointScale,float(c.values[2]+c.values[yf])/collisionPointScale,float(c.values[3]+c.values[zf])/collisionPointScale);
   };
-  auto collisionSelected=[&](int ci,int corner){return std::find(selectedCollisionPoints.begin(),selectedCollisionPoints.end(),std::pair<int,int>{ci,corner})!=selectedCollisionPoints.end();};
-  auto collisionPivot=[&](){AnimationPoint p(0,0,0);for(const auto&q:selectedCollisionPoints){auto v=collisionPointPosition(q.first,q.second);p.x+=v.x;p.y+=v.y;p.z+=v.z;}if(!selectedCollisionPoints.empty()){float n=1.0f/float(selectedCollisionPoints.size());p.x*=n;p.y*=n;p.z*=n;}return p;};
+  auto collisionFaceAxis=[](int face){return face<2?1:(face<4?2:0);};
+  auto collisionFacePosition=[&](int ci,int face){
+   AnimationPoint p(0,0,0);for(int i=0;i<4;++i){auto v=collisionPointPosition(ci,collisionFaceCorners[face][i]);p.x+=v.x;p.y+=v.y;p.z+=v.z;}
+   return AnimationPoint(p.x*0.25f,p.y*0.25f,p.z*0.25f);
+  };
+  auto collisionFaceSelected=[&](int ci,int face){return std::find(selectedCollisionFaces.begin(),selectedCollisionFaces.end(),std::pair<int,int>{ci,face})!=selectedCollisionFaces.end();};
+  auto collisionPivot=[&](){AnimationPoint p(0,0,0);for(const auto&q:selectedCollisionFaces){auto v=collisionFacePosition(q.first,q.second);p.x+=v.x;p.y+=v.y;p.z+=v.z;}if(!selectedCollisionFaces.empty()){float n=1.0f/float(selectedCollisionFaces.size());p.x*=n;p.y*=n;p.z*=n;}return p;};
   auto beginCollisionDrag=[&](int axis){
-   if(selectedCollisionPoints.empty()||(vertexToolMode==VertexToolMode::Scale&&selectedCollisionPoints.size()<2U))return false;
-   collisionDrag=CollisionDragState{};collisionDrag.active=true;collisionDrag.mode=int(vertexToolMode);collisionDrag.axis=axis;collisionDrag.chunk=animationViewerChunk_;collisionDrag.entry=animationViewerEntry_;collisionDrag.frame=poseFrameIndex;collisionDrag.mouseStart=io.MousePos;collisionDrag.original=frame.collisions;collisionDrag.points=selectedCollisionPoints;
+   if(selectedCollisionFaces.empty())return false;
+   if(vertexToolMode==VertexToolMode::AxisMove){bool matching=false;for(const auto&q:selectedCollisionFaces)if(collisionFaceAxis(q.second)==axis)matching=true;if(!matching)return false;}
+   collisionDrag=CollisionDragState{};collisionDrag.active=true;collisionDrag.mode=int(vertexToolMode);collisionDrag.axis=axis;collisionDrag.chunk=animationViewerChunk_;collisionDrag.entry=animationViewerEntry_;collisionDrag.frame=poseFrameIndex;collisionDrag.mouseStart=io.MousePos;collisionDrag.original=frame.collisions;collisionDrag.faces=selectedCollisionFaces;
    auto p=collisionPivot();collisionDrag.px=p.x;collisionDrag.py=p.y;collisionDrag.pz=p.z;collisionDrag.depth=toCamera(p.x,p.y,p.z).depth;
    animationPlaying_=false;animationPlaybackFrame_=double(poseFrameIndex);animationFrame_=poseFrameIndex;return true;
   };
@@ -3505,33 +3513,46 @@ void EditorUI::drawAnimationViewer(){
     auto a=axisWorldVector(collisionDrag.axis);auto p=project(collisionDrag.px,collisionDrag.py,collisionDrag.pz),q=project(collisionDrag.px+a.x,collisionDrag.py+a.y,collisionDrag.pz+a.z);
     float vx=q.x-p.x,vy=q.y-p.y,l=vx*vx+vy*vy;if(l>0.01f){float amount=(delta.x*vx+delta.y*vy)/l;if(collisionDrag.axis==0)dx=amount;else if(collisionDrag.axis==1)dz=amount;else dy=amount;}
    }
-   float factor=collisionDrag.mode==int(VertexToolMode::Scale)?std::clamp(1.0f+(delta.x-delta.y)/20.0f,0.05f,8.0f):1.0f;
+   const float factor=collisionDrag.mode==int(VertexToolMode::Scale)?std::clamp(1.0f+(delta.x-delta.y)/20.0f,0.05f,8.0f):1.0f;
    auto updated=collisionDrag.original;
-   for(const auto&q:collisionDrag.points){
-    if(q.first<0||static_cast<std::size_t>(q.first)>=updated.size()||q.second<0||q.second>7)continue;
-    const auto&source=collisionDrag.original[static_cast<std::size_t>(q.first)];
-    const std::size_t sourceX=(q.second&1)?7U:4U,sourceY=(q.second&2)?8U:5U,sourceZ=(q.second&4)?9U:6U;
-    AnimationPoint p(float(source.values[1]+source.values[sourceX])/collisionPointScale,float(source.values[3]+source.values[sourceZ])/collisionPointScale,float(source.values[2]+source.values[sourceY])/collisionPointScale);
-    auto&v=updated[static_cast<std::size_t>(q.first)];
-    const std::size_t xf=(q.second&1)?7U:4U,yf=(q.second&2)?8U:5U,zf=(q.second&4)?9U:6U;
-    auto set=[&](std::size_t field,float original,float pivot,float move,std::size_t offset){float target=collisionDrag.mode==int(VertexToolMode::Scale)?pivot+(original-pivot)*factor:original+move;std::int64_t raw=std::llround(target*collisionPointScale)-v.values[offset];v.values[field]=static_cast<std::int32_t>(std::clamp<std::int64_t>(raw,std::numeric_limits<std::int32_t>::min(),std::numeric_limits<std::int32_t>::max()));};
-    set(xf,p.x,collisionDrag.px,dx,1U);set(zf,p.y,collisionDrag.py,dy,3U);set(yf,p.z,collisionDrag.pz,dz,2U);
+   for(const auto&q:collisionDrag.faces){
+    if(q.first<0||static_cast<std::size_t>(q.first)>=updated.size()||q.second<0||q.second>=6)continue;
+    const int face=q.second;
+    const std::size_t field=face==0?6U:face==1?9U:face==2?5U:face==3?8U:face==4?4U:7U;
+    const std::size_t opposite=face==0?9U:face==1?6U:face==2?8U:face==3?5U:face==4?7U:4U;
+    const std::size_t offset=face<2?3U:(face<4?2U:1U);
+    const float move=face<2?dz:(face<4?dy:dx);
+    const auto&source=collisionDrag.original[static_cast<std::size_t>(q.first)];auto&target=updated[static_cast<std::size_t>(q.first)];
+    double next=double(source.values[field])+double(move)*collisionPointScale;
+    if(collisionDrag.mode==int(VertexToolMode::Scale)){const double fixed=double(source.values[offset])+double(source.values[opposite]);const double moving=double(source.values[offset])+double(source.values[field]);next=fixed+(moving-fixed)*double(factor)-double(source.values[offset]);}
+    target.values[field]=static_cast<std::int32_t>(std::clamp<double>(std::round(next),double(std::numeric_limits<std::int32_t>::min()),double(std::numeric_limits<std::int32_t>::max())));
    }
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationCollision>values;
-   for(const auto&q:collisionDrag.points){auto i=static_cast<std::size_t>(q.first);if(q.first>=0&&i<updated.size()&&std::find(indices.begin(),indices.end(),i)==indices.end()){indices.push_back(i);values.push_back(updated[i]);}}
-   if(!indices.empty()&&!nsf_.setAnimationFrameCollisions(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,values))status_="Collision transform rejected; last valid bounds kept until mouse release.";
+   for(const auto&q:collisionDrag.faces){auto i=static_cast<std::size_t>(q.first);if(q.first>=0&&i<updated.size()&&std::find(indices.begin(),indices.end(),i)==indices.end()){indices.push_back(i);values.push_back(updated[i]);}}
+   if(!indices.empty()&&!nsf_.setAnimationFrameCollisions(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,values))status_="Collision face transform rejected; last valid bounds kept until mouse release.";
   };
-  int hoveredCollisionIndex=-1,hoveredCollisionCorner=-1;
-  if(animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse){float best=14.0f;for(std::size_t ci=0;ci<frame.collisions.size();++ci)for(int corner=0;corner<8;++corner){auto p=collisionPointPosition(int(ci),corner);auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f)continue;auto screen=projectCamera(cam);float d=std::hypot(screen.x-io.MousePos.x,screen.y-io.MousePos.y);if(d<=best){best=d;hoveredCollisionIndex=int(ci);hoveredCollisionCorner=corner;}}}
+  auto pointInCollisionFace=[](const ImVec2 points[4],const ImVec2&p){bool positive=false,negative=false;for(int i=0;i<4;++i){const ImVec2&a=points[i],&b=points[(i+1)%4];const float cross=(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);positive|=cross>0.01f;negative|=cross< -0.01f;}return !(positive&&negative);};
+  int hoveredCollisionIndex=-1,hoveredCollisionFace=-1;
+  if(animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse){
+   float nearestDepth=std::numeric_limits<float>::max();
+   for(std::size_t ci=0;ci<frame.collisions.size();++ci)for(int face=0;face<6;++face){
+    ImVec2 polygon[4];float depth=0.0f;bool visible=true;
+    for(int k=0;k<4;++k){const auto p=collisionPointPosition(static_cast<int>(ci),collisionFaceCorners[face][k]);const auto cam=toCamera(p.x,p.y,p.z);if(cam.depth<=0.1f){visible=false;break;}polygon[k]=projectCamera(cam);depth+=cam.depth*0.25f;}
+    if(visible&&depth<nearestDepth&&pointInCollisionFace(polygon,io.MousePos)){nearestDepth=depth;hoveredCollisionIndex=static_cast<int>(ci);hoveredCollisionFace=face;}
+   }
+  }
   bool collisionDragStarted=false;
   if(animationCollisionViewer_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
-   int axis=-1;bool canStart=false;auto p=collisionPivot();auto center=project(p.x,p.y,p.z);
-   if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::FreeMove)canStart=hoveredCollisionIndex>=0&&collisionSelected(hoveredCollisionIndex,hoveredCollisionCorner);
-   else if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::AxisMove){float length=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f),best=10.0f;for(int a=0;a<3;++a){auto d=axisWorldVector(a);auto end=project(p.x+d.x*length,p.y+d.y*length,p.z+d.z*length);float vx=end.x-center.x,vy=end.y-center.y,l=vx*vx+vy*vy;if(l<1.0f)continue;float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/l,0.0f,1.0f),dist=std::hypot(io.MousePos.x-center.x-vx*t,io.MousePos.y-center.y-vy*t);if(t>0.55f&&dist<best){best=dist;axis=a;}}canStart=axis>=0;}
-   else if(!selectedCollisionPoints.empty()&&vertexToolMode==VertexToolMode::Scale)canStart=std::hypot(io.MousePos.x-center.x-14.0f,io.MousePos.y-center.y+14.0f)<=10.0f;
+   int axis=-1;bool canStart=false;const auto pivot=collisionPivot();const auto center=project(pivot.x,pivot.y,pivot.z);
+   if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::FreeMove)canStart=hoveredCollisionIndex>=0&&collisionFaceSelected(hoveredCollisionIndex,hoveredCollisionFace);
+   else if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::AxisMove){
+    float length=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f),best=10.0f;
+    for(int a=0;a<3;++a){bool allowed=false;for(const auto&face:selectedCollisionFaces)if(collisionFaceAxis(face.second)==a)allowed=true;if(!allowed)continue;const auto d=axisWorldVector(a);const auto end=project(pivot.x+d.x*length,pivot.y+d.y*length,pivot.z+d.z*length);const float vx=end.x-center.x,vy=end.y-center.y,l=vx*vx+vy*vy;if(l<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/l,0.0f,1.0f);const float dist=std::hypot(io.MousePos.x-center.x-vx*t,io.MousePos.y-center.y-vy*t);if(t>0.55f&&dist<best){best=dist;axis=a;}}
+    canStart=axis>=0;
+   }else if(!selectedCollisionFaces.empty()&&vertexToolMode==VertexToolMode::Scale)canStart=std::hypot(io.MousePos.x-center.x-14.0f,io.MousePos.y-center.y+14.0f)<=10.0f;
    if(canStart)collisionDragStarted=beginCollisionDrag(axis);
-   if(!collisionDragStarted&&hoveredCollisionIndex>=0){std::pair<int,int>pnt{hoveredCollisionIndex,hoveredCollisionCorner};if(io.KeyShift){auto it=std::find(selectedCollisionPoints.begin(),selectedCollisionPoints.end(),pnt);if(it==selectedCollisionPoints.end())selectedCollisionPoints.push_back(pnt);else selectedCollisionPoints.erase(it);}else{selectedCollisionPoints.clear();selectedCollisionPoints.push_back(pnt);}}
-   else if(!collisionDragStarted&&hoveredCollisionIndex<0&&!io.KeyShift)selectedCollisionPoints.clear();
+   if(!collisionDragStarted&&hoveredCollisionIndex>=0){const std::pair<int,int>face{hoveredCollisionIndex,hoveredCollisionFace};if(io.KeyShift){auto it=std::find(selectedCollisionFaces.begin(),selectedCollisionFaces.end(),face);if(it==selectedCollisionFaces.end())selectedCollisionFaces.push_back(face);else selectedCollisionFaces.erase(it);}else{selectedCollisionFaces.clear();selectedCollisionFaces.push_back(face);}}
+   else if(!collisionDragStarted&&hoveredCollisionIndex<0&&!io.KeyShift)selectedCollisionFaces.clear();
   }
   if(collisionDrag.active&&(collisionDrag.chunk!=animationViewerChunk_||collisionDrag.entry!=animationViewerEntry_||collisionDrag.frame!=poseFrameIndex))collisionDrag.active=false;
   if(collisionDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyCollisionDrag();collisionDrag.active=false;}else if(collisionDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyCollisionDrag();else if(collisionDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))collisionDrag.active=false;
@@ -3947,7 +3968,7 @@ void EditorUI::drawAnimationViewer(){
     if(visible)dl->AddConvexPolyFilled(points,4,collisionFill);
    }
    for(const auto&edge:boxEdges)drawCollisionLine(corners[edge[0]],corners[edge[1]]);
-   for(int cornerIndex=0;cornerIndex<8;++cornerIndex){const auto&corner=corners[cornerIndex];if(corner.depth<=0.1f)continue;const int ci=static_cast<int>(&collision-&frame.collisions[0]);const bool selected=collisionSelected(ci,cornerIndex),hot=hoveredCollisionIndex==ci&&hoveredCollisionCorner==cornerIndex;const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):collisionLine;dl->AddCircleFilled(projectCamera(corner),selected?5.5f:4.0f,color,12);if(selected)dl->AddCircle(projectCamera(corner),7.0f,IM_COL32(245,245,245,255),12,1.2f);}
+   for(int cornerIndex=0;cornerIndex<8;++cornerIndex){const auto&corner=corners[cornerIndex];if(corner.depth<=0.1f)continue;const int ci=static_cast<int>(&collision-&frame.collisions[0]);const bool selected=collisionFaceSelected(ci,cornerIndex),hot=hoveredCollisionIndex==ci&&hoveredCollisionFace==cornerIndex;const ImU32 color=selected?IM_COL32(40,225,105,255):hot?IM_COL32(255,65,65,255):collisionLine;dl->AddCircleFilled(projectCamera(corner),selected?5.5f:4.0f,color,12);if(selected)dl->AddCircle(projectCamera(corner),7.0f,IM_COL32(245,245,245,255),12,1.2f);}
   }
  }
  // In textured mode the collision geometry is rendered into the GPU viewport.
