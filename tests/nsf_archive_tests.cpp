@@ -232,7 +232,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(timelineArchive.deleteAnimationFrame(0,0,2));
  timelineFrames=timelineArchive.chunks()[0].entries[0].animation.frames;
  assert(timelineFrames.size()==3&&timelineFrames[0].xOffset==11&&timelineFrames[1].xOffset==11&&timelineFrames[2].xOffset==22);
- assert(!timelineArchive.deleteAnimationFrame(0,0,0)==false);
+ assert(!timelineArchive.deleteAnimationFrame(0,0,3));
  std::vector<std::uint8_t> timelineSaved;assert(timelineArchive.saveUncompressedBytes(timelineSaved,e));
  NsfArchive timelineReloaded;assert(timelineReloaded.loadBytes(timelineSaved,e));timelineReloaded.decodeAnimationModels(false);
  const auto&reloadedFrames=timelineReloaded.chunks()[0].entries[0].animation.frames;
