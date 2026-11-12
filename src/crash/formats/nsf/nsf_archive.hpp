@@ -201,6 +201,9 @@ public:
  bool setGoolFrameGroupEid(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint32_t eid);
  bool setGoolFrameGroupFrameCount(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,std::uint16_t frameCount);
  bool setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,bool interpolated);
+ bool appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex);
+ bool insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
+ bool deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
  bool setAnimationFrameCollisionValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t collisionIndex,std::size_t valueIndex,std::int32_t value);
  bool setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value);
