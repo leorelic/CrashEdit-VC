@@ -143,7 +143,10 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 - [x] Add depth-aware face hover and click selection in both hardware and wireframe rendering. Selection follows the nearest visible reconstructed face.
 - [x] Show selected face identity and its three vertex/color references, texture descriptor, TPAG slot/page and animated-texture status.
 - [x] Add face-level color editing, including per-corner color selection and editing the referenced color record. Changes update the shared Model and immediately refresh the viewport.
-- [x] Add face-level texture assignment and Model texture-descriptor editing, with validation of texture indices, page slots, CLUT coordinates, color mode, blend mode, UVs and segment. A dedicated in-viewport texture-page/CLUT picker remains a follow-up.
+- [x] Add face-level texture assignment and Model texture-descriptor editing, with validation of texture indices, page slots, CLUT coordinates, color mode, blend mode, UVs and segment.
+- [x] Add the in-viewport Face Texture Selector for repositioning a selected face's UV mapping directly on its texture atlas. Atlas clicks translate the existing mapping while preserving the triangle's relative UV shape and keeping the descriptor serializable.
+- [x] Correct triangle atlas-selection bounds: UV1-UV3 define the visible triangle and its legal placement; the auxiliary UV4 corner must not prevent selecting otherwise valid atlas regions. UV4 is translated when representable and otherwise retains its original byte values.
+- [x] Fit the complete atlas within the selector's available viewport so its displayed pixels remain within the corresponding clickable region.
 - [ ] Preserve camera, playback position and current face/vertex selection when changing material values or refreshing the Model.
 - [ ] Keep vertex inspection and collision overlays working independently of face selection and material editing.
 
@@ -190,7 +193,7 @@ The private companion repository `leorelic/CrashEdit-VC-Game-Samples` contains:
 
 The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture descriptors, 90 color records, 14 extended-texture records and one TPAG EID. All 14 extended records are flipbook-style (not LOD); animated triangles resolve through texture indices 0–13. The Cr10V sample has 11 frames, each with 309 vertices, and every frame links to Cr10G. The decoded model triangle count matches the Model header. Preserve these sample facts as regression expectations, but continue investigating the exact descriptor-index boundary semantics rather than assuming the final offset/mask range is invalid.
 
-## Current implementation status (2026-11-10)
+## Current implementation status (2026-11-12)
 
 - [x] Animation vertex point display, V shortcut, depth-aware overlay, hover/selection and selected-vertex inspection — user-confirmed working before this implementation.
 - [x] Shared decoded Model data supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
@@ -208,3 +211,15 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture desc
 - [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for implementation commit `8ab76bf9a650d05558b9b17b765f9c3282cde961`.
 
 The implementation is being developed directly on the checkpoint branch rather than stopping for approval after each internal work unit. If a build or real-sample test exposes a regression, roll back to `7cd6d28d366f14dabd0f07168d04ccace401981b`.
+
+### Face Texture Selector milestone — 2026-11-12
+
+- [x] User-confirmed working on the TNT Box face: the in-viewport atlas selector can now reposition the selected face's texture mapping into atlas regions that were previously inaccessible.
+- [x] Preserve the existing face texture assignment and NSF write path; the selector edits the existing fixed-size 12-byte Model texture descriptor through the established setter.
+- [x] CI passed on Windows, Ubuntu 22.04 and macOS for the selector-boundary fix (workflow run [#1017](https://github.com/leorelic/CrashEdit-VC/actions/runs/43113110594)).
+- [ ] Repeat the same full-atlas selection checks on Cr10T and other representative models / color modes. TNT Box is the current user-confirmed regression fixture; do not mark all models validated yet.
+
+Implementation trail:
+- `2d4b731` — preserve the existing four-corner UV shape while translating the selection.
+- `7043352` — fit the full atlas inside the selector viewport and clickable area.
+- `1e6a172` — stop auxiliary UV4 from restricting the triangle's selectable atlas range.
