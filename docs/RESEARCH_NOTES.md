@@ -236,3 +236,12 @@ The final correction narrows the horizontal segment-fit and vertical byte-range 
 - **Still pending:** repeat the full-atlas click/selection test on Cr10T, especially the regions that were previously inaccessible, and verify representative 4-bit, 8-bit and 16-bit descriptors. Also verify save/reopen behavior with a real edited NSF before claiming archive-wide validation.
 
 This milestone establishes the direct UV-selection workflow for the tested TNT Box case. It does not complete variable-size Model serialization, topology editing, universal TPAG/CLUT resolution, or broad real-sample round-trip validation.
+
+
+## Major milestone — first in-game NSF texture mod validated
+
+**User-confirmed end-to-end test — 2026-11-12, TNT Box in Crash Bandicoot 2:** after editing the TNT Box face texture in CrashEdit-VC, the user saved the modified NSF successfully, confirmed that the saved archive opened and displayed correctly in the original CrashEdit-RE, and then tested the archive in the original game. The supplied in-game screenshot shows the changed TNT Box textures rendering correctly. This confirms that the tested Face Texture Selector edit survives the actual NSF save path and is accepted by the retail game—not merely by the editor preview.
+
+The verified chain is: **CrashEdit-VC face texture edit → NSF save → CrashEdit-RE reopen → original Crash 2 runtime.** This is the first confirmed end-to-end game-mod validation milestone for the Model face-texture workflow.
+
+**Scope:** validation is specific to the tested TNT Box edit. It does not establish universal compatibility across all models, texture color modes, or descriptor combinations. Cr10T and additional model/color-mode tests remain pending, as do broader archive-preservation tests and variable-size Model serialization/topology editing. The test validates the existing fixed-size texture-descriptor write path and NSF save path for this real edit.
