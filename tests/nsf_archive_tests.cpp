@@ -184,7 +184,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(a.loadBytes(vertexAnimation,e));a.decodeAnimationModels(true);const auto&va=a.chunks()[0].entries[0].animation;
  assert(va.decoded&&va.frames[0].verticesDecoded&&va.frames[0].vertices.size()==1);
  assert(va.frames[0].vertices[0].x==0&&va.frames[0].vertices[0].y==8&&va.frames[0].vertices[0].z==16);
- assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
+ assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);assert(!a.setAnimationFrameVertex(0,0,0,0,1,255));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
  const std::vector<std::size_t> batchVertexIndices{0};
  const std::vector<NsfAnimationVertex> invalidBatchTargets{{0,300,16}};
  assert(!a.setAnimationFrameVertices(0,0,0,batchVertexIndices,invalidBatchTargets));
