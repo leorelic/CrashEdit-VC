@@ -1034,6 +1034,18 @@ bool NsfArchive::setAnimationFrameCollisionValue(std::size_t chunkIndex,std::siz
  frame.collisions[collisionIndex].values[valueIndex]=value;
  return true;
 }
+bool NsfArchive::setAnimationFrameCollisions(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>&indices,const std::vector<NsfAnimationCollision>&values){
+ if(indices.empty()||indices.size()!=values.size()||chunkIndex>=chunks_.size())return false;
+ for(std::size_t i=0;i<indices.size();++i)if(std::find(indices.begin(),indices.begin()+static_cast<std::ptrdiff_t>(i),indices[i])!=indices.begin()+static_cast<std::ptrdiff_t>(i))return false;
+ NsfArchive candidate=*this;
+ for(std::size_t i=0;i<indices.size();++i)for(std::size_t field=0;field<10U;++field)
+  if(!candidate.setAnimationFrameCollisionValue(chunkIndex,entryIndex,frameIndex,indices[i],field,values[i].values[field]))return false;
+ if(entryIndex>=chunks_[chunkIndex].entries.size()||entryIndex>=candidate.chunks_[chunkIndex].entries.size())return false;
+ auto&dst=chunks_[chunkIndex].entries[entryIndex];const auto&src=candidate.chunks_[chunkIndex].entries[entryIndex];
+ if(frameIndex>=dst.animation.frames.size()||frameIndex>=src.animation.frames.size())return false;
+ chunks_[chunkIndex].bytes=candidate.chunks_[chunkIndex].bytes;
+ dst.animation.frames[frameIndex].collisions=src.animation.frames[frameIndex].collisions;return true;
+}
 bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::uint8_t value){
  if(chunkIndex>=chunks_.size()||axis>=3U)return false;
  auto& chunk=chunks_[chunkIndex];
