@@ -3509,7 +3509,8 @@ void EditorUI::drawAnimationViewer(){
   }
   if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left))vertexDrag.active=false;
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&
+     (vertexToolMode==VertexToolMode::FreeMove||!isAnimationVertexSelected(hoveredVertex))){
    if(io.KeyShift){
     const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
     if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);
