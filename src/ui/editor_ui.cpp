@@ -3622,9 +3622,11 @@ void EditorUI::drawAnimationViewer(){
    const auto&p=displayPositions[vertexIndex];const CameraPoint point=toCamera(p.x,p.y,p.z);if(point.depth<=0.1f)return false;
    if(!model||!model->polygonsDecoded||model->triangles.empty())return true;
    const ImVec2 sample=projectCamera(point);float nearestSurface=std::numeric_limits<float>::max();
+   const int triangleOffset=static_cast<int>(frame.specialVertexCount);
    for(const auto&tri:model->triangles){
-    if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=displayPositions.size()||static_cast<std::size_t>(tri.b)>=displayPositions.size()||static_cast<std::size_t>(tri.c)>=displayPositions.size())continue;
-    const auto&p0=displayPositions[static_cast<std::size_t>(tri.a)];const auto&p1=displayPositions[static_cast<std::size_t>(tri.b)];const auto&p2=displayPositions[static_cast<std::size_t>(tri.c)];
+    const int ia=tri.a+triangleOffset,ib=tri.b+triangleOffset,ic=tri.c+triangleOffset;
+    if(ia<0||ib<0||ic<0||static_cast<std::size_t>(ia)>=displayPositions.size()||static_cast<std::size_t>(ib)>=displayPositions.size()||static_cast<std::size_t>(ic)>=displayPositions.size())continue;
+    const auto&p0=displayPositions[static_cast<std::size_t>(ia)];const auto&p1=displayPositions[static_cast<std::size_t>(ib)];const auto&p2=displayPositions[static_cast<std::size_t>(ic)];
     const CameraPoint c0=toCamera(p0.x,p0.y,p0.z),c1=toCamera(p1.x,p1.y,p1.z),c2=toCamera(p2.x,p2.y,p2.z);
     if(c0.depth<=0.1f||c1.depth<=0.1f||c2.depth<=0.1f)continue;
     const ImVec2 a=projectCamera(c0),b=projectCamera(c1),c=projectCamera(c2);
