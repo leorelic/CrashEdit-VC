@@ -3171,6 +3171,8 @@ void EditorUI::drawAnimationViewer(){
   };
   static VertexToolMode vertexToolMode=VertexToolMode::FreeMove;
   static VertexDragState vertexDrag;
+  struct VertexBoxState{bool pending=false,active=false;ImVec2 start{},current{};bool add=false,subtract=false;};
+  static VertexBoxState vertexBox;
   struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>faces;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
   static std::vector<std::pair<int,int>>selectedCollisionFaces;
@@ -3613,18 +3615,62 @@ void EditorUI::drawAnimationViewer(){
   }
   if(collisionDrag.active&&(collisionDrag.chunk!=animationViewerChunk_||collisionDrag.entry!=animationViewerEntry_||collisionDrag.frame!=poseFrameIndex))collisionDrag.active=false;
   if(collisionDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyCollisionDrag();collisionDrag.active=false;}else if(collisionDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyCollisionDrag();else if(collisionDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))collisionDrag.active=false;
+  auto vertexIsVisible=[&](std::size_t vertexIndex){
+   if(vertexIndex>=displayPositions.size())return false;
+   const auto&p=displayPositions[vertexIndex];const CameraPoint point=toCamera(p.x,p.y,p.z);if(point.depth<=0.1f)return false;
+   if(!model||!model->polygonsDecoded||model->triangles.empty())return true;
+   const ImVec2 sample=projectCamera(point);float nearestSurface=std::numeric_limits<float>::max();
+   for(const auto&tri:model->triangles){
+    if(tri.a<0||tri.b<0||tri.c<0||static_cast<std::size_t>(tri.a)>=displayPositions.size()||static_cast<std::size_t>(tri.b)>=displayPositions.size()||static_cast<std::size_t>(tri.c)>=displayPositions.size())continue;
+    const auto&p0=displayPositions[static_cast<std::size_t>(tri.a)];const auto&p1=displayPositions[static_cast<std::size_t>(tri.b)];const auto&p2=displayPositions[static_cast<std::size_t>(tri.c)];
+    const CameraPoint c0=toCamera(p0.x,p0.y,p0.z),c1=toCamera(p1.x,p1.y,p1.z),c2=toCamera(p2.x,p2.y,p2.z);
+    if(c0.depth<=0.1f||c1.depth<=0.1f||c2.depth<=0.1f)continue;
+    const ImVec2 a=projectCamera(c0),b=projectCamera(c1),c=projectCamera(c2);
+    const float denominator=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);if(std::fabs(denominator)<0.0001f)continue;
+    const float wa=((b.y-c.y)*(sample.x-c.x)+(c.x-b.x)*(sample.y-c.y))/denominator;
+    const float wb=((c.y-a.y)*(sample.x-c.x)+(a.x-c.x)*(sample.y-c.y))/denominator;const float wc=1.0f-wa-wb;
+    if(wa>=-0.0001f&&wb>=-0.0001f&&wc>=-0.0001f){const float depth=wa*c0.depth+wb*c1.depth+wc*c2.depth;nearestSurface=std::min(nearestSurface,depth);}
+   }
+   return nearestSurface==std::numeric_limits<float>::max()||nearestSurface>=point.depth-0.002f;
+  };
   int hoveredVertex=-1;
   if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse){
    float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();
    for(std::size_t vi=0;vi<displayPositions.size();++vi){
-    const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
+    if(!vertexIsVisible(vi))continue;
+    const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);
     const ImVec2 screen=projectCamera(camera);const float dx=screen.x-ImGui::GetIO().MousePos.x,dy=screen.y-ImGui::GetIO().MousePos.y;const float distance=std::sqrt(dx*dx+dy*dy);
     if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);}
    }
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&hoveredVertex<0&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=io.KeyShift;vertexBox.subtract=io.KeyCtrl;
+  }
+  if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+   vertexBox.current=io.MousePos;
+   if(std::fabs(vertexBox.current.x-vertexBox.start.x)+std::fabs(vertexBox.current.y-vertexBox.start.y)>5.0f)vertexBox.active=true;
+  }
+  if(vertexBox.pending&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+   vertexBox.current=io.MousePos;
+   if(vertexBox.active){
+    const float left=std::min(vertexBox.start.x,vertexBox.current.x),right=std::max(vertexBox.start.x,vertexBox.current.x);
+    const float top=std::min(vertexBox.start.y,vertexBox.current.y),bottom=std::max(vertexBox.start.y,vertexBox.current.y);
+    if(!vertexBox.add&&!vertexBox.subtract)animationSelectedVertices_.clear();
+    for(std::size_t vi=0;vi<displayPositions.size();++vi)if(vertexIsVisible(vi)){
+     const auto&p=displayPositions[vi];const ImVec2 screen=project(p.x,p.y,p.z);
+     if(screen.x<left||screen.x>right||screen.y<top||screen.y>bottom)continue;
+     const int index=static_cast<int>(vi);auto it=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index);
+     if(vertexBox.subtract){if(it!=animationSelectedVertices_.end())animationSelectedVertices_.erase(it);}
+     else if(it==animationSelectedVertices_.end())animationSelectedVertices_.push_back(index);
+    }
+    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.back();
+   }else if(!vertexBox.add&&!vertexBox.subtract){animationSelectedVertices_.clear();animationSelectedVertex_=-1;}
+   if(!animationSelectedVertices_.empty()){animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;}
+   vertexBox.pending=false;vertexBox.active=false;
+  }
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
@@ -3642,7 +3688,7 @@ void EditorUI::drawAnimationViewer(){
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
-  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
   }
@@ -3652,19 +3698,19 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&
-     (vertexToolMode==VertexToolMode::FreeMove||!isAnimationVertexSelected(hoveredVertex))){
-   if(io.KeyShift){
-    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
-    if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);
-    else if(animationSelectedVertices_.size()>1U)animationSelectedVertices_.erase(selectedIt);
-   }else{
-    animationSelectedVertices_.clear();
-    animationSelectedVertices_.push_back(hoveredVertex);
-   }
-   if(animationSelectedVertices_.empty())animationSelectedVertices_.push_back(hoveredVertex);
-   animationSelectedVertex_=isAnimationVertexSelected(hoveredVertex)?hoveredVertex:animationSelectedVertices_.back();
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+   const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
+   if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
+   else if(io.KeyShift){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
+   else if(selectedIt==animationSelectedVertices_.end()){animationSelectedVertices_.clear();animationSelectedVertices_.push_back(hoveredVertex);}
+   animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.back();
    animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
+  }
+  if(vertexBox.pending&&vertexBox.active){
+   const ImVec2 a(std::min(vertexBox.start.x,vertexBox.current.x),std::min(vertexBox.start.y,vertexBox.current.y));
+   const ImVec2 b(std::max(vertexBox.start.x,vertexBox.current.x),std::max(vertexBox.start.y,vertexBox.current.y));
+   const ImU32 color=vertexBox.subtract?IM_COL32(245,95,95,235):(vertexBox.add?IM_COL32(90,175,255,235):IM_COL32(120,205,255,235));
+   dl->AddRectFilled(a,b,IM_COL32(90,165,235,28));dl->AddRect(a,b,color,0.0f,0,1.5f);
   }
   int hoveredFace=-1;float nearestFaceDepth=std::numeric_limits<float>::max();
   if(animationFaceEditing_&&hovered&&!viewportToolbarOwnsMouse&&model&&model->polygonsDecoded){
@@ -4617,7 +4663,7 @@ void EditorUI::drawBoneRigEditor(){
  const auto&frame=animation.frames[frameIndex];
  const std::uint32_t modelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  if(!Crash::isValidEid(modelEid)||!frame.verticesDecoded)return;
- if(boneRigModelEid_!=modelEid){boneRigModelEid_=modelEid;boneRigBones_.clear();boneRigSelectedBone_=-1;}
+ if(boneRigModelEid_!=modelEid){boneRigModelEid_=modelEid;boneRigBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;}
  for(auto&bone:boneRigBones_)bone.vertices.erase(std::remove_if(bone.vertices.begin(),bone.vertices.end(),[&](int index){return index<0||static_cast<std::size_t>(index)>=frame.vertices.size();}),bone.vertices.end());
  if(boneRigSelectedBone_>=static_cast<int>(boneRigBones_.size()))boneRigSelectedBone_=-1;
  if(ImGuiWindow*properties=ImGui::FindWindowByName("Properties"))if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
@@ -4645,6 +4691,13 @@ void EditorUI::drawBoneRigEditor(){
     for(std::size_t other=0;other<boneRigBones_.size();++other){if(other==static_cast<std::size_t>(boneRigSelectedBone_))continue;auto&members=boneRigBones_[other].vertices;members.erase(std::remove(members.begin(),members.end(),index),members.end());}
     if(std::find(bone.vertices.begin(),bone.vertices.end(),index)==bone.vertices.end())bone.vertices.push_back(index);
    }
+   if(!bone.pivotInitialized&&!bone.vertices.empty()){
+    double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
+    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){
+     const auto&v=frame.vertices[static_cast<std::size_t>(index)];px+=v.x;py+=v.y;pz+=v.z;++count;
+    }
+    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;}
+   }
   }
   ImGui::SameLine();
   if(ImGui::Button("Remove Selected"))for(const int index:animationSelectedVertices_)bone.vertices.erase(std::remove(bone.vertices.begin(),bone.vertices.end(),index),bone.vertices.end());
@@ -4653,7 +4706,18 @@ void EditorUI::drawBoneRigEditor(){
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
    animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(frameIndex);animationFrame_=static_cast<int>(frameIndex);
   }
-  ImGui::TextDisabled("A vertex belongs to one bone at a time. Select its vertices, then use Free Move, Axis Move or Scale in the 3D Animation Editor. Each edit affects the current frame only.");
+  ImGui::SameLine();
+  if(ImGui::Button(boneRigRotateMode_?"Stop Bone Rotation":"Rotate Bone"))boneRigRotateMode_=!boneRigRotateMode_;
+  ImGui::SameLine();
+  if(ImGui::Button(boneRigLocalSpace_?"Local":"World"))boneRigLocalSpace_=!boneRigLocalSpace_;
+  if(!bone.vertices.empty()&&ImGui::Button("Set Pivot From Assigned Vertices")){
+   double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
+   for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){
+    const auto&v=frame.vertices[static_cast<std::size_t>(index)];px+=v.x;py+=v.y;pz+=v.z;++count;
+   }
+   if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();}
+  }
+  ImGui::TextDisabled("Rotate Bone enables the viewport rotation rings. Rotation affects assigned vertices on the current frame only; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
   ImGui::EndChild();
