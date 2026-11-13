@@ -3222,7 +3222,7 @@ void EditorUI::drawAnimationViewer(){
   const bool boneRotateButtonClicked=ImGui::InvisibleButton("##AnimationBoneRotate",ImVec2(28.0f,26.0f));
   const bool boneRotateButtonHovered=ImGui::IsItemHovered();
   if(boneRotateButtonClicked)boneRigRotateMode_=!boneRigRotateMode_;
-  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Stop Bone Rotation":"Rotate Selected Bone");
+  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Disable Rotation Tool":"Rotate Selected Vertices");
  const ImVec2 textureButtonMin(canvasMin.x+42.0f,canvasMin.y+8.0f);
  const ImVec2 textureButtonMax(textureButtonMin.x+28.0f,textureButtonMin.y+26.0f);
  bool textureButtonHovered=false;
@@ -3667,17 +3667,18 @@ void EditorUI::drawAnimationViewer(){
    const float x2=v.x*cy+z1*sy,z2=-v.x*sy+z1*cy;
    return AnimationPoint(x2*cz-y1*sz,x2*sz+y1*cz,z2);
   };
-  auto selectedBoneValid=[&](){return boneRigRotateMode_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();};
+  auto selectedBoneValid=[&](){return boneRigRotateMode_&&animationShowVertices_&&!animationSelectedVertices_.empty()&&poseFrameIndex>=0&&frame.verticesDecoded;};
   auto bonePivotWorld=[&](){
+   if(boneRigSelectedBone_<0||static_cast<std::size_t>(boneRigSelectedBone_)>=boneRigBones_.size()||boneRigModelEid_!=linkedModelEid)return selectedVertexPivot();
    const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
-   if(!bone.pivotInitialized)return selectedVertexPivot();
+   if(!bone.pivotInitialized||bone.vertices.empty())return selectedVertexPivot();
    return AnimationPoint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
                          (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
                          (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
   const std::uint64_t boneRotationKey=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
   auto boneEuler=[&]()->std::array<float,3>{
-   if(!selectedBoneValid())return {0.0f,0.0f,0.0f};
+   if(boneRigSelectedBone_<0||static_cast<std::size_t>(boneRigSelectedBone_)>=boneRigBones_.size()||boneRigModelEid_!=linkedModelEid||boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty())return {0.0f,0.0f,0.0f};
    const auto&rotations=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].frameRotations;
    const auto it=rotations.find(boneRotationKey);return it==rotations.end()?std::array<float,3>{0.0f,0.0f,0.0f}:it->second;
   };
@@ -3707,15 +3708,16 @@ void EditorUI::drawAnimationViewer(){
     }
    }
    if(pickedAxis>=0){
-    auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
-    boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=boneRigSelectedBone_;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();
-    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
+    const bool hasSelectedBone=boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
+    const std::vector<int>&rotationVertices=hasSelectedBone?boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices:animationSelectedVertices_;
+    boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=hasSelectedBone?boneRigSelectedBone_:-1;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();
+    for(const int index:rotationVertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
     if(boneRotationDrag.indices.empty())boneRotationDrag.active=false;
     else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
    }
   }
   auto applyBoneRotation=[&](){
-   if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex||boneRotationDrag.bone<0||static_cast<std::size_t>(boneRotationDrag.bone)>=boneRigBones_.size())return;
+   if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex)return;
    const AnimationPoint axis=boneRotationDrag.rotationAxis;const float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;
    const float c=std::cos(angle),sn=std::sin(angle);std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
    const int maximumCoordinate=animation.isCrash3?255:254;
@@ -3735,7 +3737,7 @@ void EditorUI::drawAnimationViewer(){
    }
    if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
     auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
-    boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
+    if(boneRotationDrag.bone>=0&&static_cast<std::size_t>(boneRotationDrag.bone)<boneRigBones_.size())boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
    }else if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
   };
   if(boneRotationDrag.active&&(boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex))boneRotationDrag.active=false;
@@ -4207,7 +4209,7 @@ void EditorUI::drawAnimationViewer(){
    const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    boneOverlay->AddCircleFilled(center,5.0f,IM_COL32(245,245,245,255),16);
    boneOverlay->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
-   if(boneRigRotateMode_)boneOverlay->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");
+   if(boneRigRotateMode_)boneOverlay->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Rotate");
   }
   auto boneEnds=[&](std::size_t boneIndex){
    AnimationPoint head{0.0f,0.0f,0.0f},tail{0.0f,0.0f,0.0f};
@@ -4890,7 +4892,7 @@ void EditorUI::drawBoneRigEditor(){
    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();}
   }
   ImGui::TextDisabled("With Bone List open, click or box-select to add visible vertices; Ctrl-click or Ctrl-box-select removes them. Hold Shift and drag to orbit the camera.");
-  ImGui::TextDisabled("Rotate Bone enables the viewport rotation rings. Rotation affects assigned vertices on the current frame only; bones remain editor-only.");
+  ImGui::TextDisabled("The viewport Rotate tool works on selected vertices with or without bones. Rotation edits the current frame; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
   ImGui::EndChild();
