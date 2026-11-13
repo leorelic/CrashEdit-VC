@@ -3851,55 +3851,6 @@ void EditorUI::drawAnimationViewer(){
     }
    }
   }
-  if(selectedBoneValid()){
-   const AnimationPoint pivot=bonePivotWorld();const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
-   const ImU32 colors[3]={IM_COL32(245,75,75,235),IM_COL32(80,220,120,235),IM_COL32(90,160,255,235)};
-   for(int axis=0;axis<3;++axis){
-    ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
-    for(int segment=1;segment<=64;++segment){const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);dl->AddLine(previous,current,colors[axis],4.0f);previous=current;}
-   }
-   const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
-   dl->AddCircleFilled(center,5.0f,IM_COL32(245,245,245,255),16);
-   dl->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
-   if(boneRigRotateMode_)dl->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");
-  }
-  auto boneEnds=[&](std::size_t boneIndex){
-   AnimationPoint head{0.0f,0.0f,0.0f},tail{0.0f,0.0f,0.0f};
-   if(boneIndex>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-   const auto&group=boneRigBones_[boneIndex];
-   const AnimationPoint groupPivot((group.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(group.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(group.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-   head=tail=groupPivot;
-   std::vector<AnimationPoint>points;
-   for(const int vertexIndex:group.vertices)if(vertexIndex>=0&&static_cast<std::size_t>(vertexIndex)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vertexIndex)],frame,model));
-   if(points.empty())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-   if(points.size()==1){head=tail=points.front();return std::pair<AnimationPoint,AnimationPoint>{head,tail};}
-   float farthest=-1.0f;
-   for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float distance=dx*dx+dy*dy+dz*dz;if(distance>farthest){farthest=distance;head=points[a];tail=points[b];}}
-   const auto distanceToPivot=[&](const AnimationPoint&p){const float dx=p.x-groupPivot.x,dy=p.y-groupPivot.y,dz=p.z-groupPivot.z;return dx*dx+dy*dy+dz*dz;};
-   if(distanceToPivot(tail)<distanceToPivot(head))std::swap(head,tail);
-   return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-  };
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const auto ends=boneEnds(bi);const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
-   const ImU32 boneColor=static_cast<int>(bi)==boneRigSelectedBone_?IM_COL32(255,205,90,255):IM_COL32(95,185,230,225);
-   if(ends.first.x==ends.second.x&&ends.first.y==ends.second.y&&ends.first.z==ends.second.z){dl->AddCircleFilled(a,5.0f,boneColor,16);continue;}
-   const float dx=b.x-a.x,dy=b.y-a.y,length=std::sqrt(dx*dx+dy*dy);if(length<1.0f)continue;
-   const float nx=-dy/length*4.5f,ny=dx/length*4.5f;
-   dl->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.55f,b.y+ny*0.55f),ImVec2(b.x-nx*0.55f,b.y-ny*0.55f),ImVec2(a.x-nx,a.y-ny),boneColor);
-   dl->AddLine(a,b,IM_COL32(20,25,32,255),1.5f);dl->AddCircleFilled(a,6.0f,boneColor,16);dl->AddCircleFilled(b,4.5f,boneColor,16);
-  }
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const int parent=boneRigBones_[bi].parentBone;
-   if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
-   const auto parentEnds=boneEnds(static_cast<std::size_t>(parent)),childEnds=boneEnds(bi);
-   const ImVec2 from=project(parentEnds.second.x,parentEnds.second.y,parentEnds.second.z),to=project(childEnds.first.x,childEnds.first.y,childEnds.first.z);
-   dl->AddLine(from,to,IM_COL32(255,190,80,235),3.0f);dl->AddCircleFilled(to,5.0f,IM_COL32(255,190,80,245),16);
-  }
-  if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
-   const auto ends=boneEnds(static_cast<std::size_t>(boneRigSelectedBone_));
-   const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
-   dl->AddCircle(a,8.0f,IM_COL32(255,255,255,235),16,1.5f);dl->AddCircle(b,7.0f,IM_COL32(255,255,255,235),16,1.5f);
-  }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
@@ -4245,7 +4196,59 @@ void EditorUI::drawAnimationViewer(){
  }
 
  }
- dl->PopClipRect();
+ ImDrawList*boneOverlay=ImGui::GetForegroundDrawList();
+ boneOverlay->PushClipRect(canvasMin,canvasMax,true);
+ if(selectedBoneValid()){
+   const AnimationPoint pivot=bonePivotWorld();const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
+   const ImU32 colors[3]={IM_COL32(245,75,75,235),IM_COL32(80,220,120,235),IM_COL32(90,160,255,235)};
+   for(int axis=0;axis<3;++axis){
+    ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
+    for(int segment=1;segment<=64;++segment){const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);boneOverlay->AddLine(previous,current,colors[axis],4.0f);previous=current;}
+   }
+   const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
+   boneOverlay->AddCircleFilled(center,5.0f,IM_COL32(245,245,245,255),16);
+   boneOverlay->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
+   if(boneRigRotateMode_)boneOverlay->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");
+  }
+  auto boneEnds=[&](std::size_t boneIndex){
+   AnimationPoint head{0.0f,0.0f,0.0f},tail{0.0f,0.0f,0.0f};
+   if(boneIndex>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+   const auto&group=boneRigBones_[boneIndex];
+   const AnimationPoint groupPivot((group.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(group.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(group.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+   head=tail=groupPivot;
+   std::vector<AnimationPoint>points;
+   for(const int vertexIndex:group.vertices)if(vertexIndex>=0&&static_cast<std::size_t>(vertexIndex)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vertexIndex)],frame,model));
+   if(points.empty())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+   if(points.size()==1){head=tail=points.front();return std::pair<AnimationPoint,AnimationPoint>{head,tail};}
+   float farthest=-1.0f;
+   for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float distance=dx*dx+dy*dy+dz*dz;if(distance>farthest){farthest=distance;head=points[a];tail=points[b];}}
+   const auto distanceToPivot=[&](const AnimationPoint&p){const float dx=p.x-groupPivot.x,dy=p.y-groupPivot.y,dz=p.z-groupPivot.z;return dx*dx+dy*dy+dz*dz;};
+   if(distanceToPivot(tail)<distanceToPivot(head))std::swap(head,tail);
+   return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+  };
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const auto ends=boneEnds(bi);const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
+   const ImU32 boneColor=static_cast<int>(bi)==boneRigSelectedBone_?IM_COL32(255,205,90,255):IM_COL32(95,185,230,225);
+   if(ends.first.x==ends.second.x&&ends.first.y==ends.second.y&&ends.first.z==ends.second.z){boneOverlay->AddCircleFilled(a,5.0f,boneColor,16);continue;}
+   const float dx=b.x-a.x,dy=b.y-a.y,length=std::sqrt(dx*dx+dy*dy);if(length<1.0f)continue;
+   const float nx=-dy/length*4.5f,ny=dx/length*4.5f;
+   boneOverlay->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.55f,b.y+ny*0.55f),ImVec2(b.x-nx*0.55f,b.y-ny*0.55f),ImVec2(a.x-nx,a.y-ny),boneColor);
+   boneOverlay->AddLine(a,b,IM_COL32(20,25,32,255),1.5f);boneOverlay->AddCircleFilled(a,6.0f,boneColor,16);boneOverlay->AddCircleFilled(b,4.5f,boneColor,16);
+  }
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const int parent=boneRigBones_[bi].parentBone;
+   if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
+   const auto parentEnds=boneEnds(static_cast<std::size_t>(parent)),childEnds=boneEnds(bi);
+   const ImVec2 from=project(parentEnds.second.x,parentEnds.second.y,parentEnds.second.z),to=project(childEnds.first.x,childEnds.first.y,childEnds.first.z);
+   boneOverlay->AddLine(from,to,IM_COL32(255,190,80,235),3.0f);boneOverlay->AddCircleFilled(to,5.0f,IM_COL32(255,190,80,245),16);
+  }
+  if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
+   const auto ends=boneEnds(static_cast<std::size_t>(boneRigSelectedBone_));
+   const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
+   boneOverlay->AddCircle(a,8.0f,IM_COL32(255,255,255,235),16,1.5f);boneOverlay->AddCircle(b,7.0f,IM_COL32(255,255,255,235),16,1.5f);
+  }
+   boneOverlay->PopClipRect();
+dl->PopClipRect();
  // Keep concise, individually aligned control hints inside the viewport.
  // Right-align every line so the help reads as a tidy control list.
  const char*viewerHelpLines[]={
