@@ -4185,7 +4185,7 @@ void EditorUI::drawAnimationViewer(){
    if(vertexToolMode==VertexToolMode::AxisMove){
     const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};
     const char*axisNames[3]={"X","Y","Z"};
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);gizmoOverlay->AddLine(center,end,colors[axis],3.0f);gizmoOverlay->AddCircleFilled(end,5.0f,colors[axis],12);gizmoOverlay->AddCircle(end,6.0f,IM_COL32(15,18,24,255),12,1.2f);gizmoOverlay->AddText(ImVec2(end.x+5.0f,end.y-7.0f),colors[axis],axisNames[axis]);}
+    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);gizmoOverlay->AddLine(center,end,colors[axis],4.0f);gizmoOverlay->AddCircleFilled(end,8.0f,colors[axis],16);gizmoOverlay->AddCircle(end,10.0f,IM_COL32(15,18,24,255),16,1.5f);gizmoOverlay->AddText(ImVec2(end.x+7.0f,end.y-8.0f),colors[axis],axisNames[axis]);}
     gizmoOverlay->AddCircleFilled(center,4.0f,IM_COL32(240,240,240,255),12);
    }else{
     gizmoOverlay->AddCircle(center,20.0f,IM_COL32(235,190,70,230),32,2.5f);
