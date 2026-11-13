@@ -4651,7 +4651,7 @@ void EditorUI::drawBoneRigEditor(){
   if(ImGui::Button("Select Bone Vertices")){
    animationSelectedVertices_.clear();for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())animationSelectedVertices_.push_back(index);
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
-   animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(frameIndex);animationFrame_=static_cast<int>(frameIndex);animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
+   animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(frameIndex);animationFrame_=static_cast<int>(frameIndex);
   }
   ImGui::SameLine();
   if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));}
