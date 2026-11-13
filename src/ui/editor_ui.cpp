@@ -3320,7 +3320,8 @@ void EditorUI::drawAnimationViewer(){
   const ImVec2 scaleCenter((scaleMoveMin.x+scaleMoveMax.x)*0.5f,(scaleMoveMin.y+scaleMoveMax.y)*0.5f);
   modeOverlay->AddCircle(scaleCenter,7.0f,modeTextColor,16,1.8f);modeOverlay->AddCircleFilled(ImVec2(scaleCenter.x+5,scaleCenter.y-5),2.0f,modeTextColor,8);
  }
- const ImVec2 handCenter(viewButtonMin.x+14.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
+ drawModeButton(viewButtonMin,viewButtonMax,!animationFaceEditing_,viewModeHovered);
+  const ImVec2 handCenter(viewButtonMin.x+14.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+3),ImVec2(handCenter.x-5,handCenter.y-4),modeTextColor,1.8f);
  modeOverlay->AddLine(ImVec2(handCenter.x-1,handCenter.y+2),ImVec2(handCenter.x-1,handCenter.y-7),modeTextColor,1.8f);
  modeOverlay->AddLine(ImVec2(handCenter.x+3,handCenter.y+2),ImVec2(handCenter.x+3,handCenter.y-6),modeTextColor,1.8f);
@@ -3681,7 +3682,7 @@ void EditorUI::drawAnimationViewer(){
                          pivot.z+radius*(u.z*std::cos(angle)+v.z*std::sin(angle)));
   };
   bool boneRotationStarted=false;
-  if(selectedBoneValid()&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
+  if(selectedBoneValid()&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!viewportToolbarOwnsMouse){
    const AnimationPoint pivot=bonePivotWorld();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);float bestDistance=9.0f;int pickedAxis=-1;
    for(int axis=0;axis<3;++axis){
@@ -3698,7 +3699,7 @@ void EditorUI::drawAnimationViewer(){
     boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=boneRigSelectedBone_;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();
     for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
     if(boneRotationDrag.indices.empty())boneRotationDrag.active=false;
-    else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;}
+    else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
    }
   }
   auto applyBoneRotation=[&](){
@@ -3726,11 +3727,12 @@ void EditorUI::drawAnimationViewer(){
    }else if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
   };
   if(boneRotationDrag.active&&(boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex))boneRotationDrag.active=false;
-  if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;}
+  if(boneRotationDrag.active&&ImGui::IsMouseDown(ImGuiMouseButton_Left))ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());
+  if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;ImGui::ClearActiveID();}
   else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
-   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=io.KeyShift;vertexBox.subtract=io.KeyCtrl;
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=io.KeyShift||boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
    vertexBox.current=io.MousePos;
@@ -3750,7 +3752,7 @@ void EditorUI::drawAnimationViewer(){
      else if(it==animationSelectedVertices_.end())animationSelectedVertices_.push_back(index);
     }
     animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.back();
-   }else if(!vertexBox.add&&!vertexBox.subtract){animationSelectedVertices_.clear();animationSelectedVertex_=-1;}
+   }else if(!vertexBox.add&&!vertexBox.subtract&&!boneRigWindowOpen_){animationSelectedVertices_.clear();animationSelectedVertex_=-1;}
    if(!animationSelectedVertices_.empty()){animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;}
    vertexBox.pending=false;vertexBox.active=false;
   }
@@ -3785,7 +3787,7 @@ void EditorUI::drawAnimationViewer(){
   if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
    if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
-   else if(io.KeyShift){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
+   else if(io.KeyShift||boneRigWindowOpen_){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
    else{animationSelectedVertices_.clear();animationSelectedVertices_.push_back(hoveredVertex);}
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.back();
    animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
