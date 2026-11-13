@@ -313,6 +313,9 @@ Implementation trail:
 - [ ] Open the Bone Rig Creator with `B` and provide a visible bone toolbar icon.
 - [ ] Place its UI in a dock beside Properties.
 - [ ] Allow creating bones and assigning selected vertices and faces to each bone through clear lists/selection workflows.
+- [x] Improve vertex selection with visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection.
+- [x] Use camera-space triangle depth checks so occluded vertices are not picked or included in box selections; leave X-ray selection for a later milestone.
+- [x] Add a bone-only three-axis rotation gizmo with a fixed pivot and Local/World axis mode. Rotation is applied to assigned vertices on the selected animation frame through the existing frame encoder.
 - [ ] Treat bones strictly as an optional, temporary authoring helper. They are not part of the Crash 2 animation format, are not written to NSF, and are never exported as a game skeleton.
 - [ ] Retain the original vertex positions and derive each frame's transformed positions from those originals plus the rig transform. Avoid cumulative deformation from repeatedly applying transforms to already transformed coordinates.
 - [ ] When saving, flatten the resulting pose into ordinary per-frame vertex positions using the existing Crash 2 Animation frame encoder. Animations that do not need bones remain ordinary vertex animations.
@@ -323,7 +326,10 @@ Implementation trail:
 - Users can create, rename and delete bones; assign the currently selected vertices; remove selected vertices; and select all vertices assigned to a bone.
 - A vertex belongs to one bone at a time. Selecting a bone's vertices reuses the existing Free Move, Axis Move and Scale tools, so each transform is encoded into the currently selected animation frame through the existing frame-vertex writer.
 - Bone definitions are currently in-memory editor state, scoped to the linked Model EID. They are not serialized into the NSF or persisted between application sessions.
-- Automatic bone-shape detection, pivots/rotation/hierarchical joints, face assignment, and cross-frame rig-pose authoring are not implemented in this first pass. The immediate goal is to validate the manual assignment workflow before expanding it into a full rig authoring system.
+- The viewport now supports visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection. Triangle-depth testing excludes vertices hidden behind the model; no X-ray mode is included.
+- The Bone List provides a Rotate Bone mode and Local/World axis toggle. Three projected rotation rings surround a stable pivot; rotation edits only the assigned vertices in the current animation frame using the existing frame encoder. Per-frame rotation orientation metadata remains editor-only and is keyed by animation EID plus frame index.
+- These additions are implementation-complete but still require a fresh CI result and user interaction testing before the roadmap acceptance checks can be marked complete.
+- Automatic bone-shape detection, hierarchical joints, face assignment, and cross-frame rig-pose authoring remain deferred.
 
 
 ### 5. PS1 texture import/export
