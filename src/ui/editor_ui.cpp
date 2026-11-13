@@ -4653,12 +4653,11 @@ void EditorUI::drawBoneRigEditor(){
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
    animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(frameIndex);animationFrame_=static_cast<int>(frameIndex);
   }
-  ImGui::SameLine();
-  if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));}
   ImGui::TextDisabled("A vertex belongs to one bone at a time. Select its vertices, then use Free Move, Axis Move or Scale in the 3D Animation Editor. Each edit affects the current frame only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
   ImGui::EndChild();
+  if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));}
  }else ImGui::TextDisabled("Create a bone, select vertices in the viewport, then assign them here.");
  ImGui::PopTextWrapPos();ImGui::End();
 }
