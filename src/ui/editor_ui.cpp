@@ -3631,7 +3631,7 @@ void EditorUI::drawAnimationViewer(){
     const float denominator=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);if(std::fabs(denominator)<0.0001f)continue;
     const float wa=((b.y-c.y)*(sample.x-c.x)+(c.x-b.x)*(sample.y-c.y))/denominator;
     const float wb=((c.y-a.y)*(sample.x-c.x)+(a.x-c.x)*(sample.y-c.y))/denominator;const float wc=1.0f-wa-wb;
-    if(wa>=-0.0001f&&wb>=-0.0001f&&wc>=-0.0001f){const float depth=wa*c0.depth+wb*c1.depth+wc*c2.depth;nearestSurface=std::min(nearestSurface,depth);}
+    if(wa>=-0.0001f&&wb>=-0.0001f&&wc>=-0.0001f){const float reciprocalDepth=wa/c0.depth+wb/c1.depth+wc/c2.depth;if(reciprocalDepth>0.0f)nearestSurface=std::min(nearestSurface,1.0f/reciprocalDepth);}
    }
    return nearestSurface==std::numeric_limits<float>::max()||nearestSurface>=point.depth-0.002f;
   };
@@ -3652,7 +3652,7 @@ void EditorUI::drawAnimationViewer(){
    const float x2=v.x*cy+z1*sy,z2=-v.x*sy+z1*cy;
    return AnimationPoint(x2*cz-y1*sz,x2*sz+y1*cz,z2);
   };
-  auto selectedBoneValid=[&](){return boneRigRotateMode_&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();};
+  auto selectedBoneValid=[&](){return boneRigRotateMode_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();};
   auto bonePivotWorld=[&](){
    const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
    if(!bone.pivotInitialized)return selectedVertexPivot();
@@ -4814,7 +4814,7 @@ void EditorUI::drawBoneRigEditor(){
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
   ImGui::EndChild();
-  if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));}
+  if(ImGui::Button("Delete Bone")){boneRigBones_.erase(boneRigBones_.begin()+boneRigSelectedBone_);boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(boneRigSelectedBone_,static_cast<int>(boneRigBones_.size()-1U));boneRigRotateMode_=false;}
  }else ImGui::TextDisabled("Create a bone, select vertices in the viewport, then assign them here.");
  ImGui::PopTextWrapPos();ImGui::End();
 }
