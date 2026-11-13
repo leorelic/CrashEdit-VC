@@ -4195,7 +4195,6 @@ void EditorUI::drawAnimationViewer(){
   }
  }
 
- }
  ImDrawList*boneOverlay=ImGui::GetForegroundDrawList();
  boneOverlay->PushClipRect(canvasMin,canvasMax,true);
  if(selectedBoneValid()){
@@ -4248,6 +4247,8 @@ void EditorUI::drawAnimationViewer(){
    boneOverlay->AddCircle(a,8.0f,IM_COL32(255,255,255,235),16,1.5f);boneOverlay->AddCircle(b,7.0f,IM_COL32(255,255,255,235),16,1.5f);
   }
    boneOverlay->PopClipRect();
+ }
+ 
 dl->PopClipRect();
  // Keep concise, individually aligned control hints inside the viewport.
  // Right-align every line so the help reads as a tidy control list.
