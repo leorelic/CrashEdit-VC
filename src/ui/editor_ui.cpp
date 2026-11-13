@@ -3173,6 +3173,8 @@ void EditorUI::drawAnimationViewer(){
   static VertexDragState vertexDrag;
   struct VertexBoxState{bool pending=false,active=false;ImVec2 start{},current{};bool add=false,subtract=false;};
   static VertexBoxState vertexBox;
+  struct BoneRotationDragState{bool active=false;int chunk=-1,entry=-1,frame=-1,bone=-1,axis=-1;float startAngle=0.0f;AnimationPoint pivot{0.0f,0.0f,0.0f};AnimationPoint rotationAxis{1.0f,0.0f,0.0f};std::vector<int> indices;std::vector<Crash::NsfAnimationVertex> original;std::array<float,3> initialEuler{};};
+  static BoneRotationDragState boneRotationDrag;
   struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>faces;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
   static std::vector<std::pair<int,int>>selectedCollisionFaces;
@@ -3644,8 +3646,87 @@ void EditorUI::drawAnimationViewer(){
    }
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
+  auto rotateBoneVector=[](AnimationPoint v,const std::array<float,3>&euler){
+   const float cx=std::cos(euler[0]),sx=std::sin(euler[0]),cy=std::cos(euler[1]),sy=std::sin(euler[1]),cz=std::cos(euler[2]),sz=std::sin(euler[2]);
+   const float y1=v.y*cx-v.z*sx,z1=v.y*sx+v.z*cx;
+   const float x2=v.x*cy+z1*sy,z2=-v.x*sy+z1*cy;
+   return AnimationPoint(x2*cz-y1*sz,x2*sz+y1*cz,z2);
+  };
+  auto selectedBoneValid=[&](){return boneRigRotateMode_&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();};
+  auto bonePivotWorld=[&](){
+   const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
+   if(!bone.pivotInitialized)return selectedVertexPivot();
+   return AnimationPoint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
+                         (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
+                         (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+  };
+  auto boneEuler=[&]()->std::array<float,3>{
+   if(!selectedBoneValid())return {0.0f,0.0f,0.0f};
+   const auto&rotations=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].frameRotations;
+   const auto it=rotations.find(poseFrameIndex);return it==rotations.end()?std::array<float,3>{0.0f,0.0f,0.0f}:it->second;
+  };
+  auto boneRotationAxisVector=[&](int axis){
+   AnimationPoint v=axis==0?AnimationPoint(1,0,0):(axis==1?AnimationPoint(0,1,0):AnimationPoint(0,0,1));
+   return boneRigLocalSpace_?rotateBoneVector(v,boneEuler()):v;
+  };
+  auto boneRingPoint=[&](const AnimationPoint&pivot,int axis,float angle,float radius){
+   AnimationPoint u=axis==0?AnimationPoint(0,1,0):(axis==1?AnimationPoint(1,0,0):AnimationPoint(1,0,0));
+   AnimationPoint v=axis==0?AnimationPoint(0,0,1):(axis==1?AnimationPoint(0,0,1):AnimationPoint(0,1,0));
+   if(boneRigLocalSpace_){const auto e=boneEuler();u=rotateBoneVector(u,e);v=rotateBoneVector(v,e);}
+   return AnimationPoint(pivot.x+radius*(u.x*std::cos(angle)+v.x*std::sin(angle)),
+                         pivot.y+radius*(u.y*std::cos(angle)+v.y*std::sin(angle)),
+                         pivot.z+radius*(u.z*std::cos(angle)+v.z*std::sin(angle)));
+  };
+  bool boneRotationStarted=false;
+  if(selectedBoneValid()&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!viewportToolbarOwnsMouse){
+   const AnimationPoint pivot=bonePivotWorld();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
+   const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);float bestDistance=9.0f;int pickedAxis=-1;
+   for(int axis=0;axis<3;++axis){
+    ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
+    for(int segment=1;segment<=64;++segment){
+     const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);
+     const float vx=current.x-previous.x,vy=current.y-previous.y,len2=vx*vx+vy*vy;
+     if(len2>0.01f){const float t=std::clamp(((io.MousePos.x-previous.x)*vx+(io.MousePos.y-previous.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(previous.x+vx*t),dy=io.MousePos.y-(previous.y+vy*t);const float distance=std::sqrt(dx*dx+dy*dy);if(distance<bestDistance){bestDistance=distance;pickedAxis=axis;}}
+     previous=current;
+    }
+   }
+   if(pickedAxis>=0){
+    auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
+    boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=boneRigSelectedBone_;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();
+    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
+    if(boneRotationDrag.indices.empty())boneRotationDrag.active=false;
+    else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;}
+   }
+  }
+  auto applyBoneRotation=[&](){
+   if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex||boneRotationDrag.bone<0||static_cast<std::size_t>(boneRotationDrag.bone)>=boneRigBones_.size())return;
+   const AnimationPoint axis=boneRotationDrag.rotationAxis;const float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;
+   const float c=std::cos(angle),sn=std::sin(angle);std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
+   const int maximumCoordinate=animation.isCrash3?255:254;
+   for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
+    const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
+    const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
+    const float dot=axis.x*x+axis.y*y+axis.z*z;
+    const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
+    const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
+    const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
+    const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
+    Crash::NsfAnimationVertex target=v;
+    target.x=std::clamp(static_cast<int>(std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f)),0,maximumCoordinate);
+    target.z=std::clamp(static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f)),0,maximumCoordinate);
+    target.y=std::clamp(static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f)),0,maximumCoordinate);
+    indices.push_back(static_cast<std::size_t>(boneRotationDrag.indices[i]));targets.push_back(target);
+   }
+   if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+    auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
+    boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[poseFrameIndex]=euler;
+   }else if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+  };
+  if(boneRotationDrag.active&&(boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex))boneRotationDrag.active=false;
+  if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;}
+  else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&hoveredVertex<0&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=io.KeyShift;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
@@ -3670,7 +3751,7 @@ void EditorUI::drawAnimationViewer(){
    if(!animationSelectedVertices_.empty()){animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;}
    vertexBox.pending=false;vertexBox.active=false;
   }
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
@@ -3688,7 +3769,7 @@ void EditorUI::drawAnimationViewer(){
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
-  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
   }
@@ -3698,7 +3779,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
    if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
    else if(io.KeyShift){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
@@ -3752,6 +3833,16 @@ void EditorUI::drawAnimationViewer(){
      dl->AddCircleFilled(ImVec2(center.x+14.0f,center.y-14.0f),5.0f,IM_COL32(255,205,80,255),12);
     }
    }
+  }
+  if(selectedBoneValid()){
+   const AnimationPoint pivot=bonePivotWorld();const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
+   const ImU32 colors[3]={IM_COL32(245,75,75,235),IM_COL32(80,220,120,235),IM_COL32(90,160,255,235)};
+   for(int axis=0;axis<3;++axis){
+    ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
+    for(int segment=1;segment<=64;++segment){const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);dl->AddLine(previous,current,colors[axis],boneRigRotateMode_?2.8f:1.4f);previous=current;}
+   }
+   const ImVec2 center=project(pivot.x,pivot.y,pivot.z);dl->AddCircleFilled(center,5.0f,IM_COL32(245,245,245,255),16);dl->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
+   if(boneRigRotateMode_)dl->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");
   }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
