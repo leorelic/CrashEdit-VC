@@ -317,6 +317,15 @@ Implementation trail:
 - [ ] Retain the original vertex positions and derive each frame's transformed positions from those originals plus the rig transform. Avoid cumulative deformation from repeatedly applying transforms to already transformed coordinates.
 - [ ] When saving, flatten the resulting pose into ordinary per-frame vertex positions using the existing Crash 2 Animation frame encoder. Animations that do not need bones remain ordinary vertex animations.
 
+**Initial implementation status (2026-11-13 — pending build and user validation):**
+
+- The first manual vertex-group workflow is implemented in the editor: the Bone List opens with `B` or its visible viewport toolbar icon and docks into the Properties area.
+- Users can create, rename and delete bones; assign the currently selected vertices; remove selected vertices; and select all vertices assigned to a bone.
+- A vertex belongs to one bone at a time. Selecting a bone's vertices reuses the existing Free Move, Axis Move and Scale tools, so each transform is encoded into the currently selected animation frame through the existing frame-vertex writer.
+- Bone definitions are currently in-memory editor state, scoped to the linked Model EID. They are not serialized into the NSF or persisted between application sessions.
+- Automatic bone-shape detection, pivots/rotation/hierarchical joints, face assignment, and cross-frame rig-pose authoring are not implemented in this first pass. The immediate goal is to validate the manual assignment workflow before expanding it into a full rig authoring system.
+
+
 ### 5. PS1 texture import/export
 
 - [ ] Add PlayStation 1-specific texture import/export after the editing workflows above are stable; this is not a generic modern texture pipeline.
