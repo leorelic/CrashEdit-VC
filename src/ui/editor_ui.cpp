@@ -3211,12 +3211,18 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);\n  const ImVec2 boneRotateButtonMin(canvasMin.x+114.0f,canvasMin.y+8.0f),boneRotateButtonMax(boneRotateButtonMin.x+28.0f,boneRotateButtonMin.y+26.0f);
+ const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);
+  const ImVec2 boneRotateButtonMin(canvasMin.x+114.0f,canvasMin.y+8.0f),boneRotateButtonMax(boneRotateButtonMin.x+28.0f,boneRotateButtonMin.y+26.0f);
  ImGui::SetCursorScreenPos(boneButtonMin);
  const bool boneButtonClicked=ImGui::InvisibleButton("##AnimationBoneList",ImVec2(28.0f,26.0f));
  const bool boneButtonHovered=ImGui::IsItemHovered();
  if(boneButtonClicked)boneRigWindowOpen_=!boneRigWindowOpen_;
- if(boneButtonHovered)ImGui::SetTooltip("Bone List (B)");\n  ImGui::SetCursorScreenPos(boneRotateButtonMin);\n  const bool boneRotateButtonClicked=ImGui::InvisibleButton("##AnimationBoneRotate",ImVec2(28.0f,26.0f));\n  const bool boneRotateButtonHovered=ImGui::IsItemHovered();\n  if(boneRotateButtonClicked)boneRigRotateMode_=!boneRigRotateMode_;\n  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Stop Bone Rotation":"Rotate Selected Bone");
+ if(boneButtonHovered)ImGui::SetTooltip("Bone List (B)");
+  ImGui::SetCursorScreenPos(boneRotateButtonMin);
+  const bool boneRotateButtonClicked=ImGui::InvisibleButton("##AnimationBoneRotate",ImVec2(28.0f,26.0f));
+  const bool boneRotateButtonHovered=ImGui::IsItemHovered();
+  if(boneRotateButtonClicked)boneRigRotateMode_=!boneRigRotateMode_;
+  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Stop Bone Rotation":"Rotate Selected Bone");
  const ImVec2 textureButtonMin(canvasMin.x+42.0f,canvasMin.y+8.0f);
  const ImVec2 textureButtonMax(textureButtonMin.x+28.0f,textureButtonMin.y+26.0f);
  bool textureButtonHovered=false;
@@ -3297,7 +3303,13 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 boneIconCenter((boneButtonMin.x+boneButtonMax.x)*0.5f,(boneButtonMin.y+boneButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(boneIconCenter.x-6.0f,boneIconCenter.y+5.0f),ImVec2(boneIconCenter.x+6.0f,boneIconCenter.y-5.0f),modeTextColor,4.0f);
  modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x-7.0f,boneIconCenter.y+6.0f),3.2f,modeTextColor,12);
- modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x+7.0f,boneIconCenter.y-6.0f),3.2f,modeTextColor,12);\n  modeOverlay->AddRectFilled(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(boneRigRotateMode_?ImGuiCol_ButtonActive:(boneRotateButtonHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);\n  modeOverlay->AddRect(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);\n  const ImVec2 rotateIconCenter((boneRotateButtonMin.x+boneRotateButtonMax.x)*0.5f,(boneRotateButtonMin.y+boneRotateButtonMax.y)*0.5f);\n  modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);\n  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+7.0f,rotateIconCenter.y-5.0f),modeTextColor,2.0f);\n  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+4.0f,rotateIconCenter.y-2.0f),modeTextColor,2.0f);
+ modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x+7.0f,boneIconCenter.y-6.0f),3.2f,modeTextColor,12);
+  modeOverlay->AddRectFilled(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(boneRigRotateMode_?ImGuiCol_ButtonActive:(boneRotateButtonHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);
+  modeOverlay->AddRect(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
+  const ImVec2 rotateIconCenter((boneRotateButtonMin.x+boneRotateButtonMax.x)*0.5f,(boneRotateButtonMin.y+boneRotateButtonMax.y)*0.5f);
+  modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);
+  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+7.0f,rotateIconCenter.y-5.0f),modeTextColor,2.0f);
+  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+4.0f,rotateIconCenter.y-2.0f),modeTextColor,2.0f);
  drawModeButton(faceButtonMin,faceButtonMax,animationFaceEditing_,faceModeHovered);
  const ImVec2 faceIconCenter((faceButtonMin.x+faceButtonMax.x)*0.5f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
