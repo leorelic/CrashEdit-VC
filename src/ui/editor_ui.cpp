@@ -3660,10 +3660,11 @@ void EditorUI::drawAnimationViewer(){
                          (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
                          (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
+  const std::uint64_t boneRotationKey=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
   auto boneEuler=[&]()->std::array<float,3>{
    if(!selectedBoneValid())return {0.0f,0.0f,0.0f};
    const auto&rotations=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].frameRotations;
-   const auto it=rotations.find(poseFrameIndex);return it==rotations.end()?std::array<float,3>{0.0f,0.0f,0.0f}:it->second;
+   const auto it=rotations.find(boneRotationKey);return it==rotations.end()?std::array<float,3>{0.0f,0.0f,0.0f}:it->second;
   };
   auto boneRotationAxisVector=[&](int axis){
    AnimationPoint v=axis==0?AnimationPoint(1,0,0):(axis==1?AnimationPoint(0,1,0):AnimationPoint(0,0,1));
@@ -3719,7 +3720,7 @@ void EditorUI::drawAnimationViewer(){
    }
    if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
     auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
-    boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[poseFrameIndex]=euler;
+    boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
    }else if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
   };
   if(boneRotationDrag.active&&(boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex))boneRotationDrag.active=false;
@@ -3783,7 +3784,7 @@ void EditorUI::drawAnimationViewer(){
    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
    if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
    else if(io.KeyShift){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
-   else if(selectedIt==animationSelectedVertices_.end()){animationSelectedVertices_.clear();animationSelectedVertices_.push_back(hoveredVertex);}
+   else{animationSelectedVertices_.clear();animationSelectedVertices_.push_back(hoveredVertex);}
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.back();
    animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;animationFrameEditorFocus_=true;
   }
@@ -4808,6 +4809,7 @@ void EditorUI::drawBoneRigEditor(){
    }
    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();}
   }
+  ImGui::TextDisabled("Click a visible vertex to select it; Shift-click adds, Ctrl-click removes, and drag on empty viewport space to box-select. Box selection only includes visible vertices.");
   ImGui::TextDisabled("Rotate Bone enables the viewport rotation rings. Rotation affects assigned vertices on the current frame only; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
