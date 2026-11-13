@@ -3,6 +3,7 @@
 #include "crash/formats/nsf/nsf_archive.hpp"
 #include "crash/formats/nsd/nsd_file.hpp"
 #include <array>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
