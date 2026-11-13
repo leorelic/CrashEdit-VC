@@ -3211,12 +3211,12 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);
+ const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);\n  const ImVec2 boneRotateButtonMin(canvasMin.x+114.0f,canvasMin.y+8.0f),boneRotateButtonMax(boneRotateButtonMin.x+28.0f,boneRotateButtonMin.y+26.0f);
  ImGui::SetCursorScreenPos(boneButtonMin);
  const bool boneButtonClicked=ImGui::InvisibleButton("##AnimationBoneList",ImVec2(28.0f,26.0f));
  const bool boneButtonHovered=ImGui::IsItemHovered();
  if(boneButtonClicked)boneRigWindowOpen_=!boneRigWindowOpen_;
- if(boneButtonHovered)ImGui::SetTooltip("Bone List (B)");
+ if(boneButtonHovered)ImGui::SetTooltip("Bone List (B)");\n  ImGui::SetCursorScreenPos(boneRotateButtonMin);\n  const bool boneRotateButtonClicked=ImGui::InvisibleButton("##AnimationBoneRotate",ImVec2(28.0f,26.0f));\n  const bool boneRotateButtonHovered=ImGui::IsItemHovered();\n  if(boneRotateButtonClicked)boneRigRotateMode_=!boneRigRotateMode_;\n  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Stop Bone Rotation":"Rotate Selected Bone");
  const ImVec2 textureButtonMin(canvasMin.x+42.0f,canvasMin.y+8.0f);
  const ImVec2 textureButtonMax(textureButtonMin.x+28.0f,textureButtonMin.y+26.0f);
  bool textureButtonHovered=false;
@@ -3258,7 +3258,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3297,7 +3297,7 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 boneIconCenter((boneButtonMin.x+boneButtonMax.x)*0.5f,(boneButtonMin.y+boneButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(boneIconCenter.x-6.0f,boneIconCenter.y+5.0f),ImVec2(boneIconCenter.x+6.0f,boneIconCenter.y-5.0f),modeTextColor,4.0f);
  modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x-7.0f,boneIconCenter.y+6.0f),3.2f,modeTextColor,12);
- modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x+7.0f,boneIconCenter.y-6.0f),3.2f,modeTextColor,12);
+ modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x+7.0f,boneIconCenter.y-6.0f),3.2f,modeTextColor,12);\n  modeOverlay->AddRectFilled(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(boneRigRotateMode_?ImGuiCol_ButtonActive:(boneRotateButtonHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);\n  modeOverlay->AddRect(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);\n  const ImVec2 rotateIconCenter((boneRotateButtonMin.x+boneRotateButtonMax.x)*0.5f,(boneRotateButtonMin.y+boneRotateButtonMax.y)*0.5f);\n  modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);\n  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+7.0f,rotateIconCenter.y-5.0f),modeTextColor,2.0f);\n  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+4.0f,rotateIconCenter.y-2.0f),modeTextColor,2.0f);
  drawModeButton(faceButtonMin,faceButtonMax,animationFaceEditing_,faceModeHovered);
  const ImVec2 faceIconCenter((faceButtonMin.x+faceButtonMax.x)*0.5f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
@@ -3684,7 +3684,7 @@ void EditorUI::drawAnimationViewer(){
   bool boneRotationStarted=false;
   if(selectedBoneValid()&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!viewportToolbarOwnsMouse){
    const AnimationPoint pivot=bonePivotWorld();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
-   const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);float bestDistance=9.0f;int pickedAxis=-1;
+   const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);float bestDistance=22.0f;int pickedAxis=-1;
    for(int axis=0;axis<3;++axis){
     ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
     for(int segment=1;segment<=64;++segment){
@@ -3762,8 +3762,8 @@ void EditorUI::drawAnimationViewer(){
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
     canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
    else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
-    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);float best=10.0f;
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.55f&&distance<best){best=distance;dragAxis=axis;}}
+    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);float best=20.0f;
+    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.35f&&distance<best){best=distance;dragAxis=axis;}}
     canStart=dragAxis>=0;
    }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
     const ImVec2 handle(center.x+14.0f,center.y-14.0f);const float dx=io.MousePos.x-handle.x,dy=io.MousePos.y-handle.y;
@@ -3831,7 +3831,7 @@ void EditorUI::drawAnimationViewer(){
     if(vertexToolMode==VertexToolMode::AxisMove){
      const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};
      const char*axisNames[3]={"X","Y","Z"};
-     for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);dl->AddLine(center,end,colors[axis],3.0f);dl->AddCircleFilled(end,5.0f,colors[axis],12);dl->AddCircle(end,6.0f,IM_COL32(15,18,24,255),12,1.2f);dl->AddText(ImVec2(end.x+5.0f,end.y-7.0f),colors[axis],axisNames[axis]);}
+     for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);dl->AddLine(center,end,colors[axis],4.0f);dl->AddCircleFilled(end,8.0f,colors[axis],16);dl->AddCircle(end,10.0f,IM_COL32(15,18,24,255),16,1.5f);dl->AddText(ImVec2(end.x+5.0f,end.y-7.0f),colors[axis],axisNames[axis]);}
      dl->AddCircleFilled(center,4.0f,IM_COL32(240,240,240,255),12);
     }else{
      dl->AddCircle(center,20.0f,IM_COL32(235,190,70,230),32,2.5f);
@@ -3844,10 +3844,10 @@ void EditorUI::drawAnimationViewer(){
    const ImU32 colors[3]={IM_COL32(245,75,75,235),IM_COL32(80,220,120,235),IM_COL32(90,160,255,235)};
    for(int axis=0;axis<3;++axis){
     ImVec2 previous=project(boneRingPoint(pivot,axis,0.0f,radius).x,boneRingPoint(pivot,axis,0.0f,radius).y,boneRingPoint(pivot,axis,0.0f,radius).z);
-    for(int segment=1;segment<=64;++segment){const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);dl->AddLine(previous,current,colors[axis],boneRigRotateMode_?2.8f:1.4f);previous=current;}
+    for(int segment=1;segment<=64;++segment){const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;const auto point=boneRingPoint(pivot,axis,angle,radius);const ImVec2 current=project(point.x,point.y,point.z);dl->AddLine(previous,current,colors[axis],boneRigRotateMode_?4.0f:2.0f);previous=current;}
    }
    const ImVec2 center=project(pivot.x,pivot.y,pivot.z);dl->AddCircleFilled(center,5.0f,IM_COL32(245,245,245,255),16);dl->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
-   if(boneRigRotateMode_)dl->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");
+   if(boneRigRotateMode_)dl->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Bone Rotation");\n   // Draw each editor bone as a tapered shaft with endpoint joints. Its endpoints\n   // are derived from the assigned vertices in the current animation pose.\n   auto boneEnds=[&](std::size_t boneIndex){\n    AnimationPoint head=pivot,tail=pivot;\n    if(boneIndex>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};\n    const auto&group=boneRigBones_[boneIndex];std::vector<AnimationPoint>points;\n    for(const int vertexIndex:group.vertices)if(vertexIndex>=0&&static_cast<std::size_t>(vertexIndex)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vertexIndex)],frame,model));\n    if(points.empty())return std::pair<AnimationPoint,AnimationPoint>{head,tail};\n    if(points.size()==1){head=tail=points.front();return std::pair<AnimationPoint,AnimationPoint>{head,tail};}\n    float farthest=-1.0f;\n    for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float distance=dx*dx+dy*dy+dz*dz;if(distance>farthest){farthest=distance;head=points[a];tail=points[b];}}\n    const auto center=project((head.x+tail.x)*0.5f,(head.y+tail.y)*0.5f,(head.z+tail.z)*0.5f);const auto pivotScreen=project(pivot.x,pivot.y,pivot.z);\n    if((center.x-pivotScreen.x)*(center.x-pivotScreen.x)+(center.y-pivotScreen.y)*(center.y-pivotScreen.y)<0.0f)std::swap(head,tail);\n    return std::pair<AnimationPoint,AnimationPoint>{head,tail};\n   };\n   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const auto ends=boneEnds(bi);const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);if(ends.first.x==ends.second.x&&ends.first.y==ends.second.y&&ends.first.z==ends.second.z){dl->AddCircleFilled(a,5.0f,IM_COL32(235,190,70,255),16);continue;}const float dx=b.x-a.x,dy=b.y-a.y,length=std::sqrt(dx*dx+dy*dy);if(length<1.0f)continue;const float nx=-dy/length*4.5f,ny=dx/length*4.5f;const ImU32 boneColor=static_cast<int>(bi)==boneRigSelectedBone_?IM_COL32(255,205,90,255):IM_COL32(95,185,230,225);dl->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.55f,b.y+ny*0.55f),ImVec2(b.x-nx*0.55f,b.y-ny*0.55f),ImVec2(a.x-nx,a.y-ny),boneColor);dl->AddLine(a,b,IM_COL32(20,25,32,255),1.5f);dl->AddCircleFilled(a,6.0f,boneColor,16);dl->AddCircleFilled(b,4.5f,boneColor,16);}\n   if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){const auto ends=boneEnds(static_cast<std::size_t>(boneRigSelectedBone_));const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);dl->AddCircle(a,8.0f,IM_COL32(255,255,255,235),16,1.5f);dl->AddCircle(b,7.0f,IM_COL32(255,255,255,235),16,1.5f);}
   }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
