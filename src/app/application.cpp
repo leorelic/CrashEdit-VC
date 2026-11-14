@@ -77,7 +77,7 @@ int Application::run(){
 #else
  ImGui_ImplOpenGL3_Init("#version 330");
 #endif
- Workspace workspace;EditorUI ui(workspace);editorUiForDrop=&ui;glfwSetDropCallback(w,glfwDropFiles);
+ Workspace workspace;EditorUI ui(workspace,executableDirectory()/"temp");editorUiForDrop=&ui;glfwSetDropCallback(w,glfwDropFiles);
  while(!glfwWindowShouldClose(w)){glfwPollEvents();ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();ui.draw();ImGui::Render();int x,y;glfwGetFramebufferSize(w,&x,&y);glViewport(0,0,x,y);glClearColor(.075f,.082f,.095f,1);glClear(GL_COLOR_BUFFER_BIT);ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());if(io.ConfigFlags&ImGuiConfigFlags_ViewportsEnable){auto*ctx=glfwGetCurrentContext();ImGui::UpdatePlatformWindows();ImGui::RenderPlatformWindowsDefault();glfwMakeContextCurrent(ctx);}glfwSwapBuffers(w);}
  ImGui::SaveIniSettingsToDisk(io.IniFilename);ImGui_ImplOpenGL3_Shutdown();ImGui_ImplGlfw_Shutdown();ImGui::DestroyContext();editorUiForDrop=nullptr;glfwDestroyWindow(w);glfwTerminate();return 0;
 }
