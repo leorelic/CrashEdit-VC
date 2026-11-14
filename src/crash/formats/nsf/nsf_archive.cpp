@@ -1166,6 +1166,24 @@ bool NsfArchive::setAnimationFrameVertices(std::size_t chunkIndex,std::size_t en
  return true;
 }
 
+bool NsfArchive::setAnimationFrameVerticesRebased(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>&vertexIndices,const std::vector<NsfAnimationVertex>&vertices,std::int32_t xOffset,std::int32_t yOffset,std::int32_t zOffset){
+ if(xOffset<std::numeric_limits<std::int16_t>::min()||xOffset>std::numeric_limits<std::int16_t>::max()||
+    yOffset<std::numeric_limits<std::int16_t>::min()||yOffset>std::numeric_limits<std::int16_t>::max()||
+    zOffset<std::numeric_limits<std::int16_t>::min()||zOffset>std::numeric_limits<std::int16_t>::max()||chunkIndex>=chunks_.size())return false;
+ NsfArchive candidate=*this;
+ if(!candidate.setAnimationFrameVertices(chunkIndex,entryIndex,frameIndex,vertexIndices,vertices)||
+    !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,0U,xOffset)||
+    !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,1U,yOffset)||
+    !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,2U,zOffset))return false;
+ if(entryIndex>=candidate.chunks_[chunkIndex].entries.size()||entryIndex>=chunks_[chunkIndex].entries.size())return false;
+ auto&destination=chunks_[chunkIndex].entries[entryIndex];
+ const auto&source=candidate.chunks_[chunkIndex].entries[entryIndex];
+ if(frameIndex>=destination.animation.frames.size()||frameIndex>=source.animation.frames.size())return false;
+ chunks_[chunkIndex].bytes=candidate.chunks_[chunkIndex].bytes;
+ destination.animation.frames[frameIndex]=source.animation.frames[frameIndex];
+ return true;
+}
+
 bool NsfArchive::setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value){
  if(chunkIndex>=chunks_.size()||axis>=3U)return false;
  auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
