@@ -3285,10 +3285,10 @@ void EditorUI::drawAnimationViewer(){
     for(const auto&v:targets){minimum=std::min(minimum,v.z);maximum=std::max(maximum,v.z);}
     if(maximum-minimum>254){status_="Flip cannot fit this geometry into the Crash 2 coordinate range.";return;}
     const int shift=minimum<0?minimum:(maximum>254?maximum-254:0);
-    const int rebasedOffset=static_cast<int>(frame.zOffset)+shift*4;
+    const int rebasedOffset=static_cast<int>(frame.yOffset)+shift*4;
     if(rebasedOffset<INT16_MIN||rebasedOffset>INT16_MAX){status_="Flip would exceed the animation frame offset range.";return;}
     for(auto&v:targets)v.z-=shift;
-    if(!nsf_.setAnimationFrameVerticesRebased(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets,frame.xOffset,frame.yOffset,rebasedOffset)){
+    if(!nsf_.setAnimationFrameVerticesRebased(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets,frame.xOffset,rebasedOffset,frame.zOffset)){
      status_="Flip could not be encoded; the original vertices and frame offset were preserved.";return;
     }
     animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
@@ -3810,8 +3810,8 @@ void EditorUI::drawAnimationViewer(){
     for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
     int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
     for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
-    const int oldOffsets[3]={frame.xOffset,frame.yOffset,frame.zOffset};int newOffsets[3]{};
-    for(int a=0;a<3;++a){newOffsets[a]=oldOffsets[a]+shift[a]*4;if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
+    int newOffsets[3]={static_cast<int>(frame.xOffset)+shift[0]*4,static_cast<int>(frame.yOffset)+shift[2]*4,static_cast<int>(frame.zOffset)+shift[1]*4};
+    for(int a=0;a<3;++a){if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
     for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
     if(!nsf_.setAnimationFrameVerticesRebased(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets,newOffsets[0],newOffsets[1],newOffsets[2])){
      if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
