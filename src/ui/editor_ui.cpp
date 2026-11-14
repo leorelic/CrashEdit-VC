@@ -3788,7 +3788,7 @@ void EditorUI::drawAnimationViewer(){
   auto applyBoneRotation=[&](){
    if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex)return;
    const AnimationPoint axis=boneRotationDrag.rotationAxis;float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;if(io.KeyShift)angle=std::round(angle/0.2617993878f)*0.2617993878f;
-   float snappedAngle=angle;if(io.KeyShift)snappedAngle=std::round(snappedAngle/(0.2617993878f))*0.2617993878f;
+   const float snappedAngle=angle;
    const float c=std::cos(snappedAngle),sn=std::sin(snappedAngle);Crash::NsfAnimationFrame rotationFrame=frame;rotationFrame.xOffset=boneRotationDrag.initialOffsets[0];rotationFrame.yOffset=boneRotationDrag.initialOffsets[1];rotationFrame.zOffset=boneRotationDrag.initialOffsets[2];
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
    const int maximumCoordinate=animation.isCrash3?255:254;
