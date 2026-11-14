@@ -352,7 +352,7 @@ void EditorUI::trackUndoHistory(){
  redoHistory_.clear();
  std::string actionLabel=status_;
  if(actionLabel.empty()||actionLabel==lastHistoryStatus_)actionLabel="Edit NSF data";
- std::replace(actionLabel.begin(),actionLabel.end(),'\\n',' ');
+ std::replace(actionLabel.begin(),actionLabel.end(),'\n',' ');
  historyLabels_.push_back(actionLabel);lastHistoryStatus_=status_;++historyCursor_;
  if(historyLabels_.size()>16U){historyLabels_.erase(historyLabels_.begin());if(historyCursor_>0)--historyCursor_;}
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;
@@ -366,9 +366,9 @@ void EditorUI::writeHistoryLog(){
  if(historyLogPath_.empty())return;
  std::error_code ec;std::filesystem::create_directories(historyLogPath_.parent_path(),ec);if(ec)return;
  std::ofstream out(historyLogPath_,std::ios::trunc);if(!out)return;
- out<<"CrashEdit-VC session action history\\n";
- out<<"Applied actions are marked [x]; later actions are available through Redo.\\n";
- for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\\n'||ch=='\\r')ch=' ';out<<(i<historyCursor_?"[x] ":"[ ] ")<<(i+1)<<". "<<label<<"\\n";}
+ out<<"CrashEdit-VC session action history\n";
+ out<<"Applied actions are marked [x]; later actions are available through Redo.\n";
+ for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\n'||ch=='\r')ch=' ';out<<(i<historyCursor_?"[x] ":"[ ] ")<<(i+1)<<". "<<label<<"\n";}
 }
 void EditorUI::jumpToHistory(std::size_t actionCount){
  const std::size_t target=std::min(actionCount,historyLabels_.size());
@@ -409,7 +409,7 @@ void EditorUI::undo(){
 void EditorUI::redo(){
  if(redoHistory_.empty())return;
  undoHistory_.push_back(undoBaseline_);
- if(undoHistory_.size()>32U)undoHistory_.erase(undoHistory_.begin());
+ if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
  undoBaseline_=std::move(redoHistory_.back());redoHistory_.pop_back();
  if(historyCursor_<historyLabels_.size())++historyCursor_;
  nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
