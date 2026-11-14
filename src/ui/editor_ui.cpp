@@ -3288,12 +3288,9 @@ void EditorUI::drawAnimationViewer(){
     const int rebasedOffset=static_cast<int>(frame.zOffset)+shift*4;
     if(rebasedOffset<INT16_MIN||rebasedOffset>INT16_MAX){status_="Flip would exceed the animation frame offset range.";return;}
     for(auto&v:targets)v.z-=shift;
-    Crash::NsfArchive candidate=nsf_;
-    if(!candidate.setAnimationFrameVertices(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets)||
-       !candidate.setAnimationFrameHeaderValue(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),2U,rebasedOffset)){
+    if(!nsf_.setAnimationFrameVerticesRebased(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets,frame.xOffset,frame.yOffset,rebasedOffset)){
      status_="Flip could not be encoded; the original vertices and frame offset were preserved.";return;
     }
-    nsf_=std::move(candidate);
     animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
     status_="Selected vertices flipped upside down.";
    };
@@ -3809,22 +3806,17 @@ void EditorUI::drawAnimationViewer(){
      target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
      target.y=static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f));
     }
-    int minimum[3]={INT_MAX,INT_MAX,INT_MAX},maximum[3]={INT_MIN,INT_MIN,INT_MIN};
+    int minimum[3]={std::numeric_limits<int>::max(),INT_MAX,INT_MAX},maximum[3]={std::numeric_limits<int>::min(),INT_MIN,INT_MIN};
     for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
     int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
     for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
     const int oldOffsets[3]={frame.xOffset,frame.yOffset,frame.zOffset};int newOffsets[3]{};
     for(int a=0;a<3;++a){newOffsets[a]=oldOffsets[a]+shift[a]*4;if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
     for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
-    Crash::NsfArchive candidate=nsf_;
-    if(!candidate.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)||
-       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),0U,newOffsets[0])||
-       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),1U,newOffsets[1])||
-       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),2U,newOffsets[2])){
+    if(!nsf_.setAnimationFrameVerticesRebased(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets,newOffsets[0],newOffsets[1],newOffsets[2])){
      if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
      return;
     }
-    nsf_=std::move(candidate);
    }
    auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
    if(boneRotationDrag.bone>=0&&static_cast<std::size_t>(boneRotationDrag.bone)<boneRigBones_.size())boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
