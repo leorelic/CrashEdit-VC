@@ -3764,31 +3764,70 @@ void EditorUI::drawAnimationViewer(){
   auto applyBoneRotation=[&](){
    if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex)return;
    const AnimationPoint axis=boneRotationDrag.rotationAxis;const float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;
-   const float c=std::cos(angle),sn=std::sin(angle);std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
+   const float c=std::cos(angle),sn=std::sin(angle);
+   std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
    const int maximumCoordinate=animation.isCrash3?255:254;
-   for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
-    const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
-    const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
-    const float dot=axis.x*x+axis.y*y+axis.z*z;
-    const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
-    const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
-    const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
-    const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
-    Crash::NsfAnimationVertex target=v;
-    const long rotatedX=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
-    const long rotatedZ=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
-    const long rotatedY=std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f);
-    if(rotatedX<0||rotatedX>maximumCoordinate||rotatedY<0||rotatedY>maximumCoordinate||rotatedZ<0||rotatedZ>maximumCoordinate){
-     if(status_!="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.")status_="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+   if(animation.isCrash3){
+    indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
+    for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
+     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
+     const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
+     const float dot=axis.x*x+axis.y*y+axis.z*z;
+     const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
+     const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
+     const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
+     const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
+     Crash::NsfAnimationVertex target=v;
+     const long rotatedX=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
+     const long rotatedZ=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
+     const long rotatedY=std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f);
+     if(rotatedX<0||rotatedX>maximumCoordinate||rotatedY<0||rotatedY>maximumCoordinate||rotatedZ<0||rotatedZ>maximumCoordinate){
+      if(status_!="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.")status_="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+      return;
+     }
+     target.x=static_cast<int>(rotatedX);target.z=static_cast<int>(rotatedZ);target.y=static_cast<int>(rotatedY);
+     indices.push_back(static_cast<std::size_t>(boneRotationDrag.indices[i]));targets.push_back(target);
+    }
+    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+     if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
      return;
     }
-    target.x=static_cast<int>(rotatedX);target.z=static_cast<int>(rotatedZ);target.y=static_cast<int>(rotatedY);
-    indices.push_back(static_cast<std::size_t>(boneRotationDrag.indices[i]));targets.push_back(target);
+   }else{
+    if(!frame.verticesDecoded||frame.vertices.empty())return;
+    targets=frame.vertices;indices.reserve(targets.size());for(std::size_t i=0;i<targets.size();++i)indices.push_back(i);
+    for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
+     const int vertexIndex=boneRotationDrag.indices[i];if(vertexIndex<0||static_cast<std::size_t>(vertexIndex)>=targets.size())return;
+     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
+     const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
+     const float dot=axis.x*x+axis.y*y+axis.z*z;
+     const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
+     const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
+     const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
+     const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
+     auto&target=targets[static_cast<std::size_t>(vertexIndex)];
+     target.x=static_cast<int>(std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f));
+     target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
+     target.y=static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f));
+    }
+    int minimum[3]={INT_MAX,INT_MAX,INT_MAX},maximum[3]={INT_MIN,INT_MIN,INT_MIN};
+    for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
+    int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
+    for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
+    const int oldOffsets[3]={frame.xOffset,frame.yOffset,frame.zOffset};int newOffsets[3]{};
+    for(int a=0;a<3;++a){newOffsets[a]=oldOffsets[a]+shift[a]*4;if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
+    for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
+    Crash::NsfArchive candidate=nsf_;
+    if(!candidate.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)||
+       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),0U,newOffsets[0])||
+       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),1U,newOffsets[1])||
+       !candidate.setAnimationFrameHeaderValue(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),2U,newOffsets[2])){
+     if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+     return;
+    }
+    nsf_=std::move(candidate);
    }
-   if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-    auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
-    if(boneRotationDrag.bone>=0&&static_cast<std::size_t>(boneRotationDrag.bone)<boneRigBones_.size())boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
-   }else if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+   auto euler=boneRotationDrag.initialEuler;euler[static_cast<std::size_t>(boneRotationDrag.axis)]+=angle;
+   if(boneRotationDrag.bone>=0&&static_cast<std::size_t>(boneRotationDrag.bone)<boneRigBones_.size())boneRigBones_[static_cast<std::size_t>(boneRotationDrag.bone)].frameRotations[boneRotationKey]=euler;
   };
   if(boneRotationDrag.active&&(boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex))boneRotationDrag.active=false;
   if(boneRotationDrag.active&&ImGui::IsMouseDown(ImGuiMouseButton_Left))ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());
