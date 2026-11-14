@@ -26,6 +26,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <tuple>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -3253,9 +3254,8 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 freeMoveMin(modeToolbarStart.x,modeToolbarStart.y+60.0f),freeMoveMax(freeMoveMin.x+28.0f,freeMoveMin.y+26.0f);
  const ImVec2 axisMoveMin(modeToolbarStart.x,axisMoveY),axisMoveMax(axisMoveMin.x+28.0f,axisMoveMin.y+26.0f);
  const ImVec2 scaleMoveMin(modeToolbarStart.x,axisMoveY+30.0f),scaleMoveMax(scaleMoveMin.x+28.0f,scaleMoveMin.y+26.0f);
- const ImVec2 flipHorizontalMin(modeToolbarStart.x,axisMoveY+60.0f),flipHorizontalMax(flipHorizontalMin.x+28.0f,flipHorizontalMin.y+26.0f);
- const ImVec2 flipVerticalMin(modeToolbarStart.x+32.0f,axisMoveY+60.0f),flipVerticalMax(flipVerticalMin.x+28.0f,flipVerticalMin.y+26.0f);
- bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false,flipHorizontalHovered=false,flipVerticalHovered=false;
+ const ImVec2 flipVerticalMin(modeToolbarStart.x,axisMoveY+60.0f),flipVerticalMax(flipVerticalMin.x+28.0f,flipVerticalMin.y+26.0f);
+ bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false,flipVerticalHovered=false;
  if(showVertexTransformToolbar){
   if(showFreeMoveButton){
    ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
@@ -3266,35 +3266,41 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
   if(animationShowVertices_&&!animationCollisionViewer_){
-   ImGui::SetCursorScreenPos(flipHorizontalMin);const bool flipHorizontalClicked=ImGui::InvisibleButton("##AnimationFlipHorizontal",ImVec2(28.0f,26.0f));flipHorizontalHovered=ImGui::IsItemHovered();
-   ImGui::SetCursorScreenPos(flipVerticalMin);const bool flipVerticalClicked=ImGui::InvisibleButton("##AnimationFlipVertical",ImVec2(28.0f,26.0f));flipVerticalHovered=ImGui::IsItemHovered();
-   if(flipHorizontalHovered)ImGui::SetTooltip("Flip Horizontal — mirror left to right");
-   if(flipVerticalHovered)ImGui::SetTooltip("Flip Vertical — turn upside down");
-   auto flipSelectedVertices=[&](bool horizontal){
+   ImGui::SetCursorScreenPos(flipVerticalMin);const bool flipUpsideDownClicked=ImGui::InvisibleButton("##AnimationFlipUpsideDown",ImVec2(28.0f,26.0f));flipVerticalHovered=ImGui::IsItemHovered();
+   if(flipVerticalHovered)ImGui::SetTooltip("Flip Upside Down — mirror selected vertices vertically");
+   auto flipSelectedVerticesUpsideDown=[&](){
     if(animationSelectedVertices_.empty()||poseFrameIndex<0||!frame.verticesDecoded)return;
-    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;indices.reserve(animationSelectedVertices_.size());targets.reserve(animationSelectedVertices_.size());
-    double sum=0.0;std::size_t count=0;
-    for(const int index:animationSelectedVertices_)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){const auto&v=frame.vertices[static_cast<std::size_t>(index)];sum+=horizontal?static_cast<double>(v.x):static_cast<double>(v.z);++count;}
-    if(count!=animationSelectedVertices_.size()||count==0)return;
-    const double center=sum/static_cast<double>(count);
-    const int maximumCoordinate=animation.isCrash3?255:254;
+    double sum=0.0;
+    for(const int index:animationSelectedVertices_)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())sum+=static_cast<double>(frame.vertices[static_cast<std::size_t>(index)].z);else return;
+    const double center=sum/static_cast<double>(animationSelectedVertices_.size());
+    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
+    indices.reserve(frame.vertices.size());targets=frame.vertices;
+    for(std::size_t i=0;i<frame.vertices.size();++i)indices.push_back(i);
     for(const int index:animationSelectedVertices_){
-     const auto&source=frame.vertices[static_cast<std::size_t>(index)];auto target=source;
-     const long mirrored=std::lround(2.0*center-static_cast<double>(horizontal?source.x:source.z));
-     if(mirrored<0||mirrored>maximumCoordinate){status_="Flip rejected because a mirrored vertex would exceed the Crash coordinate range.";return;}
-     if(horizontal)target.x=static_cast<int>(mirrored);else target.z=static_cast<int>(mirrored);
-     indices.push_back(static_cast<std::size_t>(index));targets.push_back(target);
+     auto&target=targets[static_cast<std::size_t>(index)];
+     target.z=static_cast<int>(std::lround(2.0*center-static_cast<double>(target.z)));
     }
-    if(nsf_.setAnimationFrameVertices(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-     animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
-     status_=horizontal?"Selected vertices flipped left-to-right.":"Selected vertices flipped upside down.";
-    }else status_="Flip could not be encoded; the original vertices were preserved.";
+    if(animation.isCrash3){status_="Upside-down rebasing is currently restricted to Crash 2 until Crash 3 coordinate scaling is verified.";return;}
+    int minimum=std::numeric_limits<int>::max(),maximum=std::numeric_limits<int>::min();
+    for(const auto&v:targets){minimum=std::min(minimum,v.z);maximum=std::max(maximum,v.z);}
+    if(maximum-minimum>254){status_="Flip cannot fit this geometry into the Crash 2 coordinate range.";return;}
+    const int shift=minimum<0?minimum:(maximum>254?maximum-254:0);
+    const int rebasedOffset=static_cast<int>(frame.zOffset)+shift*4;
+    if(rebasedOffset<INT16_MIN||rebasedOffset>INT16_MAX){status_="Flip would exceed the animation frame offset range.";return;}
+    for(auto&v:targets)v.z-=shift;
+    Crash::NsfArchive candidate=nsf_;
+    if(!candidate.setAnimationFrameVertices(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets)||
+       !candidate.setAnimationFrameHeaderValue(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),2U,rebasedOffset)){
+     status_="Flip could not be encoded; the original vertices and frame offset were preserved.";return;
+    }
+    nsf_=std::move(candidate);
+    animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
+    status_="Selected vertices flipped upside down.";
    };
-   if(flipHorizontalClicked)flipSelectedVertices(true);
-   if(flipVerticalClicked)flipSelectedVertices(false);
+   if(flipUpsideDownClicked)flipSelectedVerticesUpsideDown();
   }
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||flipHorizontalHovered||flipVerticalHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||flipVerticalHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
