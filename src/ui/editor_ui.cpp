@@ -255,7 +255,8 @@ static const char* entryIconName(std::uint32_t type){
  switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 6:case 15:case 17:return "ThingOrange";case 11:return "ThingCode";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
-EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();}
+EditorUI::EditorUI(Workspace& w):workspace_(w){registerEditorSettingsHandler();std::error_code ec;historyLogPath_=std::filesystem::current_path(ec)/"temp"/"cevc-temp-history.txt";}
+EditorUI::~EditorUI(){std::error_code ec;if(!historyLogPath_.empty())std::filesystem::remove(historyLogPath_,ec);}
 void EditorUI::handleDroppedFiles(int count,const char** paths){
  for(int i=0;i<count;++i){
   if(!paths||!paths[i])continue;
@@ -326,7 +327,7 @@ void EditorUI::refreshUndoBaselineBytes(){
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
 }
 void EditorUI::resetUndoHistory(){
- undoHistory_.clear();redoHistory_.clear();undoBaselineValid_=false;undoNsfBytes_.clear();undoNsdBytes_.clear();
+ undoHistory_.clear();redoHistory_.clear();undoBaselineValid_=false;undoNsfBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
  if(!nsfValid_)return;
  std::string error;
  if(!nsf_.saveUncompressedBytes(undoNsfBytes_,error)){undoNsfBytes_.clear();return;}
@@ -345,31 +346,76 @@ void EditorUI::trackUndoHistory(){
   if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations){bonesEqual=false;break;}
  }
  if(nsfBytes==undoNsfBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
+ if(historyCursor_<historyLabels_.size())historyLabels_.erase(historyLabels_.begin()+static_cast<std::ptrdiff_t>(historyCursor_),historyLabels_.end());
  undoHistory_.push_back(undoBaseline_);
  if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
  redoHistory_.clear();
+ std::string actionLabel=status_;
+ if(actionLabel.empty()||actionLabel==lastHistoryStatus_)actionLabel="Edit NSF data";
+ std::replace(actionLabel.begin(),actionLabel.end(),'\\n',' ');
+ historyLabels_.push_back(actionLabel);lastHistoryStatus_=status_;++historyCursor_;
+ if(historyLabels_.size()>16U){historyLabels_.erase(historyLabels_.begin());if(historyCursor_>0)--historyCursor_;}
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;
- undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);
+ undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
+}
+void EditorUI::clearHistoryLog(){
+ historyLabels_.clear();historyCursor_=0;lastHistoryStatus_.clear();
+ if(!historyLogPath_.empty()){std::error_code ec;std::filesystem::remove(historyLogPath_,ec);}
+}
+void EditorUI::writeHistoryLog(){
+ if(historyLogPath_.empty())return;
+ std::error_code ec;std::filesystem::create_directories(historyLogPath_.parent_path(),ec);if(ec)return;
+ std::ofstream out(historyLogPath_,std::ios::trunc);if(!out)return;
+ out<<"CrashEdit-VC session action history\\n";
+ out<<"Applied actions are marked [x]; later actions are available through Redo.\\n";
+ for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\\n'||ch=='\\r')ch=' ';out<<(i<historyCursor_?"[x] ":"[ ] ")<<(i+1)<<". "<<label<<"\\n";}
+}
+void EditorUI::jumpToHistory(std::size_t actionCount){
+ const std::size_t target=std::min(actionCount,historyLabels_.size());
+ while(historyCursor_>target&&!undoHistory_.empty())undo();
+ while(historyCursor_<target&&!redoHistory_.empty())redo();
+}
+void EditorUI::drawActionHistory(){
+ ImGui::Begin("Action History");
+ if(!nsfValid_)ImGui::TextDisabled("Open an NSF archive to begin recording edits.");
+ else if(historyLabels_.empty())ImGui::TextDisabled("No editing actions recorded yet.");
+ else{
+  ImGui::TextDisabled("%zu recorded actions | %zu currently applied",historyLabels_.size(),historyCursor_);
+  ImGui::Separator();
+  for(std::size_t i=0;i<historyLabels_.size();++i){
+   ImGui::PushID(static_cast<int>(i));
+   const bool applied=i<historyCursor_;
+   const bool current=i+1==historyCursor_;
+   if(current)ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.45f,0.85f,0.55f,1.0f));
+   const std::string label=(applied?"[x] ":"[ ] ")+std::to_string(i+1)+". "+historyLabels_[i];
+   if(ImGui::Selectable(label.c_str(),current,ImGuiSelectableFlags_SpanAllColumns))jumpToHistory(i+1);
+   if(current)ImGui::PopStyleColor();
+   ImGui::PopID();
+  }
+ }
+ ImGui::End();
 }
 void EditorUI::undo(){
  if(undoHistory_.empty())return;
  redoHistory_.push_back(undoBaseline_);
  if(redoHistory_.size()>16U)redoHistory_.erase(redoHistory_.begin());
  undoBaseline_=std::move(undoHistory_.back());undoHistory_.pop_back();
+ if(historyCursor_>0)--historyCursor_;
  nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
  refreshUndoBaselineBytes();
  animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
- animationPlaying_=false;status_="Undo completed.";
+ animationPlaying_=false;status_="Undo completed.";writeHistoryLog();
 }
 void EditorUI::redo(){
  if(redoHistory_.empty())return;
  undoHistory_.push_back(undoBaseline_);
  if(undoHistory_.size()>32U)undoHistory_.erase(undoHistory_.begin());
  undoBaseline_=std::move(redoHistory_.back());redoHistory_.pop_back();
+ if(historyCursor_<historyLabels_.size())++historyCursor_;
  nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
  refreshUndoBaselineBytes();
  animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
- animationPlaying_=false;status_="Redo completed.";
+ animationPlaying_=false;status_="Redo completed.";writeHistoryLog();
 }
 void EditorUI::draw(){
  const ImGuiIO&historyIo=ImGui::GetIO();
@@ -383,9 +429,9 @@ void EditorUI::draw(){
  ImGuiWindowFlags f=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_MenuBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));ImGui::Begin("CrashEditHost",nullptr,f);ImGui::PopStyleVar(3);drawMenu();drawToolbar();
  auto id=ImGui::GetID("CrashEditDockSpace");
- if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<7){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",bottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=7;ImGui::MarkIniSettingsDirty();}
+ if(ImGui::DockBuilderGetNode(id)==nullptr||editorPreferences.dockLayoutVersion<8){if(ImGui::DockBuilderGetNode(id)!=nullptr)ImGui::DockBuilderRemoveNode(id);ImGui::DockBuilderAddNode(id,ImGuiDockNodeFlags_DockSpace|ImGuiDockNodeFlags_PassthruCentralNode);ImGui::DockBuilderSetNodeSize(id,v->WorkSize);ImGuiID center=id;auto right=ImGui::DockBuilderSplitNode(center,ImGuiDir_Right,.28f,nullptr,&center);auto rightBottom=ImGui::DockBuilderSplitNode(right,ImGuiDir_Down,.42f,nullptr,&right);auto bottom=ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.27f,nullptr,&center);ImGui::DockBuilderDockWindow("3D Zone Editor",center);ImGui::DockBuilderDockWindow("3D Animation Editor",center);ImGui::DockBuilderDockWindow("GOOL Inspector",center);ImGui::DockBuilderDockWindow("GOOL Script Editor",center);ImGui::DockBuilderDockWindow("GOOL Blueprint",center);ImGui::DockBuilderDockWindow("Resource Hierarchy",right);ImGui::DockBuilderDockWindow("Action History",right);ImGui::DockBuilderDockWindow("Properties",rightBottom);ImGui::DockBuilderDockWindow("Animation Frame Editor",rightBottom);ImGui::DockBuilderDockWindow("Model Editor",rightBottom);ImGui::DockBuilderDockWindow("Face Editor",bottom);ImGui::DockBuilderDockWindow("Console / Diagnostics",bottom);ImGui::DockBuilderDockWindow("GOOL Data Pool",bottom);ImGui::DockBuilderDockWindow("GOOL State Map",bottom);ImGui::DockBuilderDockWindow("GOOL State Descriptions",bottom);ImGui::DockBuilderDockWindow("GOOL Frame Groups",bottom);ImGui::DockBuilderDockWindow("Search Entries",bottom);ImGui::DockBuilderDockWindow("Texture Viewer",bottom);ImGui::DockBuilderDockWindow("CLUT",bottom);ImGui::DockBuilderDockWindow("Spawn Points",bottom);ImGui::DockBuilderDockWindow("Animation Timeline",bottom);ImGui::DockBuilderFinish(id);editorPreferences.dockLayoutVersion=8;ImGui::MarkIniSettingsDirty();}
  ImGui::DockSpace(id,ImVec2(0,-(ImGui::GetTextLineHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().ItemSpacing.y)),ImGuiDockNodeFlags_PassthruCentralNode);ImGui::Separator();ImGui::TextUnformatted(status_.c_str());
- drawHierarchy();
+ drawHierarchy();drawActionHistory();
  bool showAnimationWorkspace=false;
  const Crash::NsfEntry*selectedAnimationResource=nullptr;
  const Crash::NsfEntry*selectedModelResource=nullptr;
