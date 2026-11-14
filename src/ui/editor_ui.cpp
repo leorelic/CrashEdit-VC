@@ -3174,7 +3174,7 @@ void EditorUI::drawAnimationViewer(){
   static VertexDragState vertexDrag;
   struct VertexBoxState{bool pending=false,active=false;ImVec2 start{},current{};bool add=false,subtract=false;};
   static VertexBoxState vertexBox;
-  struct BoneRotationDragState{bool active=false;int chunk=-1,entry=-1,frame=-1,bone=-1,axis=-1;float startAngle=0.0f;AnimationPoint pivot{0.0f,0.0f,0.0f};AnimationPoint rotationAxis{1.0f,0.0f,0.0f};std::vector<int> indices;std::vector<Crash::NsfAnimationVertex> original;std::array<float,3> initialEuler{};};
+  struct BoneRotationDragState{bool active=false;int chunk=-1,entry=-1,frame=-1,bone=-1,axis=-1;float startAngle=0.0f;AnimationPoint pivot{0.0f,0.0f,0.0f};AnimationPoint rotationAxis{1.0f,0.0f,0.0f};std::vector<int> indices;std::vector<Crash::NsfAnimationVertex> original,allOriginal;std::array<float,3> initialEuler{};std::array<std::int16_t,3> initialOffsets{};};
   static BoneRotationDragState boneRotationDrag;
   struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>faces;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
@@ -3752,7 +3752,7 @@ void EditorUI::drawAnimationViewer(){
    if(pickedAxis>=0){
     const bool hasSelectedBone=boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
     const std::vector<int>&rotationVertices=hasSelectedBone?boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices:animationSelectedVertices_;
-    boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=hasSelectedBone?boneRigSelectedBone_:-1;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();
+    boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=hasSelectedBone?boneRigSelectedBone_:-1;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();boneRotationDrag.initialOffsets={frame.xOffset,frame.yOffset,frame.zOffset};boneRotationDrag.allOriginal=frame.vertices;
     for(const int index:rotationVertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
     if(boneRotationDrag.indices.empty())boneRotationDrag.active=false;
     else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
@@ -3761,13 +3761,13 @@ void EditorUI::drawAnimationViewer(){
   auto applyBoneRotation=[&](){
    if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex)return;
    const AnimationPoint axis=boneRotationDrag.rotationAxis;const float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;
-   const float c=std::cos(angle),sn=std::sin(angle);
+   const float c=std::cos(angle),sn=std::sin(angle);Crash::NsfAnimationFrame rotationFrame=frame;rotationFrame.xOffset=boneRotationDrag.initialOffsets[0];rotationFrame.yOffset=boneRotationDrag.initialOffsets[1];rotationFrame.zOffset=boneRotationDrag.initialOffsets[2];
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
    const int maximumCoordinate=animation.isCrash3?255:254;
    if(animation.isCrash3){
     indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
-     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
+     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,rotationFrame,model);
      const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
      const float dot=axis.x*x+axis.y*y+axis.z*z;
      const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
@@ -3791,10 +3791,10 @@ void EditorUI::drawAnimationViewer(){
     }
    }else{
     if(!frame.verticesDecoded||frame.vertices.empty())return;
-    targets=frame.vertices;indices.reserve(targets.size());for(std::size_t i=0;i<targets.size();++i)indices.push_back(i);
+    targets=boneRotationDrag.allOriginal;indices.reserve(targets.size());for(std::size_t i=0;i<targets.size();++i)indices.push_back(i);
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
      const int vertexIndex=boneRotationDrag.indices[i];if(vertexIndex<0||static_cast<std::size_t>(vertexIndex)>=targets.size())return;
-     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,frame,model);
+     const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,rotationFrame,model);
      const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
      const float dot=axis.x*x+axis.y*y+axis.z*z;
      const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
@@ -3810,7 +3810,7 @@ void EditorUI::drawAnimationViewer(){
     for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
     int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
     for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
-    int newOffsets[3]={static_cast<int>(frame.xOffset)+shift[0]*4,static_cast<int>(frame.yOffset)+shift[2]*4,static_cast<int>(frame.zOffset)+shift[1]*4};
+    int newOffsets[3]={static_cast<int>(boneRotationDrag.initialOffsets[0])+shift[0]*4,static_cast<int>(boneRotationDrag.initialOffsets[1])+shift[2]*4,static_cast<int>(boneRotationDrag.initialOffsets[2])+shift[1]*4};
     for(int a=0;a<3;++a){if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
     for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
     if(!nsf_.setAnimationFrameVerticesRebased(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets,newOffsets[0],newOffsets[1],newOffsets[2])){
