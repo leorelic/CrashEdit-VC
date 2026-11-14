@@ -12,11 +12,11 @@ namespace CrashEdit {
 enum class GameVersion { Crash1Beta1995, Crash1BetaMAR08, Crash1BetaMAY11, Crash1, Crash2, Crash3BetaMAY14, Crash3 };
 class EditorUI {
 public:
- explicit EditorUI(Workspace& w); void draw();
+ explicit EditorUI(Workspace& w); ~EditorUI(); void draw();
  void handleDroppedFiles(int count,const char** paths);
 private:
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
- void undo(); void redo(); void resetUndoHistory(); void trackUndoHistory(); void refreshUndoBaselineBytes();
+ void undo(); void redo(); void jumpToHistory(std::size_t actionCount); void resetUndoHistory(); void trackUndoHistory(); void refreshUndoBaselineBytes(); void drawActionHistory(); void clearHistoryLog(); void writeHistoryLog();
  void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawBoneRigEditor(); void drawFaceEditor(); void drawFaceTextureSelector(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
@@ -25,6 +25,10 @@ private:
  struct EditorSnapshot { Crash::NsfArchive nsf; Crash::NsdFile nsd; std::vector<BoneRigBone> bones; };
  std::vector<BoneRigBone> boneRigBones_;
  std::vector<EditorSnapshot> undoHistory_,redoHistory_;
+ std::vector<std::string> historyLabels_;
+ std::size_t historyCursor_=0;
+ std::string lastHistoryStatus_;
+ std::filesystem::path historyLogPath_;
  EditorSnapshot undoBaseline_;
  std::vector<std::uint8_t> undoNsfBytes_,undoNsdBytes_;
  bool undoBaselineValid_=false;
