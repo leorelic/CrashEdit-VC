@@ -3806,7 +3806,7 @@ void EditorUI::drawAnimationViewer(){
      target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
      target.y=static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f));
     }
-    int minimum[3]={std::numeric_limits<int>::max(),INT_MAX,INT_MAX},maximum[3]={std::numeric_limits<int>::min(),INT_MIN,INT_MIN};
+    int minimum[3]={std::numeric_limits<int>::max(),std::numeric_limits<int>::max(),std::numeric_limits<int>::max()},maximum[3]={std::numeric_limits<int>::min(),std::numeric_limits<int>::min(),std::numeric_limits<int>::min()};
     for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
     int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
     for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
