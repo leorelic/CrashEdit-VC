@@ -284,7 +284,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
  invalidateBlueprintAnalysisCache();nsf_=std::move(archive);sceneCameraInitialized_=false;sceneCameraChunk_=-1;sceneCameraEntry_=-1;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
- nsfValid_=true;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
+ nsfValid_=true;boneRigBones_.clear();boneRigModelEid_=0;boneRigAnimationEid_=0;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd){status_+=" Matching NSD unavailable: "+nsdError;Diagnostics::log(DiagnosticLevel::Warning,"Matching NSD unavailable: "+nsdError);}
  editorPreferences.lastNsfPath=file.string();
@@ -345,7 +345,7 @@ void EditorUI::trackUndoHistory(){
  }
  if(nsfBytes==undoNsfBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
  undoHistory_.push_back(undoBaseline_);
- if(undoHistory_.size()>32U)undoHistory_.erase(undoHistory_.begin());
+ if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
  redoHistory_.clear();
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;
  undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);
@@ -353,7 +353,7 @@ void EditorUI::trackUndoHistory(){
 void EditorUI::undo(){
  if(undoHistory_.empty())return;
  redoHistory_.push_back(undoBaseline_);
- if(redoHistory_.size()>32U)redoHistory_.erase(redoHistory_.begin());
+ if(redoHistory_.size()>16U)redoHistory_.erase(redoHistory_.begin());
  undoBaseline_=std::move(undoHistory_.back());undoHistory_.pop_back();
  nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
  refreshUndoBaselineBytes();
@@ -366,7 +366,7 @@ void EditorUI::redo(){
  if(undoHistory_.size()>32U)undoHistory_.erase(undoHistory_.begin());
  undoBaseline_=std::move(redoHistory_.back());redoHistory_.pop_back();
  nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
- resetUndoBaselineBytes();
+ refreshUndoBaselineBytes();
  animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
  animationPlaying_=false;status_="Redo completed.";
 }
@@ -3624,7 +3624,7 @@ void EditorUI::drawAnimationViewer(){
     auto a=axisWorldVector(collisionDrag.axis);auto p=project(collisionDrag.px,collisionDrag.py,collisionDrag.pz),q=project(collisionDrag.px+a.x,collisionDrag.py+a.y,collisionDrag.pz+a.z);
     float vx=q.x-p.x,vy=q.y-p.y,l=vx*vx+vy*vy;if(l>0.01f){float amount=(delta.x*vx+delta.y*vy)/l;if(collisionDrag.axis==0)dx=amount;else if(collisionDrag.axis==1)dz=amount;else dy=amount;}
    }
-   const float factor=collisionDrag.mode==int(VertexToolMode::Scale)?std::clamp(1.0f+(delta.x-delta.y)/20.0f,0.05f,8.0f):1.0f;
+   float factor=collisionDrag.mode==int(VertexToolMode::Scale)?std::clamp(1.0f+(delta.x-delta.y)/20.0f,0.05f,8.0f):1.0f;if(io.KeyShift&&collisionDrag.mode==int(VertexToolMode::Scale))factor=std::clamp(std::round(factor/0.2f)*0.2f,0.2f,8.0f);if(io.KeyShift&&collisionDrag.mode==int(VertexToolMode::AxisMove)){dx=std::round(dx*collisionPointScale/20.0f)*20.0f/collisionPointScale;dy=std::round(dy*collisionPointScale/20.0f)*20.0f/collisionPointScale;dz=std::round(dz*collisionPointScale/20.0f)*20.0f/collisionPointScale;}
    auto updated=collisionDrag.original;
    for(const auto&q:collisionDrag.faces){
     if(q.first<0||static_cast<std::size_t>(q.first)>=updated.size()||q.second<0||q.second>=6)continue;
