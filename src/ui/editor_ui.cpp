@@ -3285,7 +3285,7 @@ void EditorUI::drawAnimationViewer(){
      if(horizontal)target.x=static_cast<int>(mirrored);else target.z=static_cast<int>(mirrored);
      indices.push_back(static_cast<std::size_t>(index));targets.push_back(target);
     }
-    if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+    if(nsf_.setAnimationFrameVertices(static_cast<std::size_t>(animationViewerChunk_),static_cast<std::size_t>(animationViewerEntry_),static_cast<std::size_t>(poseFrameIndex),indices,targets)){
      animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
      status_=horizontal?"Selected vertices flipped left-to-right.":"Selected vertices flipped upside down.";
     }else status_="Flip could not be encoded; the original vertices were preserved.";
