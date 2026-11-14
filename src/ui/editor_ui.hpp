@@ -23,7 +23,7 @@ private:
  struct BoneRigBone { std::string name; std::vector<int> vertices; int parentBone=-1; float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f; bool pivotInitialized=false; std::map<std::uint64_t,std::array<float,3>> frameRotations; };
  std::vector<BoneRigBone> boneRigBones_;
  int boneRigSelectedBone_=-1;
- std::uint32_t boneRigModelEid_=0;
+ std::uint32_t boneRigModelEid_=0,boneRigAnimationEid_=0;
  bool boneRigRotateMode_=false,boneRigLocalSpace_=true;
  char boneRigName_[64]="Bone";
  bool boneRigWindowOpen_=true;
