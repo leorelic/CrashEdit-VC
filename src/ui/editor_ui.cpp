@@ -3362,20 +3362,13 @@ void EditorUI::drawAnimationViewer(){
   drawModeButton(axisMoveMin,axisMoveMax,vertexToolMode==VertexToolMode::AxisMove,axisMoveHovered);
   drawModeButton(scaleMoveMin,scaleMoveMax,vertexToolMode==VertexToolMode::Scale,scaleMoveHovered);
   if(animationShowVertices_&&!animationCollisionViewer_){
-   drawModeButton(flipHorizontalMin,flipHorizontalMax,false,flipHorizontalHovered);
    drawModeButton(flipVerticalMin,flipVerticalMax,false,flipVerticalHovered);
-   const ImVec2 h((flipHorizontalMin.x+flipHorizontalMax.x)*0.5f,(flipHorizontalMin.y+flipHorizontalMax.y)*0.5f);
    const ImVec2 v((flipVerticalMin.x+flipVerticalMax.x)*0.5f,(flipVerticalMin.y+flipVerticalMax.y)*0.5f);
-   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x+8,h.y),modeTextColor,2.2f);
-   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x-4,h.y-4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x-4,h.y+4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(h.x+8,h.y),ImVec2(h.x+4,h.y-4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(h.x+8,h.y),ImVec2(h.x+4,h.y+4),modeTextColor,2.0f);
    modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x,v.y+8),modeTextColor,2.2f);
-   modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x+4,v.y-4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x-4,v.y-4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(v.x,v.y+8),ImVec2(v.x+4,v.y+4),modeTextColor,2.0f);
-   modeOverlay->AddLine(ImVec2(v.x,v.y+8),ImVec2(v.x-4,v.y+4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x-6,v.y-4),ImVec2(v.x,v.y-8),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x+6,v.y-4),ImVec2(v.x,v.y-8),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x-6,v.y+4),ImVec2(v.x,v.y+8),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x+6,v.y+4),ImVec2(v.x,v.y+8),modeTextColor,2.0f);
   }
   const ImVec2 axisCenter((axisMoveMin.x+axisMoveMax.x)*0.5f,(axisMoveMin.y+axisMoveMax.y)*0.5f);
   modeOverlay->AddLine(ImVec2(axisCenter.x-7,axisCenter.y+6),ImVec2(axisCenter.x+7,axisCenter.y-6),IM_COL32(235,75,75,255),2.0f);
@@ -4873,14 +4866,57 @@ void EditorUI::drawBoneRigEditor(){
  const auto&frame=animation.frames[frameIndex];
  const std::uint32_t modelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  if(!Crash::isValidEid(modelEid)||!frame.verticesDecoded)return;
- if(boneRigModelEid_!=modelEid){boneRigModelEid_=modelEid;boneRigBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;}
+ if(boneRigModelEid_!=modelEid||boneRigAnimationEid_!=entry.eid){
+  boneRigModelEid_=modelEid;boneRigAnimationEid_=entry.eid;boneRigBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;
+  const auto dataDirectory=std::filesystem::current_path()/"data";
+  const auto bonePath=dataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
+  std::ifstream input(bonePath);
+  std::string signature;unsigned version=0;std::uint32_t storedAnimation=0,storedModel=0;std::size_t boneCount=0;
+  if(input>>signature>>version>>storedAnimation>>storedModel>>boneCount&&signature=="CRASHEDIT_BONES"&&version==1U&&storedAnimation==entry.eid&&storedModel==modelEid&&boneCount<=4096U){
+   bool valid=true;std::vector<BoneRigBone>loaded;loaded.reserve(boneCount);
+   for(std::size_t i=0;i<boneCount&&valid;++i){
+    BoneRigBone bone;std::size_t vertexCount=0,rotationCount=0;
+    if(!(input>>std::quoted(bone.name)>>bone.parentBone>>bone.pivotX>>bone.pivotY>>bone.pivotZ>>bone.pivotInitialized>>vertexCount)||vertexCount>65536U){valid=false;break;}
+    for(std::size_t v=0;v<vertexCount;++v){int index=-1;if(!(input>>index)||index<0||static_cast<std::size_t>(index)>=frame.vertices.size()){valid=false;break;}bone.vertices.push_back(index);}
+    if(!valid||!(input>>rotationCount)||rotationCount>65536U){valid=false;break;}
+    for(std::size_t r=0;r<rotationCount;++r){std::uint64_t key=0;std::array<float,3>rotation{};if(!(input>>key>>rotation[0]>>rotation[1]>>rotation[2])){valid=false;break;}bone.frameRotations.emplace(key,rotation);}
+    loaded.push_back(std::move(bone));
+   }
+   if(valid){for(std::size_t i=0;i<loaded.size();++i)if(loaded[i].parentBone>=static_cast<int>(loaded.size())||loaded[i].parentBone==static_cast<int>(i))valid=false;}
+   if(valid){boneRigBones_=std::move(loaded);status_="Loaded editor bone rig: "+bonePath.filename().string();}
+   else status_="Bone rig file is invalid; starting with an empty rig.";
+  }
+ }
  for(auto&bone:boneRigBones_)bone.vertices.erase(std::remove_if(bone.vertices.begin(),bone.vertices.end(),[&](int index){return index<0||static_cast<std::size_t>(index)>=frame.vertices.size();}),bone.vertices.end());
  if(boneRigSelectedBone_>=static_cast<int>(boneRigBones_.size()))boneRigSelectedBone_=-1;
  if(ImGuiWindow*properties=ImGui::FindWindowByName("Properties"))if(properties->DockNode)ImGui::SetNextWindowDockID(properties->DockNode->ID,ImGuiCond_FirstUseEver);
  if(!ImGui::Begin("Bone List",&boneRigWindowOpen_)){ImGui::End();return;}
  ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
  ImGui::Text("%s | %s",Crash::eidToEName(entry.eid).c_str(),Crash::eidToEName(modelEid).c_str());
- ImGui::TextDisabled("Editor-only vertex groups and visual parent links. Nothing here is written as a skeleton to the NSF.");
+ ImGui::TextDisabled("Editor-only vertex groups and visual parent links. Saved separately from the NSF.");
+ const auto boneDataDirectory=std::filesystem::current_path()/"data";
+ const auto boneFile=boneDataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
+ if(ImGui::Button("Save Bones")){
+  std::error_code ec;std::filesystem::create_directories(boneDataDirectory,ec);
+  std::ofstream output(boneFile,std::ios::trunc);
+  bool saved=static_cast<bool>(output);
+  if(saved){
+   output<<"CRASHEDIT_BONES 1 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
+   for(const auto&savedBone:boneRigBones_){
+    output<<std::quoted(savedBone.name)<<" "<<savedBone.parentBone<<" "<<savedBone.pivotX<<" "<<savedBone.pivotY<<" "<<savedBone.pivotZ<<" "<<savedBone.pivotInitialized<<" "<<savedBone.vertices.size();
+    for(const int vertex:savedBone.vertices)output<<" "<<vertex;
+    output<<" "<<savedBone.frameRotations.size()<<"\n";
+    for(const auto&[key,rotation]:savedBone.frameRotations)output<<key<<" "<<rotation[0]<<" "<<rotation[1]<<" "<<rotation[2]<<"\n";
+   }
+   output.flush();saved=static_cast<bool>(output);output.close();
+  }
+  status_=saved?"Saved bone rig: "+boneFile.filename().string():"Could not save bone rig: "+boneFile.string();
+ }
+ ImGui::SameLine();
+ if(ImGui::Button("Reload Bones")){
+  boneRigAnimationEid_=0;boneRigModelEid_=0;status_="Bone rig will reload from its sidecar file.";
+ }
+ ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
  ImGui::Separator();ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
  if(ImGui::Button("Create Bone")){
   std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
