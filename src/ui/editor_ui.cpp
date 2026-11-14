@@ -3253,7 +3253,9 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 freeMoveMin(modeToolbarStart.x,modeToolbarStart.y+60.0f),freeMoveMax(freeMoveMin.x+28.0f,freeMoveMin.y+26.0f);
  const ImVec2 axisMoveMin(modeToolbarStart.x,axisMoveY),axisMoveMax(axisMoveMin.x+28.0f,axisMoveMin.y+26.0f);
  const ImVec2 scaleMoveMin(modeToolbarStart.x,axisMoveY+30.0f),scaleMoveMax(scaleMoveMin.x+28.0f,scaleMoveMin.y+26.0f);
- bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false;
+ const ImVec2 flipHorizontalMin(modeToolbarStart.x,axisMoveY+60.0f),flipHorizontalMax(flipHorizontalMin.x+28.0f,flipHorizontalMin.y+26.0f);
+ const ImVec2 flipVerticalMin(modeToolbarStart.x+32.0f,axisMoveY+60.0f),flipVerticalMax(flipVerticalMin.x+28.0f,flipVerticalMin.y+26.0f);
+ bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false,flipHorizontalHovered=false,flipVerticalHovered=false;
  if(showVertexTransformToolbar){
   if(showFreeMoveButton){
    ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
@@ -3263,8 +3265,36 @@ void EditorUI::drawAnimationViewer(){
   if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Axis Move — drag selected collision faces along their matching axes":"Axis Move — drag X/Y/Z gizmo handles for the selected vertices");
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
+  if(animationShowVertices_&&!animationCollisionViewer_){
+   ImGui::SetCursorScreenPos(flipHorizontalMin);const bool flipHorizontalClicked=ImGui::InvisibleButton("##AnimationFlipHorizontal",ImVec2(28.0f,26.0f));flipHorizontalHovered=ImGui::IsItemHovered();
+   ImGui::SetCursorScreenPos(flipVerticalMin);const bool flipVerticalClicked=ImGui::InvisibleButton("##AnimationFlipVertical",ImVec2(28.0f,26.0f));flipVerticalHovered=ImGui::IsItemHovered();
+   if(flipHorizontalHovered)ImGui::SetTooltip("Flip Horizontal — mirror left to right");
+   if(flipVerticalHovered)ImGui::SetTooltip("Flip Vertical — turn upside down");
+   auto flipSelectedVertices=[&](bool horizontal){
+    if(animationSelectedVertices_.empty()||poseFrameIndex<0||!frame.verticesDecoded)return;
+    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;indices.reserve(animationSelectedVertices_.size());targets.reserve(animationSelectedVertices_.size());
+    double sum=0.0;std::size_t count=0;
+    for(const int index:animationSelectedVertices_)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){const auto&v=frame.vertices[static_cast<std::size_t>(index)];sum+=horizontal?static_cast<double>(v.x):static_cast<double>(v.z);++count;}
+    if(count!=animationSelectedVertices_.size()||count==0)return;
+    const double center=sum/static_cast<double>(count);
+    const int maximumCoordinate=animation.isCrash3?255:254;
+    for(const int index:animationSelectedVertices_){
+     const auto&source=frame.vertices[static_cast<std::size_t>(index)];auto target=source;
+     const long mirrored=std::lround(2.0*center-static_cast<double>(horizontal?source.x:source.z));
+     if(mirrored<0||mirrored>maximumCoordinate){status_="Flip rejected because a mirrored vertex would exceed the Crash coordinate range.";return;}
+     if(horizontal)target.x=static_cast<int>(mirrored);else target.z=static_cast<int>(mirrored);
+     indices.push_back(static_cast<std::size_t>(index));targets.push_back(target);
+    }
+    if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+     animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;
+     status_=horizontal?"Selected vertices flipped left-to-right.":"Selected vertices flipped upside down.";
+    }else status_="Flip could not be encoded; the original vertices were preserved.";
+   };
+   if(flipHorizontalClicked)flipSelectedVertices(true);
+   if(flipVerticalClicked)flipSelectedVertices(false);
+  }
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||flipHorizontalHovered||flipVerticalHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3325,6 +3355,22 @@ void EditorUI::drawAnimationViewer(){
   }
   drawModeButton(axisMoveMin,axisMoveMax,vertexToolMode==VertexToolMode::AxisMove,axisMoveHovered);
   drawModeButton(scaleMoveMin,scaleMoveMax,vertexToolMode==VertexToolMode::Scale,scaleMoveHovered);
+  if(animationShowVertices_&&!animationCollisionViewer_){
+   drawModeButton(flipHorizontalMin,flipHorizontalMax,false,flipHorizontalHovered);
+   drawModeButton(flipVerticalMin,flipVerticalMax,false,flipVerticalHovered);
+   const ImVec2 h((flipHorizontalMin.x+flipHorizontalMax.x)*0.5f,(flipHorizontalMin.y+flipHorizontalMax.y)*0.5f);
+   const ImVec2 v((flipVerticalMin.x+flipVerticalMax.x)*0.5f,(flipVerticalMin.y+flipVerticalMax.y)*0.5f);
+   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x+8,h.y),modeTextColor,2.2f);
+   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x-4,h.y-4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(h.x-8,h.y),ImVec2(h.x-4,h.y+4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(h.x+8,h.y),ImVec2(h.x+4,h.y-4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(h.x+8,h.y),ImVec2(h.x+4,h.y+4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x,v.y+8),modeTextColor,2.2f);
+   modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x+4,v.y-4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x,v.y-8),ImVec2(v.x-4,v.y-4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x,v.y+8),ImVec2(v.x+4,v.y+4),modeTextColor,2.0f);
+   modeOverlay->AddLine(ImVec2(v.x,v.y+8),ImVec2(v.x-4,v.y+4),modeTextColor,2.0f);
+  }
   const ImVec2 axisCenter((axisMoveMin.x+axisMoveMax.x)*0.5f,(axisMoveMin.y+axisMoveMax.y)*0.5f);
   modeOverlay->AddLine(ImVec2(axisCenter.x-7,axisCenter.y+6),ImVec2(axisCenter.x+7,axisCenter.y-6),IM_COL32(235,75,75,255),2.0f);
   modeOverlay->AddLine(ImVec2(axisCenter.x-7,axisCenter.y+6),ImVec2(axisCenter.x+7,axisCenter.y+6),IM_COL32(80,210,115,255),2.0f);
@@ -3730,9 +3776,14 @@ void EditorUI::drawAnimationViewer(){
     const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
     const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
     Crash::NsfAnimationVertex target=v;
-    target.x=std::clamp(static_cast<int>(std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f)),0,maximumCoordinate);
-    target.z=std::clamp(static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f)),0,maximumCoordinate);
-    target.y=std::clamp(static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f)),0,maximumCoordinate);
+    const long rotatedX=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
+    const long rotatedZ=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
+    const long rotatedY=std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f);
+    if(rotatedX<0||rotatedX>maximumCoordinate||rotatedY<0||rotatedY>maximumCoordinate||rotatedZ<0||rotatedZ>maximumCoordinate){
+     if(status_!="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.")status_="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+     return;
+    }
+    target.x=static_cast<int>(rotatedX);target.z=static_cast<int>(rotatedZ);target.y=static_cast<int>(rotatedY);
     indices.push_back(static_cast<std::size_t>(boneRotationDrag.indices[i]));targets.push_back(target);
    }
    if(nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
@@ -3745,7 +3796,7 @@ void EditorUI::drawAnimationViewer(){
   if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;ImGui::ClearActiveID();}
   else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(boneRigWindowOpen_&&animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
@@ -3776,8 +3827,8 @@ void EditorUI::drawAnimationViewer(){
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
     canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
    else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
-    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);float best=20.0f;
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.35f&&distance<best){best=distance;dragAxis=axis;}}
+    const float axisLength=std::clamp(animationGridRadius_*0.28f,0.8f,8.0f);float best=36.0f;
+    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.12f&&distance<best){best=distance;dragAxis=axis;}}
     canStart=dragAxis>=0;
    }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
     const ImVec2 handle(center.x+14.0f,center.y-14.0f);const float dx=io.MousePos.x-handle.x,dy=io.MousePos.y-handle.y;
@@ -4183,11 +4234,11 @@ void EditorUI::drawAnimationViewer(){
   if(center.x>-99999.0f){
    ImDrawList* gizmoOverlay=ImGui::GetForegroundDrawList();
    gizmoOverlay->PushClipRect(canvasMin,canvasMax,true);
-   const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);
+   const float axisLength=std::clamp(animationGridRadius_*0.28f,0.8f,8.0f);
    if(vertexToolMode==VertexToolMode::AxisMove){
     const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};
     const char*axisNames[3]={"X","Y","Z"};
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);gizmoOverlay->AddLine(center,end,colors[axis],4.0f);gizmoOverlay->AddCircleFilled(end,8.0f,colors[axis],16);gizmoOverlay->AddCircle(end,10.0f,IM_COL32(15,18,24,255),16,1.5f);gizmoOverlay->AddText(ImVec2(end.x+7.0f,end.y-8.0f),colors[axis],axisNames[axis]);}
+    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);gizmoOverlay->AddLine(center,end,colors[axis],5.5f);gizmoOverlay->AddCircleFilled(end,12.0f,colors[axis],20);gizmoOverlay->AddCircle(end,15.0f,IM_COL32(15,18,24,255),20,2.0f);gizmoOverlay->AddText(ImVec2(end.x+7.0f,end.y-8.0f),colors[axis],axisNames[axis]);}
     gizmoOverlay->AddCircleFilled(center,4.0f,IM_COL32(240,240,240,255),12);
    }else{
     gizmoOverlay->AddCircle(center,20.0f,IM_COL32(235,190,70,230),32,2.5f);
