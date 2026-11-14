@@ -335,6 +335,7 @@ void EditorUI::resetUndoHistory(){
 }
 void EditorUI::trackUndoHistory(){
  if(!nsfValid_||!undoBaselineValid_||ImGui::IsMouseDown(ImGuiMouseButton_Left))return;
+ if(!ImGui::IsAnyItemActive()&&!ImGui::IsMouseReleased(ImGuiMouseButton_Left)&&!ImGui::IsMouseReleased(ImGuiMouseButton_Right))return;
  std::vector<std::uint8_t>nsfBytes,nsdBytes;std::string error;
  if(!nsf_.saveUncompressedBytes(nsfBytes,error))return;
  if(nsdValid_&&!nsd_.saveBytes(nsdBytes,error))return;
