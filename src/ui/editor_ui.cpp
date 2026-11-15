@@ -320,12 +320,6 @@ bool EditorUI::saveFiles(){
  Diagnostics::log(DiagnosticLevel::Info,status_);
  return true;
 }
-void EditorUI::refreshUndoBaselineBytes(){
- undoNsfBytes_.clear();undoNsdBytes_.clear();std::string error;
- if(nsfValid_)nsf_.saveUncompressedBytes(undoNsfBytes_,error);
- if(nsdValid_)nsd_.saveBytes(undoNsdBytes_,error);
- undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
-}
 bool EditorUI::saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& snapshot){
  if(historySnapshotDirectory_.empty())return false;
  std::error_code ec;std::filesystem::create_directories(historySnapshotDirectory_,ec);if(ec)return false;
