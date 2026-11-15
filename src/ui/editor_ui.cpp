@@ -1049,7 +1049,7 @@ void EditorUI::drawMenu(){
   if(ImGui::MenuItem("Open NSF...","Ctrl+O")){openDialog_=true;centerOpenDialog_=true;}
   if(ImGui::MenuItem("Save","Ctrl+S",false,nsfValid_&&nsdValid_))saveFiles();
   if(ImGui::MenuItem("Close Workspace",nullptr,false,workspace_.isOpen())){workspace_.close();nsfValid_=nsdValid_=false;resetUndoHistory();status_="Workspace closed.";}
-  ImGui::Separator();if(ImGui::MenuItem("Exit"))std::exit(0);ImGui::EndMenu();
+  ImGui::Separator();if(ImGui::MenuItem("Exit")){clearHistoryLog();std::exit(0);}ImGui::EndMenu();
  }
  if(ImGui::BeginMenu("Edit")){if(ImGui::MenuItem("Undo","Ctrl+Z",false,historyCursor_>0U))undo();if(ImGui::MenuItem("Redo","Ctrl+Y",false,historyCursor_+1U<historyLabels_.size()))redo();ImGui::EndMenu();}
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
