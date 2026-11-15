@@ -346,7 +346,8 @@ void EditorUI::trackUndoHistory(){
   if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations){bonesEqual=false;break;}
  }
  if(nsfBytes==undoNsfBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
- if(historyCursor_<historyLabels_.size())historyLabels_.erase(historyLabels_.begin()+static_cast<std::ptrdiff_t>(historyCursor_),historyLabels_.end());
+ if(historyLabels_.empty())historyLabels_.push_back("Original file state");
+ if(historyCursor_+1U<historyLabels_.size())historyLabels_.erase(historyLabels_.begin()+static_cast<std::ptrdiff_t>(historyCursor_+1U),historyLabels_.end());
  undoHistory_.push_back(undoBaseline_);
  if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
  redoHistory_.clear();
@@ -354,7 +355,7 @@ void EditorUI::trackUndoHistory(){
  if(actionLabel.empty()||actionLabel==lastHistoryStatus_)actionLabel="Edit NSF data";
  std::replace(actionLabel.begin(),actionLabel.end(),'\n',' ');
  historyLabels_.push_back(actionLabel);lastHistoryStatus_=status_;++historyCursor_;
- if(historyLabels_.size()>16U){historyLabels_.erase(historyLabels_.begin());if(historyCursor_>0)--historyCursor_;}
+ if(historyLabels_.size()>17U){historyLabels_.erase(historyLabels_.begin());if(historyCursor_>0)--historyCursor_;}
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;
  undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
 }
@@ -367,11 +368,11 @@ void EditorUI::writeHistoryLog(){
  std::error_code ec;std::filesystem::create_directories(historyLogPath_.parent_path(),ec);if(ec)return;
  std::ofstream out(historyLogPath_,std::ios::trunc);if(!out)return;
  out<<"CrashEdit-VC session action history\n";
- out<<"Applied actions are marked [x]; later actions are available through Redo.\n";
- for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\n'||ch=='\r')ch=' ';out<<(i<historyCursor_?"[x] ":"[ ] ")<<(i+1)<<". "<<label<<"\n";}
+ out<<"[x] = current or earlier state; [ ] = a state available through Redo.\n";
+ for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\n'||ch=='\r')ch=' ';out<<(i<=historyCursor_?"[x] ":"[ ] ")<<(i==0?std::string("0. "):std::to_string(i)+". ")<<label<<"\n";}
 }
-void EditorUI::jumpToHistory(std::size_t actionCount){
- const std::size_t target=std::min(actionCount,historyLabels_.size());
+void EditorUI::jumpToHistory(std::size_t stateIndex){
+ const std::size_t target=std::min(stateIndex,historyLabels_.empty()?0U:historyLabels_.size()-1U);
  while(historyCursor_>target&&!undoHistory_.empty())undo();
  while(historyCursor_<target&&!redoHistory_.empty())redo();
 }
@@ -380,16 +381,27 @@ void EditorUI::drawActionHistory(){
  if(!nsfValid_)ImGui::TextDisabled("Open an NSF archive to begin recording edits.");
  else if(historyLabels_.empty())ImGui::TextDisabled("No editing actions recorded yet.");
  else{
-  ImGui::TextDisabled("%zu recorded actions | %zu currently applied",historyLabels_.size(),historyCursor_);
+  ImGui::TextDisabled("%zu states | current state %zu",historyLabels_.size(),historyCursor_);
   ImGui::Separator();
   for(std::size_t i=0;i<historyLabels_.size();++i){
    ImGui::PushID(static_cast<int>(i));
-   const bool applied=i<historyCursor_;
-   const bool current=i+1==historyCursor_;
+   const bool applied=i<=historyCursor_,current=i==historyCursor_;
+   const float width=std::max(1.0f,ImGui::GetContentRegionAvail().x-8.0f);
+   const std::string label=(applied?"[x] ":"[ ] ")+(i==0?std::string("0. "):std::to_string(i)+". ")+historyLabels_[i];
+   const ImVec2 textSize=ImGui::CalcTextSize(label.c_str(),nullptr,false,width-8.0f);
+   const float rowHeight=std::max(ImGui::GetTextLineHeight(),textSize.y)+6.0f;
+   const ImVec2 rowMin=ImGui::GetCursorScreenPos(),rowMax(rowMin.x+width,rowMin.y+rowHeight);
+   const bool hovered=ImGui::IsMouseHoveringRect(rowMin,rowMax);
+   if(current||hovered)ImGui::GetWindowDrawList()->AddRectFilled(rowMin,rowMax,ImGui::GetColorU32(current?ImGuiCol_Header:ImGuiCol_HeaderHovered),2.0f);
    if(current)ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.45f,0.85f,0.55f,1.0f));
-   const std::string label=(applied?"[x] ":"[ ] ")+std::to_string(i+1)+". "+historyLabels_[i];
-   if(ImGui::Selectable(label.c_str(),current,ImGuiSelectableFlags_SpanAllColumns))jumpToHistory(i+1);
+   ImGui::SetCursorScreenPos(ImVec2(rowMin.x+4.0f,rowMin.y+3.0f));
+   ImGui::PushTextWrapPos(rowMin.x+width-3.0f);
+   ImGui::TextUnformatted(label.c_str());
+   ImGui::PopTextWrapPos();
    if(current)ImGui::PopStyleColor();
+   if(hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))jumpToHistory(i);
+   ImGui::SetCursorScreenPos(ImVec2(rowMin.x,rowMax.y));
+   ImGui::Dummy(ImVec2(width,1.0f));
    ImGui::PopID();
   }
  }
