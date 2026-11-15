@@ -15,6 +15,7 @@ public:
  explicit EditorUI(Workspace& w,const std::filesystem::path& temporaryDirectory={}); ~EditorUI(); void draw();
  void handleDroppedFiles(int count,const char** paths);
 private:
+ struct EditorSnapshot;
  void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
  void undo(); void redo(); void jumpToHistory(std::size_t stateIndex); void resetUndoHistory(); void trackUndoHistory(); void refreshUndoBaselineBytes(); void drawActionHistory(); void clearHistoryLog(); void writeHistoryLog(); bool saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& snapshot); bool loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapshot); void restoreHistoryState(std::size_t stateIndex);
  void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawBoneRigEditor(); void drawFaceEditor(); void drawFaceTextureSelector(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
