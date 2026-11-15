@@ -255,8 +255,8 @@ static const char* entryIconName(std::uint32_t type){
  switch(type){case 1:return "ThingLime";case 3:return "ThingBlue";case 7:return "ThingViolet";case 21:return "Painting";case 6:case 15:case 17:return "ThingOrange";case 11:return "ThingCode";default:return "ThingGray";}
 }
 static const char* entityPropertyName(std::uint16_t id){switch(id){case 0x2C:return "Name";case 0x32:return "Z modifier";case 0x4B:return "Positions";case 0x9F:return "Entity ID";case 0xA4:return "GOOL arguments / Settings";case 0xA9:return "GOOL Type";case 0xAA:return "GOOL Subtype";case 0x277:return "DDA Death / 1-Up Count";case 0x287:return "Victim Object IDs";case 0x288:return "DDA Section";case 0x28B:return "Box Count (Willy)";case 0x119:return "Camera panning";case 0x130:return "Field of view";case 0x142:return "Camera distance";case 0x162:return "Camera field 0x162";case 0x16D:return "Camera setting 0x16D";case 0x173:return "Camera index";case 0x174:return "Camera sub-index";case 0x176:return "Camera path links";case 0x185:return "Camera flags";case 0x186:return "Camera water settings";case 0x198:return "Camera event sender";case 0x1A8:return "Camera transitions";case 0x1B5:return "Camera particles";case 0x1B8:return "Camera FX control";case 0x1DE:return "Camera fog distance";case 0x1FA:return "Camera backgrounds";case 0x27F:return "Camera scenery updates";case 0x297:return "Camera mirrors";case 0x2AA:return "Camera stars";default:return "Unknown / game-specific";}}
-EditorUI::EditorUI(Workspace& w,const std::filesystem::path& temporaryDirectory):workspace_(w){registerEditorSettingsHandler();historyLogPath_=(temporaryDirectory.empty()?std::filesystem::current_path():temporaryDirectory)/"cevc-temp-history.txt";}
-EditorUI::~EditorUI(){std::error_code ec;if(!historyLogPath_.empty())std::filesystem::remove(historyLogPath_,ec);}
+EditorUI::EditorUI(Workspace& w,const std::filesystem::path& temporaryDirectory):workspace_(w){registerEditorSettingsHandler();historyLogPath_=(temporaryDirectory.empty()?std::filesystem::current_path():temporaryDirectory)/"cevc-temp-history.txt";historySnapshotDirectory_=historyLogPath_.parent_path()/"cevc-temp-history-snapshots";}
+EditorUI::~EditorUI(){clearHistoryLog();}
 void EditorUI::handleDroppedFiles(int count,const char** paths){
  for(int i=0;i<count;++i){
   if(!paths||!paths[i])continue;
@@ -326,13 +326,82 @@ void EditorUI::refreshUndoBaselineBytes(){
  if(nsdValid_)nsd_.saveBytes(undoNsdBytes_,error);
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
 }
+bool EditorUI::saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& snapshot){
+ if(historySnapshotDirectory_.empty())return false;
+ std::error_code ec;std::filesystem::create_directories(historySnapshotDirectory_,ec);if(ec)return false;
+ const auto path=historySnapshotDirectory_/(std::string("state-")+std::to_string(stateIndex)+".bin");
+ std::vector<std::uint8_t>nsfBytes,nsdBytes;std::string error;
+ if(!snapshot.nsf.saveUncompressedBytes(nsfBytes,error))return false;
+ if(nsdValid_&&!snapshot.nsd.saveBytes(nsdBytes,error))return false;
+ std::ofstream out(path,std::ios::binary|std::ios::trunc);if(!out)return false;
+ const std::uint32_t magic=0x48435645U,version=1U;
+ const std::uint8_t hasNsd=nsdValid_?1U:0U;
+ auto write=[&](const auto&value){out.write(reinterpret_cast<const char*>(&value),sizeof(value));};
+ auto writeBytes=[&](const std::vector<std::uint8_t>&bytes){const std::uint64_t size=bytes.size();write(size);if(size)out.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(size));};
+ write(magic);write(version);write(hasNsd);writeBytes(nsfBytes);writeBytes(nsdBytes);
+ const std::uint64_t boneCount=snapshot.bones.size();write(boneCount);
+ for(const auto&bone:snapshot.bones){
+  const std::uint64_t nameSize=bone.name.size(),vertexCount=bone.vertices.size(),rotationCount=bone.frameRotations.size();
+  write(nameSize);if(nameSize)out.write(bone.name.data(),static_cast<std::streamsize>(nameSize));
+  write(vertexCount);for(int vertex:bone.vertices)write(vertex);
+  write(bone.parentBone);write(bone.pivotX);write(bone.pivotY);write(bone.pivotZ);write(bone.pivotInitialized);
+  write(rotationCount);for(const auto&[frame,rotation]:bone.frameRotations){write(frame);out.write(reinterpret_cast<const char*>(rotation.data()),static_cast<std::streamsize>(sizeof(float)*rotation.size()));}
+ }
+ out.flush();if(!out)return false;
+ if(stateIndex>=historySnapshotPaths_.size())historySnapshotPaths_.resize(stateIndex+1U);
+ historySnapshotPaths_[stateIndex]=path;return true;
+}
+bool EditorUI::loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapshot){
+ if(stateIndex>=historySnapshotPaths_.size()||historySnapshotPaths_[stateIndex].empty())return false;
+ std::ifstream in(historySnapshotPaths_[stateIndex],std::ios::binary);if(!in)return false;
+ auto read=[&](auto&value){in.read(reinterpret_cast<char*>(&value),sizeof(value));return static_cast<bool>(in);};
+ auto readBytes=[&](std::vector<std::uint8_t>&bytes){std::uint64_t size=0;if(!read(size)||size>1024ULL*1024ULL*1024ULL)return false;bytes.resize(static_cast<std::size_t>(size));if(size)in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(size));return static_cast<bool>(in);};
+ std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;
+ std::vector<std::uint8_t>nsfBytes,nsdBytes;
+ if(!read(magic)||!read(version)||magic!=0x48435645U||version!=1U||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
+ Crash::NsfArchive archive;if(!archive.loadBytes(nsfBytes,error))return false;
+ if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3BetaMAY14||gameVersion_==GameVersion::Crash3)archive.decodeZones(gameVersion_==GameVersion::Crash3);
+ archive.decodeGools(nsfGoolVersion(gameVersion_));
+ if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3)archive.decodeAnimationModels(gameVersion_==GameVersion::Crash3);
+ Crash::NsdFile level;if(hasNsd&&!level.loadBytes(nsdBytes,nsdVariant(gameVersion_),error))return false;
+ std::uint64_t boneCount=0;if(!read(boneCount)||boneCount>100000U)return false;
+ std::vector<BoneRigBone>bones;bones.reserve(static_cast<std::size_t>(boneCount));
+ for(std::uint64_t i=0;i<boneCount;++i){
+  BoneRigBone bone;std::uint64_t nameSize=0,vertexCount=0,rotationCount=0;
+  if(!read(nameSize)||nameSize>1024U*1024U)return false;bone.name.resize(static_cast<std::size_t>(nameSize));if(nameSize)in.read(bone.name.data(),static_cast<std::streamsize>(nameSize));
+  if(!in||!read(vertexCount)||vertexCount>10000000U)return false;bone.vertices.resize(static_cast<std::size_t>(vertexCount));for(int&vertex:bone.vertices)if(!read(vertex))return false;
+  if(!read(bone.parentBone)||!read(bone.pivotX)||!read(bone.pivotY)||!read(bone.pivotZ)||!read(bone.pivotInitialized)||!read(rotationCount)||rotationCount>10000000U)return false;
+  for(std::uint64_t j=0;j<rotationCount;++j){std::uint64_t frame=0;std::array<float,3>rotation{};if(!read(frame))return false;in.read(reinterpret_cast<char*>(rotation.data()),static_cast<std::streamsize>(sizeof(float)*rotation.size()));if(!in)return false;bone.frameRotations.emplace(frame,rotation);}
+  bones.push_back(std::move(bone));
+ }
+ snapshot.nsf=std::move(archive);snapshot.nsd=std::move(level);snapshot.bones=std::move(bones);return static_cast<bool>(in);
+}
+void EditorUI::restoreHistoryState(std::size_t stateIndex){
+ EditorSnapshot restored;if(!loadHistorySnapshot(stateIndex,restored)){status_="Could not restore history state "+std::to_string(stateIndex)+". The temporary snapshot may be missing or damaged.";return;}
+ undoBaseline_=std::move(restored);boneRigBones_=undoBaseline_.bones;nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;nsdValid_=false;
+ if(stateIndex<historySnapshotPaths_.size()){
+  std::ifstream in(historySnapshotPaths_[stateIndex],std::ios::binary);std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;in.read(reinterpret_cast<char*>(&magic),4);in.read(reinterpret_cast<char*>(&version),4);in.read(reinterpret_cast<char*>(&hasNsd),1);nsdValid_=hasNsd!=0;
+ }
+ historyCursor_=stateIndex;refreshUndoBaselineBytes();
+ animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationPlaying_=false;
+ writeHistoryLog();
+}
+void EditorUI::refreshUndoBaselineBytes(){
+ undoNsfBytes_.clear();undoNsdBytes_.clear();std::string error;
+ if(nsfValid_)nsf_.saveUncompressedBytes(undoNsfBytes_,error);
+ if(nsdValid_)nsd_.saveBytes(undoNsdBytes_,error);
+ undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
+}
 void EditorUI::resetUndoHistory(){
- undoHistory_.clear();redoHistory_.clear();undoBaselineValid_=false;undoNsfBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
+ historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;undoBaselineValid_=false;undoNsfBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
  if(!nsfValid_)return;
  std::string error;
- if(!nsf_.saveUncompressedBytes(undoNsfBytes_,error)){undoNsfBytes_.clear();return;}
+ if(!nsf_.saveUncompressedBytes(undoNsfBytes_,error))return;
  if(nsdValid_&&!nsd_.saveBytes(undoNsdBytes_,error)){undoNsfBytes_.clear();undoNsdBytes_.clear();return;}
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=true;
+ historyLabels_.push_back("Original file state");
+ if(!saveHistorySnapshot(0U,undoBaseline_)){historyLabels_.clear();undoBaselineValid_=false;status_="Could not create the temporary original-state history snapshot.";}
+ writeHistoryLog();
 }
 void EditorUI::trackUndoHistory(){
  if(!nsfValid_||!undoBaselineValid_||ImGui::IsMouseDown(ImGuiMouseButton_Left))return;
@@ -346,22 +415,23 @@ void EditorUI::trackUndoHistory(){
   if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations){bonesEqual=false;break;}
  }
  if(nsfBytes==undoNsfBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
- if(historyLabels_.empty())historyLabels_.push_back("Original file state");
- if(historyCursor_+1U<historyLabels_.size())historyLabels_.erase(historyLabels_.begin()+static_cast<std::ptrdiff_t>(historyCursor_+1U),historyLabels_.end());
- undoHistory_.push_back(undoBaseline_);
- if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
- redoHistory_.clear();
+ if(historyCursor_+1U<historyLabels_.size()){
+  for(std::size_t i=historyCursor_+1U;i<historySnapshotPaths_.size();++i){std::error_code ec;std::filesystem::remove(historySnapshotPaths_[i],ec);}
+  historyLabels_.resize(historyCursor_+1U);historySnapshotPaths_.resize(historyCursor_+1U);
+ }
  std::string actionLabel=status_;
- if(actionLabel.empty()||actionLabel==lastHistoryStatus_)actionLabel="Edit NSF data";
- std::replace(actionLabel.begin(),actionLabel.end(),'\n',' ');
- historyLabels_.push_back(actionLabel);lastHistoryStatus_=status_;++historyCursor_;
- if(historyLabels_.size()>17U){historyLabels_.erase(historyLabels_.begin());if(historyCursor_>0)--historyCursor_;}
- undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;
- undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
+ if(actionLabel.empty()||actionLabel=="Ready — open a Crash 2 level archive."||actionLabel=="Undo completed."||actionLabel=="Redo completed.")actionLabel="Edit NSF data";
+ std::replace(actionLabel.begin(),actionLabel.end(),'\n',' ');std::replace(actionLabel.begin(),actionLabel.end(),'\r',' ');
+ EditorSnapshot next;next.nsf=nsf_;next.nsd=nsd_;next.bones=boneRigBones_;
+ const std::size_t nextIndex=historyLabels_.size();
+ if(!saveHistorySnapshot(nextIndex,next)){status_="History snapshot could not be written to the temporary folder; the action was not added to Action History.";return;}
+ historyLabels_.push_back(actionLabel);historyCursor_=nextIndex;
+ undoBaseline_=std::move(next);undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
 }
 void EditorUI::clearHistoryLog(){
- historyLabels_.clear();historyCursor_=0;lastHistoryStatus_.clear();
- if(!historyLogPath_.empty()){std::error_code ec;std::filesystem::remove(historyLogPath_,ec);}
+ historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;
+ std::error_code ec;if(!historySnapshotDirectory_.empty())std::filesystem::remove_all(historySnapshotDirectory_,ec);
+ if(!historyLogPath_.empty())std::filesystem::remove(historyLogPath_,ec);
 }
 void EditorUI::writeHistoryLog(){
  if(historyLogPath_.empty())return;
@@ -371,11 +441,8 @@ void EditorUI::writeHistoryLog(){
  out<<"[x] = current or earlier state; [ ] = a state available through Redo.\n";
  for(std::size_t i=0;i<historyLabels_.size();++i){std::string label=historyLabels_[i];for(char&ch:label)if(ch=='\n'||ch=='\r')ch=' ';out<<(i<=historyCursor_?"[x] ":"[ ] ")<<(i==0?std::string("0. "):std::to_string(i)+". ")<<label<<"\n";}
 }
-void EditorUI::jumpToHistory(std::size_t stateIndex){
- const std::size_t target=std::min(stateIndex,historyLabels_.empty()?0U:historyLabels_.size()-1U);
- while(historyCursor_>target&&!undoHistory_.empty())undo();
- while(historyCursor_<target&&!redoHistory_.empty())redo();
-}
+void EditorUI::jumpToHistory(std::size_t stateIndex){restoreHistoryState(stateIndex);}
+
 void EditorUI::drawActionHistory(){
  ImGui::Begin("Action History");
  if(!nsfValid_)ImGui::TextDisabled("Open an NSF archive to begin recording edits.");
@@ -386,49 +453,24 @@ void EditorUI::drawActionHistory(){
   for(std::size_t i=0;i<historyLabels_.size();++i){
    ImGui::PushID(static_cast<int>(i));
    const bool applied=i<=historyCursor_,current=i==historyCursor_;
-   const float width=std::max(1.0f,ImGui::GetContentRegionAvail().x-8.0f);
+   const float width=std::max(1.0f,ImGui::GetContentRegionAvail().x);
    const std::string label=(applied?"[x] ":"[ ] ")+(i==0?std::string("0. "):std::to_string(i)+". ")+historyLabels_[i];
-   const ImVec2 textSize=ImGui::CalcTextSize(label.c_str(),nullptr,false,width-8.0f);
+   const float wrapWidth=std::max(1.0f,width-12.0f);
+   const ImVec2 textSize=ImGui::CalcTextSize(label.c_str(),nullptr,false,wrapWidth);
    const float rowHeight=std::max(ImGui::GetTextLineHeight(),textSize.y)+6.0f;
-   const ImVec2 rowMin=ImGui::GetCursorScreenPos(),rowMax(rowMin.x+width,rowMin.y+rowHeight);
-   const bool hovered=ImGui::IsMouseHoveringRect(rowMin,rowMax);
-   if(current||hovered)ImGui::GetWindowDrawList()->AddRectFilled(rowMin,rowMax,ImGui::GetColorU32(current?ImGuiCol_Header:ImGuiCol_HeaderHovered),2.0f);
-   if(current)ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.45f,0.85f,0.55f,1.0f));
-   ImGui::SetCursorScreenPos(ImVec2(rowMin.x+4.0f,rowMin.y+3.0f));
-   ImGui::PushTextWrapPos(rowMin.x+width-3.0f);
-   ImGui::TextUnformatted(label.c_str());
-   ImGui::PopTextWrapPos();
+   const ImVec2 rowStart=ImGui::GetCursorScreenPos();
+   if(current)ImGui::PushStyleColor(ImGuiCol_Header,ImVec4(0.18f,0.34f,0.52f,1.0f));
+   if(ImGui::Selectable("##history-state",current,ImGuiSelectableFlags_None,ImVec2(width,rowHeight)))jumpToHistory(i);
    if(current)ImGui::PopStyleColor();
-   if(hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))jumpToHistory(i);
-   ImGui::SetCursorScreenPos(ImVec2(rowMin.x,rowMax.y));
-   ImGui::Dummy(ImVec2(width,1.0f));
+   const ImVec2 textPos(rowStart.x+4.0f,rowStart.y+3.0f);
+   ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(),ImGui::GetFontSize(),textPos,ImGui::GetColorU32(current?ImGuiCol_Text:ImGuiCol_Text),label.c_str(),nullptr,wrapWidth);
    ImGui::PopID();
   }
  }
  ImGui::End();
 }
-void EditorUI::undo(){
- if(undoHistory_.empty())return;
- redoHistory_.push_back(undoBaseline_);
- if(redoHistory_.size()>16U)redoHistory_.erase(redoHistory_.begin());
- undoBaseline_=std::move(undoHistory_.back());undoHistory_.pop_back();
- if(historyCursor_>0)--historyCursor_;
- nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
- refreshUndoBaselineBytes();
- animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
- animationPlaying_=false;status_="Undo completed.";writeHistoryLog();
-}
-void EditorUI::redo(){
- if(redoHistory_.empty())return;
- undoHistory_.push_back(undoBaseline_);
- if(undoHistory_.size()>16U)undoHistory_.erase(undoHistory_.begin());
- undoBaseline_=std::move(redoHistory_.back());redoHistory_.pop_back();
- if(historyCursor_<historyLabels_.size())++historyCursor_;
- nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;boneRigBones_=undoBaseline_.bones;
- refreshUndoBaselineBytes();
- animationSelectedVertices_.clear();animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;
- animationPlaying_=false;status_="Redo completed.";writeHistoryLog();
-}
+void EditorUI::undo(){if(historyCursor_>0)restoreHistoryState(historyCursor_-1U);}
+void EditorUI::redo(){if(historyCursor_+1U<historyLabels_.size())restoreHistoryState(historyCursor_+1U);}
 void EditorUI::draw(){
  const ImGuiIO&historyIo=ImGui::GetIO();
  if(nsfValid_&&!historyIo.WantTextInput&&historyIo.KeyCtrl&&!historyIo.KeyAlt&&!historyIo.KeySuper){
@@ -1009,7 +1051,7 @@ void EditorUI::drawMenu(){
   if(ImGui::MenuItem("Close Workspace",nullptr,false,workspace_.isOpen())){workspace_.close();nsfValid_=nsdValid_=false;resetUndoHistory();status_="Workspace closed.";}
   ImGui::Separator();if(ImGui::MenuItem("Exit"))std::exit(0);ImGui::EndMenu();
  }
- if(ImGui::BeginMenu("Edit")){if(ImGui::MenuItem("Undo","Ctrl+Z",false,!undoHistory_.empty()))undo();if(ImGui::MenuItem("Redo","Ctrl+Y",false,!redoHistory_.empty()))redo();ImGui::EndMenu();}
+ if(ImGui::BeginMenu("Edit")){if(ImGui::MenuItem("Undo","Ctrl+Z",false,historyCursor_>0U))undo();if(ImGui::MenuItem("Redo","Ctrl+Y",false,historyCursor_+1U<historyLabels_.size()))redo();ImGui::EndMenu();}
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
