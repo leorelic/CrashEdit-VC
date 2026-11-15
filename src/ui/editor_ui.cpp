@@ -356,7 +356,7 @@ bool EditorUI::loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapsh
  std::ifstream in(historySnapshotPaths_[stateIndex],std::ios::binary);if(!in)return false;
  auto read=[&](auto&value){in.read(reinterpret_cast<char*>(&value),sizeof(value));return static_cast<bool>(in);};
  auto readBytes=[&](std::vector<std::uint8_t>&bytes){std::uint64_t size=0;if(!read(size)||size>1024ULL*1024ULL*1024ULL)return false;bytes.resize(static_cast<std::size_t>(size));if(size)in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(size));return static_cast<bool>(in);};
- std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;
+ std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;std::string error;
  std::vector<std::uint8_t>nsfBytes,nsdBytes;
  if(!read(magic)||!read(version)||magic!=0x48435645U||version!=1U||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
  Crash::NsfArchive archive;if(!archive.loadBytes(nsfBytes,error))return false;
