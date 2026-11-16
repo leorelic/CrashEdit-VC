@@ -1187,26 +1187,6 @@ void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor",nullptr,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
  animationDockId_=ImGui::GetWindowDockID();
- auto setAnimationCameraView=[&](int view,bool opposite=false){
-  constexpr float halfPi=1.570796327f,pi=3.141592654f;
-  switch(view){
-   case 1: animationYaw_=opposite?pi:0.0f;animationPitch_=0.0f;break;
-   case 3: animationYaw_=opposite?-halfPi:halfPi;animationPitch_=0.0f;break;
-   case 7: animationYaw_=0.0f;animationPitch_=opposite?-halfPi:halfPi;break;
-   default: break;
-  }
- };
- ImGui::TextDisabled("Camera");ImGui::SameLine();
- if(ImGui::SmallButton("Front"))setAnimationCameraView(1);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Front view (Numpad 1)");
- ImGui::SameLine();if(ImGui::SmallButton("Side"))setAnimationCameraView(3);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Right view (Numpad 3)");
- ImGui::SameLine();if(ImGui::SmallButton("Top"))setAnimationCameraView(7);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Top view (Numpad 7)");
- ImGui::SameLine();if(ImGui::SmallButton(animationOrthographic_?"Orthographic":"Perspective"))animationOrthographic_=!animationOrthographic_;
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Toggle projection (Numpad 5)");
- ImGui::SameLine();if(ImGui::SmallButton("Reset View"))animationCameraInitialized_=false;
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Reset camera and frame the animation (Numpad 0)");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  // Never make the interaction canvas larger than the space actually available.
@@ -3353,6 +3333,26 @@ void EditorUI::drawAnimationViewer(){
   static std::vector<std::pair<int,int>>selectedCollisionFaces;
   static int selectedCollisionChunk=-1,selectedCollisionEntry=-1,selectedCollisionFrame=-1;
 
+ auto setAnimationCameraView=[&](int view,bool opposite=false){
+  constexpr float halfPi=1.570796327f,pi=3.141592654f;
+  switch(view){
+   case 1: animationYaw_=opposite?pi:0.0f;animationPitch_=0.0f;break;
+   case 3: animationYaw_=opposite?-halfPi:halfPi;animationPitch_=0.0f;break;
+   case 7: animationYaw_=0.0f;animationPitch_=opposite?-halfPi:halfPi;break;
+   default: break;
+  }
+ };
+ ImGui::TextDisabled("Camera");ImGui::SameLine();
+ if(ImGui::SmallButton("Front"))setAnimationCameraView(1);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Front view (Numpad 1)");
+ ImGui::SameLine();if(ImGui::SmallButton("Side"))setAnimationCameraView(3);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Right view (Numpad 3)");
+ ImGui::SameLine();if(ImGui::SmallButton("Top"))setAnimationCameraView(7);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Top view (Numpad 7)");
+ ImGui::SameLine();if(ImGui::SmallButton(animationOrthographic_?"Orthographic":"Perspective"))animationOrthographic_=!animationOrthographic_;
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Toggle projection (Numpad 5)");
+ ImGui::SameLine();if(ImGui::SmallButton("Reset View"))animationCameraInitialized_=false;
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Reset camera and frame the animation (Numpad 0)");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
