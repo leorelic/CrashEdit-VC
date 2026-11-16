@@ -4564,11 +4564,12 @@ dl->PopClipRect();
    "Projection    Perspective"
   };
   float gy=infoY+8.0f;
-  const float lineHeight=ImGui::GetTextLineHeightWithSpacing();
+  const float textWidth=std::max(1.0f,cameraPanelWidth-32.0f);
   for(const char*line:guideLines){
-   if(gy+ImGui::GetTextLineHeight()>cameraPanelMax.y-10.0f)break;
-   cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line);
-   gy+=lineHeight;
+   const ImVec2 lineSize=ImGui::CalcTextSize(line,nullptr,false,textWidth);
+   if(gy+lineSize.y>cameraPanelMax.y-10.0f)break;
+   cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line,nullptr,textWidth);
+   gy+=lineSize.y+ImGui::GetStyle().ItemSpacing.y;
   }
  }
  cameraOverlay->PopClipRect();
