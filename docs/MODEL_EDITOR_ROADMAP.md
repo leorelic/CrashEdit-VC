@@ -353,3 +353,40 @@ Adding/removing vertices and faces (Blender-style topology creation/deletion) is
 - Keep editor-only rig data separate from the game file format.
 - Mark work complete only after regression coverage and user validation appropriate to the feature; distinguish editor preview/save validation from original-game validation.
 - Continue independent implementation under the project's MIT licensing boundary. Do not use excluded repositories as implementation sources, design templates, or feature checklists.
+
+
+---
+
+## Viewport camera controls — added to the active editor milestone (2026-11-16)
+
+The 3D Animation Editor gains Blender-style camera orientation shortcuts and orthographic viewing. These controls are additive: **do not remove, remap, or change existing viewport navigation or editor shortcuts**.
+
+### Camera presets and projection
+
+- [ ] Numpad 1: Front; Ctrl+Numpad 1: Back.
+- [ ] Numpad 3: Right; Ctrl+Numpad 3: Left.
+- [ ] Numpad 7: Top; Ctrl+Numpad 7: Bottom.
+- [ ] Numpad 5: toggle Perspective / Orthographic projection.
+- [ ] Numpad 2 / 4 / 6 / 8: orbit camera in fixed increments.
+- [ ] Numpad 9: orbit 180 degrees.
+- [ ] Numpad 0: reset and frame the current animation.
+- [ ] Provide visible Front, Side, Top, projection and Reset View controls for keyboards without a numpad.
+- [ ] Keep wheel zoom, mouse orbit/pan and existing camera movement behavior.
+
+### Existing controls that must remain unchanged
+
+- [ ] Preserve W/A/S/D camera movement, including the existing Shift-modified movement behavior.
+- [ ] Preserve E/Q vertical camera movement.
+- [ ] Preserve R camera reset.
+- [ ] Preserve X wireframe, C collision viewer, T texture toggle, V vertex visibility, F face-edit mode and H texture selector.
+- [ ] Preserve animation playback, vertex selection, transform snapping, bone tools and all other existing editor shortcuts.
+- [ ] Camera shortcuts must not fire while a text/numeric input is active, or while another viewport tool owns the keyboard/mouse interaction.
+
+### Camera implementation acceptance
+
+- [ ] Front, back, left, right, top and bottom views have the expected axis orientation.
+- [ ] Orthographic projection removes perspective size distortion while retaining depth-aware picking, face selection, collision overlays, grid rendering and transform gizmos.
+- [ ] Camera presets do not reset the selected frame, playback state, vertex/face selection, or edit mode.
+- [ ] Existing perspective view and mouse navigation remain unchanged.
+- [ ] Validate on Windows and Linux; macOS CI remains part of the normal build matrix.
+

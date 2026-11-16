@@ -53,6 +53,7 @@ private:
  float sceneYaw_=0.0f,scenePitch_=0.261799f,sceneDistance_=20.0f;
  float sceneTargetX_=0.0f,sceneTargetY_=0.0f,sceneTargetZ_=0.0f;
  float animationYaw_=0.0f,animationPitch_=0.261799f,animationDistance_=3.0f,animationFrameTimer_=0.0f;
+ bool animationOrthographic_=false;
  double animationPlaybackFrame_=0.0;
  float animationTargetX_=0.0f,animationTargetY_=0.0f,animationTargetZ_=0.0f;
  float animationGridCenterX_=0.0f,animationGridCenterY_=0.0f,animationGridCenterZ_=0.0f,animationGridRadius_=1.0f;

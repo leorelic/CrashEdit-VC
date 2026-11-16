@@ -1187,6 +1187,26 @@ void EditorUI::drawNode(const ResourceNode&n){std::string label=(n.isDirectory?"
 void EditorUI::drawViewport(){
  ImGui::Begin("3D Zone Editor",nullptr,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
  animationDockId_=ImGui::GetWindowDockID();
+ auto setAnimationCameraView=[&](int view,bool opposite=false){
+  constexpr float halfPi=1.570796327f,pi=3.141592654f;
+  switch(view){
+   case 1: animationYaw_=opposite?pi:0.0f;animationPitch_=0.0f;break;
+   case 3: animationYaw_=opposite?-halfPi:halfPi;animationPitch_=0.0f;break;
+   case 7: animationYaw_=0.0f;animationPitch_=opposite?-halfPi:halfPi;break;
+   default: break;
+  }
+ };
+ ImGui::TextDisabled("Camera");ImGui::SameLine();
+ if(ImGui::SmallButton("Front"))setAnimationCameraView(1);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Front view (Numpad 1)");
+ ImGui::SameLine();if(ImGui::SmallButton("Side"))setAnimationCameraView(3);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Right view (Numpad 3)");
+ ImGui::SameLine();if(ImGui::SmallButton("Top"))setAnimationCameraView(7);
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Top view (Numpad 7)");
+ ImGui::SameLine();if(ImGui::SmallButton(animationOrthographic_?"Orthographic":"Perspective"))animationOrthographic_=!animationOrthographic_;
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Toggle projection (Numpad 5)");
+ ImGui::SameLine();if(ImGui::SmallButton("Reset View"))animationCameraInitialized_=false;
+ if(ImGui::IsItemHovered())ImGui::SetTooltip("Reset camera and frame the animation (Numpad 0)");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();
  // Never make the interaction canvas larger than the space actually available.
@@ -3537,6 +3557,23 @@ void EditorUI::drawAnimationViewer(){
    animationCameraInitialized_=true;
   }
   const ImGuiIO&io=ImGui::GetIO();
+  const bool cameraKeysAllowed=hovered&&ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&
+   !viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&
+   !io.WantTextInput&&!io.KeyAlt&&!io.KeySuper;
+  if(cameraKeysAllowed){
+   const bool opposite=io.KeyCtrl;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad1,false))setAnimationCameraView(1,opposite);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad3,false))setAnimationCameraView(3,opposite);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad7,false))setAnimationCameraView(7,opposite);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad5,false))animationOrthographic_=!animationOrthographic_;
+   constexpr float quarterTurn=0.261799388f,pi=3.141592654f;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad4,false))animationYaw_-=quarterTurn;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad6,false))animationYaw_+=quarterTurn;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad8,false))animationPitch_=std::clamp(animationPitch_+quarterTurn,-1.5707963f,1.5707963f);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad2,false))animationPitch_=std::clamp(animationPitch_-quarterTurn,-1.5707963f,1.5707963f);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad9,false))animationYaw_+=pi;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad0,false))animationCameraInitialized_=false;
+  }
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active){
@@ -3568,8 +3605,9 @@ void EditorUI::drawAnimationViewer(){
    return CameraPoint{rx,py,animationDistance_-pz};
   };
   auto projectCamera=[&](const CameraPoint&p){
-   return ImVec2(canvasMin.x+canvasSize.x*0.5f+p.x*focal/p.depth,
-                 canvasMin.y+canvasSize.y*0.5f-p.y*focal/p.depth);
+   const float projectionScale=animationOrthographic_?focal/std::max(0.1f,animationDistance_):focal/p.depth;
+   return ImVec2(canvasMin.x+canvasSize.x*0.5f+p.x*projectionScale,
+                 canvasMin.y+canvasSize.y*0.5f-p.y*projectionScale);
   };
   auto project=[&](float x,float y,float z){
    const CameraPoint p=toCamera(x,y,z);
