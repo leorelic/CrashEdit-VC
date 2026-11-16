@@ -3349,7 +3349,7 @@ void EditorUI::drawAnimationViewer(){
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f); 
  const ImGuiIO& cameraPanelIo=ImGui::GetIO();
  // Dock the guide to the viewport itself and use its full vertical extent.
- const float cameraPanelWidth=std::min(canvasSize.x,std::max(280.0f,canvasSize.x*0.34f));
+ const float cameraPanelWidth=std::min(canvasSize.x,std::max(240.0f,canvasSize.x*0.27f));
  const float cameraPanelHeight=canvasSize.y;
  const ImVec2 cameraGuideButtonMin(canvasMin.x+canvasSize.x-112.0f,canvasMin.y+8.0f);
  const ImVec2 cameraGuideButtonMax(cameraGuideButtonMin.x+100.0f,cameraGuideButtonMin.y+27.0f);
@@ -4571,6 +4571,20 @@ dl->PopClipRect();
    cameraOverlay->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line,nullptr,textWidth);
    gy+=lineSize.y+ImGui::GetStyle().ItemSpacing.y;
   }
+ }
+ // Keep the viewport settings control above the camera panel and all scene overlays.
+ const ImU32 settingsButtonColor=ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button);
+ cameraOverlay->AddRectFilled(toolbarMin,toolbarMax,settingsButtonColor,4.0f);
+ cameraOverlay->AddRect(toolbarMin,toolbarMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
+ const ImVec2 settingsCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
+ const ImU32 settingsIconColor=ImGui::GetColorU32(ImGuiCol_Text);
+ cameraOverlay->AddCircle(settingsCenter,6.0f,settingsIconColor,16,1.8f);
+ cameraOverlay->AddCircleFilled(settingsCenter,2.0f,settingsIconColor,12);
+ for(int spoke=0;spoke<8;++spoke){
+  const float angle=float(spoke)*0.785398163f;
+  const ImVec2 a(settingsCenter.x+std::cos(angle)*7.0f,settingsCenter.y+std::sin(angle)*7.0f);
+  const ImVec2 b(settingsCenter.x+std::cos(angle)*9.0f,settingsCenter.y+std::sin(angle)*9.0f);
+  cameraOverlay->AddLine(a,b,settingsIconColor,1.8f);
  }
  cameraOverlay->PopClipRect();
  if(animationFaceEditing_)drawFaceTextureSelector();
