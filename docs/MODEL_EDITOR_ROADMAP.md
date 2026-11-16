@@ -357,36 +357,13 @@ Adding/removing vertices and faces (Blender-style topology creation/deletion) is
 
 ---
 
-## Viewport camera controls — added to the active editor milestone (2026-11-16)
+## Viewport camera controls — polish pass (2026-11-16)
 
-The 3D Animation Editor gains Blender-style camera orientation shortcuts and orthographic viewing. These controls are additive: **do not remove, remap, or change existing viewport navigation or editor shortcuts**.
+- [x] Move camera movement instructions and view presets into a right-side Camera Guide, opened by a top-right viewer button and animated in from right to left.
+- [x] Provide clickable Front, Back, Right, Left, Top and Bottom presets in the guide.
+- [x] Ease Numpad view transitions rather than snapping; mouse orbit remains direct and responsive.
+- [x] Remove the incomplete Perspective / Orthographic switch and Numpad 5 binding. The textured hardware renderer did not honor the old orthographic flag, so the editor now consistently presents Perspective rather than exposing a misleading control.
+- [ ] Verify slide animation, guide hit-testing, presets, and smooth Numpad transitions on Windows and Linux; macOS remains in the CI matrix.
+- [ ] Revisit Orthographic only as a complete renderer-wide feature, including hardware rendering, overlays, picking, collision geometry and gizmos.
 
-### Camera presets and projection
-
-- [ ] Numpad 1: Front; Ctrl+Numpad 1: Back.
-- [ ] Numpad 3: Right; Ctrl+Numpad 3: Left.
-- [ ] Numpad 7: Top; Ctrl+Numpad 7: Bottom.
-- [ ] Numpad 5: toggle Perspective / Orthographic projection.
-- [ ] Numpad 2 / 4 / 6 / 8: orbit camera in fixed increments.
-- [ ] Numpad 9: orbit 180 degrees.
-- [ ] Numpad 0: reset and frame the current animation.
-- [ ] Provide visible Front, Side, Top, projection and Reset View controls for keyboards without a numpad.
-- [ ] Keep wheel zoom, mouse orbit/pan and existing camera movement behavior.
-
-### Existing controls that must remain unchanged
-
-- [ ] Preserve W/A/S/D camera movement, including the existing Shift-modified movement behavior.
-- [ ] Preserve E/Q vertical camera movement.
-- [ ] Preserve R camera reset.
-- [ ] Preserve X wireframe, C collision viewer, T texture toggle, V vertex visibility, F face-edit mode and H texture selector.
-- [ ] Preserve animation playback, vertex selection, transform snapping, bone tools and all other existing editor shortcuts.
-- [ ] Camera shortcuts must not fire while a text/numeric input is active, or while another viewport tool owns the keyboard/mouse interaction.
-
-### Camera implementation acceptance
-
-- [ ] Front, back, left, right, top and bottom views have the expected axis orientation.
-- [ ] Orthographic projection removes perspective size distortion while retaining depth-aware picking, face selection, collision overlays, grid rendering and transform gizmos.
-- [ ] Camera presets do not reset the selected frame, playback state, vertex/face selection, or edit mode.
-- [ ] Existing perspective view and mouse navigation remain unchanged.
-- [ ] Validate on Windows and Linux; macOS CI remains part of the normal build matrix.
-
+Existing navigation and editing shortcuts remain unchanged: W/A/S/D, Shift-modified movement, Q/E, R, mouse orbit/pan, wheel zoom, playback, selection, transforms, face editing, collision tools and bone tools.

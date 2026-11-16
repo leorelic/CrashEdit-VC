@@ -3333,28 +3333,50 @@ void EditorUI::drawAnimationViewer(){
   static std::vector<std::pair<int,int>>selectedCollisionFaces;
   static int selectedCollisionChunk=-1,selectedCollisionEntry=-1,selectedCollisionFrame=-1;
 
+ static bool cameraPanelOpen=false;
+ static float cameraPanelProgress=0.0f;
+ static float cameraTargetYaw=0.0f,cameraTargetPitch=0.261799f;
  auto setAnimationCameraView=[&](int view,bool opposite=false){
   constexpr float halfPi=1.570796327f,pi=3.141592654f;
   switch(view){
-   case 1: animationYaw_=opposite?pi:0.0f;animationPitch_=0.0f;break;
-   case 3: animationYaw_=opposite?-halfPi:halfPi;animationPitch_=0.0f;break;
-   case 7: animationYaw_=0.0f;animationPitch_=opposite?-halfPi:halfPi;break;
+   case 1: cameraTargetYaw=opposite?pi:0.0f;cameraTargetPitch=0.0f;break;
+   case 3: cameraTargetYaw=opposite?-halfPi:halfPi;cameraTargetPitch=0.0f;break;
+   case 7: cameraTargetYaw=0.0f;cameraTargetPitch=opposite?-halfPi:halfPi;break;
    default: break;
   }
  };
- ImGui::TextDisabled("Camera");ImGui::SameLine();
- if(ImGui::SmallButton("Front"))setAnimationCameraView(1);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Front view (Numpad 1)");
- ImGui::SameLine();if(ImGui::SmallButton("Side"))setAnimationCameraView(3);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Right view (Numpad 3)");
- ImGui::SameLine();if(ImGui::SmallButton("Top"))setAnimationCameraView(7);
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Top view (Numpad 7)");
- ImGui::SameLine();if(ImGui::SmallButton(animationOrthographic_?"Orthographic":"Perspective"))animationOrthographic_=!animationOrthographic_;
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Toggle projection (Numpad 5)");
- ImGui::SameLine();if(ImGui::SmallButton("Reset View"))animationCameraInitialized_=false;
- if(ImGui::IsItemHovered())ImGui::SetTooltip("Reset camera and frame the animation (Numpad 0)");
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
- ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f);
+ ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f); 
+ const ImGuiIO& cameraPanelIo=ImGui::GetIO();
+ const float cameraPanelWidth=std::min(320.0f,std::max(240.0f,canvasSize.x*0.72f));
+ const float cameraPanelHeight=std::min(310.0f,std::max(230.0f,canvasSize.y-58.0f));
+ const ImVec2 cameraGuideButtonMin(canvasMin.x+canvasSize.x-112.0f,canvasMin.y+8.0f);
+ const ImVec2 cameraGuideButtonMax(cameraGuideButtonMin.x+100.0f,cameraGuideButtonMin.y+27.0f);
+ const bool cameraGuideButtonHover=cameraPanelIo.MousePos.x>=cameraGuideButtonMin.x&&cameraPanelIo.MousePos.x<=cameraGuideButtonMax.x&&cameraPanelIo.MousePos.y>=cameraGuideButtonMin.y&&cameraPanelIo.MousePos.y<=cameraGuideButtonMax.y;
+ if(cameraGuideButtonHover&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))cameraPanelOpen=!cameraPanelOpen;
+ cameraPanelProgress+=( (cameraPanelOpen?1.0f:0.0f)-cameraPanelProgress)*std::min(1.0f,cameraPanelIo.DeltaTime*12.0f);
+ if(std::fabs((cameraPanelOpen?1.0f:0.0f)-cameraPanelProgress)<0.001f)cameraPanelProgress=cameraPanelOpen?1.0f:0.0f;
+ const float cameraPanelX=canvasMin.x+canvasSize.x-cameraPanelWidth*cameraPanelProgress;
+ const ImVec2 cameraPanelMin(cameraPanelX,canvasMin.y+42.0f);
+ const ImVec2 cameraPanelMax(cameraPanelX+cameraPanelWidth,cameraPanelMin.y+cameraPanelHeight);
+ const bool cameraPanelHover=cameraPanelProgress>0.02f&&cameraPanelIo.MousePos.x>=cameraPanelMin.x&&cameraPanelIo.MousePos.x<=cameraPanelMax.x&&cameraPanelIo.MousePos.y>=cameraPanelMin.y&&cameraPanelIo.MousePos.y<=cameraPanelMax.y;
+ const bool cameraPanelCloseHover=cameraPanelHover&&cameraPanelIo.MousePos.x>=cameraPanelMax.x-36.0f&&cameraPanelIo.MousePos.x<=cameraPanelMax.x-8.0f&&cameraPanelIo.MousePos.y>=cameraPanelMin.y+8.0f&&cameraPanelIo.MousePos.y<=cameraPanelMin.y+32.0f;
+ if(cameraPanelCloseHover&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))cameraPanelOpen=false;
+ const ImVec2 cameraPresetStart(cameraPanelMin.x+14.0f,cameraPanelMin.y+58.0f);
+ const float cameraPresetW=(cameraPanelWidth-38.0f)*0.5f;
+ const char*cameraPresetNames[6]={"Front","Back","Right","Left","Top","Bottom"};
+ const int cameraPresetViews[6]={1,1,3,3,7,7};
+ const bool cameraPresetOpposite[6]={false,true,false,true,false,true};
+ if(cameraPanelProgress>0.8f){
+  for(int pi=0;pi<6;++pi){
+   const int col=pi%2,row=pi/2;
+   const ImVec2 mn(cameraPresetStart.x+float(col)*(cameraPresetW+8.0f),cameraPresetStart.y+float(row)*36.0f);
+   const ImVec2 mx(mn.x+cameraPresetW,mn.y+28.0f);
+   if(cameraPanelIo.MousePos.x>=mn.x&&cameraPanelIo.MousePos.x<=mx.x&&cameraPanelIo.MousePos.y>=mn.y&&cameraPanelIo.MousePos.y<=mx.y&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    setAnimationCameraView(cameraPresetViews[pi],cameraPresetOpposite[pi]);
+  }
+ }
+
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
  ImGui::SetCursorScreenPos(toolbarMin);
  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(6.0f,4.0f));
@@ -3437,7 +3459,8 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
- const bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ viewportToolbarOwnsMouse=viewportToolbarOwnsMouse||cameraGuideButtonHover||cameraPanelHover;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
@@ -3549,7 +3572,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_=center.x;animationTargetY_=center.y;animationTargetZ_=center.z;
    animationGridCenterX_=center.x;animationGridCenterY_=center.y;animationGridCenterZ_=center.z;
    animationGridRadius_=radius;
-   animationYaw_=0.0f;animationPitch_=0.261799f;
+   animationYaw_=0.0f;animationPitch_=0.261799f;cameraTargetYaw=0.0f;cameraTargetPitch=0.261799f;
    // Match CrashEdit-RE's reset-camera behavior: frame all CorePositions,
    // center on their bounds, and keep enough distance for the full model.
    animationDistance_=std::clamp(radius*3.2f,0.75f,200000.0f);
@@ -3565,15 +3588,17 @@ void EditorUI::drawAnimationViewer(){
    if(ImGui::IsKeyPressed(ImGuiKey_Keypad1,false))setAnimationCameraView(1,opposite);
    if(ImGui::IsKeyPressed(ImGuiKey_Keypad3,false))setAnimationCameraView(3,opposite);
    if(ImGui::IsKeyPressed(ImGuiKey_Keypad7,false))setAnimationCameraView(7,opposite);
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad5,false))animationOrthographic_=!animationOrthographic_;
    constexpr float quarterTurn=0.261799388f,pi=3.141592654f;
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad4,false))animationYaw_-=quarterTurn;
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad6,false))animationYaw_+=quarterTurn;
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad8,false))animationPitch_=std::clamp(animationPitch_+quarterTurn,-1.5707963f,1.5707963f);
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad2,false))animationPitch_=std::clamp(animationPitch_-quarterTurn,-1.5707963f,1.5707963f);
-   if(ImGui::IsKeyPressed(ImGuiKey_Keypad9,false))animationYaw_+=pi;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad4,false))cameraTargetYaw-=quarterTurn;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad6,false))cameraTargetYaw+=quarterTurn;
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad8,false))cameraTargetPitch=std::clamp(cameraTargetPitch+quarterTurn,-1.5707963f,1.5707963f);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad2,false))cameraTargetPitch=std::clamp(cameraTargetPitch-quarterTurn,-1.5707963f,1.5707963f);
+   if(ImGui::IsKeyPressed(ImGuiKey_Keypad9,false))cameraTargetYaw+=pi;
    if(ImGui::IsKeyPressed(ImGuiKey_Keypad0,false))animationCameraInitialized_=false;
   }
+  const float cameraEase=1.0f-std::exp(-9.0f*std::max(0.0f,io.DeltaTime));
+  animationYaw_+=std::remainder(cameraTargetYaw-animationYaw_,6.28318530718f)*cameraEase;
+  animationPitch_+=(cameraTargetPitch-animationPitch_)*cameraEase;
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active){
@@ -3605,7 +3630,7 @@ void EditorUI::drawAnimationViewer(){
    return CameraPoint{rx,py,animationDistance_-pz};
   };
   auto projectCamera=[&](const CameraPoint&p){
-   const float projectionScale=animationOrthographic_?focal/std::max(0.1f,animationDistance_):focal/p.depth;
+   const float projectionScale=focal/p.depth;
    return ImVec2(canvasMin.x+canvasSize.x*0.5f+p.x*projectionScale,
                  canvasMin.y+canvasSize.y*0.5f-p.y*projectionScale);
   };
@@ -4033,6 +4058,7 @@ void EditorUI::drawAnimationViewer(){
   if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
+   cameraTargetYaw=animationYaw_;cameraTargetPitch=animationPitch_;
   }
   if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
    const float pan=animationDistance_*0.0018f;
@@ -4496,34 +4522,46 @@ void EditorUI::drawAnimationViewer(){
 dl->PopClipRect();
  // Keep concise, individually aligned control hints inside the viewport.
  // Right-align every line so the help reads as a tidy control list.
- const char*viewerHelpLines[]={
-  "Left Mouse - Orbit camera",
-  "Right Mouse - Pan camera",
-  "Mouse Wheel - Zoom camera",
-  "W / A / S / D - Move camera",
-  "Q / E - Move camera down / up",
-  "Shift + Click - Select multiple collision faces",
-  "C - Toggle collision display",
-  "V - Toggle vertices",
-  "X - Toggle wireframe",
-  "T - Toggle textures",
-  "F - Toggle face editing mode",
-  "R - Reset camera"
- };
- ImDrawList*toolbarDraw=ImGui::GetWindowDrawList();
- const float helpRight=canvasMax.x-12.0f;
- float helpY=canvasMin.y+10.0f;
- const float helpLineHeight=ImGui::GetTextLineHeightWithSpacing();
- const ImU32 helpColor=IM_COL32(220,226,236,225);
- for(const char*line:viewerHelpLines){
-  const ImVec2 lineSize=ImGui::CalcTextSize(line);
-  toolbarDraw->AddText(ImVec2(helpRight-lineSize.x,helpY),helpColor,line);
-  helpY+=helpLineHeight;
+ ImDrawList*toolbarDraw=ImGui::GetForegroundDrawList();
+ const ImU32 guideButtonColor=ImGui::GetColorU32(cameraGuideButtonHover?ImGuiCol_ButtonHovered:ImGuiCol_Button);
+ toolbarDraw->AddRectFilled(cameraGuideButtonMin,cameraGuideButtonMax,guideButtonColor,5.0f);
+ toolbarDraw->AddRect(cameraGuideButtonMin,cameraGuideButtonMax,IM_COL32(115,130,150,190),5.0f);
+ toolbarDraw->AddText(ImVec2(cameraGuideButtonMin.x+12.0f,cameraGuideButtonMin.y+6.0f),IM_COL32(240,244,250,255),cameraPanelOpen?"Camera Guide  >":"Camera Guide  <");
+ if(cameraPanelProgress>0.01f){
+  toolbarDraw->AddRectFilled(cameraPanelMin,cameraPanelMax,IM_COL32(24,30,40,246),7.0f);
+  toolbarDraw->AddRect(cameraPanelMin,cameraPanelMax,IM_COL32(105,125,150,220),7.0f);
+  toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,cameraPanelMin.y+12.0f),IM_COL32(245,248,255,255),"CAMERA CONTROLS");
+  toolbarDraw->AddText(ImVec2(cameraPanelMax.x-28.0f,cameraPanelMin.y+14.0f),IM_COL32(215,225,238,255),"X");
+  toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,cameraPanelMin.y+37.0f),IM_COL32(165,185,210,255),"Click a view preset");
+  for(int pi=0;pi<6;++pi){
+   const int col=pi%2,row=pi/2;
+   const ImVec2 mn(cameraPresetStart.x+float(col)*(cameraPresetW+8.0f),cameraPresetStart.y+float(row)*36.0f);
+   const ImVec2 mx(mn.x+cameraPresetW,mn.y+28.0f);
+   const bool hot=cameraPanelIo.MousePos.x>=mn.x&&cameraPanelIo.MousePos.x<=mx.x&&cameraPanelIo.MousePos.y>=mn.y&&cameraPanelIo.MousePos.y<=mx.y;
+   toolbarDraw->AddRectFilled(mn,mx,IM_COL32(55,70,91,hot?255:220),4.0f);
+   toolbarDraw->AddRect(mn,mx,IM_COL32(115,140,170,200),4.0f);
+   const ImVec2 ts=ImGui::CalcTextSize(cameraPresetNames[pi]);
+   toolbarDraw->AddText(ImVec2(mn.x+(cameraPresetW-ts.x)*0.5f,mn.y+6.0f),IM_COL32(245,248,252,255),cameraPresetNames[pi]);
+  }
+  const float infoY=cameraPresetStart.y+3.0f*36.0f+12.0f;
+  const char*guideLines[]={
+   "Numpad 1 / Ctrl+1  Front / Back",
+   "Numpad 3 / Ctrl+3  Right / Left",
+   "Numpad 7 / Ctrl+7  Top / Bottom",
+   "Numpad 2 / 4 / 6 / 8  Orbit",
+   "Numpad 9  Turn 180 degrees",
+   "Numpad 0 or R  Reset and frame",
+   "Left Mouse drag  Orbit",
+   "Right Mouse drag  Pan",
+   "Wheel  Zoom",
+   "W / A / S / D  Move camera",
+   "Q / E  Move down / up",
+   "Shift + W/A/S/D  World-axis movement",
+   "Projection: Perspective"
+  };
+  float gy=infoY;
+  for(const char*line:guideLines){toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,gy),IM_COL32(220,228,240,245),line);gy+=ImGui::GetTextLineHeightWithSpacing();}
  }
- toolbarDraw->AddRectFilled(toolbarMin,toolbarMax,ImGui::GetColorU32(toolbarHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button),4.0f);
- const ImVec2 iconCenter((toolbarMin.x+toolbarMax.x)*0.5f,(toolbarMin.y+toolbarMax.y)*0.5f);
- const ImU32 iconColor=ImGui::GetColorU32(ImGuiCol_Text);
- for(int dot=-1;dot<=1;++dot)toolbarDraw->AddCircleFilled(ImVec2(iconCenter.x+float(dot)*5.0f,iconCenter.y),1.6f,iconColor);
 
  if(animationFaceEditing_)drawFaceTextureSelector();
  ImGui::End();
