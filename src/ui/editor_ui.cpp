@@ -4568,7 +4568,7 @@ dl->PopClipRect();
   for(const char*line:guideLines){
    const ImVec2 lineSize=ImGui::CalcTextSize(line,nullptr,false,textWidth);
    if(gy+lineSize.y>cameraPanelMax.y-10.0f)break;
-   cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line,nullptr,textWidth);
+   cameraOverlay->AddText(ImGui::GetFont(),ImGui::GetFontSize(),ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line,nullptr,textWidth);
    gy+=lineSize.y+ImGui::GetStyle().ItemSpacing.y;
   }
  }
