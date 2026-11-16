@@ -3488,6 +3488,7 @@ void EditorUI::drawAnimationViewer(){
  ImDrawList*dl=ImGui::GetWindowDrawList();const ImVec2 canvasMax(canvasMin.x+canvasSize.x,canvasMin.y+canvasSize.y);
  dl->AddRectFilled(canvasMin,canvasMax,IM_COL32(0,0,0,255));
  // Draw the overlay after the canvas background so the controls remain visible.
+ if(!ImGui::IsPopupOpen("AnimationViewportOptions")){
  ImDrawList*modeOverlay=ImGui::GetForegroundDrawList();
  const ImU32 modeTextColor=ImGui::GetColorU32(ImGuiCol_Text);
  auto drawModeButton=[&](const ImVec2&min,const ImVec2&max,bool active,bool hovered){
@@ -3546,6 +3547,7 @@ void EditorUI::drawAnimationViewer(){
  modeOverlay->AddLine(ImVec2(handCenter.x-5,handCenter.y+7),ImVec2(handCenter.x-1,handCenter.y+10),modeTextColor,1.8f);
  modeOverlay->AddLine(ImVec2(handCenter.x-1,handCenter.y+10),ImVec2(handCenter.x+5,handCenter.y+10),modeTextColor,1.8f);
  modeOverlay->AddLine(ImVec2(handCenter.x+5,handCenter.y+10),ImVec2(handCenter.x+8,handCenter.y+5),modeTextColor,1.8f);
+  }
  dl->PushClipRect(canvasMin,canvasMax,true);
  if(!frame.verticesDecoded||frame.vertices.empty()){
   const char*message=!frame.verticesDecoded?"Animation frame geometry is unavailable.":"Animation frame has no vertices.";
