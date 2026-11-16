@@ -298,6 +298,9 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [x] Use camera-space triangle depth checks so occluded vertices are not picked or included in box selections; X-ray selection remains deferred.
 - [x] Preserve depth-aware hover feedback, selected-marker appearance, and the `V` visibility shortcut.
 - [x] Provide Free Move, Axis Move, and Scale toolbar modes, with numeric coordinate editing as a precise fallback.
+- [x] With two or more selected vertices, scale symmetrically around the selection's shared center rather than translating the group as a block.
+- [x] Preserve per-frame vertex encoding and calculate drag transforms from immutable drag-start positions; submit edits through the atomic batch setter.
+- [x] Enforce the observed Crash 2 coordinate range of 0–254 and each compressed frame's temporal bit-width limits. Do not widen, clamp, or wrap out-of-range values; retain the last valid value during a drag.
 - [ ] Improve picking precision and make individual-versus-group selection behavior consistently predictable across dense and overlapping geometry.
 - [ ] Refine selection highlighting and hover/selected feedback so the active selection is immediately clear.
 - [ ] Ensure camera orbit/pan/zoom never conflicts with vertex selection, box selection, or transform handles.
@@ -314,7 +317,7 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [ ] Keep bone data editor-only: it is not part of the Crash 2 Animation format, must not be written as a game skeleton, and must not change animations that do not use the helper.
 - [ ] Decide separately whether hierarchical joints, automatic bone-shape detection, face assignment, and X-ray selection are worth adding; do not treat them as prerequisites for the basic rig workflow.
 
-**Current implementation notes:** the Bone List supports basic vertex groups and per-frame rotation. Bone definitions and rotation orientation metadata are editor-side state, not NSF data. The first workflow is implemented, but the full persistence/cross-frame authoring behavior and fresh user validation remain open. Do not describe the rig as a game skeleton.
+**Current implementation notes:** a vertex belongs to one bone at a time. Selecting a bone's vertices reuses the existing transform tools, and rotation edits the assigned vertices in the currently selected Animation frame. Per-frame rotation orientation metadata is keyed by Animation EID plus frame index. Bone definitions and rotation metadata are editor-side state, are not serialized into NSF, and are not currently persisted between application sessions. The first workflow is implemented, but the full cross-frame authoring behavior and fresh user validation remain open. Do not describe the rig as a game skeleton.
 
 ### 3. Transform and pivot tools
 

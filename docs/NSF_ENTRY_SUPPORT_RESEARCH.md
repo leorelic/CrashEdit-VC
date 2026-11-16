@@ -123,7 +123,7 @@ Texture pages are chunk type 1. The EID is stored in the page data header, and t
 
 1. **Animation + Model foundation:** bounded decoders for frame headers/collision/special vertices/temporal data and model headers/polygon streams/colors/textures/compressed positions. Keep raw item bytes authoritative and preserve unknown fields.
 2. **3D Animation Viewer:** resolve Animation-to-Model links, render decoded topology and textures, support playback/interpolation/collision display, and keep the viewer live against model edits.
-3. **SLST:** bounded source/delta parser, editable start/end sources and delta records, round-trip tests.
+3. **SLST:** bounded source/delta parsing and lossless format research. Keep the integrated SLST editor/generator and its relationship to scenery geometry, level objects, and polygon sorting grouped with the future Scenery / Geometry authoring category in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md); do not treat it as a detached near-term editor task.
 4. **Sound:** decode the single SampleSet item and inspect sample metadata without guessing playback parameters.
 5. **Music:** parse the 36-byte header, VH, SEP tracks and referenced VB resources; then consider a custom-bank-aware preview.
 6. **Demo:** raw lossless support first, research consumer code and real files before defining its structure.
