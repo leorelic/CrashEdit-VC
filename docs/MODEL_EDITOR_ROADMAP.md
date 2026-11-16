@@ -257,93 +257,105 @@ Implementation trail:
 
 ---
 
-## Animation and Model authoring roadmap — updated 2026-11-13
+## Animation and Model authoring roadmap — updated 2026-11-16
 
-This is the agreed implementation order for the next stage of Crash 2 animation/model authoring. The existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, and face texture workflow are foundations to extend—not replace. Preserve working controls and rendering behavior while adding each capability as a small, independently testable step.
+The current Animation/Model editor is the foundation for the next authoring work. Preserve the existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, face-texture workflow, collision editor, and working rendering behavior. The priorities below separate immediate editor improvements from the later Scenery/Geometry authoring category.
 
-### 1. NSF chunk expansion for growing entries
+### Completed foundation milestones
+
+#### NSF chunk expansion for growing entries
 
 - [x] Detect when appending or inserting an Animation frame would exceed the current 64 KiB NSF chunk capacity.
-- [x] Ask before changing archive structure: explain that the edit exceeds the current chunk and offer to create a new chunk and move the entire entry.
-- [x] On confirmation, relocate the whole entry, retain its EID and entry type, rebuild the affected offset tables, and automatically retry the requested frame operation.
+- [x] Ask before changing archive structure and offer to create a new chunk and move the entire entry.
+- [x] On confirmation, relocate the whole entry, retain its EID and entry type, rebuild affected offset tables, and retry the requested frame operation.
 - [x] Cancel without modifying the archive.
-- [x] Preserve complete raw entry data, frame payloads, and retained padding; validate the rebuilt source and destination chunks before committing the change in memory.
+- [x] Preserve complete raw entry data, frame payloads, and retained padding; validate rebuilt chunks before committing.
 - [x] Update the selected resource location and animation editor after relocation.
-- [x] Add a synthetic regression fixture covering a nearly full chunk, following-entry preservation, trailing padding, append-after-relocation, and save/reload.
-- [x] User-confirmed working in CrashEdit-VC. GitHub Actions build and test jobs passed on Windows, Ubuntu 22.04, and macOS (workflow [workflow run](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834)).
+- [x] Add synthetic regression coverage for a nearly full chunk, following-entry preservation, trailing padding, append-after-relocation, and save/reload.
+- [x] User-confirmed working in CrashEdit-VC. GitHub Actions passed on Windows, Ubuntu 22.04, and macOS (workflow [run](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834)).
 - [ ] Exercise relocation with additional entry types and representative real archives; validate game loading for expanded archives before treating every resource type as proven safe.
 
-The archive relocation API is generic for valid entries in normal type-0 chunks, while the current capacity preflight and confirmation workflow is connected to Animation Append/Insert. See the NSF chunk research section in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md).
+The archive relocation API is generic for valid entries in normal type-0 chunks, while the current capacity preflight and confirmation workflow is connected to Animation Append/Insert. See the NSF chunk research in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md).
 
-### 2. Multi-vertex selection and editing
+#### Collision editing
 
-- [x] Support Shift-click selection and deselection of multiple visible vertex markers in the 3D Animation Editor. Preserve existing depth-aware picking, hover feedback, selected-marker appearance, and the `V` visibility shortcut.
-- [x] Add visible vertex-edit toolbar modes beside the existing viewport controls; Free Move, Axis Move and Scale have been built and user-validated:
-  - **Free movement:** drag selected vertices in the camera view plane.
-  - **Axis movement:** display X/Y/Z gizmo axes and constrain movement to the selected axis.
-  - **Scale:** drag the scale handle to scale selected vertices symmetrically around their shared center.
-- [x] Keep the existing numeric vertex controls as a precise fallback; editing a selected coordinate applies the same relative offset to every selected vertex, with a copied-archive preflight before live writes.
-- [x] With two or more selected vertices, provide Blender-like symmetric scaling so the selection expands/contracts around its shared center rather than translating as a block; user-confirmed working.
-- [x] Confirm the Crash 2 frame coordinate representation: observed animation vertex coordinates stay within 0–254, regardless of the object's apparent in-game size. Enforce 0–254 for Crash 2 writes; keep Crash 3's separate byte-space behavior unchanged pending its own research. Compressed-model temporal deltas impose additional per-vertex bit-width limits. Do not widen, clamp or wrap coordinates.
-- [x] Preserve the existing per-frame vertex encoding and re-decode the edited frame after each committed transform. Drag transforms are calculated from the immutable positions captured at drag start and submitted through the atomic batch setter; out-of-range coordinates retain the last valid value until mouse release. User-confirmed working.
-
-### 3. Collision editing — completed major milestone (2026-11-13)
-
-<badge color="success">User-confirmed complete</badge>
-
-The user has built and tested the collision editor and explicitly confirmed that the final interaction fixes work perfectly. The implementation uses six selectable rectangular faces rather than independently selectable corner points.
-
-- [x] Extend the existing depth-aware collision viewer into a selectable, editable collision-face workflow activated alongside the `C` collision toggle.
-- [x] Correct collision face picking to use the same X/Y/Z coordinate mapping as the renderer.
-- [x] Select any of the six rectangle faces; highlight hovered and selected faces in textured and wireframe modes.
-- [x] Shift-click add multiple faces to the selection without toggling earlier selections off. This supports selecting opposite sides of a box.
-- [x] Axis Move updates the selected face boundary; the shared stored boundary moves all four corners together while the opposite side remains fixed.
-- [x] Scale requires the corresponding opposite faces to be selected and scales both boundaries symmetrically around their shared center.
-- [x] Give gizmo handles and scale controls mouse-input priority over camera orbit, with forgiving hit regions.
+- [x] Extend the depth-aware collision viewer into a selectable, editable collision-face workflow activated alongside the `C` collision toggle.
+- [x] Correct collision face picking to use the renderer's X/Y/Z coordinate mapping.
+- [x] Select any of the six rectangular faces; highlight hovered and selected faces in textured and wireframe modes.
+- [x] Shift-click add multiple faces without clearing earlier selections.
+- [x] Axis Move updates the selected face boundary while leaving the opposite side fixed.
+- [x] Scale requires the corresponding opposite faces and scales both boundaries symmetrically.
+- [x] Give gizmo handles mouse-input priority over camera orbit.
 - [x] Remove Free Move from Collision Editing; it remains available for vertex editing.
-- [x] Preserve the existing collision rendering, raw 0x28-byte collision record representation, and transactional frame/archive write path.
+- [x] Preserve the raw 0x28-byte collision record and transactional frame/archive write path.
 - [x] User-confirmed working after local build and interaction testing (2026-11-13).
 
-Implementation trail:
-- `10d07b5` — six-face selection, corrected collision coordinate mapping, shared-boundary transforms, and face overlays.
-- `f058b2e` — reliable gizmo input priority, additive Shift selection, removal of collision Free Move, and symmetric two-sided scaling.
+Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2e` fixed gizmo input priority, additive selection, and symmetric scaling.
 
-### 4. Optional editor-only Bone Rig Creator
+### 1. Vertex selection and 3D viewport usability
 
-- [ ] Open the Bone Rig Creator with `B` and provide a visible bone toolbar icon.
-- [ ] Place its UI in a dock beside Properties.
-- [ ] Allow creating bones and assigning selected vertices and faces to each bone through clear lists/selection workflows.
-- [x] Improve vertex selection with visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection.
-- [x] Use camera-space triangle depth checks so occluded vertices are not picked or included in box selections; leave X-ray selection for a later milestone.
-- [x] Add a bone-only three-axis rotation gizmo with a fixed pivot and Local/World axis mode. Rotation is applied to assigned vertices on the selected animation frame through the existing frame encoder.
-- [ ] Treat bones strictly as an optional, temporary authoring helper. They are not part of the Crash 2 animation format, are not written to NSF, and are never exported as a game skeleton.
-- [ ] Retain the original vertex positions and derive each frame's transformed positions from those originals plus the rig transform. Avoid cumulative deformation from repeatedly applying transforms to already transformed coordinates.
-- [ ] When saving, flatten the resulting pose into ordinary per-frame vertex positions using the existing Crash 2 Animation frame encoder. Animations that do not need bones remain ordinary vertex animations.
+- [x] Support visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection.
+- [x] Use camera-space triangle depth checks so occluded vertices are not picked or included in box selections; X-ray selection remains deferred.
+- [x] Preserve depth-aware hover feedback, selected-marker appearance, and the `V` visibility shortcut.
+- [x] Provide Free Move, Axis Move, and Scale toolbar modes, with numeric coordinate editing as a precise fallback.
+- [ ] Improve picking precision and make individual-versus-group selection behavior consistently predictable across dense and overlapping geometry.
+- [ ] Refine selection highlighting and hover/selected feedback so the active selection is immediately clear.
+- [ ] Ensure camera orbit/pan/zoom never conflicts with vertex selection, box selection, or transform handles.
+- [ ] Validate selection and editing usability on large and dense models, not only small test objects.
 
-**Initial implementation status (2026-11-13 — pending build and user validation):**
+### 2. Optional editor-only Bone Rig Creator
 
-- The first manual vertex-group workflow is implemented in the editor: the Bone List opens with `B` or its visible viewport toolbar icon and docks into the Properties area.
-- Users can create, rename and delete bones; assign the currently selected vertices; remove selected vertices; and select all vertices assigned to a bone.
-- A vertex belongs to one bone at a time. Selecting a bone's vertices reuses the existing Free Move, Axis Move and Scale tools, so each transform is encoded into the currently selected animation frame through the existing frame-vertex writer.
-- Bone definitions are currently in-memory editor state, scoped to the linked Model EID. They are not serialized into the NSF or persisted between application sessions.
-- The viewport now supports visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection. Triangle-depth testing excludes vertices hidden behind the model; no X-ray mode is included.
-- The Bone List provides a Rotate Bone mode and Local/World axis toggle. Three projected rotation rings surround a stable pivot; rotation edits only the assigned vertices in the current animation frame using the existing frame encoder. Per-frame rotation orientation metadata remains editor-only and is keyed by animation EID plus frame index.
-- These additions are implementation-complete but still require a fresh CI result and user interaction testing before the roadmap acceptance checks can be marked complete.
-- Automatic bone-shape detection, hierarchical joints, face assignment, and cross-frame rig-pose authoring remain deferred.
+- [x] Open the Bone List with `B` or its visible viewport toolbar icon and dock it beside Properties.
+- [x] Create, rename, and delete bones; assign selected vertices; remove selected vertices; and select all vertices assigned to a bone.
+- [x] Provide a bone-only three-axis rotation gizmo with a stable pivot and Local/World axis mode.
+- [ ] Complete the rig authoring workflow and validate it through a fresh CI build and user interaction testing.
+- [ ] Retain original vertex positions and derive each frame's transformed positions from those originals plus the rig transform, avoiding cumulative deformation.
+- [ ] Define and validate the intended cross-frame rig-pose workflow; flatten any saved result into ordinary per-frame vertex positions through the existing Animation frame encoder.
+- [ ] Keep bone data editor-only: it is not part of the Crash 2 Animation format, must not be written as a game skeleton, and must not change animations that do not use the helper.
+- [ ] Decide separately whether hierarchical joints, automatic bone-shape detection, face assignment, and X-ray selection are worth adding; do not treat them as prerequisites for the basic rig workflow.
 
+**Current implementation notes:** the Bone List supports basic vertex groups and per-frame rotation. Bone definitions and rotation orientation metadata are editor-side state, not NSF data. The first workflow is implemented, but the full persistence/cross-frame authoring behavior and fresh user validation remain open. Do not describe the rig as a game skeleton.
 
-### 5. PS1 texture import/export
+### 3. Transform and pivot tools
 
-- [ ] Add PlayStation 1-specific texture import/export after the editing workflows above are stable; this is not a generic modern texture pipeline.
-- [ ] Support the relevant PS1 representations: 4bpp indexed, 8bpp indexed, and 16-bit direct color, including PS1 transparency/semi-transparency conventions.
+- [x] Provide Free Move, Axis Move, Scale, and bone rotation controls.
+- [x] Preserve Shift snapping on axis transforms.
+- [ ] Make move, scale, and rotate behavior consistent across frames and selection sizes.
+- [ ] Improve pivot editing and make pivot placement/behavior explicit for the relevant transform modes.
+- [ ] Verify that transforms preserve valid Crash 2 coordinate ranges and compressed-frame bit-width constraints without silent clamping or wrapping.
+- [ ] Keep the established scale-down → rotate → scale-back workaround available; do not add or reintroduce a Flip button.
+- [ ] Test undo/redo, save/reopen, and multi-frame behavior for each transform type.
+
+### 4. Compatibility and regression validation
+
+- [ ] Compare representative Model/Animation pairs `El1eG` / `El1eV` and `Cr10G` / `Cr10V` against CrashEdit-RE `t/net9` and real Crash 2 behavior.
+- [ ] Test parse → serialize → parse equality for untouched resources and targeted edits.
+- [ ] Validate texture-page/CLUT resolution, animated texture chains, LOD edge cases, missing references, and malformed resource boundaries.
+- [ ] Verify save/reopen behavior and preserve unrelated NSF/NSD data.
+- [ ] Keep Crash 2 as the acceptance target; treat Crash 3-specific behavior as a separate compatibility pass.
+
+### 5. Scenery / Geometry Editing and level-object authoring
+
+This is a separate future category, not an extension of the current Animation/Model editor checklist. It covers whichever workflows the project ultimately adopts for Scenery/Geometry editing and level-object creation, import, conversion, or related authoring. Topology creation/deletion belongs here rather than in the current vertex-transform tools.
+
+- [ ] Research Scenery/Geometry resource layouts and how level objects reference or combine their geometry, materials, and related resources.
+- [ ] Research the Type 4 **SLST (Sort List)** entry as part of this category, not as an unrelated standalone editor task.
+- [ ] Establish how SLST source and delta records relate to scenery polygon ordering, camera-dependent sorting, zones, and level-object rendering.
+- [ ] Confirm runtime semantics, interpolation/transition behavior, and generation constraints from source, multiple real Crash 2 samples, and in-game tests before implementing an SLST generator.
+- [ ] Define safe geometry/topology serialization, including variable-size data, index/count updates, dependent-resource references, and round-trip preservation.
+- [ ] Only then design the user workflow for scenery/geometry editing and level-object creation/import/conversion, with SLST inspection/editing and any required regeneration handled as part of the same category.
+
+The existing Animation/Model vertex tools continue to edit positions on existing topology only. Adding/removing vertices or faces, constructing scenery, and creating/converting level objects are explicitly deferred to this separate category. See the SLST section in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md) and the focused research note in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+
+### 6. PS1 Texture Import/Export — final roadmap category
+
+This remains intentionally last, after the editing and Scenery/Geometry priorities above are established. It is a PlayStation 1-specific workflow, not a generic modern texture pipeline.
+
+- [ ] Support relevant PS1 representations: 4bpp indexed, 8bpp indexed, and 16-bit direct color, including PS1 transparency/semi-transparency conventions.
 - [ ] Export texture data to a usable image format and import edited images back into the existing texture-page/descriptor workflow.
 - [ ] Preserve the existing CLUT/palette by default. For indexed images, map edited colors to the existing palette wherever possible.
-- [ ] If an edited image contains colors not representable by the current CLUT, report the limitation and offer an explicit palette/CLUT-editing workflow rather than silently changing the palette or degrading colors.
-- [ ] Update the texture-page data and all affected mapping/selectors/references consistently, then verify save/reopen and real-game behavior on representative 4bpp, 8bpp, and 16-bit samples.
-
-### Deferred: topology and geometry creation
-
-Adding/removing vertices and faces (Blender-style topology creation/deletion) is deliberately **not** part of the current five-step roadmap. Defer it to the later Custom Scenery / Geometry work, after variable-size Model serialization and dependent Animation vertex-count updates can be handled safely. Multi-vertex transforms edit existing vertices only; they must not implicitly add/remove geometry.
+- [ ] If edited colors cannot be represented by the current CLUT, report the limitation and offer an explicit palette/CLUT-editing workflow rather than silently changing the palette or degrading colors.
+- [ ] Update texture-page data and all affected mapping/selectors/references consistently, then verify save/reopen and real-game behavior on representative 4bpp, 8bpp, and 16-bit samples.
 
 ### Roadmap acceptance rules
 

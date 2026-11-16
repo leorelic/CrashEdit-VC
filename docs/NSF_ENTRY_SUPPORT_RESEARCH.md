@@ -77,6 +77,11 @@ A Sort List is a sequence of items: a start source, zero or more delta records, 
 
 CrashEdit's SLST controller family exposes source and delta structures separately. CrashEdit-VC should preserve the original item sequence and unknown/invalid values, validate all count/index boundaries, and provide an editor for the start/end sources and each delta. Runtime ordering/world-indexing behavior should be investigated separately from binary parsing.
 
+### Relationship to the future Scenery / Geometry authoring category
+
+As of 2026-11-16, SLST entry research is explicitly grouped with the future **Scenery / Geometry Editing and level-object authoring** category in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md). This category will cover the eventual scenery/geometry editing workflow and level-object creation, import, conversion, or related authoring. SLST research is part of that same body of work, rather than a detached resource-editor task.
+
+Research should connect the binary source/delta sequence to actual scenery polygon ordering, camera-dependent display behavior, zone/level-object relationships, and the game's runtime constraints. Confirm whether and where SLST is required for newly created or converted geometry; do not assume all scenery or level objects share one path. Parsing and lossless inspection can establish the format, but an SLST generator and integrated authoring UI must wait for sample-based semantic analysis and original-game validation.
 ## Type 12 — Sound
 
 Original source:

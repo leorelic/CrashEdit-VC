@@ -172,6 +172,17 @@ Current working understanding from original viewer source: SLST is a camera-depe
 
 The exact Crash 2 record semantics, interpolation rules, and runtime constraints still need confirmation. Do not implement a generator based only on viewer behavior. The long-term goal is to inspect, decode, validate, and eventually generate SLST data for custom scenery, with actual in-game validation.
 
+**Roadmap placement (updated 2026-11-16):** SLST research is grouped with the future **Scenery / Geometry Editing and level-object authoring** category. It is not a separate near-term editor task and is not folded into the current Animation/Model vertex-editing roadmap. That future category covers the eventual Scenery/Geometry workflow and whatever level-object creation, import, conversion, or related authoring tools prove appropriate.
+
+The combined research should establish:
+- How Type 4 SLST source and delta records represent polygon ordering and transitions between sort-list states.
+- How SLST data is associated with scenery geometry, zones, camera positions, and level-object rendering.
+- The exact runtime meaning of record types, node indices, interpolation/transition behavior, and any ordering or count constraints.
+- Whether custom or converted geometry requires new SLST data, how it should be generated, and how the game consumes it.
+- Safe geometry and SLST serialization, including unknown-field preservation, bounds validation, and real-game regression.
+
+Treat the relationship between SLST and scenery authoring as a research question to prove, not an assumption that every geometry object uses the same sort-list path. Use multiple Crash 2 samples and in-game validation before defining a generator or final UI workflow.
+
 ## Documentation and evidence policy
 
 For every significant discovery, record:
