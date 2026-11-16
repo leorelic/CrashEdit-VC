@@ -3376,7 +3376,6 @@ void EditorUI::drawAnimationViewer(){
     setAnimationCameraView(cameraPresetViews[pi],cameraPresetOpposite[pi]);
   }
  }
- viewportToolbarOwnsMouse=viewportToolbarOwnsMouse||cameraGuideButtonHover||cameraPanelHover;
 
  const ImVec2 toolbarMin(canvasMin.x+8.0f,canvasMin.y+8.0f);
  ImGui::SetCursorScreenPos(toolbarMin);
@@ -3461,6 +3460,7 @@ void EditorUI::drawAnimationViewer(){
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
  bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ viewportToolbarOwnsMouse=viewportToolbarOwnsMouse||cameraGuideButtonHover||cameraPanelHover;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
  ImGui::SetNextItemAllowOverlap();
