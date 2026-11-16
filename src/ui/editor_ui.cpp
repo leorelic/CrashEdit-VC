@@ -3348,8 +3348,9 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 canvasMin=ImGui::GetCursorScreenPos();
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f); 
  const ImGuiIO& cameraPanelIo=ImGui::GetIO();
- const float cameraPanelWidth=std::min(320.0f,std::max(240.0f,canvasSize.x*0.72f));
- const float cameraPanelHeight=std::min(310.0f,std::max(230.0f,canvasSize.y-58.0f));
+ // Dock the guide to the viewport itself and use its full vertical extent.
+ const float cameraPanelWidth=std::min(canvasSize.x,std::max(280.0f,canvasSize.x*0.48f));
+ const float cameraPanelHeight=canvasSize.y;
  const ImVec2 cameraGuideButtonMin(canvasMin.x+canvasSize.x-112.0f,canvasMin.y+8.0f);
  const ImVec2 cameraGuideButtonMax(cameraGuideButtonMin.x+100.0f,cameraGuideButtonMin.y+27.0f);
  const bool cameraGuideButtonHover=cameraPanelIo.MousePos.x>=cameraGuideButtonMin.x&&cameraPanelIo.MousePos.x<=cameraGuideButtonMax.x&&cameraPanelIo.MousePos.y>=cameraGuideButtonMin.y&&cameraPanelIo.MousePos.y<=cameraGuideButtonMax.y;
@@ -3357,13 +3358,13 @@ void EditorUI::drawAnimationViewer(){
  cameraPanelProgress+=( (cameraPanelOpen?1.0f:0.0f)-cameraPanelProgress)*std::min(1.0f,cameraPanelIo.DeltaTime*12.0f);
  if(std::fabs((cameraPanelOpen?1.0f:0.0f)-cameraPanelProgress)<0.001f)cameraPanelProgress=cameraPanelOpen?1.0f:0.0f;
  const float cameraPanelX=canvasMin.x+canvasSize.x-cameraPanelWidth*cameraPanelProgress;
- const ImVec2 cameraPanelMin(cameraPanelX,canvasMin.y+42.0f);
- const ImVec2 cameraPanelMax(cameraPanelX+cameraPanelWidth,cameraPanelMin.y+cameraPanelHeight);
+ const ImVec2 cameraPanelMin(cameraPanelX,canvasMin.y);
+ const ImVec2 cameraPanelMax(cameraPanelX+cameraPanelWidth,canvasMin.y+cameraPanelHeight);
  const bool cameraPanelHover=cameraPanelProgress>0.02f&&cameraPanelIo.MousePos.x>=cameraPanelMin.x&&cameraPanelIo.MousePos.x<=cameraPanelMax.x&&cameraPanelIo.MousePos.y>=cameraPanelMin.y&&cameraPanelIo.MousePos.y<=cameraPanelMax.y;
  const bool cameraPanelCloseHover=cameraPanelHover&&cameraPanelIo.MousePos.x>=cameraPanelMax.x-36.0f&&cameraPanelIo.MousePos.x<=cameraPanelMax.x-8.0f&&cameraPanelIo.MousePos.y>=cameraPanelMin.y+8.0f&&cameraPanelIo.MousePos.y<=cameraPanelMin.y+32.0f;
  if(cameraPanelCloseHover&&ImGui::IsMouseClicked(ImGuiMouseButton_Left))cameraPanelOpen=false;
- const ImVec2 cameraPresetStart(cameraPanelMin.x+14.0f,cameraPanelMin.y+58.0f);
- const float cameraPresetW=(cameraPanelWidth-38.0f)*0.5f;
+ const ImVec2 cameraPresetStart(cameraPanelMin.x+16.0f,cameraPanelMin.y+76.0f);
+ const float cameraPresetW=(cameraPanelWidth-44.0f)*0.5f;
  const char*cameraPresetNames[6]={"Front","Back","Right","Left","Top","Bottom"};
  const int cameraPresetViews[6]={1,1,3,3,7,7};
  const bool cameraPresetOpposite[6]={false,true,false,true,false,true};
@@ -4520,49 +4521,57 @@ void EditorUI::drawAnimationViewer(){
  }
  
 dl->PopClipRect();
- // Keep concise, individually aligned control hints inside the viewport.
- // Right-align every line so the help reads as a tidy control list.
- ImDrawList*toolbarDraw=ImGui::GetForegroundDrawList();
+ // Draw the panel on the viewport draw list, clipped to the 3D canvas.
+ // This prevents it from appearing over neighboring editor windows.
+ ImDrawList*cameraOverlay=ImGui::GetWindowDrawList();
+ cameraOverlay->PushClipRect(canvasMin,canvasMax,true);
  const ImU32 guideButtonColor=ImGui::GetColorU32(cameraGuideButtonHover?ImGuiCol_ButtonHovered:ImGuiCol_Button);
- toolbarDraw->AddRectFilled(cameraGuideButtonMin,cameraGuideButtonMax,guideButtonColor,5.0f);
- toolbarDraw->AddRect(cameraGuideButtonMin,cameraGuideButtonMax,IM_COL32(115,130,150,190),5.0f);
- toolbarDraw->AddText(ImVec2(cameraGuideButtonMin.x+12.0f,cameraGuideButtonMin.y+6.0f),IM_COL32(240,244,250,255),cameraPanelOpen?"Camera Guide  >":"Camera Guide  <");
+ cameraOverlay->AddRectFilled(cameraGuideButtonMin,cameraGuideButtonMax,guideButtonColor,5.0f);
+ cameraOverlay->AddRect(cameraGuideButtonMin,cameraGuideButtonMax,IM_COL32(115,130,150,210),5.0f);
+ cameraOverlay->AddText(ImVec2(cameraGuideButtonMin.x+12.0f,cameraGuideButtonMin.y+6.0f),IM_COL32(240,244,250,255),cameraPanelOpen?"Camera Guide  >":"Camera Guide  <");
  if(cameraPanelProgress>0.01f){
-  toolbarDraw->AddRectFilled(cameraPanelMin,cameraPanelMax,IM_COL32(24,30,40,246),7.0f);
-  toolbarDraw->AddRect(cameraPanelMin,cameraPanelMax,IM_COL32(105,125,150,220),7.0f);
-  toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,cameraPanelMin.y+12.0f),IM_COL32(245,248,255,255),"CAMERA CONTROLS");
-  toolbarDraw->AddText(ImVec2(cameraPanelMax.x-28.0f,cameraPanelMin.y+14.0f),IM_COL32(215,225,238,255),"X");
-  toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,cameraPanelMin.y+37.0f),IM_COL32(165,185,210,255),"Click a view preset");
+  cameraOverlay->AddRectFilled(cameraPanelMin,cameraPanelMax,IM_COL32(24,30,40,250),0.0f);
+  cameraOverlay->AddRect(cameraPanelMin,cameraPanelMax,IM_COL32(105,125,150,230),0.0f);
+  cameraOverlay->AddLine(ImVec2(cameraPanelMin.x,cameraPanelMin.y+54.0f),ImVec2(cameraPanelMax.x,cameraPanelMin.y+54.0f),IM_COL32(90,110,135,210),1.0f);
+  cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,cameraPanelMin.y+17.0f),IM_COL32(245,248,255,255),"CAMERA CONTROLS");
+  cameraOverlay->AddText(ImVec2(cameraPanelMax.x-28.0f,cameraPanelMin.y+17.0f),IM_COL32(215,225,238,255),"X");
+  cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,cameraPanelMin.y+40.0f),IM_COL32(165,185,210,255),"Choose a view");
   for(int pi=0;pi<6;++pi){
    const int col=pi%2,row=pi/2;
-   const ImVec2 mn(cameraPresetStart.x+float(col)*(cameraPresetW+8.0f),cameraPresetStart.y+float(row)*36.0f);
-   const ImVec2 mx(mn.x+cameraPresetW,mn.y+28.0f);
+   const ImVec2 mn(cameraPresetStart.x+float(col)*(cameraPresetW+10.0f),cameraPresetStart.y+float(row)*38.0f);
+   const ImVec2 mx(mn.x+cameraPresetW,mn.y+30.0f);
    const bool hot=cameraPanelIo.MousePos.x>=mn.x&&cameraPanelIo.MousePos.x<=mx.x&&cameraPanelIo.MousePos.y>=mn.y&&cameraPanelIo.MousePos.y<=mx.y;
-   toolbarDraw->AddRectFilled(mn,mx,IM_COL32(55,70,91,hot?255:220),4.0f);
-   toolbarDraw->AddRect(mn,mx,IM_COL32(115,140,170,200),4.0f);
+   cameraOverlay->AddRectFilled(mn,mx,IM_COL32(55,70,91,hot?255:225),5.0f);
+   cameraOverlay->AddRect(mn,mx,IM_COL32(115,140,170,210),5.0f);
    const ImVec2 ts=ImGui::CalcTextSize(cameraPresetNames[pi]);
-   toolbarDraw->AddText(ImVec2(mn.x+(cameraPresetW-ts.x)*0.5f,mn.y+6.0f),IM_COL32(245,248,252,255),cameraPresetNames[pi]);
+   cameraOverlay->AddText(ImVec2(mn.x+(cameraPresetW-ts.x)*0.5f,mn.y+7.0f),IM_COL32(245,248,252,255),cameraPresetNames[pi]);
   }
-  const float infoY=cameraPresetStart.y+3.0f*36.0f+12.0f;
+  const float infoY=cameraPresetStart.y+3.0f*38.0f+18.0f;
+  cameraOverlay->AddLine(ImVec2(cameraPanelMin.x+14.0f,infoY-8.0f),ImVec2(cameraPanelMax.x-14.0f,infoY-8.0f),IM_COL32(90,110,135,180),1.0f);
   const char*guideLines[]={
-   "Numpad 1 / Ctrl+1  Front / Back",
-   "Numpad 3 / Ctrl+3  Right / Left",
-   "Numpad 7 / Ctrl+7  Top / Bottom",
-   "Numpad 2 / 4 / 6 / 8  Orbit",
-   "Numpad 9  Turn 180 degrees",
-   "Numpad 0 or R  Reset and frame",
-   "Left Mouse drag  Orbit",
-   "Right Mouse drag  Pan",
-   "Wheel  Zoom",
-   "W / A / S / D  Move camera",
-   "Q / E  Move down / up",
-   "Shift + W/A/S/D  World-axis movement",
-   "Projection: Perspective"
+   "Numpad 1 / Ctrl+1    Front / Back",
+   "Numpad 3 / Ctrl+3    Right / Left",
+   "Numpad 7 / Ctrl+7    Top / Bottom",
+   "Numpad 2 / 4 / 6 / 8    Orbit",
+   "Numpad 9    Turn 180 degrees",
+   "Numpad 0 or R    Reset and frame",
+   "Left Mouse drag    Orbit",
+   "Right Mouse drag    Pan",
+   "Mouse Wheel    Zoom",
+   "W / A / S / D    Move camera",
+   "Q / E    Move down / up",
+   "Shift + W/A/S/D    World-axis movement",
+   "Projection    Perspective"
   };
-  float gy=infoY;
-  for(const char*line:guideLines){toolbarDraw->AddText(ImVec2(cameraPanelMin.x+14.0f,gy),IM_COL32(220,228,240,245),line);gy+=ImGui::GetTextLineHeightWithSpacing();}
+  float gy=infoY+8.0f;
+  const float lineHeight=ImGui::GetTextLineHeightWithSpacing();
+  for(const char*line:guideLines){
+   if(gy+ImGui::GetTextLineHeight()>cameraPanelMax.y-10.0f)break;
+   cameraOverlay->AddText(ImVec2(cameraPanelMin.x+16.0f,gy),IM_COL32(220,228,240,245),line);
+   gy+=lineHeight;
+  }
  }
-
+ cameraOverlay->PopClipRect();
  if(animationFaceEditing_)drawFaceTextureSelector();
  ImGui::End();
 }
