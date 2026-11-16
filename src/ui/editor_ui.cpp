@@ -3349,7 +3349,7 @@ void EditorUI::drawAnimationViewer(){
  ImVec2 canvasSize=ImGui::GetContentRegionAvail();canvasSize.x=std::max(canvasSize.x,1.0f);canvasSize.y=std::max(canvasSize.y,1.0f); 
  const ImGuiIO& cameraPanelIo=ImGui::GetIO();
  // Dock the guide to the viewport itself and use its full vertical extent.
- const float cameraPanelWidth=std::min(canvasSize.x,std::max(280.0f,canvasSize.x*0.48f));
+ const float cameraPanelWidth=std::min(canvasSize.x,std::max(280.0f,canvasSize.x*0.34f));
  const float cameraPanelHeight=canvasSize.y;
  const ImVec2 cameraGuideButtonMin(canvasMin.x+canvasSize.x-112.0f,canvasMin.y+8.0f);
  const ImVec2 cameraGuideButtonMax(cameraGuideButtonMin.x+100.0f,cameraGuideButtonMin.y+27.0f);
