@@ -5240,7 +5240,7 @@ void EditorUI::drawBoneRigEditor(){
  const auto boneFile=boneDataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
  if(ImGui::Button("Save Bones")){
   std::error_code ec;std::filesystem::create_directories(boneDataDirectory,ec);
-  const auto temporaryBoneFile=boneFile.string()+".tmp";
+  const std::filesystem::path temporaryBoneFile=boneFile.string()+".tmp";
   std::ofstream output(temporaryBoneFile,std::ios::trunc);
   bool saved=static_cast<bool>(output);
   if(saved){
