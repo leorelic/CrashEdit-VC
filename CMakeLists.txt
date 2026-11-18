@@ -3,6 +3,7 @@ project(CrashEdit VERSION 0.1.0 LANGUAGES CXX)
 
 option(CRASHEDIT_BUILD_APP "Build the GLFW / Dear ImGui application" ON)
 option(CRASHEDIT_BUILD_TESTS "Build CrashEdit format tests" ON)
+option(CRASHEDIT_BUILD_SAMPLE_TESTS "Build tests that validate private real-game sample entries" OFF)
 option(CRASHEDIT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -198,4 +199,18 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_gool_script_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME gool_script_tests COMMAND crashedit_gool_script_tests)
+endif()
+
+if(CRASHEDIT_BUILD_SAMPLE_TESTS)
+    add_executable(crashedit_real_sample_tests
+        tests/real_sample_compatibility_tests.cpp
+        src/crash/formats/nsf/nsf_archive.cpp
+        src/crash/formats/gool/gool_opcodes.cpp
+    )
+    target_include_directories(crashedit_real_sample_tests PRIVATE src)
+    if(MSVC)
+        target_compile_options(crashedit_real_sample_tests PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(crashedit_real_sample_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
 endif()
