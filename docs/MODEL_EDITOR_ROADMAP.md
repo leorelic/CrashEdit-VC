@@ -221,7 +221,7 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 760 polygon word
 - [ ] Topology editing and cross-resource vertex-count changes remain disabled until the Model serializer and every dependent Animation frame encoder are verified.
 - [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for code commit `fd90a3ce489459f3816ca005a06021f3ae7e6af1` (run [44419838173](https://github.com/leorelic/CrashEdit-VC/actions/runs/44419838173)); the private real-sample workflow also passed (run [44416679912](https://github.com/leorelic/CrashEdit-VC-Game-Samples/actions/runs/44416679912)).
 
-The implementation is developed on `cpp-port-foundation`. The protected rollback reference is branch `checkpoint/pre-four-roadmap-items-3d4cbbf`, pinned to `3d4cbbf565ec063a27c5b61ab53732a3aa17b2d5`. If a later change destabilizes the work, restore that exact checkpoint.
+The implementation is developed on `cpp-port-foundation`. The dedicated rollback reference is branch `checkpoint/pre-four-roadmap-items-3d4cbbf`, pinned to `3d4cbbf565ec063a27c5b61ab53732a3aa17b2d5`. If a later change destabilizes the work, restore that exact checkpoint.
 
 ### Face Texture Selector milestone — 2026-11-12
 
