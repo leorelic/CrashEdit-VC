@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
+#include <cstdlib>
+#include <iostream>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -13,6 +14,8 @@
 
 using namespace CrashEdit::Crash;
 
+#define REQUIRE(condition) do { if(!(condition)){ std::cerr << "Sample compatibility check failed at " << __FILE__ << ":" << __LINE__ << ": " << #condition << "\\n"; std::abort(); } } while(false)
+
 static void put16(std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint16_t value){
  bytes[offset]=static_cast<std::uint8_t>(value);bytes[offset+1U]=static_cast<std::uint8_t>(value>>8U);
 }
@@ -20,12 +23,12 @@ static void put32(std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32
  for(unsigned i=0;i<4U;++i)bytes[offset+i]=static_cast<std::uint8_t>(value>>(i*8U));
 }
 static std::vector<std::uint8_t>readFile(const std::filesystem::path&path){
- std::ifstream input(path,std::ios::binary);assert(static_cast<bool>(input));
+ std::ifstream input(path,std::ios::binary);REQUIRE(static_cast<bool>(input));
  return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(input),{});
 }
 static std::vector<std::uint8_t>makeArchive(const std::vector<std::uint8_t>&model,const std::vector<std::uint8_t>&animation){
  constexpr std::size_t chunkSize=65536U,entryTableEnd=28U;
- assert(entryTableEnd+model.size()+animation.size()<=chunkSize);
+ REQUIRE(entryTableEnd+model.size()+animation.size()<=chunkSize);
  std::vector<std::uint8_t>bytes(chunkSize,0);
  put16(bytes,0,0x1234U);put16(bytes,2,0U);put32(bytes,4,0U);put32(bytes,8,2U);
  const std::size_t animationOffset=entryTableEnd+model.size(),endOffset=animationOffset+animation.size();
@@ -61,7 +64,7 @@ static std::uint64_t triangleHash(const NsfModel&model){
 static std::uint64_t frameVertexHash(const NsfAnimationFrame&frame){
  std::uint64_t hash=14695981039346656037ULL;
  for(const auto&vertex:frame.vertices){
-  assert(vertex.x>=0&&vertex.x<=255&&vertex.y>=0&&vertex.y<=255&&vertex.z>=0&&vertex.z<=255);
+  REQUIRE(vertex.x>=0&&vertex.x<=255&&vertex.y>=0&&vertex.y<=255&&vertex.z>=0&&vertex.z<=255);
   hash=hashByte(hash,static_cast<std::uint8_t>(vertex.x));
   hash=hashByte(hash,static_cast<std::uint8_t>(vertex.y));
   hash=hashByte(hash,static_cast<std::uint8_t>(vertex.z));
@@ -70,7 +73,7 @@ static std::uint64_t frameVertexHash(const NsfAnimationFrame&frame){
 }
 static std::vector<std::uint8_t>rawEntryBytes(const NsfArchive&archive,const NsfEntry&entry){
  const auto&bytes=archive.chunks().front().bytes;
- assert(entry.offset<=bytes.size()&&entry.size<=bytes.size()-entry.offset);
+ REQUIRE(entry.offset<=bytes.size()&&entry.size<=bytes.size()-entry.offset);
  return std::vector<std::uint8_t>(bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset),bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset+entry.size));
 }
 static void validatePair(const std::filesystem::path&directory,
@@ -79,39 +82,39 @@ static void validatePair(const std::filesystem::path&directory,
  std::uint32_t textureCount,std::uint32_t colorCount,std::uint32_t extendedCount,std::size_t pageCount,
  std::uint64_t expectedTriangleHash,const std::vector<std::uint64_t>&expectedFrameHashes){
  const auto modelBytes=readFile(directory/modelFile),animationBytes=readFile(directory/animationFile);
- NsfArchive archive;std::string error;assert(archive.loadBytes(makeArchive(modelBytes,animationBytes),error));
+ NsfArchive archive;std::string error;REQUIRE(archive.loadBytes(makeArchive(modelBytes,animationBytes),error));
  archive.decodeAnimationModels(false);
  const NsfEntry*modelEntry=findEntry(archive,modelEid,2U);const NsfEntry*animationEntry=findEntry(archive,animationEid,1U);
- assert(modelEntry&&animationEntry);
+ REQUIRE(modelEntry&&animationEntry);
  const NsfModel&model=modelEntry->model;const NsfAnimation&animation=animationEntry->animation;
- assert(model.decoded&&model.polygonsDecoded&&model.error.empty()&&model.polygonError.empty());
- assert(model.compressed&&model.vertexCount==vertexCount&&model.polygonCount==polygonCount);
- assert(model.triangles.size()==polygonCount&&triangleHash(model)==expectedTriangleHash);
- assert(model.textures.size()==textureCount&&model.colors.size()==colorCount);
- assert(model.extendedTextures.size()==extendedCount&&model.texturePageEids.size()==pageCount);
- assert(animation.decoded&&animation.error.empty()&&animation.frames.size()==frameCount);
- assert(expectedFrameHashes.size()==frameCount);
+ REQUIRE(model.decoded&&model.polygonsDecoded&&model.error.empty()&&model.polygonError.empty());
+ REQUIRE(model.compressed&&model.vertexCount==vertexCount&&model.polygonCount==polygonCount);
+ REQUIRE(model.triangles.size()==polygonCount&&triangleHash(model)==expectedTriangleHash);
+ REQUIRE(model.textures.size()==textureCount&&model.colors.size()==colorCount);
+ REQUIRE(model.extendedTextures.size()==extendedCount&&model.texturePageEids.size()==pageCount);
+ REQUIRE(animation.decoded&&animation.error.empty()&&animation.frames.size()==frameCount);
+ REQUIRE(expectedFrameHashes.size()==frameCount);
  for(std::size_t i=0;i<frameCount;++i){
   const auto&frame=animation.frames[i];
-  assert(frame.verticesDecoded&&frame.modelResolved&&frame.modelEid==modelEid);
-  assert(frame.vertexCount==vertexCount&&frame.vertices.size()==vertexCount);
-  assert(frameVertexHash(frame)==expectedFrameHashes[i]);
+  REQUIRE(frame.verticesDecoded&&frame.modelResolved&&frame.modelEid==modelEid);
+  REQUIRE(frame.vertexCount==vertexCount&&frame.vertices.size()==vertexCount);
+  REQUIRE(frameVertexHash(frame)==expectedFrameHashes[i]);
  }
  const auto originalModelBytes=rawEntryBytes(archive,*modelEntry);
  const auto originalAnimationBytes=rawEntryBytes(archive,*animationEntry);
- std::vector<std::uint8_t>saved;assert(archive.saveUncompressedBytes(saved,error));
- NsfArchive roundTrip;assert(roundTrip.loadBytes(saved,error));roundTrip.decodeAnimationModels(false);
+ std::vector<std::uint8_t>saved;REQUIRE(archive.saveUncompressedBytes(saved,error));
+ NsfArchive roundTrip;REQUIRE(roundTrip.loadBytes(saved,error));roundTrip.decodeAnimationModels(false);
  const NsfEntry*roundModel=findEntry(roundTrip,modelEid,2U);const NsfEntry*roundAnimation=findEntry(roundTrip,animationEid,1U);
- assert(roundModel&&roundAnimation);
- assert(rawEntryBytes(roundTrip,*roundModel)==originalModelBytes);
- assert(rawEntryBytes(roundTrip,*roundAnimation)==originalAnimationBytes);
- assert(triangleHash(roundModel->model)==expectedTriangleHash);
- assert(roundAnimation->animation.frames.size()==expectedFrameHashes.size());
- for(std::size_t i=0;i<expectedFrameHashes.size();++i)assert(frameVertexHash(roundAnimation->animation.frames[i])==expectedFrameHashes[i]);
+ REQUIRE(roundModel&&roundAnimation);
+ REQUIRE(rawEntryBytes(roundTrip,*roundModel)==originalModelBytes);
+ REQUIRE(rawEntryBytes(roundTrip,*roundAnimation)==originalAnimationBytes);
+ REQUIRE(triangleHash(roundModel->model)==expectedTriangleHash);
+ REQUIRE(roundAnimation->animation.frames.size()==expectedFrameHashes.size());
+ for(std::size_t i=0;i<expectedFrameHashes.size();++i)REQUIRE(frameVertexHash(roundAnimation->animation.frames[i])==expectedFrameHashes[i]);
 }
 
 int main(int argc,char**argv){
- assert(argc==2);
+ REQUIRE(argc==2);
  const std::filesystem::path directory=argv[1];
  validatePair(directory,"entry_8_2_El1eG.bin","entry_8_3_El1eV.bin",
   0x50A82755U,0x50A82773U,38U,64U,7U,25U,15U,0U,3U,
