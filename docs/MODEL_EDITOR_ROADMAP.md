@@ -129,7 +129,7 @@ This is the key Model-to-Animation dependency. Model position records are not th
 
 ## Integrated implementation target
 
-This is one connected Model + Animation Editor feature, not a sequence of user-facing mini-releases. Implement the full workflow against the checkpoint at `7cd6d28d366f14dabd0f07168d04ccace401981b`. Internal work may still be organized and tested in dependency order, but do not stop after each small phase for approval. If the integrated implementation proves unstable, the checkpoint is the rollback target.
+This is one connected Model + Animation Editor feature, not a sequence of user-facing mini-releases. Implement the full workflow against the checkpoint at `3d4cbbf565ec063a27c5b61ab53732a3aa17b2d5`. Internal work may still be organized and tested in dependency order, but do not stop after each small phase for approval. If the integrated implementation proves unstable, the checkpoint is the rollback target.
 
 ### Shared editable Model representation
 
@@ -189,7 +189,7 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 
 - [x] Compare reconstructed Model triangle indices, corner colors, texture references/flags and types with CrashEdit-RE `airumu/CrashEdit` branch `t/net9` on `El1eG` and `Cr10G`.
 - [x] Inspect real Crash 2 Model/Animation pairs: `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; confirm all Animation frames link to the expected Model and have the expected decoded vertex counts.
-- [ ] Test native C++ parse → serialize → parse equality for untouched real-sample Models and Animations.
+- [x] Run the native C++ parser/serializer on the extracted real-sample Model/Animation pairs; decoded triangle/frame golden hashes match and the raw Model and Animation entry bytes remain identical after save/reload.
 - [x] Test targeted edits to Model colors, descriptors, scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word, plus compressed/uncompressed and multi-vertex Animation writes, atomic rejection, rebasing and save/reload in synthetic NSF fixtures.
 - [x] Verify NSF save/reload and checksum handling for synthetic fixed-size Model edits and compressed/uncompressed Animation vertex edits. Real archive-wide preservation testing remains pending.
 - [ ] Exercise malformed counts, truncated items, invalid texture indices, missing TPAG pages, invalid animation links and extended-texture boundary cases.
@@ -217,11 +217,11 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 760 polygon word
 - [ ] A variable-size Model item serializer is still required before adding/removing polygons, descriptors, colors, extended-texture records or changing vertex counts. Current setters patch existing fixed-size fields in place and preserve item offsets/sizes.
 - [ ] TPAG/CLUT resolution still needs a fully shared resource-preview path; the Animation Editor displays resolved descriptor and TPAG references while the renderer retains texture-page decoding.
 - [ ] Full CrashEdit-RE parity for chained flipbook/leap records and LOD edge cases remains to be validated against the t/net9 runtime implementation.
-- [x] Real-sample Model triangle parity and Animation frame linkage/vertex-count checks completed for `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; native C++ archive round-trip and original-game validation remain pending.
+- [x] Real-sample Model triangle parity, Animation frame linkage/vertex-count checks, and native C++ extracted-entry save/reload validation completed for `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; full-archive and original-game validation remain pending.
 - [ ] Topology editing and cross-resource vertex-count changes remain disabled until the Model serializer and every dependent Animation frame encoder are verified.
-- [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for implementation commit `8ab76bf9a650d05558b9b17b765f9c3282cde961`.
+- [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for code commit `fd90a3ce489459f3816ca005a06021f3ae7e6af1` (run [44419838173](https://github.com/leorelic/CrashEdit-VC/actions/runs/44419838173)); the private real-sample workflow also passed (run [44416679912](https://github.com/leorelic/CrashEdit-VC-Game-Samples/actions/runs/44416679912)).
 
-The implementation is being developed directly on the checkpoint branch rather than stopping for approval after each internal work unit. If a build or real-sample test exposes a regression, roll back to `7cd6d28d366f14dabd0f07168d04ccace401981b`.
+The implementation is developed on `cpp-port-foundation`. The protected rollback reference is branch `checkpoint/pre-four-roadmap-items-3d4cbbf`, pinned to `3d4cbbf565ec063a27c5b61ab53732a3aa17b2d5`. If a later change destabilizes the work, restore that exact checkpoint.
 
 ### Face Texture Selector milestone — 2026-11-12
 
@@ -340,8 +340,8 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [x] Confirm the Model item/header counts and compressed-position counts for both real sample pairs against the original `ModelEntryLoader`/`ModelEntry` source.
 - [x] Add synthetic regression coverage for atomic batch rejection, duplicate vertex indices, Crash 2 frame-offset rebasing, compressed multi-vertex edits, and save/reload while preserving collision bytes.
 - [x] Match the Animation frame layout and signed X-Z-Y temporal decoding order to CrashEdit-RE `Frame.MakeVertices()`; sample frame counts, model links, and decoded vertex counts agree.
-- [ ] Run the native C++ archive parser against the private real-sample entries for full parse → serialize → parse equality; current real-sample parity is a source/entry-data comparison, while C++ tests use synthetic fixtures.
-- [ ] Validate real-sample save/reopen and original-game behavior, texture-page/CLUT resolution, chained animated-texture edge cases, missing references, and malformed resource boundaries.
+- [x] Run the native C++ parser/serializer against both private real-sample pairs in the dedicated sample workflow; triangle/frame golden hashes match and the extracted Model/Animation entry bytes are preserved exactly after save/reload.
+- [x] Validate extracted real-sample entry save/reload and decoded-data stability for both pairs. [ ] Still validate full NSF/NSD archive behavior, original-game loading, texture-page/CLUT resolution, chained animated-texture edge cases, missing references, and malformed resource boundaries.
 - [x] Keep Crash 2 as the acceptance target; Crash 3-specific model/frame behavior remains a separate compatibility pass.
 
 ### 5. Scenery / Geometry Editing and level-object authoring
