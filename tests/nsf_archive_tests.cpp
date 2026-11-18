@@ -192,8 +192,21 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const std::vector<NsfAnimationVertex> validBatchTargets{{0,88,16}};
  assert(a.setAnimationFrameVertices(0,0,0,batchVertexIndices,validBatchTargets));
  assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
+ const std::vector<std::size_t> duplicateVertexIndices{0,0};
+ const std::vector<NsfAnimationVertex> duplicateVertexTargets{{0,96,16},{0,104,16}};
+ assert(!a.setAnimationFrameVertices(0,0,0,duplicateVertexIndices,duplicateVertexTargets));
+ assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
+ assert(a.setAnimationFrameVerticesRebased(0,0,0,batchVertexIndices,validBatchTargets,12,-8,4));
+ assert(a.chunks()[0].entries[0].animation.frames[0].xOffset==12);
+ assert(a.chunks()[0].entries[0].animation.frames[0].yOffset==-8);
+ assert(a.chunks()[0].entries[0].animation.frames[0].zOffset==4);
+ assert(!a.setAnimationFrameVerticesRebased(0,0,0,batchVertexIndices,validBatchTargets,40000,-8,4));
+ assert(a.chunks()[0].entries[0].animation.frames[0].xOffset==12);
  std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
+ assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].xOffset==12);
+ assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].yOffset==-8);
+ assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].zOffset==4);
 
  // Compressed Model positions use signed, variable-width X-Z-Y deltas.
  std::vector<std::uint8_t> compressedModelChunk(65536);p16(compressedModelChunk,0,0x1234);p16(compressedModelChunk,2,0);p32(compressedModelChunk,4,6);p32(compressedModelChunk,8,1);

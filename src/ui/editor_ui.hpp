@@ -34,7 +34,7 @@ private:
  bool undoBaselineValid_=false;
  int boneRigSelectedBone_=-1;
  std::uint32_t boneRigModelEid_=0,boneRigAnimationEid_=0;
- bool boneRigRotateMode_=false,boneRigLocalSpace_=true;
+ bool boneRigRotateMode_=false,boneRigLocalSpace_=true,boneRigUsePivot_=true;
  char boneRigName_[64]="Bone";
  bool boneRigWindowOpen_=true;
  bool chunkExpansionDialog_=false;

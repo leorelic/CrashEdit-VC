@@ -3656,6 +3656,13 @@ void EditorUI::drawAnimationViewer(){
   const std::size_t animationChunkIndex=static_cast<std::size_t>(animationViewerChunk_);
   const std::size_t animationEntryIndex=static_cast<std::size_t>(animationViewerEntry_);
   auto selectedVertexPivot=[&](){
+   if(boneRigUsePivot_&&boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
+    const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
+    if(bone.pivotInitialized&&!bone.vertices.empty())
+     return AnimationPoint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
+                           (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
+                           (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+   }
    AnimationPoint pivot(0.0f,0.0f,0.0f);std::size_t count=0;
    for(const int index:animationSelectedVertices_)if(index>=0&&static_cast<std::size_t>(index)<displayPositions.size()){
     const auto&p=displayPositions[static_cast<std::size_t>(index)];pivot.x+=p.x;pivot.y+=p.y;pivot.z+=p.z;++count;
@@ -3718,9 +3725,14 @@ void EditorUI::drawAnimationViewer(){
      const float pivotRawX=sx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f;
      const float pivotRawY=sz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f;
      const float pivotRawZ=sy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f;
-     target.x=std::clamp(static_cast<int>(std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor)),0,maximumCoordinate);
-     target.y=std::clamp(static_cast<int>(std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor)),0,maximumCoordinate);
-     target.z=std::clamp(static_cast<int>(std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor)),0,maximumCoordinate);
+     const long x=std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor);
+     const long y=std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor);
+     const long z=std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor);
+     if(x<0||x>maximumCoordinate||y<0||y>maximumCoordinate||z<0||z>maximumCoordinate){
+      status_="Scale would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+      return;
+     }
+     target.x=static_cast<int>(x);target.y=static_cast<int>(y);target.z=static_cast<int>(z);
      targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
@@ -3735,9 +3747,14 @@ void EditorUI::drawAnimationViewer(){
    indices.reserve(vertexDrag.indices.size());targets.reserve(vertexDrag.original.size());
    for(std::size_t i=0;i<vertexDrag.original.size();++i){
     auto target=vertexDrag.original[i];
-    target.x=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.x)+rawDx)),0,maximumCoordinate);
-    target.y=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.y)+rawDy)),0,maximumCoordinate);
-    target.z=std::clamp(static_cast<int>(std::lround(static_cast<float>(target.z)+rawDz)),0,maximumCoordinate);
+    const long x=std::lround(static_cast<float>(target.x)+rawDx);
+    const long y=std::lround(static_cast<float>(target.y)+rawDy);
+    const long z=std::lround(static_cast<float>(target.z)+rawDz);
+    if(x<0||x>maximumCoordinate||y<0||y>maximumCoordinate||z<0||z>maximumCoordinate){
+     status_="Move would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+     return;
+    }
+    target.x=static_cast<int>(x);target.y=static_cast<int>(y);target.z=static_cast<int>(z);
     indices.push_back(static_cast<std::size_t>(vertexDrag.indices[i]));targets.push_back(target);
    }
    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
@@ -3882,12 +3899,13 @@ void EditorUI::drawAnimationViewer(){
   };
   int hoveredVertex=-1;
   if(animationShowVertices_&&hovered&&!viewportToolbarOwnsMouse){
-   float bestDistance=11.0f,bestDepth=std::numeric_limits<float>::max();
+   float bestDistance=9.0f,bestDepth=std::numeric_limits<float>::max();
    for(std::size_t vi=0;vi<displayPositions.size();++vi){
-    if(!vertexIsVisible(vi))continue;
-    const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);
+    const auto&p=displayPositions[vi];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
     const ImVec2 screen=projectCamera(camera);const float dx=screen.x-ImGui::GetIO().MousePos.x,dy=screen.y-ImGui::GetIO().MousePos.y;const float distance=std::sqrt(dx*dx+dy*dy);
-    if(distance<=bestDistance&&(distance<bestDistance||camera.depth<bestDepth)){bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);}
+    if(distance>bestDistance||(distance==bestDistance&&camera.depth>=bestDepth))continue;
+    if(!vertexIsVisible(vi))continue;
+    bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);
    }
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
@@ -4015,8 +4033,8 @@ void EditorUI::drawAnimationViewer(){
   if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;ImGui::ClearActiveID();}
   else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(boneRigWindowOpen_&&animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
-   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&(!boneRigWindowOpen_||!io.KeyShift)&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_||io.KeyShift;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
    vertexBox.current=io.MousePos;
@@ -4028,9 +4046,9 @@ void EditorUI::drawAnimationViewer(){
     const float left=std::min(vertexBox.start.x,vertexBox.current.x),right=std::max(vertexBox.start.x,vertexBox.current.x);
     const float top=std::min(vertexBox.start.y,vertexBox.current.y),bottom=std::max(vertexBox.start.y,vertexBox.current.y);
     if(!vertexBox.add&&!vertexBox.subtract)animationSelectedVertices_.clear();
-    for(std::size_t vi=0;vi<displayPositions.size();++vi)if(vertexIsVisible(vi)){
+    for(std::size_t vi=0;vi<displayPositions.size();++vi){
      const auto&p=displayPositions[vi];const ImVec2 screen=project(p.x,p.y,p.z);
-     if(screen.x<left||screen.x>right||screen.y<top||screen.y>bottom)continue;
+     if(screen.x<left||screen.x>right||screen.y<top||screen.y>bottom||!vertexIsVisible(vi))continue;
      const int index=static_cast<int>(vi);auto it=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index);
      if(vertexBox.subtract){if(it!=animationSelectedVertices_.end())animationSelectedVertices_.erase(it);}
      else if(it==animationSelectedVertices_.end())animationSelectedVertices_.push_back(index);
@@ -4069,7 +4087,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!boneRotationStarted&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
    if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
    else if(io.KeyShift||boneRigWindowOpen_){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
@@ -4172,9 +4190,12 @@ void EditorUI::drawAnimationViewer(){
     if(animationShowVertices_&&frame.verticesDecoded){
      for(std::size_t vi=0;vi<displayPositions.size();++vi){
       if(!visible[vi])continue;
-      const ImU32 color=isAnimationVertexSelected(static_cast<int>(vi))?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
-      dl->AddCircleFilled(projected[vi],6.0f,color,16);
-      dl->AddCircle(projected[vi],7.0f,IM_COL32(20,24,30,255),16,1.5f);
+      const bool selected=isAnimationVertexSelected(static_cast<int>(vi));
+      const bool isHovered=static_cast<int>(vi)==hoveredVertex;
+      const ImU32 color=selected?IM_COL32(40,225,105,255):IM_COL32(255,190,64,255);
+      dl->AddCircleFilled(projected[vi],selected?6.5f:5.0f,color,16);
+      dl->AddCircle(projected[vi],selected?8.0f:6.5f,IM_COL32(20,24,30,255),16,1.5f);
+      if(isHovered)dl->AddCircle(projected[vi],10.0f,IM_COL32(255,65,65,255),20,2.0f);
      }
     }
    }else{
@@ -4369,7 +4390,7 @@ void EditorUI::drawAnimationViewer(){
         const CameraPoint cam=toCamera(position.x,position.y,position.z);if(cam.depth<=0.05f)continue;
         constexpr float nearP=.05f,farP=200.0f;
         const float cz=((farP+nearP)/(farP-nearP))*cam.depth-(2.0f*farP*nearP)/(farP-nearP);
-        const ImU32 color=isAnimationVertexSelected(static_cast<int>(vi))?IM_COL32(40,225,105,255):(static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):IM_COL32(255,190,64,255));
+        const ImU32 color=static_cast<int>(vi)==hoveredVertex?IM_COL32(255,65,65,255):(isAnimationVertexSelected(static_cast<int>(vi))?IM_COL32(40,225,105,255):IM_COL32(255,190,64,255));
         vertexPoints.push_back({2.0f*cam.x*focal/canvasSize.x,2.0f*cam.y*focal/canvasSize.y,cz,cam.depth,channel(color,IM_COL32_R_SHIFT),channel(color,IM_COL32_G_SHIFT),channel(color,IM_COL32_B_SHIFT),1.0f,0.0f,0.0f,1.0f});
        }
        GL::Uniform1i(has,0);GL::Uniform1i(blendMask,3);GL::Uniform1i(blendMode,3);GL::Uniform1i(cullMode,0);
@@ -5233,6 +5254,13 @@ void EditorUI::drawBoneRigEditor(){
   
   ImGui::SameLine();
   if(ImGui::Button(boneRigLocalSpace_?"Local":"World"))boneRigLocalSpace_=!boneRigLocalSpace_;
+  float editablePivot[3]={bone.pivotX,bone.pivotY,bone.pivotZ};
+  if(ImGui::InputFloat3("Pivot (raw vertex X/Y/Z)",editablePivot,"%.3f")){
+   if(std::isfinite(editablePivot[0])&&std::isfinite(editablePivot[1])&&std::isfinite(editablePivot[2])){
+    bone.pivotX=editablePivot[0];bone.pivotY=editablePivot[1];bone.pivotZ=editablePivot[2];bone.pivotInitialized=true;
+   }
+  }
+  ImGui::Checkbox("Use bone pivot for Move / Scale gizmos", &boneRigUsePivot_);
   if(!bone.vertices.empty()&&ImGui::Button("Set Pivot From Assigned Vertices")){
    double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){
@@ -5240,7 +5268,7 @@ void EditorUI::drawBoneRigEditor(){
    }
    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();}
   }
-  ImGui::TextDisabled("With Bone List open, click or box-select to add visible vertices; Ctrl-click or Ctrl-box-select removes them. Hold Shift and drag to orbit the camera.");
+  ImGui::TextDisabled("With Bone List open, click or box-select adds visible vertices; Ctrl-click or Ctrl-box-select removes them. Shift-drag orbits the camera. In normal vertex mode, Shift adds, Ctrl removes, and dragging empty space box-selects.");
   ImGui::TextDisabled("The viewport Rotate tool works on selected vertices with or without bones. Rotation edits the current frame; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
