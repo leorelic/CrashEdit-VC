@@ -5181,7 +5181,7 @@ void EditorUI::drawBoneRigEditor(){
    bool valid=true;std::vector<BoneRigBone>loaded;loaded.reserve(boneCount);
    for(std::size_t i=0;i<boneCount&&valid;++i){
     BoneRigBone bone;std::size_t vertexCount=0,rotationCount=0;
-    if(!(input>>std::quoted(bone.name)>>bone.parentBone>>bone.pivotX>>bone.pivotY>>bone.pivotZ>>bone.pivotInitialized>>vertexCount)||vertexCount>65536U){valid=false;break;}
+    if(!(input>>std::quoted(bone.name)>>bone.parentBone>>bone.pivotX>>bone.pivotY>>bone.pivotZ>>bone.pivotInitialized>>vertexCount)||vertexCount>65536U||bone.parentBone< -1||!std::isfinite(bone.pivotX)||!std::isfinite(bone.pivotY)||!std::isfinite(bone.pivotZ)){valid=false;break;}
     for(std::size_t v=0;v<vertexCount;++v){int index=-1;if(!(input>>index)||index<0||static_cast<std::size_t>(index)>=frame.vertices.size()){valid=false;break;}bone.vertices.push_back(index);}
     if(!valid||!(input>>rotationCount)||rotationCount>65536U){valid=false;break;}
     for(std::size_t r=0;r<rotationCount;++r){
@@ -5198,7 +5198,8 @@ void EditorUI::drawBoneRigEditor(){
       std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(count);
       for(std::size_t v=0;v<count;++v){
        Crash::NsfAnimationVertex value;
-       if(!(input>>value.x>>value.y>>value.z)||value.x<0||value.x>2040||value.y<0||value.y>2040||value.z<0||value.z>2040){valid=false;break;}
+       const int maximumRestCoordinate=animation.isCrash3?2040:254;
+       if(!(input>>value.x>>value.y>>value.z)||value.x<0||value.x>maximumRestCoordinate||value.y<0||value.y>maximumRestCoordinate||value.z<0||value.z>maximumRestCoordinate){valid=false;break;}
        rest.push_back(value);
       }
       if(valid)bone.frameRestVertices.emplace(key,std::move(rest));
@@ -5206,7 +5207,24 @@ void EditorUI::drawBoneRigEditor(){
     }
     loaded.push_back(std::move(bone));
    }
-   if(valid){for(std::size_t i=0;i<loaded.size();++i)if(loaded[i].parentBone>=static_cast<int>(loaded.size())||loaded[i].parentBone==static_cast<int>(i))valid=false;}
+   if(valid){
+    std::vector<int>assignedVertices;
+    for(std::size_t i=0;i<loaded.size();++i){
+     const int parent=loaded[i].parentBone;
+     if(parent>=static_cast<int>(loaded.size())||parent==static_cast<int>(i)){valid=false;break;}
+     for(const int vertex:loaded[i].vertices){
+      if(std::find(assignedVertices.begin(),assignedVertices.end(),vertex)!=assignedVertices.end()){valid=false;break;}
+      assignedVertices.push_back(vertex);
+     }
+     int ancestor=parent;
+     for(std::size_t depth=0;depth<loaded.size()&&ancestor>=0;++depth){
+      if(ancestor==static_cast<int>(i)||static_cast<std::size_t>(ancestor)>=loaded.size()){valid=false;break;}
+      ancestor=loaded[static_cast<std::size_t>(ancestor)].parentBone;
+     }
+     if(ancestor>=0)valid=false;
+     if(!valid)break;
+    }
+   }
    if(valid){boneRigBones_=std::move(loaded);status_="Loaded editor bone rig: "+bonePath.filename().string();}
    else status_="Bone rig file is invalid; starting with an empty rig.";
   }
@@ -5222,7 +5240,8 @@ void EditorUI::drawBoneRigEditor(){
  const auto boneFile=boneDataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
  if(ImGui::Button("Save Bones")){
   std::error_code ec;std::filesystem::create_directories(boneDataDirectory,ec);
-  std::ofstream output(boneFile,std::ios::trunc);
+  const auto temporaryBoneFile=boneFile.string()+".tmp";
+  std::ofstream output(temporaryBoneFile,std::ios::trunc);
   bool saved=static_cast<bool>(output);
   if(saved){
    output<<"CRASHEDIT_BONES 2 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
@@ -5240,6 +5259,14 @@ void EditorUI::drawBoneRigEditor(){
    }
    output.flush();saved=static_cast<bool>(output);output.close();
   }
+  if(saved){
+#ifdef _WIN32
+   saved=MoveFileExW(temporaryBoneFile.c_str(),boneFile.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
+#else
+   std::error_code renameError;std::filesystem::rename(temporaryBoneFile,boneFile,renameError);saved=!renameError;
+#endif
+  }
+  if(!saved){std::error_code cleanupError;std::filesystem::remove(temporaryBoneFile,cleanupError);}
   status_=saved?"Saved bone rig: "+boneFile.filename().string():"Could not save bone rig: "+boneFile.string();
  }
  ImGui::SameLine();
