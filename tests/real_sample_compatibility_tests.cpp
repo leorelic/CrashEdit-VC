@@ -23,7 +23,7 @@ static void put32(std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32
  for(unsigned i=0;i<4U;++i)bytes[offset+i]=static_cast<std::uint8_t>(value>>(i*8U));
 }
 static std::vector<std::uint8_t>readFile(const std::filesystem::path&path){
- std::ifstream input(path,std::ios::binary);assert(input&&"sample file could not be opened");
+ std::ifstream input(path,std::ios::binary);assert(static_cast<bool>(input));
  return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(input),{});
 }
 static std::vector<std::uint8_t>makeArchive(const std::vector<std::uint8_t>&model,const std::vector<std::uint8_t>&animation){
@@ -114,7 +114,7 @@ static void validatePair(const std::filesystem::path&directory,
 }
 
 int main(int argc,char**argv){
- assert(argc==2&&"pass the checked-out CrashEdit-VC-Game-Samples directory");
+ assert(argc==2);
  const std::filesystem::path directory=argv[1];
  validatePair(directory,"entry_8_2_El1eG.bin","entry_8_3_El1eV.bin",
   0x50A82755U,0x50A82773U,38U,64U,7U,25U,15U,0U,3U,
