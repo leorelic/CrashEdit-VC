@@ -89,7 +89,12 @@ static void validatePair(const std::filesystem::path&directory,
  const NsfModel&model=modelEntry->model;const NsfAnimation&animation=animationEntry->animation;
  REQUIRE(model.decoded&&model.polygonsDecoded&&model.error.empty()&&model.polygonError.empty());
  REQUIRE(model.compressed&&model.vertexCount==vertexCount&&model.polygonCount==polygonCount);
- REQUIRE(model.triangles.size()==polygonCount&&triangleHash(model)==expectedTriangleHash);
+ const std::uint64_t actualTriangleHash=triangleHash(model);
+ if(model.triangles.size()!=polygonCount||actualTriangleHash!=expectedTriangleHash){
+  std::cerr<<"Model "<<std::hex<<modelEid<<std::dec<<" triangle count "<<model.triangles.size()<<"/"<<polygonCount
+           <<" hash 0x"<<std::hex<<actualTriangleHash<<" expected 0x"<<expectedTriangleHash<<std::dec<<"\\n";
+ }
+ REQUIRE(model.triangles.size()==polygonCount&&actualTriangleHash==expectedTriangleHash);
  REQUIRE(model.textures.size()==textureCount&&model.colors.size()==colorCount);
  REQUIRE(model.extendedTextures.size()==extendedCount&&model.texturePageEids.size()==pageCount);
  REQUIRE(animation.decoded&&animation.error.empty()&&animation.frames.size()==frameCount);
