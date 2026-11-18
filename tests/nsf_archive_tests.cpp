@@ -227,9 +227,21 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedArchive.chunks().size()==2&&compressedArchive.chunks()[0].entries[0].model.compressed);
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
- assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);for(std::size_t i=0;i<40U;++i)assert(compressedArchive.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
+ const std::vector<std::size_t> compressedBatchIndices{0,2};
+ const std::vector<NsfAnimationVertex> compressedBatchTargets{{20,30,40},{50,60,70}};
+ assert(compressedArchive.setAnimationFrameVertices(1,0,0,compressedBatchIndices,compressedBatchTargets));
+ const auto&compressedFrames=compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(compressedFrames[0].x==20&&compressedFrames[0].y==30&&compressedFrames[0].z==40);
+ assert(compressedFrames[1].x==0&&compressedFrames[1].y==10&&compressedFrames[1].z==0);
+ assert(compressedFrames[2].x==50&&compressedFrames[2].y==60&&compressedFrames[2].z==70);
+ for(std::size_t i=0;i<40U;++i)assert(compressedArchive.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
  std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
- assert(compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
+ const auto&compressedReloaded=compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(compressedReloaded[0].x==20&&compressedReloaded[0].y==30&&compressedReloaded[0].z==40);
+ assert(compressedReloaded[1].x==0&&compressedReloaded[1].y==10&&compressedReloaded[1].z==0);
+ assert(compressedReloaded[2].x==50&&compressedReloaded[2].y==60&&compressedReloaded[2].z==70);
+ for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
 
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
