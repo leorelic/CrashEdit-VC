@@ -98,7 +98,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // Crash 2 Type 2 model: all five base items plus the optional compressed-position item.
  std::vector<std::uint8_t> modelChunk(65536);p16(modelChunk,0,0x1234);p16(modelChunk,2,0);p32(modelChunk,4,4);p32(modelChunk,8,1);
- constexpr std::size_t modelEntry=24,modelItemCount=6,modelTable=16+modelItemCount*4;
+ constexpr std::size_t modelEntry=24,modelItemCount=6,modelTable=16+(modelItemCount+1)*4;
  const std::size_t modelItemSizes[]={0x50,4,4,12,4,4};
  std::size_t modelEntrySize=modelTable;for(auto n:modelItemSizes)modelEntrySize+=n;
  p32(modelChunk,16,modelEntry);p32(modelChunk,20,modelEntry+modelEntrySize);
@@ -123,7 +123,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(model.positions.size()==1&&model.positions[0].raw==0x12345678U);
  // Crash 2 Type 1 animation: one bounded frame with a direct Model EID.
  std::vector<std::uint8_t> animationChunk(65536);p16(animationChunk,0,0x1234);p16(animationChunk,2,0);p32(animationChunk,4,5);p32(animationChunk,8,1);
- constexpr std::size_t animationEntry=24,animationItemCount=1,animationTable=16+animationItemCount*4,animationFrameSize=24;
+ constexpr std::size_t animationEntry=24,animationItemCount=1,animationTable=16+(animationItemCount+1)*4,animationFrameSize=24;
  const std::size_t animationEntrySize=animationTable+animationFrameSize;
  p32(animationChunk,16,animationEntry);p32(animationChunk,20,animationEntry+animationEntrySize);
  p32(animationChunk,animationEntry,0x0100ffff);p32(animationChunk,animationEntry+4,0x0200007b);p32(animationChunk,animationEntry+8,1);p32(animationChunk,animationEntry+12,animationItemCount);
@@ -140,7 +140,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // Three-vertex fan command reconstructs one editable Model triangle.
  std::vector<std::uint8_t> triangleChunk(65536);p16(triangleChunk,0,0x1234);p16(triangleChunk,2,0);p32(triangleChunk,4,4);p32(triangleChunk,8,1);
- constexpr std::size_t triEntry=24,triItems=5,triTable=16+triItems*4;const std::size_t triSizes[]={0x50,12,52,12,4};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
+ constexpr std::size_t triEntry=24,triItems=5,triTable=16+(triItems+1)*4;const std::size_t triSizes[]={0x50,12,52,12,4};std::size_t triSize=triTable;for(auto n:triSizes)triSize+=n;
  p32(triangleChunk,16,triEntry);p32(triangleChunk,20,triEntry+triSize);p32(triangleChunk,triEntry,0x0100ffff);p32(triangleChunk,triEntry+4,0x0200007b);p32(triangleChunk,triEntry+8,2);p32(triangleChunk,triEntry+12,triItems);
  std::size_t triOffset=triTable;for(std::size_t i=0;i<triItems;++i){p32(triangleChunk,triEntry+16+i*4,triOffset);triOffset+=triSizes[i];}p32(triangleChunk,triEntry+16+triItems*4,static_cast<std::uint32_t>(triSize));
  const std::size_t triInfo=triEntry+triTable,triPoly=triInfo+0x50,triColors=triPoly+12,triTextures=triColors+52;
@@ -167,17 +167,17 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(roundModel.triangles.size()==1&&roundModel.triangles[0].animated&&roundModel.triangles[0].textureIndex==0&&roundModel.triangles[0].colorB==12);
  // Crash 3 animation stores the linked Model EID at +8, with a reserved word at +12.
  std::vector<std::uint8_t> c3Animation(65536);p16(c3Animation,0,0x1234);p16(c3Animation,2,0);p32(c3Animation,4,5);p32(c3Animation,8,1);
- constexpr std::size_t c3Entry=24,c3Frame=44,c3EntrySize=56;p32(c3Animation,16,c3Entry);p32(c3Animation,20,c3Entry+c3EntrySize);
+ constexpr std::size_t c3Entry=24,c3Frame=48,c3EntrySize=56;p32(c3Animation,16,c3Entry);p32(c3Animation,20,c3Entry+c3EntrySize);
  p32(c3Animation,c3Entry,0x0100ffff);p32(c3Animation,c3Entry+4,0x0200007b);p32(c3Animation,c3Entry+8,1);p32(c3Animation,c3Entry+12,1);
- p32(c3Animation,c3Entry+16,20);p32(c3Animation,c3Entry+20,c3EntrySize);
+ p32(c3Animation,c3Entry+16,24);p32(c3Animation,c3Entry+20,c3EntrySize);
  p16(c3Animation,c3Frame,1);p16(c3Animation,c3Frame+2,2);p16(c3Animation,c3Frame+4,3);p16(c3Animation,c3Frame+6,4);
  p32(c3Animation,c3Frame+8,0x0200007b);p32(c3Animation,c3Frame+12,0);p32(c3Animation,c3Frame+16,0);p32(c3Animation,c3Frame+20,0);p32(c3Animation,c3Frame+24,28);
  assert(a.loadBytes(c3Animation,e));a.decodeAnimationModels(true);const auto&c3=a.chunks()[0].entries[0].animation;assert(c3.decoded&&c3.frames[0].modelEid==0x0200007bU);
 
  // Uncompressed animation frame expands its 24-bit vertex from the temporal stream.
  std::vector<std::uint8_t> vertexAnimation(65536);p16(vertexAnimation,0,0x1234);p16(vertexAnimation,2,0);p32(vertexAnimation,4,5);p32(vertexAnimation,8,1);
- constexpr std::size_t vaEntry=24,vaFrame=44,vaEntrySize=56;p32(vertexAnimation,16,vaEntry);p32(vertexAnimation,20,vaEntry+vaEntrySize);
- p32(vertexAnimation,vaEntry,0x0100ffff);p32(vertexAnimation,vaEntry+4,0x0200007b);p32(vertexAnimation,vaEntry+8,1);p32(vertexAnimation,vaEntry+12,1);p32(vertexAnimation,vaEntry+16,20);p32(vertexAnimation,vaEntry+20,vaEntrySize);
+ constexpr std::size_t vaEntry=24,vaFrame=48,vaEntrySize=56;p32(vertexAnimation,16,vaEntry);p32(vertexAnimation,20,vaEntry+vaEntrySize);
+ p32(vertexAnimation,vaEntry,0x0100ffff);p32(vertexAnimation,vaEntry+4,0x0200007b);p32(vertexAnimation,vaEntry+8,1);p32(vertexAnimation,vaEntry+12,1);p32(vertexAnimation,vaEntry+16,24);p32(vertexAnimation,vaEntry+20,vaEntrySize);
  p32(vertexAnimation,vaFrame+8,0x0200007b);p32(vertexAnimation,vaFrame+16,1);p32(vertexAnimation,vaFrame+20,0);p32(vertexAnimation,vaFrame+24,28);
  // Bytes are reversed within the 32-bit temporal word by the original format decoder.
  p32(vertexAnimation,vaFrame+28,0x03020100);
@@ -210,7 +210,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // Compressed Model positions use signed, variable-width X-Z-Y deltas.
  std::vector<std::uint8_t> compressedModelChunk(65536);p16(compressedModelChunk,0,0x1234);p16(compressedModelChunk,2,0);p32(compressedModelChunk,4,6);p32(compressedModelChunk,8,1);
- constexpr std::size_t cmEntry=24,cmItems=6,cmTable=16+cmItems*4;const std::size_t cmSizes[]={0x50,12,52,12,4,12};std::size_t cmEntrySize=cmTable;for(auto n:cmSizes)cmEntrySize+=n;
+ constexpr std::size_t cmEntry=24,cmItems=6,cmTable=16+(cmItems+1)*4;const std::size_t cmSizes[]={0x50,12,52,12,4,12};std::size_t cmEntrySize=cmTable;for(auto n:cmSizes)cmEntrySize+=n;
  p32(compressedModelChunk,16,cmEntry);p32(compressedModelChunk,20,cmEntry+cmEntrySize);p32(compressedModelChunk,cmEntry,0x0100ffff);p32(compressedModelChunk,cmEntry+4,0x0200007b);p32(compressedModelChunk,cmEntry+8,2);p32(compressedModelChunk,cmEntry+12,cmItems);
  std::size_t cmOffset=cmTable;for(std::size_t i=0;i<cmItems;++i){p32(compressedModelChunk,cmEntry+16+i*4,cmOffset);cmOffset+=cmSizes[i];}p32(compressedModelChunk,cmEntry+16+cmItems*4,static_cast<std::uint32_t>(cmEntrySize));
  const std::size_t cmInfo=cmEntry+cmTable,cmPoly=cmInfo+0x50,cmColors=cmPoly+12,cmTextures=cmColors+52,cmExtended=cmTextures+12,cmPositions=cmExtended+4;
@@ -219,8 +219,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  for(std::uint32_t i=0;i<13;++i){compressedModelChunk[cmColors+i*4]=static_cast<std::uint8_t>(i);compressedModelChunk[cmColors+i*4+1]=static_cast<std::uint8_t>(i+1);compressedModelChunk[cmColors+i*4+2]=static_cast<std::uint8_t>(i+2);}
  p32(compressedModelChunk,cmExtended,0x00001001U);for(std::uint32_t i=0;i<3;++i)p32(compressedModelChunk,cmPositions+i*4,0x000001ffU);
  std::vector<std::uint8_t> compressedAnimationChunk(65536);p16(compressedAnimationChunk,0,0x1234);p16(compressedAnimationChunk,2,0);p32(compressedAnimationChunk,4,7);p32(compressedAnimationChunk,8,1);
- constexpr std::size_t caEntry=24,caFrame=44,caEntrySize=96;p32(compressedAnimationChunk,16,caEntry);p32(compressedAnimationChunk,20,caEntry+caEntrySize);
- p32(compressedAnimationChunk,caEntry,0x0100ffff);p32(compressedAnimationChunk,caEntry+4,0x0200007b);p32(compressedAnimationChunk,caEntry+8,1);p32(compressedAnimationChunk,caEntry+12,1);p32(compressedAnimationChunk,caEntry+16,20);p32(compressedAnimationChunk,caEntry+20,caEntrySize);
+ constexpr std::size_t caEntry=24,caFrame=48,caEntrySize=96;p32(compressedAnimationChunk,16,caEntry);p32(compressedAnimationChunk,20,caEntry+caEntrySize);
+ p32(compressedAnimationChunk,caEntry,0x0100ffff);p32(compressedAnimationChunk,caEntry+4,0x0200007b);p32(compressedAnimationChunk,caEntry+8,1);p32(compressedAnimationChunk,caEntry+12,1);p32(compressedAnimationChunk,caEntry+16,24);p32(compressedAnimationChunk,caEntry+20,caEntrySize);
  p32(compressedAnimationChunk,caFrame+8,3);p32(compressedAnimationChunk,caFrame+12,1);p32(compressedAnimationChunk,caFrame+16,0x0200007b);p32(compressedAnimationChunk,caFrame+20,64);for(std::size_t i=0;i<40U;++i)compressedAnimationChunk[caFrame+24U+i]=static_cast<std::uint8_t>(0xa0U+i);
  std::vector<std::uint8_t> compressedArchiveBytes;compressedArchiveBytes.reserve(131072);compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedModelChunk.begin(),compressedModelChunk.end());compressedArchiveBytes.insert(compressedArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
  NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
@@ -277,7 +277,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // A full source chunk must relocate the whole Animation entry before retrying
  // Append. The following opaque entry remains valid and the moved EID is unchanged.
  std::vector<std::uint8_t> expansionChunk(65536);p16(expansionChunk,0,0x1234);p16(expansionChunk,2,0);p32(expansionChunk,4,9);p32(expansionChunk,8,2);
- constexpr std::size_t exAnimationEntry=28,exAnimationHeader=24,exFrameSize=24,exAnimationSize=exAnimationHeader+exFrameSize*2,exFollowingEntry=exAnimationEntry+exAnimationSize;
+ constexpr std::size_t exAnimationEntry=28,exAnimationHeader=28,exFrameSize=24,exAnimationSize=exAnimationHeader+exFrameSize*2,exFollowingEntry=exAnimationEntry+exAnimationSize;
  constexpr std::size_t exUsedEnd=65520;
  p32(expansionChunk,16,exAnimationEntry);p32(expansionChunk,20,exFollowingEntry);p32(expansionChunk,24,exUsedEnd);
  p32(expansionChunk,exAnimationEntry,0x0100ffff);p32(expansionChunk,exAnimationEntry+4,0x0200007d);p32(expansionChunk,exAnimationEntry+8,1);p32(expansionChunk,exAnimationEntry+12,2);

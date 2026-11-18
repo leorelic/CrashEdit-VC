@@ -120,6 +120,15 @@ if(CRASHEDIT_BUILD_APP)
     install(TARGETS CrashEdit RUNTIME DESTINATION . BUNDLE DESTINATION .)
 endif()
 
+
+function crash_edit_enable_test_assertions(target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${target} PRIVATE -UNDEBUG)
+    endif()
+endfunction()
+
 if(CRASHEDIT_BUILD_TESTS)
     enable_testing()
     add_executable(crashedit_nsf_tests
@@ -134,6 +143,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_nsf_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME nsf_archive_tests COMMAND crashedit_nsf_tests)
+    crash_edit_enable_test_assertions(crashedit_nsf_tests)
 
     add_executable(crashedit_nsd_tests
         tests/nsd_file_tests.cpp
@@ -146,6 +156,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_nsd_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME nsd_file_tests COMMAND crashedit_nsd_tests)
+    crash_edit_enable_test_assertions(crashedit_nsd_tests)
     add_executable(crashedit_file_save_tests
         tests/file_save_tests.cpp
         src/core/file_save.cpp
@@ -157,6 +168,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_file_save_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME file_save_tests COMMAND crashedit_file_save_tests)
+    crash_edit_enable_test_assertions(crashedit_file_save_tests)
     add_executable(crashedit_gool_tests
         tests/gool_tests.cpp
         src/crash/formats/nsf/nsf_archive.cpp
@@ -172,6 +184,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_gool_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME gool_tests COMMAND crashedit_gool_tests)
+    crash_edit_enable_test_assertions(crashedit_gool_tests)
 
     add_executable(crashedit_gool_ir_tests
         tests/gool_ir_tests.cpp
@@ -187,6 +200,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_gool_ir_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME gool_ir_tests COMMAND crashedit_gool_ir_tests)
+    crash_edit_enable_test_assertions(crashedit_gool_ir_tests)
 
     add_executable(crashedit_gool_script_tests
         tests/gool_script_tests.cpp
@@ -199,6 +213,7 @@ if(CRASHEDIT_BUILD_TESTS)
         target_compile_options(crashedit_gool_script_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME gool_script_tests COMMAND crashedit_gool_script_tests)
+    crash_edit_enable_test_assertions(crashedit_gool_script_tests)
 endif()
 
 if(CRASHEDIT_BUILD_SAMPLE_TESTS)
