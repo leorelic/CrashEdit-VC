@@ -299,7 +299,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expansionArchive.chunks()[1].entries.size()==1&&expansionArchive.chunks()[1].entries[0].eid==0x0200007dU);
  assert(expansionArchive.chunks()[1].entries[0].type==1&&expansionArchive.chunks()[1].entries[0].animation.frames.size()==2);
  assert(expansionArchive.chunks()[0].entries[0].items.size()==1&&expansionArchive.chunks()[0].bytes[expansionArchive.chunks()[0].entries[0].items[0].offset]==0x5a);
- assert(expansionArchive.chunks()[0].bytes[65459]==0xa5U);
+ assert(expansionArchive.chunks()[0].bytes[65455]==0xa5U);
  assert(expansionArchive.appendAnimationFrame(relocatedChunk,0));
  assert(expansionArchive.chunks()[1].entries[0].animation.frames.size()==3);
  std::vector<std::uint8_t> expansionSaved;assert(expansionArchive.saveUncompressedBytes(expansionSaved,e));
