@@ -11,10 +11,7 @@
 #include <string>
 #include <vector>
 
-using Crash::NsfArchive;
-using Crash::NsfEntry;
-using Crash::NsfModel;
-using Crash::NsfAnimation;
+using namespace CrashEdit::Crash;
 
 static void put16(std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint16_t value){
  bytes[offset]=static_cast<std::uint8_t>(value);bytes[offset+1U]=static_cast<std::uint8_t>(value>>8U);
@@ -61,7 +58,7 @@ static std::uint64_t triangleHash(const NsfModel&model){
  }
  return hash;
 }
-static std::uint64_t frameVertexHash(const Crash::NsfAnimationFrame&frame){
+static std::uint64_t frameVertexHash(const NsfAnimationFrame&frame){
  std::uint64_t hash=14695981039346656037ULL;
  for(const auto&vertex:frame.vertices){
   assert(vertex.x>=0&&vertex.x<=255&&vertex.y>=0&&vertex.y<=255&&vertex.z>=0&&vertex.z<=255);
