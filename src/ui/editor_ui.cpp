@@ -3989,18 +3989,23 @@ void EditorUI::drawAnimationViewer(){
    const AnimationPoint axis=boneRotationDrag.rotationAxis;float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;if(io.KeyShift)angle=std::round(angle/0.2617993878f)*0.2617993878f;
    const float snappedAngle=angle;
    const float c=std::cos(snappedAngle),sn=std::sin(snappedAngle);Crash::NsfAnimationFrame rotationFrame=frame;rotationFrame.xOffset=boneRotationDrag.initialOffsets[0];rotationFrame.yOffset=boneRotationDrag.initialOffsets[1];rotationFrame.zOffset=boneRotationDrag.initialOffsets[2];
+   auto rotateFromRest=[&](const AnimationPoint&world){
+    AnimationPoint offset(world.x-boneRotationDrag.pivot.x,world.y-boneRotationDrag.pivot.y,world.z-boneRotationDrag.pivot.z);
+    if(boneRotationDrag.bone>=0)offset=rotateBoneVector(offset,boneRotationDrag.initialEuler);
+    const float dot=axis.x*offset.x+axis.y*offset.y+axis.z*offset.z;
+    const float rx=offset.x*c+(axis.y*offset.z-axis.z*offset.y)*sn+axis.x*dot*(1.0f-c);
+    const float ry=offset.y*c+(axis.z*offset.x-axis.x*offset.z)*sn+axis.y*dot*(1.0f-c);
+    const float rz=offset.z*c+(axis.x*offset.y-axis.y*offset.x)*sn+axis.z*dot*(1.0f-c);
+    return AnimationPoint(boneRotationDrag.pivot.x+rx,boneRotationDrag.pivot.y+ry,boneRotationDrag.pivot.z+rz);
+   };
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
    const int maximumCoordinate=animation.isCrash3?255:254;
    if(animation.isCrash3){
     indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
      const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,rotationFrame,model);
-     const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
-     const float dot=axis.x*x+axis.y*y+axis.z*z;
-     const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
-     const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
-     const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
-     const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
+     const AnimationPoint rotated=rotateFromRest(world);
+     const float wx=rotated.x,wy=rotated.y,wz=rotated.z;
      Crash::NsfAnimationVertex target=v;
      const long rotatedX=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
      const long rotatedZ=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
@@ -4022,12 +4027,8 @@ void EditorUI::drawAnimationViewer(){
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
      const int vertexIndex=boneRotationDrag.indices[i];if(vertexIndex<0||static_cast<std::size_t>(vertexIndex)>=targets.size())return;
      const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,rotationFrame,model);
-     const float x=world.x-boneRotationDrag.pivot.x,y=world.y-boneRotationDrag.pivot.y,z=world.z-boneRotationDrag.pivot.z;
-     const float dot=axis.x*x+axis.y*y+axis.z*z;
-     const float rx=x*c+(axis.y*z-axis.z*y)*sn+axis.x*dot*(1.0f-c);
-     const float ry=y*c+(axis.z*x-axis.x*z)*sn+axis.y*dot*(1.0f-c);
-     const float rz=z*c+(axis.x*y-axis.y*x)*sn+axis.z*dot*(1.0f-c);
-     const float wx=boneRotationDrag.pivot.x+rx,wy=boneRotationDrag.pivot.y+ry,wz=boneRotationDrag.pivot.z+rz;
+     const AnimationPoint rotated=rotateFromRest(world);
+     const float wx=rotated.x,wy=rotated.y,wz=rotated.z;
      auto&target=targets[static_cast<std::size_t>(vertexIndex)];
      target.x=static_cast<int>(std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f));
      target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
