@@ -3326,7 +3326,7 @@ void EditorUI::drawAnimationViewer(){
   static VertexDragState vertexDrag;
   struct VertexBoxState{bool pending=false,active=false;ImVec2 start{},current{};bool add=false,subtract=false;};
   static VertexBoxState vertexBox;
-  struct BoneRotationDragState{bool active=false;int chunk=-1,entry=-1,frame=-1,bone=-1,axis=-1;float startAngle=0.0f;AnimationPoint pivot{0.0f,0.0f,0.0f};AnimationPoint rotationAxis{1.0f,0.0f,0.0f};std::vector<int> indices;std::vector<Crash::NsfAnimationVertex> original,allOriginal;std::array<float,3> initialEuler{};std::array<std::int16_t,3> initialOffsets{};};
+  struct BoneRotationDragState{bool active=false;int chunk=-1,entry=-1,frame=-1,bone=-1,axis=-1;float startAngle=0.0f;AnimationPoint pivot{0.0f,0.0f,0.0f};AnimationPoint rotationAxis{1.0f,0.0f,0.0f};std::vector<int> indices;std::vector<Crash::NsfAnimationVertex> original,allOriginal;std::array<float,3> initialEuler{};std::array<std::int16_t,3> initialOffsets{},restOffsets{};};
   static BoneRotationDragState boneRotationDrag;
   struct CollisionDragState{bool active=false;int mode=0,axis=-1,chunk=-1,entry=-1,frame=-1;ImVec2 mouseStart{};float px=0,py=0,pz=0,depth=0;std::vector<std::pair<int,int>>faces;std::vector<Crash::NsfAnimationCollision>original;};
   static CollisionDragState collisionDrag;
@@ -3659,7 +3659,7 @@ void EditorUI::drawAnimationViewer(){
    const std::uint64_t key=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
    for(auto&bone:boneRigBones_){
     const bool affected=std::any_of(indices.begin(),indices.end(),[&](int index){return std::find(bone.vertices.begin(),bone.vertices.end(),index)!=bone.vertices.end();});
-    if(affected){bone.frameRestVertices.erase(key);bone.frameRotations.erase(key);}
+    if(affected){bone.frameRestVertices.erase(key);bone.frameRestOffsets.erase(key);bone.frameRotations.erase(key);}
    }
   };
   auto selectedVertexPivot=[&](){
@@ -3974,13 +3974,21 @@ void EditorUI::drawAnimationViewer(){
      if(restIt==bone.frameRestVertices.end()){
       std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(bone.vertices.size());
       for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())rest.push_back(frame.vertices[static_cast<std::size_t>(index)]);
-      if(rest.size()==bone.vertices.size())restIt=bone.frameRestVertices.emplace(restKey,std::move(rest)).first;
+      if(rest.size()==bone.vertices.size()){
+       restIt=bone.frameRestVertices.emplace(restKey,std::move(rest)).first;
+       bone.frameRestOffsets[restKey]={frame.xOffset,frame.yOffset,frame.zOffset};
+      }
       if(bone.frameRotations.find(restKey)!=bone.frameRotations.end()){
        bone.frameRotations[restKey]={0.0f,0.0f,0.0f};
        boneRotationDrag.initialEuler={0.0f,0.0f,0.0f};
       }
      }
-     if(restIt!=bone.frameRestVertices.end())restPose=&restIt->second;
+     if(restIt!=bone.frameRestVertices.end()){
+      restPose=&restIt->second;
+      const auto offsetIt=bone.frameRestOffsets.find(restKey);
+      if(offsetIt!=bone.frameRestOffsets.end())boneRotationDrag.restOffsets=offsetIt->second;
+      else boneRotationDrag.restOffsets={frame.xOffset,frame.yOffset,frame.zOffset};
+     }else boneRotationDrag.restOffsets={frame.xOffset,frame.yOffset,frame.zOffset};
     }
     for(std::size_t i=0;i<rotationVertices.size();++i){
      const int index=rotationVertices[i];if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
@@ -3995,7 +4003,7 @@ void EditorUI::drawAnimationViewer(){
    if(!boneRotationDrag.active||boneRotationDrag.chunk!=animationViewerChunk_||boneRotationDrag.entry!=animationViewerEntry_||boneRotationDrag.frame!=poseFrameIndex)return;
    const AnimationPoint axis=boneRotationDrag.rotationAxis;float angle=std::atan2(io.MousePos.y-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).y,io.MousePos.x-project(boneRotationDrag.pivot.x,boneRotationDrag.pivot.y,boneRotationDrag.pivot.z).x)-boneRotationDrag.startAngle;if(io.KeyShift)angle=std::round(angle/0.2617993878f)*0.2617993878f;
    const float snappedAngle=angle;
-   const float c=std::cos(snappedAngle),sn=std::sin(snappedAngle);Crash::NsfAnimationFrame rotationFrame=frame;rotationFrame.xOffset=boneRotationDrag.initialOffsets[0];rotationFrame.yOffset=boneRotationDrag.initialOffsets[1];rotationFrame.zOffset=boneRotationDrag.initialOffsets[2];
+   const float c=std::cos(snappedAngle),sn=std::sin(snappedAngle);Crash::NsfAnimationFrame rotationFrame=frame;rotationFrame.xOffset=boneRotationDrag.restOffsets[0];rotationFrame.yOffset=boneRotationDrag.restOffsets[1];rotationFrame.zOffset=boneRotationDrag.restOffsets[2];
    auto rotateFromRest=[&](const AnimationPoint&world){
     AnimationPoint offset(world.x-boneRotationDrag.pivot.x,world.y-boneRotationDrag.pivot.y,world.z-boneRotationDrag.pivot.z);
     if(boneRotationDrag.bone>=0)offset=rotateBoneVector(offset,boneRotationDrag.initialEuler);
@@ -5197,8 +5205,8 @@ void EditorUI::drawBoneRigEditor(){
      std::size_t restCount=0;
      if(!(input>>restCount)||restCount>65536U){valid=false;break;}
      for(std::size_t r=0;r<restCount&&valid;++r){
-      std::uint64_t key=0;std::size_t count=0;
-      if(!(input>>key>>count)||(key>>32U)!=entry.eid||static_cast<std::uint32_t>(key)>=animation.frames.size()||count!=bone.vertices.size()){valid=false;break;}
+      std::uint64_t key=0;std::size_t count=0;std::array<std::int16_t,3>offsets{};
+      if(!(input>>key>>count>>offsets[0]>>offsets[1]>>offsets[2])||(key>>32U)!=entry.eid||static_cast<std::uint32_t>(key)>=animation.frames.size()||count!=bone.vertices.size()){valid=false;break;}
       std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(count);
       for(std::size_t v=0;v<count;++v){
        Crash::NsfAnimationVertex value;
@@ -5206,7 +5214,7 @@ void EditorUI::drawBoneRigEditor(){
        if(!(input>>value.x>>value.y>>value.z)||value.x<0||value.x>maximumRestCoordinate||value.y<0||value.y>maximumRestCoordinate||value.z<0||value.z>maximumRestCoordinate){valid=false;break;}
        rest.push_back(value);
       }
-      if(valid)bone.frameRestVertices.emplace(key,std::move(rest));
+      if(valid){bone.frameRestVertices.emplace(key,std::move(rest));bone.frameRestOffsets.emplace(key,offsets);}
      }
     }
     loaded.push_back(std::move(bone));
@@ -5256,7 +5264,9 @@ void EditorUI::drawBoneRigEditor(){
     for(const auto&[key,rotation]:savedBone.frameRotations)output<<key<<" "<<rotation[0]<<" "<<rotation[1]<<" "<<rotation[2]<<"\n";
     output<<savedBone.frameRestVertices.size()<<"\n";
     for(const auto&[key,rest]:savedBone.frameRestVertices){
-     output<<key<<" "<<rest.size();
+     const auto offsetIt=savedBone.frameRestOffsets.find(key);
+     const std::array<std::int16_t,3>offsets=offsetIt==savedBone.frameRestOffsets.end()?std::array<std::int16_t,3>{0,0,0}:offsetIt->second;
+     output<<key<<" "<<rest.size()<<" "<<offsets[0]<<" "<<offsets[1]<<" "<<offsets[2];
      for(const auto&vertex:rest)output<<" "<<vertex.x<<" "<<vertex.y<<" "<<vertex.z;
      output<<"\n";
     }
@@ -5320,10 +5330,10 @@ void EditorUI::drawBoneRigEditor(){
      if(other==static_cast<std::size_t>(boneRigSelectedBone_))continue;
      auto&otherBone=boneRigBones_[other];auto&members=otherBone.vertices;
      const auto oldSize=members.size();members.erase(std::remove(members.begin(),members.end(),index),members.end());
-     if(members.size()!=oldSize){otherBone.frameRotations.clear();otherBone.frameRestVertices.clear();}
+     if(members.size()!=oldSize){otherBone.frameRotations.clear();otherBone.frameRestVertices.clear();otherBone.frameRestOffsets.clear();}
     }
     if(std::find(bone.vertices.begin(),bone.vertices.end(),index)==bone.vertices.end()){
-     bone.vertices.push_back(index);bone.frameRotations.clear();bone.frameRestVertices.clear();
+     bone.vertices.push_back(index);bone.frameRotations.clear();bone.frameRestVertices.clear();bone.frameRestOffsets.clear();
     }
    }
    if(!bone.pivotInitialized&&!bone.vertices.empty()){

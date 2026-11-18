@@ -22,7 +22,7 @@ private:
  Workspace& workspace_;
  bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
- struct BoneRigBone { std::string name; std::vector<int> vertices; int parentBone=-1; float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f; bool pivotInitialized=false; std::map<std::uint64_t,std::array<float,3>> frameRotations; std::map<std::uint64_t,std::vector<Crash::NsfAnimationVertex>> frameRestVertices; };
+ struct BoneRigBone { std::string name; std::vector<int> vertices; int parentBone=-1; float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f; bool pivotInitialized=false; std::map<std::uint64_t,std::array<float,3>> frameRotations; std::map<std::uint64_t,std::vector<Crash::NsfAnimationVertex>> frameRestVertices; std::map<std::uint64_t,std::array<std::int16_t,3>> frameRestOffsets; };
  struct EditorSnapshot { Crash::NsfArchive nsf; Crash::NsdFile nsd; std::vector<BoneRigBone> bones; };
  std::vector<BoneRigBone> boneRigBones_;
  std::vector<std::string> historyLabels_;
