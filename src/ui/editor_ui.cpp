@@ -3959,7 +3959,27 @@ void EditorUI::drawAnimationViewer(){
     const bool hasSelectedBone=boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
     const std::vector<int>&rotationVertices=hasSelectedBone?boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices:animationSelectedVertices_;
     boneRotationDrag=BoneRotationDragState{};boneRotationDrag.active=true;boneRotationDrag.chunk=animationViewerChunk_;boneRotationDrag.entry=animationViewerEntry_;boneRotationDrag.frame=poseFrameIndex;boneRotationDrag.bone=hasSelectedBone?boneRigSelectedBone_:-1;boneRotationDrag.axis=pickedAxis;boneRotationDrag.pivot=pivot;boneRotationDrag.rotationAxis=boneRotationAxisVector(pickedAxis);boneRotationDrag.startAngle=std::atan2(io.MousePos.y-center.y,io.MousePos.x-center.x);boneRotationDrag.initialEuler=boneEuler();boneRotationDrag.initialOffsets={frame.xOffset,frame.yOffset,frame.zOffset};boneRotationDrag.allOriginal=frame.vertices;
-    for(const int index:rotationVertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){boneRotationDrag.indices.push_back(index);boneRotationDrag.original.push_back(frame.vertices[static_cast<std::size_t>(index)]);}
+    const std::uint64_t restKey=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
+    const std::vector<Crash::NsfAnimationVertex>*restPose=nullptr;
+    if(hasSelectedBone){
+     auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
+     auto restIt=bone.frameRestVertices.find(restKey);
+     if(restIt==bone.frameRestVertices.end()){
+      std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(bone.vertices.size());
+      for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())rest.push_back(frame.vertices[static_cast<std::size_t>(index)]);
+      if(rest.size()==bone.vertices.size())restIt=bone.frameRestVertices.emplace(restKey,std::move(rest)).first;
+      if(bone.frameRotations.find(restKey)!=bone.frameRotations.end()){
+       bone.frameRotations[restKey]={0.0f,0.0f,0.0f};
+       boneRotationDrag.initialEuler={0.0f,0.0f,0.0f};
+      }
+     }
+     if(restIt!=bone.frameRestVertices.end())restPose=&restIt->second;
+    }
+    for(std::size_t i=0;i<rotationVertices.size();++i){
+     const int index=rotationVertices[i];if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
+     boneRotationDrag.indices.push_back(index);
+     boneRotationDrag.original.push_back(restPose&&i<restPose->size()?(*restPose)[i]:frame.vertices[static_cast<std::size_t>(index)]);
+    }
     if(boneRotationDrag.indices.empty())boneRotationDrag.active=false;
     else{animationPlaying_=false;animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;boneRotationStarted=true;ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
    }
