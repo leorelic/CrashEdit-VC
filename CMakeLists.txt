@@ -121,7 +121,7 @@ if(CRASHEDIT_BUILD_APP)
 endif()
 
 
-function crash_edit_enable_test_assertions(target)
+function(crash_edit_enable_test_assertions target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /UNDEBUG)
     else()
