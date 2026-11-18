@@ -211,3 +211,13 @@ The new chunk is currently emitted as a raw `0x1234`, type-0 chunk with one entr
 - GitHub Actions workflow [workflow run](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834) passed its build and test jobs on Windows, Ubuntu 22.04, and macOS.
 - User validation: the user confirmed the new expansion workflow works as intended in CrashEdit-VC on 2026-11-12.
 - Further research/testing: inspect Chunk ID values across a broader set of retail NSF files; validate relocation of additional entry types and cross-resource references; test save/reopen and retail-game loading for archives that actually gained a chunk. Current user validation is not a claim that every entry type or every expanded archive has been tested in the original game.
+
+## Crash 2 Model/Animation sample-pair regression — 2026-11-19
+
+Private companion fixtures: `entry_8_2_El1eG.bin`, `entry_8_3_El1eV.bin`, `entry_7_3_Cr10G.bin`, and `entry_14_3_Cr10V.bin` in `CrashEdit-VC-Game-Samples`.
+
+- `El1eG` (`50A82755`) parses as a six-item compressed Model with 38 vertices, 108 polygon words, 64 triangles, 25 texture descriptors, 15 colors, no extended-texture records, and three TPAG EIDs. `El1eV` (`50A82773`) contains seven frames of 38 vertices; every frame references `50A82755`.
+- `Cr10G` (`4CD82055`) parses as a six-item compressed Model with 309 vertices, 760 polygon words, 574 triangles, 917 texture descriptors, 90 colors, 14 extended-texture records, and one TPAG EID (`4CD8206F`). `Cr10V` (`4CD82073`) contains eleven frames of 309 vertices; every frame references `4CD82055`.
+- Model polygon reconstruction was compared against CrashEdit-RE `ModelEntry.ConvertIndices()` for both samples. Every triangle's vertex indices, per-corner color indices, texture index, animated flag, triangle type, and subtype matched (64/64 and 574/574).
+- Animation frame headers and the signed X-Z-Y temporal bitstream ordering follow CrashEdit-RE `Frame.MakeVertices()`; sample frame counts, model links, and decoded vertex counts agree.
+- The native C++ regression suite covers synthetic compressed/uncompressed vertex writes, compressed multi-vertex batches, atomic rejection, offset rebasing, collision-byte preservation, and NSF save/reload. Running the native C++ archive parser and serializer directly against the private real-sample entries, then checking original-game behavior, remains pending.

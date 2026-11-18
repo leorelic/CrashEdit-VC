@@ -187,10 +187,10 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 
 ### Regression and acceptance criteria
 
-- [ ] Compare reconstructed Model triangles, texture references and frame poses with CrashEdit-RE `airumu/CrashEdit` branch `t/net9`.
-- [ ] Test real Crash 2 Model/Animation pairs: `El1eG` / `El1eV` (unanimated textures) and `Cr10G` / `Cr10V` (animated eye textures).
-- [ ] Test parse → serialize → parse equality for untouched Models and Animations.
-- [x] Test targeted edits to Model colors, descriptors, scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word, plus compressed and uncompressed Animation vertex writes in synthetic NSF fixtures.
+- [x] Compare reconstructed Model triangle indices, corner colors, texture references/flags and types with CrashEdit-RE `airumu/CrashEdit` branch `t/net9` on `El1eG` and `Cr10G`.
+- [x] Inspect real Crash 2 Model/Animation pairs: `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; confirm all Animation frames link to the expected Model and have the expected decoded vertex counts.
+- [ ] Test native C++ parse → serialize → parse equality for untouched real-sample Models and Animations.
+- [x] Test targeted edits to Model colors, descriptors, scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word, plus compressed/uncompressed and multi-vertex Animation writes, atomic rejection, rebasing and save/reload in synthetic NSF fixtures.
 - [x] Verify NSF save/reload and checksum handling for synthetic fixed-size Model edits and compressed/uncompressed Animation vertex edits. Real archive-wide preservation testing remains pending.
 - [ ] Exercise malformed counts, truncated items, invalid texture indices, missing TPAG pages, invalid animation links and extended-texture boundary cases.
 - [ ] Keep Crash 2 as the acceptance target. Validate Crash 3-specific model/frame behavior separately and do not generalize it from Crash 2 samples.
@@ -202,9 +202,9 @@ The private companion repository `leorelic/CrashEdit-VC-Game-Samples` contains:
 - `entry_8_2_El1eG.bin` and `entry_8_3_El1eV.bin` — Snow Go Model/Animation baseline.
 - `entry_7_3_Cr10G.bin` and `entry_14_3_Cr10V.bin` — Crash model/Animation pair with animated eye textures.
 
-The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture descriptors, 90 color records, 14 extended-texture records and one TPAG EID. All 14 extended records are flipbook-style (not LOD); animated triangles resolve through texture indices 0–13. The Cr10V sample has 11 frames, each with 309 vertices, and every frame links to Cr10G. The decoded model triangle count matches the Model header. Preserve these sample facts as regression expectations, but continue investigating the exact descriptor-index boundary semantics rather than assuming the final offset/mask range is invalid.
+The Cr10G sample has 309 vertices, 574 reconstructed triangles, 760 polygon words, 917 texture descriptors, 90 color records, 14 extended-texture records and one TPAG EID (`4CD8206F`). All 14 extended records are flipbook-style (not LOD); animated triangles resolve through texture indices 0–13. The Cr10V sample has 11 frames, each with 309 vertices, and every frame links to Cr10G. The El1eG baseline has 38 vertices, 64 reconstructed triangles, 108 polygon words, 25 texture descriptors, 15 color records, no extended-texture records and three TPAG EIDs; El1eV has seven frames of 38 vertices, all linked to El1eG. A comparison of the reconstructed triangle records against CrashEdit-RE `ModelEntry.ConvertIndices()` matched all indices, corner-color references, texture indices/flags and triangle types/subtypes for both models. The native frame decoder follows the `Frame.MakeVertices()` signed X-Z-Y temporal order and the real samples confirm expected frame/model links and vertex counts. Native C++ archive-level round-trip against these private entries remains pending; preserve the counts as regression expectations and continue investigating exact descriptor-index boundary semantics rather than assuming the final offset/mask range is invalid.
 
-## Current implementation status (2026-11-13)
+## Current implementation status (2026-11-19)
 
 - [x] Animation vertex point display, V shortcut, depth-aware overlay, hover/selection and selected-vertex inspection — user-confirmed working before this implementation.
 - [x] Shared decoded Model data supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
@@ -217,7 +217,7 @@ The Cr10G sample has 309 vertices, 574 reconstructed triangles, 917 texture desc
 - [ ] A variable-size Model item serializer is still required before adding/removing polygons, descriptors, colors, extended-texture records or changing vertex counts. Current setters patch existing fixed-size fields in place and preserve item offsets/sizes.
 - [ ] TPAG/CLUT resolution still needs a fully shared resource-preview path; the Animation Editor displays resolved descriptor and TPAG references while the renderer retains texture-page decoding.
 - [ ] Full CrashEdit-RE parity for chained flipbook/leap records and LOD edge cases remains to be validated against the t/net9 runtime implementation.
-- [ ] Real-sample parity and round-trip validation against `El1eG` / `El1eV` and `Cr10G` / `Cr10V` remains pending.
+- [x] Real-sample Model triangle parity and Animation frame linkage/vertex-count checks completed for `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; native C++ archive round-trip and original-game validation remain pending.
 - [ ] Topology editing and cross-resource vertex-count changes remain disabled until the Model serializer and every dependent Animation frame encoder are verified.
 - [x] GitHub CI build and test jobs passed on Windows, Ubuntu 22.04 and macOS for implementation commit `8ab76bf9a650d05558b9b17b765f9c3282cde961`.
 
@@ -257,7 +257,7 @@ Implementation trail:
 
 ---
 
-## Animation and Model authoring roadmap — updated 2026-11-16
+## Animation and Model authoring roadmap — updated 2026-11-19
 
 The current Animation/Model editor is the foundation for the next authoring work. Preserve the existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, face-texture workflow, collision editor, and working rendering behavior. The priorities below separate immediate editor improvements from the later Scenery/Geometry authoring category.
 
@@ -294,48 +294,55 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 
 ### 1. Vertex selection and 3D viewport usability
 
-- [x] Support visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection.
-- [x] Use camera-space triangle depth checks so occluded vertices are not picked or included in box selections; X-ray selection remains deferred.
-- [x] Preserve depth-aware hover feedback, selected-marker appearance, and the `V` visibility shortcut.
+- [x] Support visible-vertex click selection, Shift-add, Ctrl-remove, and drag-box selection in normal vertex mode and Bone List mode.
+- [x] Keep box selection depth-aware while avoiding triangle-occlusion checks for vertices outside the selection rectangle; hover picking tests occlusion only for nearby candidates.
+- [x] Tighten the pick radius and use camera depth to break equal-distance ties, improving precision around dense/overlapping vertices.
+- [x] Distinguish selected and hovered markers with a persistent selection ring and a separate hover ring/color.
+- [x] Separate camera input from selection: middle-drag orbits, right-drag pans, the wheel zooms, and left-drag selects/box-selects. Shift-left-drag remains an orbit gesture while Bone List is open.
+- [x] Gate camera movement/zoom while selection boxes, transform handles, or collision tools own the pointer.
 - [x] Provide Free Move, Axis Move, and Scale toolbar modes, with numeric coordinate editing as a precise fallback.
-- [x] With two or more selected vertices, scale symmetrically around the selection's shared center rather than translating the group as a block.
-- [x] Preserve per-frame vertex encoding and calculate drag transforms from immutable drag-start positions; submit edits through the atomic batch setter.
-- [x] Enforce the observed Crash 2 coordinate range of 0–254 and each compressed frame's temporal bit-width limits. Do not widen, clamp, or wrap out-of-range values; retain the last valid value during a drag.
-- [ ] Improve picking precision and make individual-versus-group selection behavior consistently predictable across dense and overlapping geometry.
-- [ ] Refine selection highlighting and hover/selected feedback so the active selection is immediately clear.
-- [ ] Ensure camera orbit/pan/zoom never conflicts with vertex selection, box selection, or transform handles.
-- [ ] Validate selection and editing usability on large and dense models, not only small test objects.
+- [x] Scale multi-vertex selections around their shared center by default; an enabled Bone List pivot option can use the selected bone's custom pivot for Move/Scale.
+- [ ] Validate picking and editing usability on large and dense models with hands-on user testing; X-ray selection remains deferred.
 
 ### 2. Optional editor-only Bone Rig Creator
 
 - [x] Open the Bone List with `B` or its visible viewport toolbar icon and dock it beside Properties.
 - [x] Create, rename, and delete bones; assign selected vertices; remove selected vertices; and select all vertices assigned to a bone.
-- [x] Provide a bone-only three-axis rotation gizmo with a stable pivot and Local/World axis mode.
-- [ ] Complete the rig authoring workflow and validate it through a fresh CI build and user interaction testing.
-- [ ] Retain original vertex positions and derive each frame's transformed positions from those originals plus the rig transform, avoiding cumulative deformation.
-- [ ] Define and validate the intended cross-frame rig-pose workflow; flatten any saved result into ordinary per-frame vertex positions through the existing Animation frame encoder.
-- [ ] Keep bone data editor-only: it is not part of the Crash 2 Animation format, must not be written as a game skeleton, and must not change animations that do not use the helper.
-- [ ] Decide separately whether hierarchical joints, automatic bone-shape detection, face assignment, and X-ray selection are worth adding; do not treat them as prerequisites for the basic rig workflow.
+- [x] Enforce one-bone-per-vertex membership when assigning vertices and validate sidecar assignments on load.
+- [x] Store parent-bone metadata and prevent self-parenting/cycles when editing or loading a rig. Parent links are organizational metadata; child-transform propagation is not implemented.
+- [x] Provide a bone-only three-axis rotation gizmo with Local/World axis mode and editable numeric pivot coordinates.
+- [x] Allow the selected bone pivot to drive Move/Scale gizmos, with a toggle to use the ordinary selection center instead.
+- [x] Capture a separate rest pose for each Animation EID/frame and calculate each bone rotation from that immutable base pose, rather than repeatedly rotating already-quantized vertex positions.
+- [x] Store the original frame offsets alongside each rest pose so Crash 2 coordinate rebasing does not move the base pose on subsequent rotations.
+- [x] Invalidate affected rest-pose data when assigned vertices are moved/scaled, reassigned, removed, or the pivot changes.
+- [x] Save/load editor-only rig data through a version-2 sidecar; retain version-1 sidecar compatibility, validate frame keys/coordinates/hierarchy, and replace saved files through a temporary file.
+- [x] Define the frame workflow: each Animation frame has its own rest pose and rotation state; edits are applied to that frame and written back as ordinary encoded Animation vertex positions. The rig itself remains editor-only.
+- [ ] Complete user interaction testing of multi-frame rig editing, save/reload, and undo/redo on representative Crash 2 animations.
+- [ ] Decide separately whether child-bone transform propagation, automatic bone-shape detection, face assignment, and X-ray selection are worth adding; they are not prerequisites for the current helper.
 
-**Current implementation notes:** a vertex belongs to one bone at a time. Selecting a bone's vertices reuses the existing transform tools, and rotation edits the assigned vertices in the currently selected Animation frame. Per-frame rotation orientation metadata is keyed by Animation EID plus frame index. Bone definitions and rotation metadata are editor-side state, are not serialized into NSF, and are not currently persisted between application sessions. The first workflow is implemented, but the full cross-frame authoring behavior and fresh user validation remain open. Do not describe the rig as a game skeleton.
+**Current implementation notes:** bone definitions, parent metadata, rest poses, pivots, and per-frame rotation metadata are stored in the editor sidecar, not in the Crash 2 Animation format or NSF. The rig is an editor-only vertex-group/transform helper, not a game skeleton. Version-1 sidecars load without rest-pose caches; the first rotation establishes the current visible pose as that frame's new base.
 
 ### 3. Transform and pivot tools
 
-- [x] Provide Free Move, Axis Move, Scale, and bone rotation controls.
-- [x] Preserve Shift snapping on axis transforms.
-- [ ] Make move, scale, and rotate behavior consistent across frames and selection sizes.
-- [ ] Improve pivot editing and make pivot placement/behavior explicit for the relevant transform modes.
-- [ ] Verify that transforms preserve valid Crash 2 coordinate ranges and compressed-frame bit-width constraints without silent clamping or wrapping.
-- [ ] Keep the established scale-down → rotate → scale-back workaround available; do not add or reintroduce a Flip button.
-- [ ] Test undo/redo, save/reopen, and multi-frame behavior for each transform type.
+- [x] Provide Free Move, Axis Move, Scale, and bone rotation controls, with Shift snapping on axis transforms.
+- [x] Make multi-vertex scaling use the shared selection center and provide an optional selected-bone pivot for Move/Scale.
+- [x] Allow direct numeric editing of a bone pivot and recenter it from assigned vertices.
+- [x] Reject Move/Scale results outside the observed Crash 2 coordinate range instead of silently clamping or wrapping; keep the last valid pose during a drag.
+- [x] Calculate bone rotations from per-frame rest positions and rest offsets, then submit edits through the existing atomic Animation frame encoder/rebase path.
+- [x] Keep the established scale-down → rotate → scale-back workaround available; do not add or reintroduce a Flip button.
+- [ ] Complete hands-on validation of transform behavior across different selections and multiple frames.
+- [ ] Test undo/redo and save/reopen for Move, Scale, and bone rotation in the application; synthetic archive tests cover the underlying vertex encoders and rebasing.
 
 ### 4. Compatibility and regression validation
 
-- [ ] Compare representative Model/Animation pairs `El1eG` / `El1eV` and `Cr10G` / `Cr10V` against CrashEdit-RE `t/net9` and real Crash 2 behavior.
-- [ ] Test parse → serialize → parse equality for untouched resources and targeted edits.
-- [ ] Validate texture-page/CLUT resolution, animated texture chains, LOD edge cases, missing references, and malformed resource boundaries.
-- [ ] Verify save/reopen behavior and preserve unrelated NSF/NSD data.
-- [ ] Keep Crash 2 as the acceptance target; treat Crash 3-specific behavior as a separate compatibility pass.
+- [x] Compare reconstructed Model triangles against CrashEdit-RE `airumu/CrashEdit` branch `t/net9` for the real `El1eG` and `Cr10G` samples; triangle indices, corner colors, texture indices, animated flags, and triangle type/subtype matched exactly (64/64 and 574/574 triangles).
+- [x] Check real Animation pairs: `El1eV` has 7 frames of 38 vertices, all linked to `El1eG`; `Cr10V` has 11 frames of 309 vertices, all linked to `Cr10G`.
+- [x] Confirm the Model item/header counts and compressed-position counts for both real sample pairs against the original `ModelEntryLoader`/`ModelEntry` source.
+- [x] Add synthetic regression coverage for atomic batch rejection, duplicate vertex indices, Crash 2 frame-offset rebasing, compressed multi-vertex edits, and save/reload while preserving collision bytes.
+- [x] Match the Animation frame layout and signed X-Z-Y temporal decoding order to CrashEdit-RE `Frame.MakeVertices()`; sample frame counts, model links, and decoded vertex counts agree.
+- [ ] Run the native C++ archive parser against the private real-sample entries for full parse → serialize → parse equality; current real-sample parity is a source/entry-data comparison, while C++ tests use synthetic fixtures.
+- [ ] Validate real-sample save/reopen and original-game behavior, texture-page/CLUT resolution, chained animated-texture edge cases, missing references, and malformed resource boundaries.
+- [x] Keep Crash 2 as the acceptance target; Crash 3-specific model/frame behavior remains a separate compatibility pass.
 
 ### 5. Scenery / Geometry Editing and level-object authoring
 

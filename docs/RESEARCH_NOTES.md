@@ -324,3 +324,72 @@ These counts are sample observations, not a complete interpretation of BoxSC's s
 The temporary GOOL State Machine viewer experiment is paused. Keep the existing State Descriptions and GOOL Inspector unchanged; do not build a throwaway viewer or modify the decompiler/Script Editor solely to investigate the TNT Box animation. The resource-link relationship is documented, but explaining why a newly created animation is or is not played by the retail game requires tracing the relevant `ANIM`/`ANIF` behavior and GOOL execution. Resume this investigation when the planned GOOL decompilation / readable GOOL Script work is ready to handle those semantics. Continue the independent Animation/Model editor roadmap in the meantime.
 
 This pause does not mean the original BT10V is inadequate or that it should be modified. It is the correct unmodified reference sample for the current resource-relationship investigation.
+
+## Animation/Model editor sprint — vertex selection, Bone Rig, transforms and sample parity (2026-11-19)
+
+### Vertex selection and camera input
+
+- Normal vertex mode now supports click-to-replace, Shift-add, Ctrl-remove, and empty-space drag-box selection. Bone List mode retains its add/remove behavior.
+- Hover picking uses a tighter screen-space radius and depth tie-break; triangle occlusion is checked only for candidates close to the cursor. Box selection rejects vertices outside the rectangle before the occlusion test.
+- Selected vertices retain a distinct ring while the hovered vertex gets its own hover ring/color.
+- Camera input no longer competes with left-drag box selection: middle-drag orbits, right-drag pans, the wheel zooms, and Shift-left-drag can orbit while Bone List is open. Camera input is gated while selection/transform/collision interactions own the pointer.
+- Large/dense-model interaction still needs user testing; this is not a claim that X-ray selection is implemented.
+
+### Bone Rig sidecar and per-frame rest poses
+
+- BoneRigBone now stores a rest-position array for each Animation EID/frame, aligned with that bone's vertex membership, plus the original frame X/Y/Z offsets.
+- Bone rotations are recalculated from that per-frame rest pose and the stored rig rotation rather than repeatedly rotating already-quantized positions. Preserving rest offsets is important when Crash 2 rotation requires rebasing the frame coordinate range.
+- Move/Scale edits to assigned vertices, membership changes, and pivot edits invalidate the affected frame's rest cache so later rotations cannot use stale source positions.
+- Sidecar version 2 persists per-frame rotations, rest positions, and rest offsets; version 1 remains readable and establishes the current visible pose as a new rest pose on the next rotation. Load validation rejects invalid frame keys, non-finite pivots/angles, duplicate vertex assignments, invalid parents, and hierarchy cycles. Save writes a temporary file and replaces the sidecar only after a successful flush.
+- The rig remains editor-only. Each frame has an independent rest pose and rotation state; the edited frame is flattened through the ordinary Animation vertex encoder. Parent links are metadata only and do not yet propagate transforms to child bones.
+
+### Transform and archive regression coverage
+
+- Move/Scale now reject out-of-range Crash 2 results rather than clamping coordinates. The last valid pose is retained when a drag would exceed the supported range or the frame encoder cannot represent the edit.
+- The selected bone pivot can be edited numerically, recentered from assigned vertices, and optionally used by Move/Scale gizmos. The ordinary selection-center pivot remains the default when the option is off.
+- Synthetic tests now cover duplicate-index rejection, atomic invalid batch rejection, frame-offset rebasing, rebase failure without partial mutation, compressed multi-vertex edits, preservation of collision bytes, and save/reload.
+
+### Real Crash 2 sample comparison
+
+Reference source: [CrashEdit-RE Frame.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/Frame.cs), [ModelEntryLoader.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntryLoader.cs), and [ModelEntry.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntry.cs). Private fixtures are in `CrashEdit-VC-Game-Samples`.
+
+| Sample | Model facts | Animation facts |
+|---|---|---|
+| `El1eG` / `El1eV` | 38 vertices; 64 triangles; 108 polygon words; 25 texture descriptors; 15 colors; 0 extended textures; 3 TPAG EIDs | 7 frames; 38 vertices per frame; every frame links to `El1eG` |
+| `Cr10G` / `Cr10V` | 309 vertices; 574 triangles; 760 polygon words; 917 texture descriptors; 90 colors; 14 extended textures; 1 TPAG EID (`4CD8206F`) | 11 frames; 309 vertices per frame; every frame links to `Cr10G` |
+
+The Model triangle records were compared against the `ModelEntry.ConvertIndices()` logic in the reference source. All 64 El1eG and all 574 Cr10G triangle records matched in vertex indices, per-corner color indices, texture indices, animated flags, triangle type and subtype. Animation frame structure and the signed X-Z-Y temporal decode order match `Frame.MakeVertices()`; the real entries have the expected frame counts, Model EIDs, and decoded vertex counts. This is source/sample-level parity evidence, not a native C++ archive round-trip or original-game validation. Those remain explicit acceptance tasks.
+## Animation/Model editor sprint — vertex selection, Bone Rig, transforms and sample parity (2026-11-19)
+
+### Vertex selection and camera input
+
+- Normal vertex mode now supports click-to-replace, Shift-add, Ctrl-remove, and empty-space drag-box selection. Bone List mode retains its add/remove behavior.
+- Hover picking uses a tighter screen-space radius and depth tie-break; triangle occlusion is checked only for candidates close to the cursor. Box selection rejects vertices outside the rectangle before the occlusion test.
+- Selected vertices retain a distinct ring while the hovered vertex gets its own hover ring/color.
+- Camera input no longer competes with left-drag box selection: middle-drag orbits, right-drag pans, the wheel zooms, and Shift-left-drag can orbit while Bone List is open. Camera input is gated while selection/transform/collision interactions own the pointer.
+- Large/dense-model interaction still needs user testing; this is not a claim that X-ray selection is implemented.
+
+### Bone Rig sidecar and per-frame rest poses
+
+- BoneRigBone now stores a rest-position array for each Animation EID/frame, aligned with that bone's vertex membership, plus the original frame X/Y/Z offsets.
+- Bone rotations are recalculated from that per-frame rest pose and the stored rig rotation rather than repeatedly rotating already-quantized positions. Preserving rest offsets is important when Crash 2 rotation requires rebasing the frame coordinate range.
+- Move/Scale edits to assigned vertices, membership changes, and pivot edits invalidate the affected frame's rest cache so later rotations cannot use stale source positions.
+- Sidecar version 2 persists per-frame rotations, rest positions, and rest offsets; version 1 remains readable and establishes the current visible pose as a new rest pose on the next rotation. Load validation rejects invalid frame keys, non-finite pivots/angles, duplicate vertex assignments, invalid parents, and hierarchy cycles. Save writes a temporary file and replaces the sidecar only after a successful flush.
+- The rig remains editor-only. Each frame has an independent rest pose and rotation state; the edited frame is flattened through the ordinary Animation vertex encoder. Parent links are metadata only and do not yet propagate transforms to child bones.
+
+### Transform and archive regression coverage
+
+- Move/Scale now reject out-of-range Crash 2 results rather than clamping coordinates. The last valid pose is retained when a drag would exceed the supported range or the frame encoder cannot represent the edit.
+- The selected bone pivot can be edited numerically, recentered from assigned vertices, and optionally used by Move/Scale gizmos. The ordinary selection-center pivot remains the default when the option is off.
+- Synthetic tests now cover duplicate-index rejection, atomic invalid batch rejection, frame-offset rebasing, rebase failure without partial mutation, compressed multi-vertex edits, preservation of collision bytes, and save/reload.
+
+### Real Crash 2 sample comparison
+
+Reference source: [CrashEdit-RE Frame.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/Frame.cs), [ModelEntryLoader.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntryLoader.cs), and [ModelEntry.cs](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntry.cs). Private fixtures are in `CrashEdit-VC-Game-Samples`.
+
+| Sample | Model facts | Animation facts |
+|---|---|---|
+| `El1eG` / `El1eV` | 38 vertices; 64 triangles; 108 polygon words; 25 texture descriptors; 15 colors; 0 extended textures; 3 TPAG EIDs | 7 frames; 38 vertices per frame; every frame links to `El1eG` |
+| `Cr10G` / `Cr10V` | 309 vertices; 574 triangles; 760 polygon words; 917 texture descriptors; 90 colors; 14 extended textures; 1 TPAG EID (`4CD8206F`) | 11 frames; 309 vertices per frame; every frame links to `Cr10G` |
+
+The Model triangle records were compared against the `ModelEntry.ConvertIndices()` logic in the reference source. All 64 El1eG and all 574 Cr10G triangle records matched in vertex indices, per-corner color indices, texture indices, animated flags, triangle type and subtype. Animation frame structure and the signed X-Z-Y temporal decode order match `Frame.MakeVertices()`; the real entries have the expected frame counts, Model EIDs, and decoded vertex counts. This is source/sample-level parity evidence, not a native C++ archive round-trip or original-game validation. Those remain explicit acceptance tasks.
