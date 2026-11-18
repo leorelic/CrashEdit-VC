@@ -3584,7 +3584,7 @@ void EditorUI::drawAnimationViewer(){
   }
   const ImGuiIO&io=ImGui::GetIO();
   const bool cameraKeysAllowed=hovered&&ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&
-   !viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&
+   !viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&
    !io.WantTextInput&&!io.KeyAlt&&!io.KeySuper;
   if(cameraKeysAllowed){
    const bool opposite=io.KeyCtrl;
@@ -3602,7 +3602,7 @@ void EditorUI::drawAnimationViewer(){
   const float cameraEase=1.0f-std::exp(-9.0f*std::max(0.0f,io.DeltaTime));
   animationYaw_+=std::remainder(cameraTargetYaw-animationYaw_,6.28318530718f)*cameraEase;
   animationPitch_+=(cameraTargetPitch-animationPitch_)*cameraEase;
-  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
+  if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&io.MouseWheel!=0.0f)animationDistance_=std::clamp(animationDistance_-io.MouseWheel*(0.3f+1.7f*(animationDistance_/100.0f)),0.1f,200000.0f);
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&ImGui::IsKeyPressed(ImGuiKey_R))animationCameraInitialized_=false;
   if(hovered&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active){
    const float moveSpeed=(2.0f*float(editorPreferences.animationMoveSpeed)/100.0f)*(0.2f+0.8f*(animationDistance_/20.0f))*io.DeltaTime;
@@ -4104,12 +4104,14 @@ void EditorUI::drawAnimationViewer(){
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
-  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+  const bool orbitDragging=ImGui::IsMouseDragging(ImGuiMouseButton_Middle)||
+   (boneRigWindowOpen_&&io.KeyShift&&ImGui::IsMouseDragging(ImGuiMouseButton_Left));
+  if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&orbitDragging){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
    cameraTargetYaw=animationYaw_;cameraTargetPitch=animationPitch_;
   }
-  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+  if(active&&!viewportToolbarOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!vertexDragStarted&&!collisionDragStarted&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
    const float pan=animationDistance_*0.0018f;
    const float cyaw=std::cos(animationYaw_),syaw=std::sin(animationYaw_);
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
@@ -4606,7 +4608,9 @@ dl->PopClipRect();
    "Numpad 2 / 4 / 6 / 8    Orbit",
    "Numpad 9    Turn 180 degrees",
    "Numpad 0 or R    Reset and frame",
-   "Left Mouse drag    Orbit",
+   "Middle Mouse drag    Orbit",
+   "Left Mouse drag    Vertex / box selection",
+   "Shift + Left drag    Orbit with Bone List open",
    "Right Mouse drag    Pan",
    "Mouse Wheel    Zoom",
    "W / A / S / D    Move camera",
@@ -5360,7 +5364,7 @@ void EditorUI::drawBoneRigEditor(){
    }
    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();bone.frameRestVertices.clear();}
   }
-  ImGui::TextDisabled("With Bone List open, click or box-select adds visible vertices; Ctrl-click or Ctrl-box-select removes them. Shift-drag orbits the camera. In normal vertex mode, Shift adds, Ctrl removes, and dragging empty space box-selects.");
+  ImGui::TextDisabled("With Bone List open, click or box-select adds visible vertices; Ctrl-click or Ctrl-box-select removes them. Shift-drag orbits; middle-drag always orbits. In normal vertex mode, Shift adds, Ctrl removes, and dragging empty space box-selects.");
   ImGui::TextDisabled("The viewport Rotate tool works on selected vertices with or without bones. Rotation edits the current frame; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
