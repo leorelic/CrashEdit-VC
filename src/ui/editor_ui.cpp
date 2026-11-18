@@ -3655,6 +3655,13 @@ void EditorUI::drawAnimationViewer(){
   const float modelScaleZ=std::fabs(rawModelScaleZ)>1.0e-8f?rawModelScaleZ:1.0f/128.0f;
   const std::size_t animationChunkIndex=static_cast<std::size_t>(animationViewerChunk_);
   const std::size_t animationEntryIndex=static_cast<std::size_t>(animationViewerEntry_);
+  auto invalidateBoneRestPoseForVertices=[&](const std::vector<int>&indices){
+   const std::uint64_t key=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
+   for(auto&bone:boneRigBones_){
+    const bool affected=std::any_of(indices.begin(),indices.end(),[&](int index){return std::find(bone.vertices.begin(),bone.vertices.end(),index)!=bone.vertices.end();});
+    if(affected){bone.frameRestVertices.erase(key);bone.frameRotations.erase(key);}
+   }
+  };
   auto selectedVertexPivot=[&](){
    if(boneRigUsePivot_&&boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
     const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
@@ -3737,7 +3744,7 @@ void EditorUI::drawAnimationViewer(){
     }
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
      if(status_!="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.";
-    }
+    }else invalidateBoneRestPoseForVertices(vertexDrag.indices);
     return;
    }
    if(io.KeyShift&&vertexDrag.mode==static_cast<int>(VertexToolMode::AxisMove)){
@@ -3759,7 +3766,7 @@ void EditorUI::drawAnimationViewer(){
    }
    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
     if(status_!="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.";
-   }
+   }else invalidateBoneRestPoseForVertices(vertexDrag.indices);
   };
 
   if(selectedCollisionChunk!=animationViewerChunk_||selectedCollisionEntry!=animationViewerEntry_||selectedCollisionFrame!=poseFrameIndex){selectedCollisionFaces.clear();selectedCollisionChunk=animationViewerChunk_;selectedCollisionEntry=animationViewerEntry_;selectedCollisionFrame=poseFrameIndex;}
