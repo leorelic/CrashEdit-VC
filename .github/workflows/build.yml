@@ -19,7 +19,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build build-essential libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev libxext-dev libxrender-dev libxfixes-dev libwayland-dev libxkbcommon-dev
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCRASHEDIT_BUILD_SAMPLE_TESTS=ON
       - name: Build
         run: cmake --build build --config Release --parallel
       - name: Test
