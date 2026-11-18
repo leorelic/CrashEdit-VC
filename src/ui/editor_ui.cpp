@@ -5170,14 +5170,33 @@ void EditorUI::drawBoneRigEditor(){
   const auto bonePath=dataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
   std::ifstream input(bonePath);
   std::string signature;unsigned version=0;std::uint32_t storedAnimation=0,storedModel=0;std::size_t boneCount=0;
-  if(input>>signature>>version>>storedAnimation>>storedModel>>boneCount&&signature=="CRASHEDIT_BONES"&&version==1U&&storedAnimation==entry.eid&&storedModel==modelEid&&boneCount<=4096U){
+  if(input>>signature>>version>>storedAnimation>>storedModel>>boneCount&&signature=="CRASHEDIT_BONES"&&(version==1U||version==2U)&&storedAnimation==entry.eid&&storedModel==modelEid&&boneCount<=4096U){
    bool valid=true;std::vector<BoneRigBone>loaded;loaded.reserve(boneCount);
    for(std::size_t i=0;i<boneCount&&valid;++i){
     BoneRigBone bone;std::size_t vertexCount=0,rotationCount=0;
     if(!(input>>std::quoted(bone.name)>>bone.parentBone>>bone.pivotX>>bone.pivotY>>bone.pivotZ>>bone.pivotInitialized>>vertexCount)||vertexCount>65536U){valid=false;break;}
     for(std::size_t v=0;v<vertexCount;++v){int index=-1;if(!(input>>index)||index<0||static_cast<std::size_t>(index)>=frame.vertices.size()){valid=false;break;}bone.vertices.push_back(index);}
     if(!valid||!(input>>rotationCount)||rotationCount>65536U){valid=false;break;}
-    for(std::size_t r=0;r<rotationCount;++r){std::uint64_t key=0;std::array<float,3>rotation{};if(!(input>>key>>rotation[0]>>rotation[1]>>rotation[2])){valid=false;break;}bone.frameRotations.emplace(key,rotation);}
+    for(std::size_t r=0;r<rotationCount;++r){
+     std::uint64_t key=0;std::array<float,3>rotation{};
+     if(!(input>>key>>rotation[0]>>rotation[1]>>rotation[2])||(key>>32U)!=entry.eid||static_cast<std::uint32_t>(key)>=animation.frames.size()||!std::isfinite(rotation[0])||!std::isfinite(rotation[1])||!std::isfinite(rotation[2])){valid=false;break;}
+     bone.frameRotations.emplace(key,rotation);
+    }
+    if(valid&&version>=2U){
+     std::size_t restCount=0;
+     if(!(input>>restCount)||restCount>65536U){valid=false;break;}
+     for(std::size_t r=0;r<restCount&&valid;++r){
+      std::uint64_t key=0;std::size_t count=0;
+      if(!(input>>key>>count)||(key>>32U)!=entry.eid||static_cast<std::uint32_t>(key)>=animation.frames.size()||count!=bone.vertices.size()){valid=false;break;}
+      std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(count);
+      for(std::size_t v=0;v<count;++v){
+       Crash::NsfAnimationVertex value;
+       if(!(input>>value.x>>value.y>>value.z)||value.x<0||value.x>2040||value.y<0||value.y>2040||value.z<0||value.z>2040){valid=false;break;}
+       rest.push_back(value);
+      }
+      if(valid)bone.frameRestVertices.emplace(key,std::move(rest));
+     }
+    }
     loaded.push_back(std::move(bone));
    }
    if(valid){for(std::size_t i=0;i<loaded.size();++i)if(loaded[i].parentBone>=static_cast<int>(loaded.size())||loaded[i].parentBone==static_cast<int>(i))valid=false;}
@@ -5199,12 +5218,18 @@ void EditorUI::drawBoneRigEditor(){
   std::ofstream output(boneFile,std::ios::trunc);
   bool saved=static_cast<bool>(output);
   if(saved){
-   output<<"CRASHEDIT_BONES 1 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
+   output<<"CRASHEDIT_BONES 2 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
    for(const auto&savedBone:boneRigBones_){
     output<<std::quoted(savedBone.name)<<" "<<savedBone.parentBone<<" "<<savedBone.pivotX<<" "<<savedBone.pivotY<<" "<<savedBone.pivotZ<<" "<<savedBone.pivotInitialized<<" "<<savedBone.vertices.size();
     for(const int vertex:savedBone.vertices)output<<" "<<vertex;
     output<<" "<<savedBone.frameRotations.size()<<"\n";
     for(const auto&[key,rotation]:savedBone.frameRotations)output<<key<<" "<<rotation[0]<<" "<<rotation[1]<<" "<<rotation[2]<<"\n";
+    output<<savedBone.frameRestVertices.size()<<"\n";
+    for(const auto&[key,rest]:savedBone.frameRestVertices){
+     output<<key<<" "<<rest.size();
+     for(const auto&vertex:rest)output<<" "<<vertex.x<<" "<<vertex.y<<" "<<vertex.z;
+     output<<"\n";
+    }
    }
    output.flush();saved=static_cast<bool>(output);output.close();
   }
