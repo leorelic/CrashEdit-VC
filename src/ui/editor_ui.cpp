@@ -5278,8 +5278,15 @@ void EditorUI::drawBoneRigEditor(){
    if(ImGui::Button("Assign Selected Vertices")){
    for(const int index:animationSelectedVertices_){
     if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
-    for(std::size_t other=0;other<boneRigBones_.size();++other){if(other==static_cast<std::size_t>(boneRigSelectedBone_))continue;auto&members=boneRigBones_[other].vertices;members.erase(std::remove(members.begin(),members.end(),index),members.end());}
-    if(std::find(bone.vertices.begin(),bone.vertices.end(),index)==bone.vertices.end())bone.vertices.push_back(index);
+    for(std::size_t other=0;other<boneRigBones_.size();++other){
+     if(other==static_cast<std::size_t>(boneRigSelectedBone_))continue;
+     auto&otherBone=boneRigBones_[other];auto&members=otherBone.vertices;
+     const auto oldSize=members.size();members.erase(std::remove(members.begin(),members.end(),index),members.end());
+     if(members.size()!=oldSize){otherBone.frameRotations.clear();otherBone.frameRestVertices.clear();}
+    }
+    if(std::find(bone.vertices.begin(),bone.vertices.end(),index)==bone.vertices.end()){
+     bone.vertices.push_back(index);bone.frameRotations.clear();bone.frameRestVertices.clear();
+    }
    }
    if(!bone.pivotInitialized&&!bone.vertices.empty()){
     double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
@@ -5290,7 +5297,11 @@ void EditorUI::drawBoneRigEditor(){
    }
   }
   ImGui::SameLine();
-  if(ImGui::Button("Remove Selected"))for(const int index:animationSelectedVertices_)bone.vertices.erase(std::remove(bone.vertices.begin(),bone.vertices.end(),index),bone.vertices.end());
+  if(ImGui::Button("Remove Selected")){
+   const auto oldSize=bone.vertices.size();
+   for(const int index:animationSelectedVertices_)bone.vertices.erase(std::remove(bone.vertices.begin(),bone.vertices.end(),index),bone.vertices.end());
+   if(bone.vertices.size()!=oldSize){bone.frameRotations.clear();bone.frameRestVertices.clear();}
+  }
   if(ImGui::Button("Select Bone Vertices")){
    animationSelectedVertices_.clear();for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size())animationSelectedVertices_.push_back(index);
    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
@@ -5304,6 +5315,7 @@ void EditorUI::drawBoneRigEditor(){
   if(ImGui::InputFloat3("Pivot (raw vertex X/Y/Z)",editablePivot,"%.3f")){
    if(std::isfinite(editablePivot[0])&&std::isfinite(editablePivot[1])&&std::isfinite(editablePivot[2])){
     bone.pivotX=editablePivot[0];bone.pivotY=editablePivot[1];bone.pivotZ=editablePivot[2];bone.pivotInitialized=true;
+    bone.frameRotations.clear();bone.frameRestVertices.clear();
    }
   }
   ImGui::Checkbox("Use bone pivot for Move / Scale gizmos", &boneRigUsePivot_);
@@ -5312,7 +5324,7 @@ void EditorUI::drawBoneRigEditor(){
    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<frame.vertices.size()){
     const auto&v=frame.vertices[static_cast<std::size_t>(index)];px+=v.x;py+=v.y;pz+=v.z;++count;
    }
-   if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();}
+   if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();bone.frameRestVertices.clear();}
   }
   ImGui::TextDisabled("With Bone List open, click or box-select adds visible vertices; Ctrl-click or Ctrl-box-select removes them. Shift-drag orbits the camera. In normal vertex mode, Shift adds, Ctrl removes, and dragging empty space box-selects.");
   ImGui::TextDisabled("The viewport Rotate tool works on selected vertices with or without bones. Rotation edits the current frame; bones remain editor-only.");
