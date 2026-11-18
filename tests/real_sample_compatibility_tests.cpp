@@ -93,6 +93,11 @@ static void validatePair(const std::filesystem::path&directory,
  if(model.triangles.size()!=polygonCount||actualTriangleHash!=expectedTriangleHash){
   std::cerr<<"Model "<<std::hex<<modelEid<<std::dec<<" triangle count "<<model.triangles.size()<<"/"<<polygonCount
            <<" hash 0x"<<std::hex<<actualTriangleHash<<" expected 0x"<<expectedTriangleHash<<std::dec<<"\\n";
+  for(std::size_t i=0;i<std::min<std::size_t>(12,model.triangles.size());++i){
+   const auto&t=model.triangles[i];
+   std::cerr<<i<<": "<<t.a<<","<<t.b<<","<<t.c<<" colors "<<static_cast<int>(t.colorA)<<","<<static_cast<int>(t.colorB)<<","<<static_cast<int>(t.colorC)
+            <<" tex "<<static_cast<int>(t.textureIndex)<<" type "<<static_cast<int>(t.triangleType)<<" sub "<<static_cast<int>(t.triangleSubtype)<<" anim "<<t.animated<<"\\n";
+  }
  }
  REQUIRE(model.triangles.size()==polygonCount&&actualTriangleHash==expectedTriangleHash);
  REQUIRE(model.textures.size()==textureCount&&model.colors.size()==colorCount);
