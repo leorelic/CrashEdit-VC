@@ -4069,8 +4069,8 @@ void EditorUI::drawAnimationViewer(){
   if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;ImGui::ClearActiveID();}
   else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&(!boneRigWindowOpen_||!io.KeyShift)&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
-   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_||io.KeyShift;vertexBox.subtract=io.KeyCtrl;
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+   vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
    vertexBox.current=io.MousePos;
@@ -4107,13 +4107,13 @@ void EditorUI::drawAnimationViewer(){
     const ImVec2 handle(center.x+14.0f,center.y-14.0f);const float dx=io.MousePos.x-handle.x,dy=io.MousePos.y-handle.y;
     canStart=std::sqrt(dx*dx+dy*dy)<=10.0f;
    }
-   if(canStart)vertexDragStarted=beginVertexDrag(dragAxis);
+   if(canStart){vertexDragStarted=beginVertexDrag(dragAxis);if(vertexDragStarted)ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
   }
-  if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;}
+  if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;ImGui::ClearActiveID();}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
   const bool orbitDragging=ImGui::IsMouseDragging(ImGuiMouseButton_Middle)||
-   (boneRigWindowOpen_&&io.KeyShift&&ImGui::IsMouseDragging(ImGuiMouseButton_Left));
+   (io.KeyShift&&ImGui::IsMouseDragging(ImGuiMouseButton_Left));
   if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&orbitDragging){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
