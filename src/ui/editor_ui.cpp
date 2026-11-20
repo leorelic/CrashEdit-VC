@@ -4069,7 +4069,33 @@ void EditorUI::drawAnimationViewer(){
   if(boneRotationDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyBoneRotation();boneRotationDrag.active=false;ImGui::ClearActiveID();}
   else if(boneRotationDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyBoneRotation();
   bool vertexDragStarted=false;
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  int vertexGizmoAxis=-1;
+  bool vertexGizmoHandleHovered=false;
+  if(animationShowVertices_&&!animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove){
+   const auto gizmoPivot=selectedVertexPivot();
+   const ImVec2 gizmoCenter=project(gizmoPivot.x,gizmoPivot.y,gizmoPivot.z);
+   if(gizmoCenter.x>-99999.0f){
+    if(vertexToolMode==VertexToolMode::AxisMove){
+     const float axisLength=std::clamp(animationGridRadius_*0.28f,0.8f,8.0f);
+     float bestDistance=36.0f;
+     for(int axis=0;axis<3;++axis){
+      const auto direction=axisWorldVector(axis);
+      const ImVec2 end=project(gizmoPivot.x+direction.x*axisLength,gizmoPivot.y+direction.y*axisLength,gizmoPivot.z+direction.z*axisLength);
+      const float vx=end.x-gizmoCenter.x,vy=end.y-gizmoCenter.y,len2=vx*vx+vy*vy;
+      if(len2<1.0f)continue;
+      const float t=std::clamp(((io.MousePos.x-gizmoCenter.x)*vx+(io.MousePos.y-gizmoCenter.y)*vy)/len2,0.0f,1.0f);
+      const float dx=io.MousePos.x-(gizmoCenter.x+vx*t),dy=io.MousePos.y-(gizmoCenter.y+vy*t);
+      const float distance=std::sqrt(dx*dx+dy*dy);
+      if(t>0.12f&&distance<bestDistance){bestDistance=distance;vertexGizmoAxis=axis;}
+     }
+     vertexGizmoHandleHovered=vertexGizmoAxis>=0;
+    }else if(vertexToolMode==VertexToolMode::Scale&&animationSelectedVertices_.size()>=2U){
+     const ImVec2 handle(gizmoCenter.x+14.0f,gizmoCenter.y-14.0f);
+     vertexGizmoHandleHovered=std::hypot(io.MousePos.x-handle.x,io.MousePos.y-handle.y)<=12.0f;
+    }
+   }
+  }
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!vertexGizmoHandleHovered&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
@@ -4096,24 +4122,22 @@ void EditorUI::drawAnimationViewer(){
   }
   if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
-   const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
     canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
    else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
-    const float axisLength=std::clamp(animationGridRadius_*0.28f,0.8f,8.0f);float best=36.0f;
-    for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);const float vx=end.x-center.x,vy=end.y-center.y,len2=vx*vx+vy*vy;if(len2<1.0f)continue;const float t=std::clamp(((io.MousePos.x-center.x)*vx+(io.MousePos.y-center.y)*vy)/len2,0.0f,1.0f);const float dx=io.MousePos.x-(center.x+vx*t),dy=io.MousePos.y-(center.y+vy*t),distance=std::sqrt(dx*dx+dy*dy);if(t>0.12f&&distance<best){best=distance;dragAxis=axis;}}
-    canStart=dragAxis>=0;
+    dragAxis=vertexGizmoAxis;canStart=vertexGizmoHandleHovered;
    }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
-    const ImVec2 handle(center.x+14.0f,center.y-14.0f);const float dx=io.MousePos.x-handle.x,dy=io.MousePos.y-handle.y;
-    canStart=std::sqrt(dx*dx+dy*dy)<=10.0f;
+    canStart=vertexGizmoHandleHovered;
    }
    if(canStart){vertexDragStarted=beginVertexDrag(dragAxis);if(vertexDragStarted)ImGui::SetActiveID(ImGui::GetID("AnimationViewerCanvas"),ImGui::GetCurrentWindow());}
   }
   if(vertexDrag.active&&ImGui::IsMouseReleased(ImGuiMouseButton_Left)){applyVertexDrag();vertexDrag.active=false;ImGui::ClearActiveID();}
   else if(vertexDrag.active&&ImGui::IsMouseDragging(ImGuiMouseButton_Left,1.0f))applyVertexDrag();
   else if(vertexDrag.active&&!ImGui::IsMouseDown(ImGuiMouseButton_Left))vertexDrag.active=false;
-  const bool orbitDragging=ImGui::IsMouseDragging(ImGuiMouseButton_Middle)||
-   (io.KeyShift&&ImGui::IsMouseDragging(ImGuiMouseButton_Left));
+  const bool leftOrbitGesture=(animationShowVertices_||animationCollisionViewer_||boneRigWindowOpen_)
+   ?(io.KeyShift&&ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+   :ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+  const bool orbitDragging=ImGui::IsMouseDragging(ImGuiMouseButton_Middle)||leftOrbitGesture;
   if(active&&!viewportToolbarOwnsMouse&&!collisionGizmoOwnsMouse&&!vertexDrag.active&&!collisionDrag.active&&!vertexBox.pending&&!boneRotationDrag.active&&!boneRotationStarted&&!vertexDragStarted&&!collisionDragStarted&&orbitDragging){
    animationYaw_-=io.MouseDelta.x*0.005f;
    animationPitch_=std::clamp(animationPitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
@@ -4618,7 +4642,8 @@ dl->PopClipRect();
    "Numpad 0 or R    Reset and frame",
    "Middle Mouse drag    Orbit",
    "Left Mouse drag    Vertex / box selection",
-   "Shift + Left drag    Orbit with Bone List open",
+   "Left drag    Orbit when vertex selection is off",
+   "Shift + Left drag    Orbit in vertex / collision modes",
    "Right Mouse drag    Pan",
    "Mouse Wheel    Zoom",
    "W / A / S / D    Move camera",
