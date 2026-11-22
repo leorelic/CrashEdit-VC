@@ -3455,7 +3455,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
- if(animationShowVertices_&&!animationCollisionViewer_){
+ if(!animationCollisionViewer_){
   ImGui::SetCursorScreenPos(rotateMoveMin);const bool rotateMoveClicked=ImGui::InvisibleButton("##AnimationRotateMove",ImVec2(28.0f,26.0f));rotateMoveHovered=ImGui::IsItemHovered();
   if(rotateMoveClicked)boneRigRotateMode_=!boneRigRotateMode_;
   if(rotateMoveHovered)ImGui::SetTooltip(boneRigRotateMode_?"Disable Rotation Tool":"Rotate selected vertices or the selected bone");
@@ -3531,7 +3531,7 @@ void EditorUI::drawAnimationViewer(){
   const ImVec2 scaleCenter((scaleMoveMin.x+scaleMoveMax.x)*0.5f,(scaleMoveMin.y+scaleMoveMax.y)*0.5f);
   modeOverlay->AddCircle(scaleCenter,7.0f,modeTextColor,16,1.8f);modeOverlay->AddCircleFilled(ImVec2(scaleCenter.x+5,scaleCenter.y-5),2.0f,modeTextColor,8);
  }
- if(animationShowVertices_&&!animationCollisionViewer_){
+ if(!animationCollisionViewer_){
   drawModeButton(rotateMoveMin,rotateMoveMax,boneRigRotateMode_,rotateMoveHovered);
   const ImVec2 rotateIconCenter((rotateMoveMin.x+rotateMoveMax.x)*0.5f,(rotateMoveMin.y+rotateMoveMax.y)*0.5f);
   modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);
@@ -3923,7 +3923,11 @@ void EditorUI::drawAnimationViewer(){
    const float x2=v.x*cy+z1*sy,z2=-v.x*sy+z1*cy;
    return AnimationPoint(x2*cz-y1*sz,x2*sz+y1*cz,z2);
   };
-  auto selectedBoneValid=[&](){return boneRigRotateMode_&&animationShowVertices_&&!animationSelectedVertices_.empty()&&poseFrameIndex>=0&&frame.verticesDecoded;};
+  auto selectedBoneValid=[&](){
+   const bool hasBone=boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
+   const bool hasVertexSelection=animationShowVertices_&&!animationSelectedVertices_.empty();
+   return boneRigRotateMode_&&(hasBone||hasVertexSelection)&&poseFrameIndex>=0&&frame.verticesDecoded;
+  };
   auto bonePivotWorld=[&](){
    if(boneRigSelectedBone_<0||static_cast<std::size_t>(boneRigSelectedBone_)>=boneRigBones_.size()||boneRigModelEid_!=linkedModelEid)return selectedVertexPivot();
    const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
