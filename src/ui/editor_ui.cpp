@@ -4215,23 +4215,6 @@ void EditorUI::drawAnimationViewer(){
     }
    }
   }
-  if(selectedBoneValid()&&boneRigRotateMode_&&!boneRotationDrag.active){
-   const AnimationPoint pivot=bonePivotWorld();
-   const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
-   const ImU32 ringColors[3]={IM_COL32(245,85,85,245),IM_COL32(85,220,125,245),IM_COL32(95,165,255,245)};
-   for(int axis=0;axis<3;++axis){
-    ImVec2 previous{};
-    for(int segment=0;segment<=64;++segment){
-     const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;
-     const auto point=boneRingPoint(pivot,axis,angle,radius);
-     const ImVec2 current=project(point.x,point.y,point.z);
-     if(segment>0)dl->AddLine(previous,current,ringColors[axis],2.5f);
-     previous=current;
-    }
-   }
-   const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
-   if(center.x>-99999.0f)dl->AddCircleFilled(center,4.0f,IM_COL32(245,245,245,255),12);
-  }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
