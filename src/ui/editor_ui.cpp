@@ -3395,7 +3395,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::MenuItem("Disable Textures",nullptr,&animationTexturesDisabled_);
   ImGui::Separator();
   ImGui::TextUnformatted("Editing Guides");
-  ImGui::MenuItem("Show 0–254 Frame Bounds",nullptr,&animationFrameBoundsVisible_);
+  ImGui::MenuItem("Show Animation Coordinate Bounds",nullptr,&animationFrameBoundsVisible_);
 
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
@@ -3703,7 +3703,7 @@ void EditorUI::drawAnimationViewer(){
   };
    auto applyVertexDrag=[&](){
    if(!vertexDrag.active||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex)return;
-   const int maximumCoordinate=animation.isCrash3?255:254;
+   const int maximumCoordinate=255;
    const float sx=vertexDrag.pivotX,sy=vertexDrag.pivotY,sz=vertexDrag.pivotZ;
    const ImVec2 delta(io.MousePos.x-vertexDrag.mouseStart.x,io.MousePos.y-vertexDrag.mouseStart.y);
    float rawDx=0.0f,rawDy=0.0f,rawDz=0.0f;
@@ -4028,7 +4028,7 @@ void EditorUI::drawAnimationViewer(){
     return AnimationPoint(boneRotationDrag.pivot.x+rx,boneRotationDrag.pivot.y+ry,boneRotationDrag.pivot.z+rz);
    };
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
-   const int maximumCoordinate=animation.isCrash3?255:254;
+   const int maximumCoordinate=255;
    if(animation.isCrash3){
     indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
@@ -4410,9 +4410,11 @@ void EditorUI::drawAnimationViewer(){
        const int boundsEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
        ImVec2 projectedBounds[8];
        for(int i=0;i<8;++i){
-        const float x=rawCorners[i][0]*modelScaleX;
-        const float y=rawCorners[i][2]*modelScaleY;
-        const float z=rawCorners[i][1]*modelScaleZ;
+        // Match transformVertex(): offsets translate the model inside the
+        // fixed byte-coordinate volume; they do not change its dimensions.
+        const float x=(rawCorners[i][0]+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX;
+        const float y=(rawCorners[i][2]+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY;
+        const float z=(rawCorners[i][1]+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ;
         projectedBounds[i]=project(x,y,z);
        }
        for(const auto&edge:boundsEdges){
@@ -4420,7 +4422,7 @@ void EditorUI::drawAnimationViewer(){
         if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
        }
        const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
-       dl->AddText(labelPos,boundsColor,"Model coordinate space (0–255)");
+       dl->AddText(labelPos,boundsColor,"Animation coordinate limits (0–255)");
       }
       if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
