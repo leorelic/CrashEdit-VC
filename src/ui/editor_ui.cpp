@@ -4402,29 +4402,34 @@ void EditorUI::drawAnimationViewer(){
       }
 
       if(animationFrameBoundsVisible_){
-       // This is the model's fixed byte-coordinate volume, not the current
-       // frame's posed bounds. Frame offsets move the pose inside this space
-       // and must not move the guide itself.
-       const ImU32 boundsColor=IM_COL32(90,190,255,220);
-       const float rawCorners[8][3]={{0,0,0},{255,0,0},{0,255,0},{255,255,0},{0,0,255},{255,0,255},{0,255,255},{255,255,255}};
-       const int boundsEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
-       ImVec2 projectedBounds[8];
-       for(int i=0;i<8;++i){
-        // Match transformVertex(): offsets translate the model inside the
-        // fixed byte-coordinate volume; they do not change its dimensions.
-        const float x=(rawCorners[i][0]+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX;
-        const float y=(rawCorners[i][2]+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY;
-        const float z=(rawCorners[i][1]+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ;
-        projectedBounds[i]=project(x,y,z);
+        // CrashEdit-Re's Frame.MakeVertices expands Crash 3 coordinates by 8
+        // after decoding. The editor stores those expanded values in frame.vertices,
+        // so the guide must use the same coordinate scale as the active pose.
+        const int coordinateScale=animation.isCrash3?8:1;
+        const float maximumCoordinate=254.0f*static_cast<float>(coordinateScale);
+        const bool insideGameRange=std::all_of(frame.vertices.begin(),frame.vertices.end(),[&](const Crash::NsfAnimationVertex&v){
+         return v.x>=0&&v.y>=0&&v.z>=0&&v.x<=static_cast<int>(maximumCoordinate)&&v.y<=static_cast<int>(maximumCoordinate)&&v.z<=static_cast<int>(maximumCoordinate);
+        });
+        const ImU32 boundsColor=insideGameRange?IM_COL32(80,220,125,235):IM_COL32(245,75,75,245);
+        const float rawCorners[8][3]={{0,0,0},{maximumCoordinate,0,0},{0,maximumCoordinate,0},{maximumCoordinate,maximumCoordinate,0},{0,0,maximumCoordinate},{maximumCoordinate,0,maximumCoordinate},{0,maximumCoordinate,maximumCoordinate},{maximumCoordinate,maximumCoordinate,maximumCoordinate}};
+        const int boundsEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
+        ImVec2 projectedBounds[8];
+        for(int i=0;i<8;++i){
+         // Match CrashEdit-Re's viewer transform: swap Y/Z, add frame offsets,
+         // then apply the linked model's per-axis scale.
+         const float x=(rawCorners[i][0]+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX;
+         const float y=(rawCorners[i][2]+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY;
+         const float z=(rawCorners[i][1]+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ;
+         projectedBounds[i]=project(x,y,z);
+        }
+        for(const auto&edge:boundsEdges){
+         const ImVec2 a=projectedBounds[edge[0]],b=projectedBounds[edge[1]];
+         if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
+        }
+        const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
+        dl->AddText(labelPos,boundsColor,insideGameRange?"Animation coordinates inside 0–254":"Animation coordinates outside 0–254");
        }
-       for(const auto&edge:boundsEdges){
-        const ImVec2 a=projectedBounds[edge[0]],b=projectedBounds[edge[1]];
-        if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
-       }
-       const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
-       dl->AddText(labelPos,boundsColor,"Animation coordinate limits (0–255)");
-      }
-      if(animationCollisionViewer_&&!frame.collisions.empty()){
+       if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
        const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
        const int boxEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
