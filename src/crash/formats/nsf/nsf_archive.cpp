@@ -1073,9 +1073,9 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
  auto&frame=entry.animation.frames[frameIndex];if(!frame.verticesDecoded||vertexIndex>=frame.vertexCount)return false;
  const bool crash3=entry.animation.isCrash3;
  if(crash3){if(value%8!=0)return false;value/=8;}
- // Crash 2's observed animation coordinate space is 0-254. Keep the
- // Crash 3 byte-space behavior separate until its authoring rules are verified.
- const std::int32_t maximumCoordinate=crash3?255:254;
+ // Animation vertex components are stored/decoded as unsigned bytes.
+ // The full representable range is 0-255 (0-254 was an off-by-one cap).
+ const std::int32_t maximumCoordinate=255;
  if(value<0||value>maximumCoordinate)return false;
  const std::size_t fixedHeader=crash3?28U:24U;
  const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U;
