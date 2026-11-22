@@ -3394,6 +3394,9 @@ void EditorUI::drawAnimationViewer(){
   if(ImGui::MenuItem("Collision Viewer",nullptr,&animationCollisionViewer_)){if(animationCollisionViewer_&&vertexToolMode==VertexToolMode::FreeMove)vertexToolMode=VertexToolMode::AxisMove;}
   ImGui::MenuItem("Disable Textures",nullptr,&animationTexturesDisabled_);
   ImGui::Separator();
+  ImGui::TextUnformatted("Editing Guides");
+  ImGui::MenuItem("Show 0–254 Frame Bounds",nullptr,&animationFrameBoundsVisible_);
+
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
   const char*refreshSpeedLabel=editorPreferences.palRegion?"Full Speed (50 FPS)":"Full Speed (60 FPS)";
@@ -4398,6 +4401,29 @@ void EditorUI::drawAnimationViewer(){
        }
       }
 
+      if(animationFrameBoundsVisible_&&frame.verticesDecoded&&!frame.vertices.empty()){
+       bool withinEncodingRange=true;
+       for(const auto&v:frame.vertices){
+        if(v.x<0||v.x>254||v.y<0||v.y>254||v.z<0||v.z>254){withinEncodingRange=false;break;}
+       }
+       const ImU32 boundsColor=withinEncodingRange?IM_COL32(65,235,115,245):IM_COL32(255,65,65,250);
+       const float rawCorners[8][3]={{0,0,0},{254,0,0},{0,254,0},{254,254,0},{0,0,254},{254,0,254},{0,254,254},{254,254,254}};
+       const int boundsEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
+       ImVec2 projectedBounds[8];
+       for(int i=0;i<8;++i){
+        const float x=(rawCorners[i][0]+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX;
+        const float y=(rawCorners[i][2]+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY;
+        const float z=(rawCorners[i][1]+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ;
+        projectedBounds[i]=project(x,y,z);
+       }
+       for(const auto&edge:boundsEdges){
+        const ImVec2 a=projectedBounds[edge[0]],b=projectedBounds[edge[1]];
+        if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,2.0f);
+       }
+       const char*rangeLabel=withinEncodingRange?"Frame coordinates inside 0–254":"Frame coordinates outside 0–254";
+       const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
+       dl->AddText(labelPos,boundsColor,rangeLabel);
+      }
       if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
        const int boxFaces[6][4]={{0,1,3,2},{4,6,7,5},{0,4,5,1},{2,3,7,6},{0,2,6,4},{1,5,7,3}};
