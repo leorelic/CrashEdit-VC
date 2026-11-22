@@ -3408,17 +3408,11 @@ void EditorUI::drawAnimationViewer(){
   ImGui::EndPopup();
  }
  const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);
-  const ImVec2 boneRotateButtonMin(canvasMin.x+114.0f,canvasMin.y+8.0f),boneRotateButtonMax(boneRotateButtonMin.x+28.0f,boneRotateButtonMin.y+26.0f);
  ImGui::SetCursorScreenPos(boneButtonMin);
  const bool boneButtonClicked=ImGui::InvisibleButton("##AnimationBoneList",ImVec2(28.0f,26.0f));
  const bool boneButtonHovered=ImGui::IsItemHovered();
  if(boneButtonClicked)boneRigWindowOpen_=!boneRigWindowOpen_;
  if(boneButtonHovered)ImGui::SetTooltip("Bone List (B)");
-  ImGui::SetCursorScreenPos(boneRotateButtonMin);
-  const bool boneRotateButtonClicked=ImGui::InvisibleButton("##AnimationBoneRotate",ImVec2(28.0f,26.0f));
-  const bool boneRotateButtonHovered=ImGui::IsItemHovered();
-  if(boneRotateButtonClicked)boneRigRotateMode_=!boneRigRotateMode_;
-  if(boneRotateButtonHovered)ImGui::SetTooltip(boneRigRotateMode_?"Disable Rotation Tool":"Rotate Selected Vertices");
  const ImVec2 textureButtonMin(canvasMin.x+42.0f,canvasMin.y+8.0f);
  const ImVec2 textureButtonMax(textureButtonMin.x+28.0f,textureButtonMin.y+26.0f);
  bool textureButtonHovered=false;
@@ -3449,7 +3443,8 @@ void EditorUI::drawAnimationViewer(){
  const ImVec2 freeMoveMin(modeToolbarStart.x,modeToolbarStart.y+60.0f),freeMoveMax(freeMoveMin.x+28.0f,freeMoveMin.y+26.0f);
  const ImVec2 axisMoveMin(modeToolbarStart.x,axisMoveY),axisMoveMax(axisMoveMin.x+28.0f,axisMoveMin.y+26.0f);
  const ImVec2 scaleMoveMin(modeToolbarStart.x,axisMoveY+30.0f),scaleMoveMax(scaleMoveMin.x+28.0f,scaleMoveMin.y+26.0f);
- bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false;
+ const ImVec2 rotateMoveMin(modeToolbarStart.x,axisMoveY+60.0f),rotateMoveMax(rotateMoveMin.x+28.0f,rotateMoveMin.y+26.0f);
+ bool freeMoveHovered=false,axisMoveHovered=false,scaleMoveHovered=false,rotateMoveHovered=false;
  if(showVertexTransformToolbar){
   if(showFreeMoveButton){
    ImGui::SetCursorScreenPos(freeMoveMin);const bool freeMoveClicked=ImGui::InvisibleButton("##AnimationFreeMove",ImVec2(28.0f,26.0f));freeMoveHovered=ImGui::IsItemHovered();
@@ -3460,7 +3455,12 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
   if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
- bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||boneRotateButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
+ if(animationShowVertices_&&!animationCollisionViewer_){
+  ImGui::SetCursorScreenPos(rotateMoveMin);const bool rotateMoveClicked=ImGui::InvisibleButton("##AnimationRotateMove",ImVec2(28.0f,26.0f));rotateMoveHovered=ImGui::IsItemHovered();
+  if(rotateMoveClicked)boneRigRotateMode_=!boneRigRotateMode_;
+  if(rotateMoveHovered)ImGui::SetTooltip(boneRigRotateMode_?"Disable Rotation Tool":"Rotate selected vertices or the selected bone");
+ }
+ bool viewportToolbarOwnsMouse=toolbarHovered||boneButtonHovered||faceModeHovered||viewModeHovered||freeMoveHovered||axisMoveHovered||scaleMoveHovered||rotateMoveHovered||textureButtonHovered||ImGui::IsPopupOpen("AnimationViewportOptions")||animationTextureSelectorOpen_;
  viewportToolbarOwnsMouse=viewportToolbarOwnsMouse||cameraGuideButtonHover||cameraPanelHover;
  ImGui::PopStyleVar(2);
  ImGui::SetCursorScreenPos(canvasMin);
@@ -3508,12 +3508,6 @@ void EditorUI::drawAnimationViewer(){
  modeOverlay->AddLine(ImVec2(boneIconCenter.x-6.0f,boneIconCenter.y+5.0f),ImVec2(boneIconCenter.x+6.0f,boneIconCenter.y-5.0f),modeTextColor,4.0f);
  modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x-7.0f,boneIconCenter.y+6.0f),3.2f,modeTextColor,12);
  modeOverlay->AddCircleFilled(ImVec2(boneIconCenter.x+7.0f,boneIconCenter.y-6.0f),3.2f,modeTextColor,12);
-  modeOverlay->AddRectFilled(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(boneRigRotateMode_?ImGuiCol_ButtonActive:(boneRotateButtonHovered?ImGuiCol_ButtonHovered:ImGuiCol_Button)),4.0f);
-  modeOverlay->AddRect(boneRotateButtonMin,boneRotateButtonMax,ImGui::GetColorU32(ImGuiCol_Border),4.0f);
-  const ImVec2 rotateIconCenter((boneRotateButtonMin.x+boneRotateButtonMax.x)*0.5f,(boneRotateButtonMin.y+boneRotateButtonMax.y)*0.5f);
-  modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);
-  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+7.0f,rotateIconCenter.y-5.0f),modeTextColor,2.0f);
-  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+4.0f,rotateIconCenter.y-2.0f),modeTextColor,2.0f);
  drawModeButton(faceButtonMin,faceButtonMax,animationFaceEditing_,faceModeHovered);
  const ImVec2 faceIconCenter((faceButtonMin.x+faceButtonMax.x)*0.5f,(faceButtonMin.y+faceButtonMax.y)*0.5f);
  modeOverlay->AddLine(ImVec2(faceIconCenter.x-5,faceIconCenter.y+5),ImVec2(faceIconCenter.x+5,faceIconCenter.y-5),modeTextColor,2.5f);
@@ -3536,6 +3530,13 @@ void EditorUI::drawAnimationViewer(){
   modeOverlay->AddLine(ImVec2(axisCenter.x-7,axisCenter.y+6),ImVec2(axisCenter.x-7,axisCenter.y-6),IM_COL32(85,155,245,255),2.0f);
   const ImVec2 scaleCenter((scaleMoveMin.x+scaleMoveMax.x)*0.5f,(scaleMoveMin.y+scaleMoveMax.y)*0.5f);
   modeOverlay->AddCircle(scaleCenter,7.0f,modeTextColor,16,1.8f);modeOverlay->AddCircleFilled(ImVec2(scaleCenter.x+5,scaleCenter.y-5),2.0f,modeTextColor,8);
+ }
+ if(animationShowVertices_&&!animationCollisionViewer_){
+  drawModeButton(rotateMoveMin,rotateMoveMax,boneRigRotateMode_,rotateMoveHovered);
+  const ImVec2 rotateIconCenter((rotateMoveMin.x+rotateMoveMax.x)*0.5f,(rotateMoveMin.y+rotateMoveMax.y)*0.5f);
+  modeOverlay->AddCircle(rotateIconCenter,7.0f,modeTextColor,24,2.0f);
+  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+7.0f,rotateIconCenter.y-5.0f),modeTextColor,2.0f);
+  modeOverlay->AddLine(ImVec2(rotateIconCenter.x+2.0f,rotateIconCenter.y-7.0f),ImVec2(rotateIconCenter.x+4.0f,rotateIconCenter.y-2.0f),modeTextColor,2.0f);
  }
  drawModeButton(viewButtonMin,viewButtonMax,!animationFaceEditing_,viewModeHovered);
   const ImVec2 handCenter(viewButtonMin.x+14.0f,(viewButtonMin.y+viewButtonMax.y)*0.5f);
@@ -4188,7 +4189,7 @@ void EditorUI::drawAnimationViewer(){
   if(animationFaceEditing_&&hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
    animationSelectedFace_=hoveredFace;animationPlaying_=false;
   }
-  if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
+  if(animationShowVertices_&&!boneRigRotateMode_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
      (vertexToolMode!=VertexToolMode::Scale||animationSelectedVertices_.size()>=2U)){
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(center.x>-99999.0f){
@@ -4203,6 +4204,23 @@ void EditorUI::drawAnimationViewer(){
      dl->AddCircleFilled(ImVec2(center.x+14.0f,center.y-14.0f),5.0f,IM_COL32(255,205,80,255),12);
     }
    }
+  }
+  if(selectedBoneValid()&&boneRigRotateMode_&&!boneRotationDrag.active){
+   const AnimationPoint pivot=bonePivotWorld();
+   const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
+   const ImU32 ringColors[3]={IM_COL32(245,85,85,245),IM_COL32(85,220,125,245),IM_COL32(95,165,255,245)};
+   for(int axis=0;axis<3;++axis){
+    ImVec2 previous{};
+    for(int segment=0;segment<=64;++segment){
+     const float angle=6.28318530718f*static_cast<float>(segment)/64.0f;
+     const auto point=boneRingPoint(pivot,axis,angle,radius);
+     const ImVec2 current=project(point.x,point.y,point.z);
+     if(segment>0)dl->AddLine(previous,current,ringColors[axis],2.5f);
+     previous=current;
+    }
+   }
+   const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
+   if(center.x>-99999.0f)dl->AddCircleFilled(center,4.0f,IM_COL32(245,245,245,255),12);
   }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
