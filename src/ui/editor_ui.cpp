@@ -3092,7 +3092,7 @@ void EditorUI::drawAnimationFrameEditor(){
       indices.push_back(static_cast<std::size_t>(selectedIndex));targets.push_back(target);
      }
      if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
-      status_="The multi-vertex edit is outside the Crash 2 0–254 coordinate range or cannot be represented by the selected temporal deltas; no vertices were changed.";
+      status_="The multi-vertex edit is outside the Crash 2 0–255 byte-coordinate range or cannot be represented by the current compressed deltas; no vertices were changed.";
     }
     ImGui::PopID();
    }
@@ -3582,7 +3582,7 @@ void EditorUI::drawAnimationViewer(){
     const float scaleX=std::fabs(sx)>1.0e-8f?sx:fallbackScale;
     const float scaleY=std::fabs(sy)>1.0e-8f?sy:fallbackScale;
     const float scaleZ=std::fabs(sz)>1.0e-8f?sz:fallbackScale;
-    const float coordinateLimit=254.0f*static_cast<float>(animation.isCrash3?8:1);
+    const float coordinateLimit=255.0f*static_cast<float>(animation.isCrash3?8:1);
     for(int corner=0;corner<8;++corner){
      const float x=(corner&1)?coordinateLimit:0.0f;
      const float y=(corner&2)?coordinateLimit:0.0f;
@@ -4088,8 +4088,8 @@ void EditorUI::drawAnimationViewer(){
     }
     int minimum[3]={std::numeric_limits<int>::max(),std::numeric_limits<int>::max(),std::numeric_limits<int>::max()},maximum[3]={std::numeric_limits<int>::min(),std::numeric_limits<int>::min(),std::numeric_limits<int>::min()};
     for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
-    int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>254?maximum[0]-254:0),minimum[1]<0?minimum[1]:(maximum[1]>254?maximum[1]-254:0),minimum[2]<0?minimum[2]:(maximum[2]>254?maximum[2]-254:0)};
-    for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>254){status_="Rotation cannot fit the transformed geometry into the Crash 2 coordinate range.";return;}
+    int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>255?maximum[0]-255:0),minimum[1]<0?minimum[1]:(maximum[1]>255?maximum[1]-255:0),minimum[2]<0?minimum[2]:(maximum[2]>255?maximum[2]-255:0)};
+    for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>255){status_="Rotation cannot fit the transformed geometry into the Crash 2 byte-coordinate range.";return;}
     int newOffsets[3]={static_cast<int>(boneRotationDrag.initialOffsets[0])+shift[0]*4,static_cast<int>(boneRotationDrag.initialOffsets[1])+shift[2]*4,static_cast<int>(boneRotationDrag.initialOffsets[2])+shift[1]*4};
     for(int a=0;a<3;++a){if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
     for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
@@ -4429,7 +4429,7 @@ void EditorUI::drawAnimationViewer(){
         // after decoding. The editor stores those expanded values in frame.vertices,
         // so the guide must use the same coordinate scale as the active pose.
         const int coordinateScale=animation.isCrash3?8:1;
-        const float maximumCoordinate=254.0f*static_cast<float>(coordinateScale);
+        const float maximumCoordinate=255.0f*static_cast<float>(coordinateScale);
         const bool insideGameRange=std::all_of(frame.vertices.begin(),frame.vertices.end(),[&](const Crash::NsfAnimationVertex&v){
          return v.x>=0&&v.y>=0&&v.z>=0&&v.x<=static_cast<int>(maximumCoordinate)&&v.y<=static_cast<int>(maximumCoordinate)&&v.z<=static_cast<int>(maximumCoordinate);
         });
@@ -4450,7 +4450,7 @@ void EditorUI::drawAnimationViewer(){
          if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
         }
         const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
-        dl->AddText(labelPos,boundsColor,insideGameRange?"Animation coordinates inside 0–254":"Animation coordinates outside 0–254");
+        dl->AddText(labelPos,boundsColor,insideGameRange?"Animation coordinates inside 0–255":"Animation coordinates outside 0–255");
        }
        if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
@@ -5300,7 +5300,7 @@ void EditorUI::drawBoneRigEditor(){
       std::vector<Crash::NsfAnimationVertex>rest;rest.reserve(count);
       for(std::size_t v=0;v<count;++v){
        Crash::NsfAnimationVertex value;
-       const int maximumRestCoordinate=animation.isCrash3?2040:254;
+       const int maximumRestCoordinate=animation.isCrash3?2040:255;
        if(!(input>>value.x>>value.y>>value.z)||value.x<0||value.x>maximumRestCoordinate||value.y<0||value.y>maximumRestCoordinate||value.z<0||value.z>maximumRestCoordinate){valid=false;break;}
        rest.push_back(value);
       }
