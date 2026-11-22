@@ -4401,28 +4401,26 @@ void EditorUI::drawAnimationViewer(){
        }
       }
 
-      if(animationFrameBoundsVisible_&&frame.verticesDecoded&&!frame.vertices.empty()){
-       bool withinEncodingRange=true;
-       for(const auto&v:frame.vertices){
-        if(v.x<0||v.x>254||v.y<0||v.y>254||v.z<0||v.z>254){withinEncodingRange=false;break;}
-       }
-       const ImU32 boundsColor=withinEncodingRange?IM_COL32(65,235,115,245):IM_COL32(255,65,65,250);
-       const float rawCorners[8][3]={{0,0,0},{254,0,0},{0,254,0},{254,254,0},{0,0,254},{254,0,254},{0,254,254},{254,254,254}};
+      if(animationFrameBoundsVisible_){
+       // This is the model's fixed byte-coordinate volume, not the current
+       // frame's posed bounds. Frame offsets move the pose inside this space
+       // and must not move the guide itself.
+       const ImU32 boundsColor=IM_COL32(90,190,255,220);
+       const float rawCorners[8][3]={{0,0,0},{255,0,0},{0,255,0},{255,255,0},{0,0,255},{255,0,255},{0,255,255},{255,255,255}};
        const int boundsEdges[12][2]={{0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7}};
        ImVec2 projectedBounds[8];
        for(int i=0;i<8;++i){
-        const float x=(rawCorners[i][0]+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX;
-        const float y=(rawCorners[i][2]+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY;
-        const float z=(rawCorners[i][1]+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ;
+        const float x=rawCorners[i][0]*modelScaleX;
+        const float y=rawCorners[i][2]*modelScaleY;
+        const float z=rawCorners[i][1]*modelScaleZ;
         projectedBounds[i]=project(x,y,z);
        }
        for(const auto&edge:boundsEdges){
         const ImVec2 a=projectedBounds[edge[0]],b=projectedBounds[edge[1]];
-        if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,2.0f);
+        if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
        }
-       const char*rangeLabel=withinEncodingRange?"Frame coordinates inside 0–254":"Frame coordinates outside 0–254";
        const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
-       dl->AddText(labelPos,boundsColor,rangeLabel);
+       dl->AddText(labelPos,boundsColor,"Model coordinate space (0–255)");
       }
       if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
