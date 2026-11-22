@@ -3924,17 +3924,23 @@ void EditorUI::drawAnimationViewer(){
    return AnimationPoint(x2*cz-y1*sz,x2*sz+y1*cz,z2);
   };
   auto selectedBoneValid=[&](){
-   const bool hasBone=boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
+   const bool hasBone=boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
    const bool hasVertexSelection=animationShowVertices_&&!animationSelectedVertices_.empty();
    return boneRigRotateMode_&&(hasBone||hasVertexSelection)&&poseFrameIndex>=0&&frame.verticesDecoded;
   };
   auto bonePivotWorld=[&](){
    if(boneRigSelectedBone_<0||static_cast<std::size_t>(boneRigSelectedBone_)>=boneRigBones_.size()||boneRigModelEid_!=linkedModelEid)return selectedVertexPivot();
    const auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
-   if(!bone.pivotInitialized||bone.vertices.empty())return selectedVertexPivot();
-   return AnimationPoint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
-                         (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
-                         (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+   if(bone.pivotInitialized&&!bone.vertices.empty())
+    return AnimationPoint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
+                          (bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
+                          (bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+   AnimationPoint pivot(0.0f,0.0f,0.0f);std::size_t count=0;
+   for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<displayPositions.size()){
+    const auto&p=displayPositions[static_cast<std::size_t>(index)];pivot.x+=p.x;pivot.y+=p.y;pivot.z+=p.z;++count;
+   }
+   if(count){const float inv=1.0f/static_cast<float>(count);pivot.x*=inv;pivot.y*=inv;pivot.z*=inv;return pivot;}
+   return selectedVertexPivot();
   };
   const std::uint64_t boneRotationKey=(static_cast<std::uint64_t>(animationEntry->eid)<<32U)|static_cast<std::uint32_t>(poseFrameIndex);
   auto boneEuler=[&]()->std::array<float,3>{
