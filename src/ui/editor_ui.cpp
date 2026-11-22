@@ -3395,7 +3395,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::MenuItem("Disable Textures",nullptr,&animationTexturesDisabled_);
   ImGui::Separator();
   ImGui::TextUnformatted("Editing Guides");
-  ImGui::MenuItem("Show Animation Coordinate Bounds",nullptr,&animationFrameBoundsVisible_);
+  if(ImGui::MenuItem("Show Animation Coordinate Bounds",nullptr,&animationFrameBoundsVisible_))animationCameraInitialized_=false;
 
   ImGui::TextUnformatted("Playback timing");
   const char*gameSpeedLabel=editorPreferences.palRegion?"Game speed (25 FPS)":"Game speed (30 FPS)";
@@ -3561,14 +3561,37 @@ void EditorUI::drawAnimationViewer(){
   // opening the animation. Later offset edits move the geometry without recentering.
   AnimationPoint boundsMin(FLT_MAX,FLT_MAX,FLT_MAX),boundsMax(-FLT_MAX,-FLT_MAX,-FLT_MAX);
   bool haveBounds=false;
+  auto includeCameraPoint=[&](const AnimationPoint&p){
+   boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
+   boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
+   haveBounds=true;
+  };
   for(const auto&candidate:animation.frames){
    if(!candidate.verticesDecoded)continue;
    const auto*candidateModel=findModel(animation.isCrash3?candidate.linkedModelEid:candidate.modelEid);
-   for(const auto&v:candidate.vertices){
-    const AnimationPoint p=transformVertex(v,candidate,candidateModel);
-    boundsMin.x=std::min(boundsMin.x,p.x);boundsMin.y=std::min(boundsMin.y,p.y);boundsMin.z=std::min(boundsMin.z,p.z);
-    boundsMax.x=std::max(boundsMax.x,p.x);boundsMax.y=std::max(boundsMax.y,p.y);boundsMax.z=std::max(boundsMax.z,p.z);
-    haveBounds=true;
+   for(const auto&v:candidate.vertices)includeCameraPoint(transformVertex(v,candidate,candidateModel));
+   if(animationFrameBoundsVisible_){
+    // The guide can be much larger than the posed mesh. Include its corners
+    // when fitting the camera, otherwise animations with small poses and large
+    // model scales show only a clipped section of the coordinate volume.
+    constexpr float modelScaleDenominator=3200.0f*128.0f;
+    constexpr float fallbackScale=1.0f/128.0f;
+    const float sx=candidateModel?static_cast<float>(candidateModel->scaleX)/modelScaleDenominator:fallbackScale;
+    const float sy=candidateModel?static_cast<float>(candidateModel->scaleY)/modelScaleDenominator:fallbackScale;
+    const float sz=candidateModel?static_cast<float>(candidateModel->scaleZ)/modelScaleDenominator:fallbackScale;
+    const float scaleX=std::fabs(sx)>1.0e-8f?sx:fallbackScale;
+    const float scaleY=std::fabs(sy)>1.0e-8f?sy:fallbackScale;
+    const float scaleZ=std::fabs(sz)>1.0e-8f?sz:fallbackScale;
+    const float coordinateLimit=254.0f*static_cast<float>(animation.isCrash3?8:1);
+    for(int corner=0;corner<8;++corner){
+     const float x=(corner&1)?coordinateLimit:0.0f;
+     const float y=(corner&2)?coordinateLimit:0.0f;
+     const float z=(corner&4)?coordinateLimit:0.0f;
+     includeCameraPoint(AnimationPoint(
+      (x+static_cast<float>(candidate.xOffset)/4.0f)*scaleX,
+      (z+static_cast<float>(candidate.yOffset)/4.0f)*scaleY,
+      (y+static_cast<float>(candidate.zOffset)/4.0f)*scaleZ));
+    }
    }
   }
   if(!haveBounds){boundsMin=AnimationPoint{-1,-1,-1};boundsMax=AnimationPoint{1,1,1};}
