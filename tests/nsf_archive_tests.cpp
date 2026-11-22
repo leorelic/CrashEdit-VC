@@ -236,9 +236,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedFrames[1].x==0&&compressedFrames[1].y==10&&compressedFrames[1].z==0);
  assert(compressedFrames[2].x==50&&compressedFrames[2].y==60&&compressedFrames[2].z==70);
  for(std::size_t i=0;i<40U;++i)assert(compressedArchive.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
+ // Crash 2 frame coordinates use the full unsigned-byte range, including 255.
+ assert(compressedArchive.setAnimationFrameVertex(1,0,0,0,0,255));
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==255);
  std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
  const auto&compressedReloaded=compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices;
- assert(compressedReloaded[0].x==20&&compressedReloaded[0].y==30&&compressedReloaded[0].z==40);
+ assert(compressedReloaded[0].x==255&&compressedReloaded[0].y==30&&compressedReloaded[0].z==40);
  assert(compressedReloaded[1].x==0&&compressedReloaded[1].y==10&&compressedReloaded[1].z==0);
  assert(compressedReloaded[2].x==50&&compressedReloaded[2].y==60&&compressedReloaded[2].z==70);
  for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
