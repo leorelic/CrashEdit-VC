@@ -36,7 +36,7 @@ private:
  std::uint32_t boneRigModelEid_=0,boneRigAnimationEid_=0;
  bool boneRigRotateMode_=false,boneRigLocalSpace_=true,boneRigUsePivot_=true;
  char boneRigName_[64]="Bone";
- bool boneRigWindowOpen_=true;
+ bool boneRigWindowOpen_=false;
  bool chunkExpansionDialog_=false;
  int chunkExpansionOperation_=0,chunkExpansionSourceChunk_=-1,chunkExpansionSourceEntry_=-1;
  std::size_t chunkExpansionFrame_=0;
