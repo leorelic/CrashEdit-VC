@@ -4000,7 +4000,7 @@ void EditorUI::drawAnimationViewer(){
       if(offsetIt!=bone.frameRestOffsets.end())boneRotationDrag.restOffsets=offsetIt->second;
       else boneRotationDrag.restOffsets={frame.xOffset,frame.yOffset,frame.zOffset};
      }else boneRotationDrag.restOffsets={frame.xOffset,frame.yOffset,frame.zOffset};
-    }
+    }else boneRotationDrag.restOffsets={frame.xOffset,frame.yOffset,frame.zOffset};
     for(std::size_t i=0;i<rotationVertices.size();++i){
      const int index=rotationVertices[i];if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
      boneRotationDrag.indices.push_back(index);
