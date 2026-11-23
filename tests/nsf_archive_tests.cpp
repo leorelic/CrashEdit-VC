@@ -322,6 +322,19 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[1].xBits==1U&&expandedRoundTrip.chunks()[0].entries[0].model.positions[1].yBits==1U&&expandedRoundTrip.chunks()[0].entries[0].model.positions[1].zBits==1U);
  assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==2);
 
+ // Regression for BT10V-like edits: the first compressed vertex remains
+ // representable/unchanged, while a later vertex needs a wider delta. Save
+ // must not mistake the first vertex's successful probe for a full-frame write.
+ NsfArchive laterVertexArchive;assert(laterVertexArchive.loadBytes(narrowArchiveBytes,e));laterVertexArchive.decodeAnimationModels(false);
+ const auto firstBefore=laterVertexArchive.chunks()[1].entries[0].animation.frames[0].vertices[0];
+ const auto laterBefore=laterVertexArchive.chunks()[1].entries[0].animation.frames[0].vertices[1];
+ assert(laterVertexArchive.setAnimationFrameVertex(1,0,0,1,0,static_cast<std::int32_t>((laterBefore.x+2)&0xff)));
+ std::vector<std::uint8_t> laterVertexBytes;assert(laterVertexArchive.saveUncompressedBytes(laterVertexBytes,e));
+ NsfArchive laterVertexReload;assert(laterVertexReload.loadBytes(laterVertexBytes,e));laterVertexReload.decodeAnimationModels(false);
+ const auto&laterVertices=laterVertexReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(laterVertices[0].x==firstBefore.x&&laterVertices[0].y==firstBefore.y&&laterVertices[0].z==firstBefore.z);
+ assert(laterVertices[1].x==((laterBefore.x+2)&0xff));
+
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
  std::vector<std::uint8_t> timelineChunk(65536);p16(timelineChunk,0,0x1234);p16(timelineChunk,2,0);p32(timelineChunk,4,8);p32(timelineChunk,8,2);
