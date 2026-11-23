@@ -225,8 +225,10 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(uncompressedAnimationChunk,uaFrame+8,3);p32(uncompressedAnimationChunk,uaFrame+12,0);p32(uncompressedAnimationChunk,uaFrame+16,0x0200007b);p32(uncompressedAnimationChunk,uaFrame+20,24);
  const std::vector<NsfAnimationVertex> uncompressedBasePose{{10,20,30},{40,50,60},{70,80,90}};
  std::vector<std::uint8_t> logicalBits(96U,0U),temporalBits(96U,0U);std::size_t logicalBit=0;
- for(const auto&vertex:uncompressedBasePose)for(const auto value:{vertex.x,vertex.y,vertex.z})
+ for(const auto&vertex:uncompressedBasePose)for(std::size_t axis=0;axis<3U;++axis){
+  const std::int32_t value=axis==0U?vertex.x:axis==1U?vertex.y:vertex.z;
   for(unsigned bit=0;bit<8U;++bit)logicalBits[logicalBit++]=static_cast<std::uint8_t>((static_cast<std::uint32_t>(value)>>(7U-bit))&1U);
+ }
  for(std::size_t base=0;base<temporalBits.size();base+=32U)for(std::size_t byte=0;byte<4U;++byte)for(std::size_t bit=0;bit<8U;++bit)
   temporalBits[base+byte*8U+bit]=logicalBits[base+24U-byte*8U+bit];
  for(std::size_t word=0;word<3U;++word){std::uint32_t raw=0;for(std::size_t bit=0;bit<32U;++bit)raw=(raw<<1U)|temporalBits[word*32U+bit];p32(uncompressedAnimationChunk,uaFrame+24U+word*4U,raw);}
@@ -235,7 +237,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  uncompressedArchiveBytes.insert(uncompressedArchiveBytes.end(),uncompressedAnimationChunk.begin(),uncompressedAnimationChunk.end());
  NsfArchive uncompressedEditArchive;assert(uncompressedEditArchive.loadBytes(uncompressedArchiveBytes,e));uncompressedEditArchive.decodeAnimationModels(false);
  assert(uncompressedEditArchive.chunks()[0].entries[0].model.decoded&&!uncompressedEditArchive.chunks()[0].entries[0].model.compressed);
- assert(uncompressedEditArchive.chunks()[1].entries[0].animation.frames[0].vertices==uncompressedBasePose);
+ const auto&uncompressedInitialVertices=uncompressedEditArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ for(std::size_t vi=0;vi<uncompressedBasePose.size();++vi){
+  assert(uncompressedInitialVertices[vi].x==uncompressedBasePose[vi].x);
+  assert(uncompressedInitialVertices[vi].y==uncompressedBasePose[vi].y);
+  assert(uncompressedInitialVertices[vi].z==uncompressedBasePose[vi].z);
+ }
  std::vector<NsfAnimationVertex> uncompressedExpected=uncompressedBasePose;
  uncompressedExpected[1].y=81;uncompressedExpected[2].x=95;uncompressedExpected[2].z=101;
  assert(uncompressedEditArchive.setAnimationFrameVertex(1,0,0,1,1,81));
