@@ -189,7 +189,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const std::vector<NsfAnimationVertex> unrestrictedBatchTargets{{0,300,16}};
  assert(a.setAnimationFrameVertices(0,0,0,batchVertexIndices,unrestrictedBatchTargets));
  assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==300);
- const std::vector<NsfAnimationVertex> validBatchTargets{{0,88,16}};
+ const std::vector<NsfAnimationVertex> validBatchTargets{{80,88,96}};
  assert(a.setAnimationFrameVertices(0,0,0,batchVertexIndices,validBatchTargets));
  assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
  const std::vector<std::size_t> duplicateVertexIndices{0,0};
@@ -203,7 +203,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(!a.setAnimationFrameVerticesRebased(0,0,0,batchVertexIndices,validBatchTargets,40000,-8,4));
  assert(a.chunks()[0].entries[0].animation.frames[0].xOffset==12);
  std::vector<std::uint8_t> editedVertexNsf;assert(a.saveUncompressedBytes(editedVertexNsf,e));NsfArchive vertexRoundTrip;assert(vertexRoundTrip.loadBytes(editedVertexNsf,e));vertexRoundTrip.decodeAnimationModels(true);
- assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
+ const auto&uncompressedReloaded=vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0];
+ assert(uncompressedReloaded.x==80&&uncompressedReloaded.y==88&&uncompressedReloaded.z==96);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].xOffset==12);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].yOffset==-8);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].zOffset==4);
