@@ -43,6 +43,7 @@ This is the high-level project checklist. The detailed implementation plans and 
 
 - [GOOL Development Roadmap](docs/GOOL_ROADMAP.md) — inspection, decompilation, native MIPS analysis, future authoring and recompilation.
 - [Model Editor Roadmap](docs/MODEL_EDITOR_ROADMAP.md) — Model/Animation editing, visual transforms, Bone Rig foundation, collision editing, Scenery/Geometry work and PS1 texture import/export.
+- [Project Milestones](docs/MILESTONES.md) — verified checkpoints, user-tested progress and remaining acceptance work.
 - [NSF Entry Support Research](docs/NSF_ENTRY_SUPPORT_RESEARCH.md) — resource layouts, decoding research and compatibility notes.
 - [Research Notes](docs/RESEARCH_NOTES.md) — confirmed findings, open questions and implementation evidence.
 
