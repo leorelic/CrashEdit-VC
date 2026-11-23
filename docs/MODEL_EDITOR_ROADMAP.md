@@ -180,7 +180,9 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 ### Animation pose editing and serialization
 
 - [x] Implement compressed signed-delta and uncompressed byte-stream temporal vertex encoders based on the established CrashEdit-RE `Frame.MakeVertices(model)` decode ordering.
+- [x] Preserve the complete desired pose while writing uncompressed frames: component writes re-decode the frame, so the save path restores the remaining edited coordinates between writes and verifies the final decoded pose exactly.
 - [x] Support edits to selected decoded animation vertices while preserving unrelated temporal bits, collision data, special-vertex bytes and frame metadata; reject values that cannot be represented by the frame's bit widths.
+- [x] User-confirmed in-game save milestone: edits to both Crash's `Cr10V` special/ear vertices and the uncompressed `BT10V` animation now persist after saving.
 - [x] Preserve the Model's compressed-position table and all other Animation frames that reference the Model when editing a single frame's temporal stream.
 - [x] Keep topology/vertex-count changes disabled as cross-resource operations until every dependent frame can be updated and round-tripped.
 - [x] Re-decode the edited Animation frame after temporal writes without resetting the viewer camera; fixed-size Model edits refresh the shared Model data directly.
@@ -191,6 +193,7 @@ This is one connected Model + Animation Editor feature, not a sequence of user-f
 - [x] Inspect real Crash 2 Model/Animation pairs: `El1eG` / `El1eV` and `Cr10G` / `Cr10V`; confirm all Animation frames link to the expected Model and have the expected decoded vertex counts.
 - [x] Run the native C++ parser/serializer on the extracted real-sample Model/Animation pairs; decoded triangle/frame golden hashes match and the raw Model and Animation entry bytes remain identical after save/reload.
 - [x] Test targeted edits to Model colors, descriptors, scale, TPAG EID, face texture flag, per-corner color reference and extended-texture word, plus compressed/uncompressed and multi-vertex Animation writes, atomic rejection, rebasing and save/reload in synthetic NSF fixtures.
+- [x] Add a dedicated uncompressed multi-vertex save regression that edits later vertices and multiple axes, saves/reloads the NSF, and verifies every decoded coordinate.
 - [x] Verify NSF save/reload and checksum handling for synthetic fixed-size Model edits and compressed/uncompressed Animation vertex edits. Real archive-wide preservation testing remains pending.
 - [ ] Exercise malformed counts, truncated items, invalid texture indices, missing TPAG pages, invalid animation links and extended-texture boundary cases.
 - [ ] Keep Crash 2 as the acceptance target. Validate Crash 3-specific model/frame behavior separately and do not generalize it from Crash 2 samples.
@@ -204,7 +207,13 @@ The private companion repository `leorelic/CrashEdit-VC-Game-Samples` contains:
 
 The Cr10G sample has 309 vertices, 574 reconstructed triangles, 760 polygon words, 917 texture descriptors, 90 color records, 14 extended-texture records and one TPAG EID (`4CD8206F`). All 14 extended records are flipbook-style (not LOD); animated triangles resolve through texture indices 0–13. The Cr10V sample has 11 frames, each with 309 vertices, and every frame links to Cr10G. The El1eG baseline has 38 vertices, 64 reconstructed triangles, 108 polygon words, 25 texture descriptors, 15 color records, no extended-texture records and three TPAG EIDs; El1eV has seven frames of 38 vertices, all linked to El1eG. A comparison of the reconstructed triangle records against CrashEdit-RE `ModelEntry.ConvertIndices()` matched all indices, corner-color references, texture indices/flags and triangle types/subtypes for both models. The native frame decoder follows the `Frame.MakeVertices()` signed X-Z-Y temporal order and the real samples confirm expected frame/model links and vertex counts. The private native C++ workflow now checks golden hashes for all reconstructed triangles and decoded frame vertex streams, then confirms that extracted Model and Animation entry bytes are unchanged after save/reload. Full-archive and original-game validation remain open; preserve the counts as regression expectations and continue investigating exact descriptor-index boundary semantics rather than assuming the final offset/mask range is invalid.
 
-## Current implementation status (2026-11-19)
+## Current implementation status (2026-11-23)
+
+- [x] **Animation vertex save milestone — checkpoint [`4b65928`](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e).** Fixed the uncompressed Animation save path: each component write re-decodes the frame, so the save routine now preserves the complete intended pose between writes and verifies the decoded result before committing.
+- [x] User-tested in the original game: edited `Cr10V` Crash ear vertices save and work when their values fit the frame's encoding; edited `BT10V` vertices now also persist instead of reverting to defaults.
+- [x] Added synthetic multi-vertex uncompressed-frame regression coverage, including later vertices and multiple coordinate axes, with save/reload verification.
+- [ ] **Known limitation to resolve next:** some `Cr10V` ear movements are rejected when they exceed the frame encoder's representable range, even if they remain inside the viewer's displayed boundary. The visual boundary and actual serialization limits must be reconciled; do not silently clamp or discard edits.
+
 
 - [x] Animation vertex point display, V shortcut, depth-aware overlay, hover/selection and selected-vertex inspection — user-confirmed working before this implementation.
 - [x] Shared decoded Model data supports validated fixed-size edits for scale values, TPAG EIDs, color records, texture descriptors, extended-texture words, face texture/animated flags and per-corner color references.
