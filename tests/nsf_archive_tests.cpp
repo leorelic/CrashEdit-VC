@@ -236,6 +236,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedFrames[1].x==0&&compressedFrames[1].y==10&&compressedFrames[1].z==0);
  assert(compressedFrames[2].x==50&&compressedFrames[2].y==60&&compressedFrames[2].z==70);
  for(std::size_t i=0;i<40U;++i)assert(compressedArchive.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
+ for(std::size_t i=0;i<12U;++i)assert(compressedArchive.chunks()[1].bytes[caFrame+64U+i]==compressedAnimationChunk[caFrame+64U+i]);
  // Crash 2 frame coordinates use the full unsigned-byte range, including 255.
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,0,0,255));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==255);
