@@ -3116,8 +3116,8 @@ void EditorUI::drawAnimationFrameEditor(){
    std::size_t outsideComponents=0;
    for(const auto&v:frame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(const auto value:values)if(value<0||value>255)++outsideComponents;}
    ImGui::TextColored(ImVec4(0.95f,0.72f,0.28f,1.0f),"Working pose has unsaved edits.");
-   if(outsideComponents>0U)ImGui::TextWrapped("%zu coordinate components are outside the Crash 2 0–255 frame-byte range. Editing remains unrestricted; NSF save will validate whether this pose can be represented.",outsideComponents);
-   else ImGui::TextWrapped("The original compressed frame data is untouched while editing. NSF save will validate the pose against the frame's available encoding.");
+   if(outsideComponents>0U)ImGui::TextWrapped("%zu coordinate components are outside the Crash 2 0–255 frame-byte range. Save will try to rebase the frame without changing its displayed pose; it will report if the span or signed 16-bit offsets cannot represent it.",outsideComponents);
+   else ImGui::TextWrapped("The original compressed frame data stays untouched while editing. Save can widen the linked model's shared delta widths when that can be done safely across its frames.");
   }
   ImGui::Separator();
   ImGui::Text("Collision Records");
