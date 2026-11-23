@@ -231,7 +231,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
  if(specialBytes%3U!=0U)return fail("Animation special-vertex data is not a whole number of vertices.");
  out.specialVertexCount=specialBytes/3U;
  if(out.specialVertexCount>out.vertexCount)return fail("Animation frame has more special vertices than total vertices.");
- const std::size_t temporalBytes=item.size-fakeHeader;
+ const std::size_t temporalBytes=item.size-out.headerSize;
  if(temporalBytes%4U!=0U)return fail("Animation temporal bitstream is not 32-bit aligned.");
  out.collisions.reserve(out.collisionCount);
  for(std::uint32_t i=0;i<out.collisionCount;++i){
@@ -245,7 +245,7 @@ static bool parseAnimationFrame(const std::vector<std::uint8_t>&bytes,const NsfI
   out.specialVertices.push_back(std::array<std::uint8_t,3>{bytes[q],bytes[q+1U],bytes[q+2U]});
  }
  out.temporalWords.reserve(temporalBytes/4U);
- for(std::size_t q=p+fakeHeader;q<p+item.size;q+=4U)out.temporalWords.push_back(u32(bytes,q));
+ for(std::size_t q=p+out.headerSize;q<p+item.size;q+=4U)out.temporalWords.push_back(u32(bytes,q));
  return true;
 }
 struct ModelPolyCommand {bool triangle=false;std::uint8_t color1=0,color2=0,texture=0,key=0,type=0,triType=0,triSubtype=0;bool animated=false,flag=false;};
@@ -389,17 +389,9 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  }
  std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
- const std::size_t start=frame.specialVertexCount*24U;
+ const std::size_t start=0U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
-  // Temporal words are stored little-endian, while the compressed bit
-  // decoder consumes the logical byte stream in forward order. Reverse the
-  // byte lanes within each word before applying the special-vertex prefix.
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -871,10 +863,9 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
       e="Could not rebase an animation frame linked to the expanded model.";return false;
      }
     }
-    const std::size_t start=frame.specialVertexCount*24U;
-    const std::size_t requiredBits=start+model.positions.size()*24U;
+    const std::size_t requiredBits=model.positions.size()*24U;
     const std::size_t wordCount=(requiredBits+31U)/32U;
-    std::vector<std::uint8_t>payload(fakeHeader+wordCount*4U,0U);
+    std::vector<std::uint8_t>payload(frame.headerSize+wordCount*4U,0U);
     std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),fakeHeader,payload.begin());
     for(std::size_t vi=0;vi<frame.specialVertexCount;++vi){
      const auto&v=frame.vertices[vi];const std::size_t offset=fakeHeader+vi*3U;
@@ -882,10 +873,10 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     }
     std::vector<std::uint8_t>bits(wordCount*32U,0U);
     for(std::size_t wi=0;wi<wordCount;++wi){
-     const std::uint32_t word=u32(payload,fakeHeader+wi*4U);
+     const std::uint32_t word=u32(payload,frame.headerSize+wi*4U);
      for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
     }
-    std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
+    std::size_t bit=0U;std::int32_t xAcc=0,yAcc=0,zAcc=0;
     auto encodeSigned=[&](std::int32_t delta){
      bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
      for(unsigned b=0;b<7U;++b)bits[bit++]=static_cast<std::uint8_t>((encoded>>(6U-b))&1U);
@@ -905,7 +896,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     for(std::size_t wi=0;wi<wordCount;++wi){
      std::uint32_t word=0;
      for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
-     for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
+     for(unsigned byte=0;byte<4U;++byte)payload[frame.headerSize+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
     }
     payloads.push_back(std::move(payload));
    }
@@ -1441,19 +1432,13 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
   return decodeAnimationVertices(frame,model,crash3);
  }
- const std::size_t temporalOffset=frame.rawOffset+fakeHeader;
+ const std::size_t temporalOffset=frame.rawOffset+frame.headerSize;
  if(!has(chunk.bytes,temporalOffset,frame.temporalWords.size()*4U))return false;
  std::vector<std::uint8_t>bits;bits.reserve(frame.temporalWords.size()*32U);
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
- const std::size_t start=frame.specialVertexCount*24U;
+ const std::size_t start=0U;
  if(model&&model->compressed){
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
-  // Work in logical byte order, matching decodeAnimationVertices().
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1478,20 +1463,14 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    if(!encodeSigned(p.xBits,dx)||!encodeSigned(p.zBits,dz)||!encodeSigned(p.yBits,dy))return false;
    xAcc=targetX;yAcc=targetY;zAcc=targetZ;
   }
-  // Restore the on-disk word byte order before writing temporal words.
-  std::vector<std::uint8_t> physical(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-  bits.swap(physical);
  }else{
-  const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
+  const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
   if(bits.size()<required||vertexIndex<frame.specialVertexCount)return false;
   std::vector<std::uint8_t>reordered(bits.size());
   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
    for(std::size_t byte=0;byte<4U;++byte)
     for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  std::size_t bit=start+(vertexIndex-frame.specialVertexCount)*24U;
+  std::size_t bit=(vertexIndex-frame.specialVertexCount)*24U;
   const std::int32_t current[3]={frame.vertices[vertexIndex].x,frame.vertices[vertexIndex].y,frame.vertices[vertexIndex].z};
   for(std::size_t component=0;component<3U;++component){
    const std::int32_t v=component==axis?value:(crash3?current[component]/8:current[component]);
