@@ -330,11 +330,10 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
  const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
  assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
- // Special vertices remain in the leading frame slots; the compressed
- // model positions follow them. The first compressed position in this fixture
- // decodes to X=10, Z=0, Y=0.
+ // Special vertices occupy only the frame header. The compressed temporal
+ // bitstream starts after that header and contains the two model positions.
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
- assert(specialFrame.vertices[1].x==10&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
+ assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
  const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
