@@ -662,7 +662,7 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
      }
     }else{
      for(std::size_t vi=0;vi<frame.vertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
-      const auto&v=frame.vertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
+      const NsfAnimationVertex v=frame.vertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
       if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,axis,value)){
        e="Animation frame "+std::to_string(fi)+" vertex "+std::to_string(vi)+" has coordinates that cannot be represented by the current NSF frame encoding. The editable pose is preserved; no source data was changed.";
        return false;
