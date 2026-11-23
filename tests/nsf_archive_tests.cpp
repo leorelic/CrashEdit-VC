@@ -308,7 +308,9 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // Widening one model position's delta width expands the shared table and re-encodes linked frames.
  std::vector<std::uint8_t> narrowModelChunk=compressedModelChunk;
  for(std::size_t i=0;i<3U;++i)p32(narrowModelChunk,cmPositions+i*4U,0x00000049U);
- std::vector<std::uint8_t> narrowArchiveBytes;narrowArchiveBytes.reserve(131072);narrowArchiveBytes.insert(narrowArchiveBytes.end(),narrowModelChunk.begin(),narrowModelChunk.end());narrowArchiveBytes.insert(narrowArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
+ std::vector<std::uint8_t> narrowAnimationChunk=compressedAnimationChunk;
+ std::fill(narrowAnimationChunk.begin()+static_cast<std::ptrdiff_t>(caFrame+24U),narrowAnimationChunk.begin()+static_cast<std::ptrdiff_t>(caFrame+80U),0U);
+ std::vector<std::uint8_t> narrowArchiveBytes;narrowArchiveBytes.reserve(131072);narrowArchiveBytes.insert(narrowArchiveBytes.end(),narrowModelChunk.begin(),narrowModelChunk.end());narrowArchiveBytes.insert(narrowArchiveBytes.end(),narrowAnimationChunk.begin(),narrowAnimationChunk.end());
  NsfArchive narrowArchive;assert(narrowArchive.loadBytes(narrowArchiveBytes,e));narrowArchive.decodeAnimationModels(false);
  assert(narrowArchive.chunks()[0].entries[0].model.positions[0].xBits==1U);
  assert(narrowArchive.chunks()[0].entries[0].model.positions[0].yBits==1U&&narrowArchive.chunks()[0].entries[0].model.positions[0].zBits==1U);
