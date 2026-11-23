@@ -299,7 +299,7 @@ bool EditorUI::saveFiles(){
  std::string error;
  std::vector<std::uint8_t> nsdBytes,nsfBytes;
  if(!nsd_.saveBytes(nsdBytes,error)){status_="Save failed (NSD serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
- if(!nsf_.commitAnimationEdits(error)){status_="Save failed (NSF animation encoding): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
+ if(!nsf_.commitAnimationEdits(error)){const auto marker=error.find(" [chunk=");int failedChunk=-1,failedEntry=-1;if(marker!=std::string::npos&&std::sscanf(error.c_str()+marker," [chunk=%d,entry=%d]",&failedChunk,&failedEntry)==2&&failedChunk>=0&&failedEntry>=0){chunkExpansionDialog_=true;chunkExpansionOperation_=3;chunkExpansionSourceChunk_=failedChunk;chunkExpansionSourceEntry_=failedEntry;status_="Animation payload expansion needs more room in its current NSF chunk. Choose whether to move that animation entry to a fresh chunk and retry saving.";Diagnostics::log(DiagnosticLevel::Warning,status_);return false;}status_="Save failed (NSF animation encoding): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  if(!nsf_.saveUncompressedBytes(nsfBytes,error)){status_="Save failed (NSF serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  std::string dateStamp;
  if(editorPreferences.createDatedBackup){
@@ -563,16 +563,17 @@ void EditorUI::draw(){
  if(chunkExpansionDialog_){
   ImGui::OpenPopup("NSF Chunk Capacity");
   if(ImGui::BeginPopupModal("NSF Chunk Capacity",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings)){
-   ImGui::TextWrapped("Adding this frame exceeds the current 64 KiB chunk limit. Create a new chunk and move this entire entry there?");
+   if(chunkExpansionOperation_==3)ImGui::TextWrapped("Expanding this animation frame exceeds the available space in its current 64 KiB chunk. Create a new chunk and move this entire animation entry there, then retry saving?");else ImGui::TextWrapped("Adding this frame exceeds the current 64 KiB chunk limit. Create a new chunk and move this entire entry there?");
    ImGui::TextDisabled("The entry EID, type, item payloads, and padding will be preserved.");
-   if(ImGui::Button("Create New Chunk and Continue")){
+   if(ImGui::Button(chunkExpansionOperation_==3?"Create New Chunk and Retry Save":"Create New Chunk and Continue")){
+    const int operation=chunkExpansionOperation_;
     Crash::NsfArchive backup=nsf_;
     std::size_t destinationChunk=0;std::string moveError;
     bool completed=nsf_.moveEntryToNewChunk(static_cast<std::size_t>(chunkExpansionSourceChunk_),
                                              static_cast<std::size_t>(chunkExpansionSourceEntry_),
                                              destinationChunk,moveError);
-    if(completed){
-     const bool edited=chunkExpansionOperation_==1?
+    if(completed&&operation!=3){
+     const bool edited=operation==1?
       nsf_.appendAnimationFrame(destinationChunk,0U):
       nsf_.insertAnimationFrameAfter(destinationChunk,0U,chunkExpansionFrame_);
      if(!edited){nsf_=std::move(backup);completed=false;moveError="The entry was moved in memory, but the requested frame would still exceed a fresh chunk's capacity. No changes were kept.";}
@@ -583,14 +584,17 @@ void EditorUI::draw(){
      animationSelectionChunk_=static_cast<int>(destinationChunk);animationSelectionEntry_=0;
      animationPlaying_=false;animationFrameTimer_=0.0f;
      animationSelectedVertex_=-1;animationSelectedFace_=-1;animationHoveredFace_=-1;animationSelectedVertices_.clear();
-     const auto&updatedFrames=nsf_.chunks()[destinationChunk].entries[0].animation.frames;
-     animationFrame_=chunkExpansionOperation_==1?static_cast<int>(updatedFrames.size()-1U):static_cast<int>(chunkExpansionFrame_+1U);
-     animationPlaybackFrame_=static_cast<double>(animationFrame_);
-     status_="Created a new NSF chunk, moved the animation entry, and completed the frame edit.";
+     if(operation!=3){
+      const auto&updatedFrames=nsf_.chunks()[destinationChunk].entries[0].animation.frames;
+      animationFrame_=operation==1?static_cast<int>(updatedFrames.size()-1U):static_cast<int>(chunkExpansionFrame_+1U);
+      animationPlaybackFrame_=static_cast<double>(animationFrame_);
+      status_="Created a new NSF chunk, moved the animation entry, and completed the frame edit.";
+     }else status_="Moved the animation entry to a fresh NSF chunk. Retrying save...";
     }else{
      status_="Could not expand the NSF chunk: "+moveError;
     }
     chunkExpansionDialog_=false;ImGui::CloseCurrentPopup();
+    if(completed&&operation==3)saveFiles();
    }
    ImGui::SameLine();
    if(ImGui::Button("Cancel")){
