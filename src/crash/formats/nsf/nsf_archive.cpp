@@ -771,11 +771,78 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
  if(model.positions.empty()){e="The linked model has no compressed positions to expand.";return false;}
  const auto&positionItem=modelEntry->items[5];
  if(positionItem.size!=model.positions.size()*4U||!has(modelChunk->bytes,positionItem.offset,positionItem.size)){e="The linked model's compressed-position table is malformed.";return false;}
- // Width 7 is the format's full signed-byte delta width. It also resets the
- // corresponding accumulator, so every byte-coordinate delta is representable.
+ // Crash 2 temporal streams are variable-width: each axis contributes
+ // one sign bit plus its model position's X/Z/Y width. The width value 7
+ // also resets that axis accumulator. Expanding every axis to seven bits
+ // needlessly inflates every dependent frame and was the source of the
+ // chunk-capacity failures. Keep existing widths unless a linked frame
+ // actually needs more bits, then widen only that axis at that position.
+ std::vector<NsfAnimationFrame*> linkedFrames;
+ for(auto&animationChunk:chunks_)if(animationChunk.type==0U&&animationChunk.entryTableValid)
+  for(auto&animationEntry:animationChunk.entries)if(animationEntry.valid&&animationEntry.type==1U&&animationEntry.animation.decoded)
+   for(auto&linkedFrame:animationEntry.animation.frames)if(linkedFrame.linkedModelEid==modelEid){
+    if(!linkedFrame.verticesDecoded||linkedFrame.vertices.size()!=linkedFrame.vertexCount||
+       linkedFrame.vertexCount!=model.vertexCount||model.positions.size()+linkedFrame.specialVertexCount!=linkedFrame.vertexCount){
+     e="A frame sharing the compressed model has an unsupported vertex layout.";return false;
+    }
+    linkedFrames.push_back(&linkedFrame);
+   }
+ if(linkedFrames.empty()){e="No decoded animation frames reference the compressed model.";return false;}
+ auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)&0xff;if(delta>127)delta-=256;return delta;};
+ std::vector<std::uint8_t> xWidths(model.positions.size()),yWidths(model.positions.size()),zWidths(model.positions.size());
+ std::vector<std::int32_t> xAcc(linkedFrames.size(),0),yAcc(linkedFrames.size(),0),zAcc(linkedFrames.size(),0);
+ for(std::size_t pi=0;pi<model.positions.size();++pi){
+  const auto&position=model.positions[pi];
+  std::uint8_t width=position.xBits;
+  if(width==7U)std::fill(xAcc.begin(),xAcc.end(),0);
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(xAcc[fi]+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
+   const auto delta=deltaFor(linkedFrames[fi]->vertices[pi].x,base);
+   if(width!=7U&&(delta<-(1<<width)||delta>((1<<width)-1)))width=7U;
+  }
+  if(width==7U)std::fill(xAcc.begin(),xAcc.end(),0);
+  xWidths[pi]=width;
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(xAcc[fi]+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
+   (void)deltaFor(linkedFrames[fi]->vertices[pi].x,base);
+   xAcc[fi]=linkedFrames[fi]->vertices[pi].x;
+  }
+
+  width=position.zBits;
+  if(width==7U)std::fill(zAcc.begin(),zAcc.end(),0);
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(zAcc[fi]+position.z)&0xff;
+   const auto delta=deltaFor(linkedFrames[fi]->vertices[pi].z,base);
+   if(width!=7U&&(delta<-(1<<width)||delta>((1<<width)-1)))width=7U;
+  }
+  if(width==7U)std::fill(zAcc.begin(),zAcc.end(),0);
+  zWidths[pi]=width;
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(zAcc[fi]+position.z)&0xff;
+   (void)deltaFor(linkedFrames[fi]->vertices[pi].z,base);
+   zAcc[fi]=linkedFrames[fi]->vertices[pi].z;
+  }
+
+  width=position.yBits;
+  if(width==7U)std::fill(yAcc.begin(),yAcc.end(),0);
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(yAcc[fi]+position.y)&0xff;
+   const auto delta=deltaFor(linkedFrames[fi]->vertices[pi].y,base);
+   if(width!=7U&&(delta<-(1<<width)||delta>((1<<width)-1)))width=7U;
+  }
+  if(width==7U)std::fill(yAcc.begin(),yAcc.end(),0);
+  yWidths[pi]=width;
+  for(std::size_t fi=0;fi<linkedFrames.size();++fi){
+   const auto base=(yAcc[fi]+position.y)&0xff;
+   (void)deltaFor(linkedFrames[fi]->vertices[pi].y,base);
+   yAcc[fi]=linkedFrames[fi]->vertices[pi].y;
+  }
+ }
  for(std::size_t i=0;i<model.positions.size();++i){
-  auto&position=model.positions[i];position.xBits=7U;position.zBits=7U;position.yBits=7U;
-  position.raw=(position.raw&~0x1ffU)|0x1ffU;
+  auto&position=model.positions[i];
+  position.xBits=xWidths[i];position.yBits=yWidths[i];position.zBits=zWidths[i];
+  position.raw=(position.raw&~0x1ffU)|(static_cast<std::uint32_t>(position.xBits)<<6U)|
+               (static_cast<std::uint32_t>(position.yBits)<<3U)|position.zBits;
   const std::size_t offset=positionItem.offset+i*4U;
   for(unsigned byte=0;byte<4U;++byte)modelChunk->bytes[offset+byte]=static_cast<std::uint8_t>(position.raw>>(byte*8U));
  }
@@ -830,7 +897,8 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
      }
     }
     const std::size_t start=frame.specialVertexCount*24U;
-    const std::size_t requiredBits=start+model.positions.size()*24U;
+    std::size_t requiredBits=start;
+    for(const auto&position:model.positions)requiredBits+=3U+position.xBits+position.zBits+position.yBits;
     const std::size_t wordCount=(requiredBits+31U)/32U;
     std::vector<std::uint8_t>payload(fakeHeader+wordCount*4U,0U);
     std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),fakeHeader,payload.begin());
@@ -844,18 +912,21 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
      for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
     }
     std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
-    auto encodeSigned=[&](std::int32_t delta){
-     bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
-     for(unsigned b=0;b<7U;++b)bits[bit++]=static_cast<std::uint8_t>((encoded>>(6U-b))&1U);
+    auto encodeSigned=[&](std::int32_t delta,std::uint8_t width){
+     bits[bit++]=delta<0?1U:0U;
+     const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+(1<<width):delta);
+     for(unsigned b=0;b<width;++b)bits[bit++]=static_cast<std::uint8_t>((encoded>>(width-1U-b))&1U);
     };
-    auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
+    auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)&0xff;if(delta>127)delta-=256;return delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
      const auto&target=frame.vertices[pi];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
      const std::int32_t baseZ=(zAcc+position.z)&0xff;
      const std::int32_t baseY=(yAcc+position.y)&0xff;
-     encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
+     encodeSigned(deltaFor(target.x,baseX),position.xBits);
+     encodeSigned(deltaFor(target.z,baseZ),position.zBits);
+     encodeSigned(deltaFor(target.y,baseY),position.yBits);
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
     }
     for(std::size_t wi=0;wi<wordCount;++wi){
