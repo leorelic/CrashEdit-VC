@@ -241,10 +241,11 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==255);
  std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false); for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
  // A pose that cannot fit the source delta widths remains editable and survives history serialization.
- const std::vector<NsfAnimationVertex> outOfRangePose{{-20,300,40},{0,10,0},{50,60,70}};
+ const std::vector<NsfAnimationVertex> outOfRangePose{{-20,300,40},{50,60,70}};
  assert(compressedArchive.setAnimationFrameVertices(1,0,0,compressedBatchIndices,outOfRangePose));
  std::string encodingError;assert(!compressedArchive.commitAnimationEdits(encodingError));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==-20);
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesEdited);
  std::vector<std::uint8_t> sourceBytes,poseOverlay;
  assert(compressedArchive.saveUncompressedSourceBytes(sourceBytes,e));
  assert(compressedArchive.saveAnimationEditOverlay(poseOverlay,e));
