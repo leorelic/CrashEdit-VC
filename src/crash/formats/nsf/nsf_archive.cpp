@@ -780,10 +780,39 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
  std::vector<NsfAnimationFrame*> linkedFrames;
  for(auto&animationChunk:chunks_)if(animationChunk.type==0U&&animationChunk.entryTableValid)
   for(auto&animationEntry:animationChunk.entries)if(animationEntry.valid&&animationEntry.type==1U&&animationEntry.animation.decoded)
-   for(auto&linkedFrame:animationEntry.animation.frames)if(linkedFrame.linkedModelEid==modelEid){
+   for(std::size_t frameIndex=0;frameIndex<animationEntry.animation.frames.size();++frameIndex){
+    auto&linkedFrame=animationEntry.animation.frames[frameIndex];
+    if(linkedFrame.linkedModelEid!=modelEid)continue;
     if(!linkedFrame.verticesDecoded||linkedFrame.vertices.size()!=linkedFrame.vertexCount||
        linkedFrame.vertexCount!=model.vertexCount||model.positions.size()+linkedFrame.specialVertexCount!=linkedFrame.vertexCount){
      e="A frame sharing the compressed model has an unsupported vertex layout.";return false;
+    }
+    // Rebase every dependent frame before choosing shared delta widths. The
+    // chosen widths must describe the exact byte coordinates that will be
+    // serialized, not pre-rebase working coordinates.
+    std::int64_t minimum[3]={INT64_MAX,INT64_MAX,INT64_MAX},maximum[3]={INT64_MIN,INT64_MIN,INT64_MIN};
+    for(const auto&v:linkedFrame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(unsigned axis=0;axis<3U;++axis){minimum[axis]=std::min<std::int64_t>(minimum[axis],values[axis]);maximum[axis]=std::max<std::int64_t>(maximum[axis],values[axis]);}}
+    std::int64_t shift[3]={0,0,0};bool needsRebase=false;
+    for(unsigned axis=0;axis<3U;++axis){
+     if(maximum[axis]-minimum[axis]>255){e="An animation frame linked to this model spans more than 255 local units on an axis; its pose remains editable but cannot be stored in the Crash 2 byte-coordinate format.";return false;}
+     if(minimum[axis]<0){shift[axis]=minimum[axis];needsRebase=true;}
+     else if(maximum[axis]>255){shift[axis]=maximum[axis]-255;needsRebase=true;}
+    }
+    if(needsRebase){
+     const std::int64_t offsets[3]={
+      static_cast<std::int64_t>(linkedFrame.xOffset)+shift[0]*4,
+      static_cast<std::int64_t>(linkedFrame.yOffset)+shift[2]*4,
+      static_cast<std::int64_t>(linkedFrame.zOffset)+shift[1]*4
+     };
+     for(const auto offset:offsets)if(offset<INT16_MIN||offset>INT16_MAX){e="An animation frame linked to this model needs an offset outside the signed 16-bit NSF range; its pose remains editable.";return false;}
+     for(auto&v:linkedFrame.vertices){v.x=static_cast<std::int32_t>(static_cast<std::int64_t>(v.x)-shift[0]);v.y=static_cast<std::int32_t>(static_cast<std::int64_t>(v.y)-shift[1]);v.z=static_cast<std::int32_t>(static_cast<std::int64_t>(v.z)-shift[2]);}
+     const std::size_t chunkIndex=static_cast<std::size_t>(&animationChunk-chunks_.data());
+     const std::size_t entryIndex=static_cast<std::size_t>(&animationEntry-animationChunk.entries.data());
+     if(!setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,0U,static_cast<std::int32_t>(offsets[0]))||
+        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,1U,static_cast<std::int32_t>(offsets[1]))||
+        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,2U,static_cast<std::int32_t>(offsets[2]))){
+      e="Could not rebase an animation frame linked to the expanded model.";return false;
+     }
     }
     linkedFrames.push_back(&linkedFrame);
    }
@@ -872,30 +901,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize)||frame.headerSize!=fakeHeader+frame.specialVertexCount*3U){
      e="An animation frame linked to this model has an invalid header boundary.";return false;
     }
-    std::int64_t minimum[3]={INT64_MAX,INT64_MAX,INT64_MAX},maximum[3]={INT64_MIN,INT64_MIN,INT64_MIN};
-    for(const auto&v:frame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(unsigned axis=0;axis<3U;++axis){minimum[axis]=std::min<std::int64_t>(minimum[axis],values[axis]);maximum[axis]=std::max<std::int64_t>(maximum[axis],values[axis]);}}
-    std::int64_t shift[3]={0,0,0};bool needsRebase=false;
-    for(unsigned axis=0;axis<3U;++axis){
-     if(maximum[axis]-minimum[axis]>255){e="An animation frame linked to this model spans more than 255 local units on an axis; its pose remains editable but cannot be stored in the Crash 2 byte-coordinate format.";return false;}
-     if(minimum[axis]<0){shift[axis]=minimum[axis];needsRebase=true;}
-     else if(maximum[axis]>255){shift[axis]=maximum[axis]-255;needsRebase=true;}
-    }
-    if(needsRebase){
-     const std::int64_t offsets[3]={
-      static_cast<std::int64_t>(frame.xOffset)+shift[0]*4,
-      static_cast<std::int64_t>(frame.yOffset)+shift[2]*4,
-      static_cast<std::int64_t>(frame.zOffset)+shift[1]*4
-     };
-     for(const auto offset:offsets)if(offset<INT16_MIN||offset>INT16_MAX){e="An animation frame linked to this model needs an offset outside the signed 16-bit NSF range; its pose remains editable.";return false;}
-     for(auto&v:frame.vertices){v.x=static_cast<std::int32_t>(static_cast<std::int64_t>(v.x)-shift[0]);v.y=static_cast<std::int32_t>(static_cast<std::int64_t>(v.y)-shift[1]);v.z=static_cast<std::int32_t>(static_cast<std::int64_t>(v.z)-shift[2]);}
-     const std::size_t chunkIndex=static_cast<std::size_t>(&chunk-chunks_.data());
-     const std::size_t entryIndex=static_cast<std::size_t>(&entry-chunk.entries.data());
-     if(!setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,0U,static_cast<std::int32_t>(offsets[0]))||
-        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,1U,static_cast<std::int32_t>(offsets[1]))||
-        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,2U,static_cast<std::int32_t>(offsets[2]))){
-      e="Could not rebase an animation frame linked to the expanded model.";return false;
-     }
-    }
+    // All linked frames were rebased before the shared width analysis above.
     const std::size_t start=frame.specialVertexCount*24U;
     std::size_t requiredBits=start;
     for(const auto&position:model.positions)requiredBits+=3U+position.xBits+position.zBits+position.yBits;
