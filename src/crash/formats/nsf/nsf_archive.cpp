@@ -391,7 +391,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
-  if(model->positions.size()>frame.vertices.size())return fail("Model compressed-position count exceeds animation frame vertices.");
+  if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -407,7 +407,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
    // Match the established CrashEdit frame decoder's position ordering.
-   if(i<frame.vertices.size())frame.vertices[i]={xAcc,yAcc,zAcc};
+   frame.vertices[i+frame.specialVertexCount]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
@@ -683,9 +683,8 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
     if(!entry.animation.isCrash3&&frame.linkedModelEid!=0U&&!model){e="Animation frame "+std::to_string(fi)+" references a model that is not available for Crash 2 save validation. The editable pose is preserved.";return false;}
     if(model&&model->compressed){
-     if(frame.specialVertexCount!=0U){e="This compressed Crash 2 frame uses special vertices; safe re-encoding of that mixed layout is not yet supported. The editable pose is preserved.";return false;}
-     if(model->positions.size()!=frame.vertices.size()){
-      e="Animation frame "+std::to_string(fi)+" has a compressed-position count that does not match its frame vertices. The editable pose is preserved.";
+     if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size()){
+      e="Animation frame "+std::to_string(fi)+" has a compressed-position count plus special-vertex count that does not match its frame vertices. The editable pose is preserved.";
       return false;
      }
      if(!model->positions.empty()){
@@ -784,7 +783,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     entryAffected=true;affected[fi]=true;
     if(entry.animation.isCrash3){e="Compressed model expansion is only enabled for the active Crash 2 animation format.";return false;}
     if(!frame.verticesDecoded||frame.vertices.size()!=frame.vertexCount||frame.vertexCount!=model.vertexCount||
-       frame.specialVertexCount!=0U||model.specialVertexCount!=0U||model.positions.size()!=frame.vertexCount){
+       model.positions.size()+frame.specialVertexCount!=frame.vertexCount||model.specialVertexCount!=frame.specialVertexCount){
      e="An animation frame linked to this model has an unsupported special-vertex or compressed-position layout.";return false;
     }
     const std::size_t fakeHeader=24U+static_cast<std::size_t>(frame.collisionCount)*0x28U;
@@ -837,7 +836,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     const auto&target=frame.vertices[pi];
+     const auto&target=frame.vertices[pi+frame.specialVertexCount];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
      const std::int32_t baseZ=(zAcc+position.z)&0xff;
      const std::int32_t baseY=(yAcc+position.y)&0xff;
@@ -1378,7 +1377,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
   for(const auto&modelEntry:modelChunk.entries)
    if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
- if(!(model&&model->compressed)&&vertexIndex<frame.specialVertexCount){
+ if(vertexIndex<frame.specialVertexCount){
   if(value>255)return false;
   if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
   return decodeAnimationVertices(frame,model,crash3);
@@ -1389,7 +1388,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
-  if(vertexIndex>=model->positions.size()||model->positions.size()>frame.vertices.size())return false;
+  if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1402,8 +1401,8 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t i=0;i<model->positions.size();++i){
    const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
    std::int32_t targetX=0,targetY=0,targetZ=0;
-   const auto&source=frame.vertices[i];
-   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   const auto&source=frame.vertices[i+frame.specialVertexCount];
+   if(!toByte(i+frame.specialVertexCount==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i+frame.specialVertexCount==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i+frame.specialVertexCount==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
    const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    const std::int32_t baseZ=(zAcc+p.z)&0xff;
    const std::int32_t baseY=(yAcc+p.y)&0xff;
