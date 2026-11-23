@@ -123,6 +123,43 @@ static void validatePair(const std::filesystem::path&directory,
  for(std::size_t i=0;i<expectedFrameHashes.size();++i)REQUIRE(frameVertexHash(roundAnimation->animation.frames[i])==expectedFrameHashes[i]);
 }
 
+static void validateUncompressedAnimationEdit(const std::filesystem::path&directory){
+ const auto modelBytes=readFile(directory/"entry_3_0_BT10G.bin");
+ const auto animationBytes=readFile(directory/"entry_3_1_BT10V.bin");
+ NsfArchive archive;std::string error;
+ REQUIRE(archive.loadBytes(makeArchive(modelBytes,animationBytes),error));
+ archive.decodeAnimationModels(false);
+ const NsfEntry*model=findEntry(archive,0x4BB82055U,2U);
+ const NsfEntry*animation=findEntry(archive,0x4BB82073U,1U);
+ REQUIRE(model&&animation&&model->model.decoded&&!model->model.compressed);
+ REQUIRE(animation->animation.decoded&&animation->animation.frames.size()==1U);
+ const auto&original=animation->animation.frames[0].vertices;
+ REQUIRE(original.size()==8U);
+ std::vector<NsfAnimationVertex>expected=original;
+ // Exercise edits beyond vertex zero and on multiple axes. The old save loop
+ // decoded after each write and discarded these not-yet-encoded edits.
+ expected[3].y=240;
+ expected[6].x=12;
+ expected[7].z=10;
+ REQUIRE(archive.setAnimationFrameVertex(0U,1U,0U,3U,1U,expected[3].y));
+ REQUIRE(archive.setAnimationFrameVertex(0U,1U,0U,6U,0U,expected[6].x));
+ REQUIRE(archive.setAnimationFrameVertex(0U,1U,0U,7U,2U,expected[7].z));
+ std::vector<std::uint8_t>saved;
+ REQUIRE(archive.saveUncompressedBytes(saved,error));
+ NsfArchive roundTrip;
+ REQUIRE(roundTrip.loadBytes(saved,error));
+ roundTrip.decodeAnimationModels(false);
+ const NsfEntry*savedAnimation=findEntry(roundTrip,0x4BB82073U,1U);
+ REQUIRE(savedAnimation&&savedAnimation->animation.decoded&&savedAnimation->animation.frames.size()==1U);
+ const auto&actual=savedAnimation->animation.frames[0].vertices;
+ REQUIRE(actual.size()==expected.size());
+ for(std::size_t vi=0;vi<expected.size();++vi){
+  REQUIRE(actual[vi].x==expected[vi].x);
+  REQUIRE(actual[vi].y==expected[vi].y);
+  REQUIRE(actual[vi].z==expected[vi].z);
+ }
+}
+
 int main(int argc,char**argv){
  REQUIRE(argc==2);
  const std::filesystem::path directory=argv[1];
@@ -137,5 +174,6 @@ int main(int argc,char**argv){
   {0x09E91ACC26AD9A04ULL,0x04095291B09E2A5EULL,0x4A7C0F7C22E0AA45ULL,0xAECABEFF2933AFECULL,
    0x1598E289F09248E5ULL,0xC1B030A121AE9001ULL,0x9BED2F3675DF9EACULL,0x1954AA9B4087B1AEULL,
    0x6C9754A7F294418AULL,0x2E32745505EB07C6ULL,0xECE3F6CA9011A1FBULL});
+ validateUncompressedAnimationEdit(directory);
  return 0;
 }
