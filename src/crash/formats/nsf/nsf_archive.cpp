@@ -725,6 +725,104 @@ bool NsfArchive::loadAnimationEditOverlay(const std::vector<std::uint8_t>&bytes,
  if(p!=bytes.size()){e="Editable animation pose overlay contains trailing data.";return false;}
  chunks_=std::move(candidate.chunks_);e.clear();return true;
 }
+bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::string&e){
+ NsfEntry*modelEntry=nullptr;NsfChunk*modelChunk=nullptr;
+ for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)
+  if(entry.valid&&entry.type==2U&&entry.eid==modelEid&&entry.model.decoded){modelEntry=&entry;modelChunk=&chunk;break;}
+ if(!modelEntry||!modelChunk||!modelEntry->model.compressed||modelEntry->items.size()!=6U){e="The linked model has no expandable compressed-position table.";return false;}
+ auto&model=modelEntry->model;
+ if(model.positions.empty()){e="The linked model has no compressed positions to expand.";return false;}
+ const auto&positionItem=modelEntry->items[5];
+ if(positionItem.size!=model.positions.size()*4U||!has(modelChunk->bytes,positionItem.offset,positionItem.size)){e="The linked model's compressed-position table is malformed.";return false;}
+ // Width 7 is the format's full signed-byte delta width. It also resets the
+ // corresponding accumulator, so every byte-coordinate delta is representable.
+ for(std::size_t i=0;i<model.positions.size();++i){
+  auto&position=model.positions[i];position.xBits=7U;position.zBits=7U;position.yBits=7U;
+  position.raw=(position.raw&~0x1ffU)|0x1ffU;
+  const std::size_t offset=positionItem.offset+i*4U;
+  for(unsigned byte=0;byte<4U;++byte)modelChunk->bytes[offset+byte]=static_cast<std::uint8_t>(position.raw>>(byte*8U));
+ }
+ for(auto&chunk:chunks_){
+  if(chunk.type!=0||!chunk.entryTableValid)continue;
+  for(auto&entry:chunk.entries){
+   if(!entry.valid||entry.type!=1U||!entry.animation.decoded||entry.animation.frames.empty())continue;
+   std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
+   std::vector<bool>affected(entry.animation.frames.size(),false);
+   bool entryAffected=false;
+   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
+    const auto&frame=entry.animation.frames[fi];
+    if(frame.linkedModelEid!=modelEid){
+     if(!has(chunk.bytes,frame.rawOffset,frame.rawSize)){e="An animation frame payload is outside its NSF chunk.";return false;}
+     payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
+     continue;
+    }
+    entryAffected=true;affected[fi]=true;
+    if(entry.animation.isCrash3){e="Compressed model expansion is only enabled for the active Crash 2 animation format.";return false;}
+    if(!frame.verticesDecoded||frame.vertices.size()!=frame.vertexCount||frame.vertexCount!=model.vertexCount||
+       frame.specialVertexCount!=model.specialVertexCount||model.positions.size()!=frame.vertexCount-frame.specialVertexCount){
+     e="An animation frame linked to this model has an incompatible vertex or special-vertex layout.";return false;
+    }
+    const std::size_t fakeHeader=24U+static_cast<std::size_t>(frame.collisionCount)*0x28U;
+    if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize)||frame.headerSize!=fakeHeader+frame.specialVertexCount*3U){
+     e="An animation frame linked to this model has an invalid header boundary.";return false;
+    }
+    for(const auto&v:frame.vertices)if(v.x<0||v.x>255||v.y<0||v.y>255||v.z<0||v.z>255){
+     e="A rebased animation frame still contains coordinates outside 0–255; its editable pose is preserved.";return false;
+    }
+    const std::size_t start=frame.specialVertexCount*24U;
+    const std::size_t requiredBits=start+model.positions.size()*24U;
+    const std::size_t wordCount=(requiredBits+31U)/32U;
+    std::vector<std::uint8_t>payload(fakeHeader+wordCount*4U,0U);
+    std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),fakeHeader,payload.begin());
+    for(std::size_t vi=0;vi<frame.specialVertexCount;++vi){
+     const auto&v=frame.vertices[vi];const std::size_t offset=fakeHeader+vi*3U;
+     payload[offset]=static_cast<std::uint8_t>(v.x);payload[offset+1U]=static_cast<std::uint8_t>(v.y);payload[offset+2U]=static_cast<std::uint8_t>(v.z);
+    }
+    std::vector<std::uint8_t>bits(wordCount*32U,0U);
+    for(std::size_t wi=0;wi<wordCount;++wi){
+     const std::uint32_t word=u32(payload,fakeHeader+wi*4U);
+     for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
+    }
+    std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
+    auto encodeSigned=[&](std::int32_t delta){
+     bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
+     for(unsigned b=0;b<7U;++b)bits[bit++]=static_cast<std::uint8_t>((encoded>>(6U-b))&1U);
+    };
+    auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)&0xff;return delta>127?delta-256:delta;};
+    for(std::size_t pi=0;pi<model.positions.size();++pi){
+     const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
+     const auto&target=frame.vertices[pi+frame.specialVertexCount];
+     const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
+     const std::int32_t baseZ=(zAcc+position.z)&0xff;
+     const std::int32_t baseY=(yAcc+position.y)&0xff;
+     encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
+     xAcc=target.x;yAcc=target.y;zAcc=target.z;
+    }
+    for(std::size_t wi=0;wi<wordCount;++wi){
+     std::uint32_t word=0;for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
+     for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
+    }
+    payloads.push_back(std::move(payload));
+   }
+   if(!entryAffected)continue;
+   if(!replaceAnimationFramePayloads(chunk,entry,payloads)){e="The expanded animation frame payloads do not fit safely in their NSF chunk. The editable pose is preserved.";return false;}
+   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi)if(affected[fi]){
+    auto&previous=entry.animation.frames[fi];const auto desired=previous.vertices;
+    NsfAnimationFrame decoded;
+    if(!parseAnimationFrame(chunk.bytes,entry.items[fi],false,decoded)){e="Could not parse a rebuilt compressed animation frame: "+decoded.error;return false;}
+    decoded.linkedModelEid=modelEid;decoded.modelResolved=true;
+    if(!decodeAnimationVertices(decoded,&model,false)){e="Could not decode a rebuilt compressed animation frame: "+decoded.vertexError;return false;}
+    if(decoded.vertices.size()!=desired.size()){e="Rebuilt compressed animation frame changed its vertex count.";return false;}
+    for(std::size_t vi=0;vi<desired.size();++vi)if(decoded.vertices[vi].x!=desired[vi].x||decoded.vertices[vi].y!=desired[vi].y||decoded.vertices[vi].z!=desired[vi].z){
+     e="Rebuilt compressed animation frame did not reproduce its editable pose exactly.";return false;
+    }
+    decoded.verticesEdited=false;previous=std::move(decoded);
+   }
+  }
+ }
+ e.clear();return true;
+}
+
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
  std::vector<std::uint8_t> bytes;if(!saveUncompressedBytes(bytes,e))return false;
  std::ofstream s(f,std::ios::binary|std::ios::trunc);if(!s){e="Could not create NSF output.";return false;}
