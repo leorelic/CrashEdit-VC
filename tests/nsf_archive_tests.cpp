@@ -262,7 +262,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
 
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
- NsfArchive rebaseArchive;assert(rebaseArchive.loadBytes(vertexAnimation,e));rebaseArchive.decodeAnimationModels(true);
+ NsfArchive rebaseArchive;assert(rebaseArchive.loadBytes(vertexAnimation,e));rebaseArchive.decodeAnimationModels(false);
  assert(rebaseArchive.setAnimationFrameVertex(0,0,0,0,0,-20));
  std::vector<std::uint8_t> rebasedBytes;assert(rebaseArchive.saveUncompressedBytes(rebasedBytes,e));
  NsfArchive rebasedRoundTrip;assert(rebasedRoundTrip.loadBytes(rebasedBytes,e));rebasedRoundTrip.decodeAnimationModels(true);
