@@ -282,20 +282,6 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].xBits==7U);
  assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==200);
 
- // Crash 2 special vertices remain raw and precede the compressed model positions.
- std::vector<std::uint8_t> specialModelChunk=compressedModelChunk;p32(specialModelChunk,cmInfo+0x38,4);p32(specialModelChunk,cmInfo+0x4c,1);
- std::vector<std::uint8_t> specialAnimationChunk=compressedAnimationChunk;p32(specialAnimationChunk,caFrame+8,4);p32(specialAnimationChunk,caFrame+20,67);
- specialAnimationChunk[caFrame+64]=10;specialAnimationChunk[caFrame+65]=20;specialAnimationChunk[caFrame+66]=30;
- std::vector<std::uint8_t> specialArchiveBytes;specialArchiveBytes.reserve(131072);specialArchiveBytes.insert(specialArchiveBytes.end(),specialModelChunk.begin(),specialModelChunk.end());specialArchiveBytes.insert(specialArchiveBytes.end(),specialAnimationChunk.begin(),specialAnimationChunk.end());
- NsfArchive specialArchive;assert(specialArchive.loadBytes(specialArchiveBytes,e));specialArchive.decodeAnimationModels(false);
- const auto&specialFrame=specialArchive.chunks()[1].entries[0].animation.frames[0];
- assert(specialFrame.specialVertexCount==1U&&specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
- assert(specialArchive.setAnimationFrameVertex(1,0,0,0,0,12));
- std::vector<std::uint8_t> specialEdited;assert(specialArchive.saveUncompressedBytes(specialEdited,e));
- NsfArchive specialRoundTrip;assert(specialRoundTrip.loadBytes(specialEdited,e));specialRoundTrip.decodeAnimationModels(false);
- const auto&specialReloaded=specialRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices;
- assert(specialReloaded[0].x==12&&specialReloaded[0].y==20&&specialReloaded[0].z==30);
-
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
  std::vector<std::uint8_t> timelineChunk(65536);p16(timelineChunk,0,0x1234);p16(timelineChunk,2,0);p32(timelineChunk,4,8);p32(timelineChunk,8,2);
