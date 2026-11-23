@@ -705,7 +705,7 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
      if(!model->positions.empty()){
       const std::size_t firstCompressedVertex=frame.specialVertexCount;
       if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,firstCompressedVertex,0U,frame.vertices[firstCompressedVertex].x)){
-       if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,e))return false;
+       if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,ci,ei,e))return false;
        continue;
       }
      }
@@ -778,7 +778,7 @@ bool NsfArchive::loadAnimationEditOverlay(const std::vector<std::uint8_t>&bytes,
 }
 static bool replaceAnimationFramePayloads(NsfChunk&,NsfEntry&,const std::vector<std::vector<std::uint8_t>>&);
 
-bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::string&e){
+bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size_t preferredChunk,std::size_t preferredEntry,std::string&e){
  NsfEntry*modelEntry=nullptr;NsfChunk*modelChunk=nullptr;
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)
   if(entry.valid&&entry.type==2U&&entry.eid==modelEid&&entry.model.decoded){modelEntry=&entry;modelChunk=&chunk;break;}
@@ -795,10 +795,28 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
   const std::size_t offset=positionItem.offset+i*4U;
   for(unsigned byte=0;byte<4U;++byte)modelChunk->bytes[offset+byte]=static_cast<std::uint8_t>(position.raw>>(byte*8U));
  }
- for(auto&chunk:chunks_){
-  if(chunk.type!=0||!chunk.entryTableValid)continue;
-  for(auto&entry:chunk.entries){
-   if(!entry.valid||entry.type!=1U)continue;
+ // The model position table is shared by every animation that references it,
+ // so all of those entries must be rebuilt. Process the animation whose edited
+ // pose triggered this expansion first: if the chunk cannot hold its enlarged
+ // payload, the relocation prompt must move the animation the user is editing,
+ // not an unrelated earlier entry that happens to share the model.
+ std::vector<NsfEntryLocation> animationOrder;
+ for(std::size_t ci=0;ci<chunks_.size();++ci){
+  const auto&sourceChunk=chunks_[ci];
+  if(sourceChunk.type!=0||!sourceChunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<sourceChunk.entries.size();++ei){
+   const auto&sourceEntry=sourceChunk.entries[ei];
+   if(sourceEntry.valid&&sourceEntry.type==1U)animationOrder.push_back({ci,ei});
+  }
+ }
+ std::stable_sort(animationOrder.begin(),animationOrder.end(),[&](const NsfEntryLocation&a,const NsfEntryLocation&b){
+  const bool aPreferred=a.chunkIndex==preferredChunk&&a.entryIndex==preferredEntry;
+  const bool bPreferred=b.chunkIndex==preferredChunk&&b.entryIndex==preferredEntry;
+  return aPreferred&&!bPreferred;
+ });
+ for(const auto&location:animationOrder){
+  auto&chunk=chunks_[location.chunkIndex];
+  auto&entry=chunk.entries[location.entryIndex];
    if(!entry.animation.decoded){e="Cannot expand a shared model position table while an animation entry is undecoded. The editable pose is preserved.";return false;}
    if(entry.animation.frames.empty())continue;
    std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
