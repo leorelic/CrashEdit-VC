@@ -280,12 +280,11 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
  const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
  assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
- // CrashEdit's Crash 2 reference decoder skips the special-byte prefix in
- // the temporal stream, then writes compressed positions from vertex index 0.
- // The model has two compressed positions (vertexCount - positionBase), so
- // the first two decoded vertices come from the model/temporal data, not the
- // raw special-byte prefix.
- assert(specialFrame.vertices[0].x==0&&specialFrame.vertices[0].y==0&&specialFrame.vertices[0].z==0);
+ // CrashEdit's Crash 2 reference decoder starts compressed decoding after
+ // the 24-bit special-vertex prefix, then writes compressed positions from
+ // vertex index 0 (overwriting the initially read special vertex). In this
+ // fixture the remaining temporal bits encode X=10, Z=0, Y=0.
+ assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==0&&specialFrame.vertices[0].z==0);
  assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
