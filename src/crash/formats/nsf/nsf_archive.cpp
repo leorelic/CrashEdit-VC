@@ -696,8 +696,10 @@ bool NsfArchive::saveAnimationEditOverlay(std::vector<std::uint8_t>&out,std::str
 bool NsfArchive::loadAnimationEditOverlay(const std::vector<std::uint8_t>&bytes,std::string&e){
  auto get32=[&](std::size_t p){return std::uint32_t(bytes[p])|(std::uint32_t(bytes[p+1U])<<8U)|(std::uint32_t(bytes[p+2U])<<16U)|(std::uint32_t(bytes[p+3U])<<24U);};
  if(bytes.size()<12U||get32(0)!=0x45534f50U||get32(4)!=1U){e="Editable animation pose overlay has an invalid header.";return false;}
- const std::uint32_t count=get32(8);std::size_t p=12U;
+ const std::uint32_t count=get32(8);if(static_cast<std::size_t>(count)>(bytes.size()-12U)/16U){e="Editable animation pose overlay declares more frames than its data can contain.";return false;}
+ std::size_t p=12U;
  NsfArchive candidate=*this;
+ for(auto&chunk:candidate.chunks_)for(auto&entry:chunk.entries)for(auto&frame:entry.animation.frames)frame.verticesEdited=false;
  for(std::uint32_t n=0;n<count;++n){
   if(p>bytes.size()||bytes.size()-p<16U){e="Editable animation pose overlay is truncated.";return false;}
   const std::size_t ci=get32(p),ei=get32(p+4U),fi=get32(p+8U),vc=get32(p+12U);p+=16U;
