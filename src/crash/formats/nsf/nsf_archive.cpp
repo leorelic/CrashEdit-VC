@@ -919,6 +919,65 @@ static bool rebuildAnimationFrameItems(NsfChunk&chunk,NsfEntry&entry,std::size_t
  return true;
 }
 
+static bool replaceAnimationFramePayloads(NsfChunk&chunk,NsfEntry&entry,const std::vector<std::vector<std::uint8_t>>&payloads){
+ const std::size_t oldCount=entry.items.size();
+ if(!entry.valid||entry.type!=1U||!entry.animation.decoded||oldCount==0U||oldCount!=entry.animation.frames.size()||payloads.size()!=oldCount)return false;
+ const std::uint32_t entryCount=u32(chunk.bytes,8U);
+ if(entryCount!=chunk.entries.size()||entryCount==0U)return false;
+ const std::size_t entryIndex=static_cast<std::size_t>(&entry-chunk.entries.data());
+ if(entryIndex>=chunk.entries.size())return false;
+ const std::size_t oldEntryEnd=entry.offset+entry.size;
+ const std::size_t offsetTableEnd=16U+(static_cast<std::size_t>(entryCount)+1U)*4U;
+ if(entry.offset<offsetTableEnd||oldEntryEnd>NsfChunkSize)return false;
+ const std::size_t sentinelOffset=16U+static_cast<std::size_t>(entryCount)*4U;
+ const std::size_t usedEnd=u32(chunk.bytes,sentinelOffset);
+ if(usedEnd<oldEntryEnd||usedEnd>NsfChunkSize)return false;
+ const std::size_t headerEnd=16U+(oldCount+1U)*4U;
+ if(entry.size<headerEnd||entry.items.empty())return false;
+ const std::size_t firstItemOffset=entry.items.front().offset-entry.offset;
+ if(firstItemOffset<headerEnd||firstItemOffset>entry.size)return false;
+ const std::size_t prefixPadding=firstItemOffset-headerEnd;
+ const std::size_t oldPayloadEnd=entry.items.back().offset+entry.items.back().size;
+ if(oldPayloadEnd>oldEntryEnd)return false;
+ const std::size_t trailingPadding=oldEntryEnd-oldPayloadEnd;
+ std::size_t newEntrySize=headerEnd+prefixPadding;
+ for(const auto&payload:payloads){if(payload.size()>NsfChunkSize-newEntrySize)return false;newEntrySize+=payload.size();}
+ if(trailingPadding>NsfChunkSize-newEntrySize)return false;
+ const std::size_t newPayloadEnd=newEntrySize;newEntrySize+=trailingPadding;
+ if(entry.offset>NsfChunkSize||newEntrySize>NsfChunkSize-entry.offset)return false;
+ const std::ptrdiff_t delta=static_cast<std::ptrdiff_t>(newEntrySize)-static_cast<std::ptrdiff_t>(entry.size);
+ const std::ptrdiff_t newUsedEndSigned=static_cast<std::ptrdiff_t>(usedEnd)+delta;
+ if(newUsedEndSigned<0||newUsedEndSigned>static_cast<std::ptrdiff_t>(NsfChunkSize))return false;
+ std::vector<std::uint8_t>newEntry(newEntrySize,0U);
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset),16U,newEntry.begin());
+ auto write32=[](std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32_t value){for(unsigned i=0;i<4U;++i)bytes[offset+i]=static_cast<std::uint8_t>(value>>(i*8U));};
+ write32(newEntry,12U,static_cast<std::uint32_t>(oldCount));
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset+headerEnd),prefixPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(headerEnd));
+ std::size_t cursor=headerEnd+prefixPadding;
+ for(std::size_t i=0;i<oldCount;++i){
+  write32(newEntry,16U+i*4U,static_cast<std::uint32_t>(cursor));
+  if(!payloads[i].empty())std::copy(payloads[i].begin(),payloads[i].end(),newEntry.begin()+static_cast<std::ptrdiff_t>(cursor));
+  cursor+=payloads[i].size();
+ }
+ write32(newEntry,16U+oldCount*4U,static_cast<std::uint32_t>(cursor));
+ if(trailingPadding>0U)std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(oldPayloadEnd),trailingPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(newPayloadEnd));
+ const std::size_t suffixSize=usedEnd-oldEntryEnd;
+ const std::size_t newEntryEnd=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(oldEntryEnd)+delta);
+ if(suffixSize>0U)std::memmove(chunk.bytes.data()+static_cast<std::ptrdiff_t>(newEntryEnd),chunk.bytes.data()+static_cast<std::ptrdiff_t>(oldEntryEnd),suffixSize);
+ std::copy(newEntry.begin(),newEntry.end(),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset));
+ entry.size=newEntrySize;entry.itemCount=static_cast<std::uint32_t>(oldCount);entry.items.clear();entry.items.reserve(oldCount);
+ for(std::size_t i=0;i<oldCount;++i){const std::size_t start=u32(chunk.bytes,entry.offset+16U+i*4U),end=u32(chunk.bytes,entry.offset+16U+(i+1U)*4U);entry.items.push_back({entry.offset+start,end-start});}
+ for(std::size_t i=entryIndex+1U;i<chunk.entries.size();++i){
+  auto&following=chunk.entries[i];following.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(following.offset)+delta);
+  for(auto&item:following.items)item.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(item.offset)+delta);
+  if(following.type==1U&&following.animation.frames.size()==following.items.size())for(std::size_t frame=0;frame<following.animation.frames.size();++frame){following.animation.frames[frame].rawOffset=following.items[frame].offset;following.animation.frames[frame].rawSize=following.items[frame].size;}
+ }
+ for(std::size_t i=0;i<chunk.entries.size();++i)write32(chunk.bytes,16U+i*4U,static_cast<std::uint32_t>(chunk.entries[i].offset));
+ write32(chunk.bytes,sentinelOffset,static_cast<std::uint32_t>(newUsedEndSigned));
+ for(std::size_t i=0;i<entry.animation.frames.size();++i){entry.animation.frames[i].rawOffset=entry.items[i].offset;entry.animation.frames[i].rawSize=entry.items[i].size;}
+ return true;
+}
+
 bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex)const{
  if(chunkIndex>=chunks_.size())return false;
  const auto&chunk=chunks_[chunkIndex];
