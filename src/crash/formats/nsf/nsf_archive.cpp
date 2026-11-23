@@ -392,14 +392,6 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
-  // NSF temporal words are little-endian, but the temporal bitstream is
-  // consumed in byte order. Normalize each 32-bit word before bit decoding,
-  // just as the uncompressed path does.
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -414,8 +406,9 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    xAcc=(xAcc+dx+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
-   // Match the established CrashEdit frame decoder's position ordering.
-   frame.vertices[i+frame.specialVertexCount]={xAcc,yAcc,zAcc};
+   // The temporal cursor skips the special-vertex bit prefix, but compressed
+   // positions are mapped from vertex index zero in the reference decoder.
+   frame.vertices[i]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
@@ -858,24 +851,17 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     const auto&target=frame.vertices[pi+frame.specialVertexCount];
+     const auto&target=frame.vertices[pi];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
      const std::int32_t baseZ=(zAcc+position.z)&0xff;
      const std::int32_t baseY=(yAcc+position.y)&0xff;
      encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
     }
-    // Store temporal bits in byte-stream order. The decoder reads each
-    // little-endian NSF word and then normalizes its byte order before
-    // consuming the bitstream, so packing a whole word and writing it
-    // little-endian here would reverse each group of four bytes twice.
     for(std::size_t wi=0;wi<wordCount;++wi){
-     for(unsigned byte=0;byte<4U;++byte){
-      std::uint8_t value=0;
-      for(unsigned bitIndex=0;bitIndex<8U;++bitIndex)
-       value=static_cast<std::uint8_t>((value<<1U)|bits[wi*32U+byte*8U+bitIndex]);
-      payload[fakeHeader+wi*4U+byte]=value;
-     }
+     std::uint32_t word=0;
+     for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
+     for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
     }
     payloads.push_back(std::move(payload));
    }
@@ -1419,13 +1405,6 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
-  // Convert raw little-endian temporal words into the byte-ordered bitstream
-  // used by Crash 2's compressed X/Z/Y delta records.
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1438,8 +1417,8 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t i=0;i<model->positions.size();++i){
    const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
    std::int32_t targetX=0,targetY=0,targetZ=0;
-   const auto&source=frame.vertices[i+frame.specialVertexCount];
-   if(!toByte(i+frame.specialVertexCount==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i+frame.specialVertexCount==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i+frame.specialVertexCount==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   const auto&source=frame.vertices[i];
+   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
    const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    const std::int32_t baseZ=(zAcc+p.z)&0xff;
    const std::int32_t baseY=(yAcc+p.y)&0xff;
@@ -1465,14 +1444,6 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
    for(std::size_t byte=0;byte<4U;++byte)
     for(std::size_t b=0;b<8U;++b)bits[base+byte*8U+b]=reordered[base+24U-byte*8U+b];
- }
- if(model&&model->compressed){
-  // Restore NSF word byte order after writing the normalized temporal bits.
-  std::vector<std::uint8_t> rawOrder(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)rawOrder[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-  bits.swap(rawOrder);
  }
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){
   std::uint32_t word=0;for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|bits[wordIndex*32U+bit];
