@@ -391,7 +391,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
-  if(model->positions.size()>frame.vertices.size())return fail("Model compressed-position count exceeds animation frame vertices.");
+  if(model->positions.size()>frame.vertices.size()-frame.specialVertexCount)return fail("Model compressed-position count exceeds the non-special animation vertices.");
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -407,7 +407,8 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
    // Match the established CrashEdit frame decoder's position ordering.
-   if(i<frame.vertices.size())frame.vertices[i]={xAcc,yAcc,zAcc};
+   const std::size_t frameVertexIndex=i+frame.specialVertexCount;
+   if(frameVertexIndex<frame.vertices.size())frame.vertices[frameVertexIndex]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
@@ -1161,7 +1162,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
   for(const auto&modelEntry:modelChunk.entries)
    if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
- if(!(model&&model->compressed)&&vertexIndex<frame.specialVertexCount){
+ if(vertexIndex<frame.specialVertexCount){
   if(value>255)return false;
   if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
   return decodeAnimationVertices(frame,model,crash3);
@@ -1172,7 +1173,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
-  if(vertexIndex>=model->positions.size()||model->positions.size()>frame.vertices.size())return false;
+  if(vertexIndex<frame.specialVertexCount||vertexIndex>=frame.specialVertexCount+model->positions.size()||model->positions.size()>frame.vertices.size()-frame.specialVertexCount)return false;
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1185,8 +1186,9 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t i=0;i<model->positions.size();++i){
    const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
    std::int32_t targetX=0,targetY=0,targetZ=0;
-   const auto&source=frame.vertices[i];
-   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   const std::size_t frameVertexIndex=i+frame.specialVertexCount;
+   const auto&source=frame.vertices[frameVertexIndex];
+   if(!toByte(frameVertexIndex==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(frameVertexIndex==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(frameVertexIndex==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
    const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    const std::int32_t baseZ=(zAcc+p.z)&0xff;
    const std::int32_t baseY=(yAcc+p.y)&0xff;
