@@ -267,7 +267,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive rebaseArchive;assert(rebaseArchive.loadBytes(crash2RebaseAnimation,e));rebaseArchive.decodeAnimationModels(false);
  assert(rebaseArchive.setAnimationFrameVertex(0,0,0,0,0,-20));
  std::vector<std::uint8_t> rebasedBytes;assert(rebaseArchive.saveUncompressedBytes(rebasedBytes,e));
- NsfArchive rebasedRoundTrip;assert(rebasedRoundTrip.loadBytes(rebasedBytes,e));rebasedRoundTrip.decodeAnimationModels(true);
+ NsfArchive rebasedRoundTrip;assert(rebasedRoundTrip.loadBytes(rebasedBytes,e));rebasedRoundTrip.decodeAnimationModels(false);
  assert(rebasedRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].x==0);
  assert(rebasedRoundTrip.chunks()[0].entries[0].animation.frames[0].xOffset==-80);
 
