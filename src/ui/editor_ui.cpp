@@ -4082,12 +4082,13 @@ void EditorUI::drawAnimationViewer(){
      const auto&v=boneRotationDrag.original[i];const AnimationPoint world=transformVertex(v,rotationFrame,model);
      const AnimationPoint rotated=rotateFromRest(world);
      const float wx=rotated.x,wy=rotated.y,wz=rotated.z;
+     const long x=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
+     const long z=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
+     const long y=std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f);
+     if(x<std::numeric_limits<std::int32_t>::min()||x>std::numeric_limits<std::int32_t>::max()||y<std::numeric_limits<std::int32_t>::min()||y>std::numeric_limits<std::int32_t>::max()||z<std::numeric_limits<std::int32_t>::min()||z>std::numeric_limits<std::int32_t>::max()){status_="Rotation exceeds the editor's supported coordinate precision.";return;}
      auto&target=targets[static_cast<std::size_t>(vertexIndex)];
-     target.x=static_cast<int>(std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f));
-     target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
-     target.y=static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f));
+     target.x=static_cast<std::int32_t>(x);target.z=static_cast<std::int32_t>(z);target.y=static_cast<std::int32_t>(y);
     }
-    for(const auto&v:targets)if(v.x==std::numeric_limits<std::int32_t>::min()||v.x==std::numeric_limits<std::int32_t>::max()||v.y==std::numeric_limits<std::int32_t>::min()||v.y==std::numeric_limits<std::int32_t>::max()||v.z==std::numeric_limits<std::int32_t>::min()||v.z==std::numeric_limits<std::int32_t>::max()){status_="Rotation exceeds the editor's supported coordinate precision.";return;}
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
      status_="Could not update the editable animation pose.";
      return;
