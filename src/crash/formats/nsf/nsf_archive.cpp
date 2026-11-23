@@ -752,6 +752,8 @@ bool NsfArchive::loadAnimationEditOverlay(const std::vector<std::uint8_t>&bytes,
  if(p!=bytes.size()){e="Editable animation pose overlay contains trailing data.";return false;}
  chunks_=std::move(candidate.chunks_);e.clear();return true;
 }
+static bool replaceAnimationFramePayloads(NsfChunk&,NsfEntry&,const std::vector<std::vector<std::uint8_t>>&);
+
 bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::string&e){
  NsfEntry*modelEntry=nullptr;NsfChunk*modelChunk=nullptr;
  for(auto&chunk:chunks_)if(chunk.type==0&&chunk.entryTableValid)for(auto&entry:chunk.entries)
