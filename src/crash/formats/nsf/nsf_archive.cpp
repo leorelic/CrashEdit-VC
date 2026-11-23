@@ -882,7 +882,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     payloads.push_back(std::move(payload));
    }
    if(!entryAffected)continue;
-   if(!replaceAnimationFramePayloads(chunk,entry,payloads)){e="The expanded animation frame payloads do not fit safely in their NSF chunk. The editable pose is preserved.";return false;}
+   if(!replaceAnimationFramePayloads(chunk,entry,payloads)){const std::size_t failedChunk=static_cast<std::size_t>(&chunk-chunks_.data());const std::size_t failedEntry=static_cast<std::size_t>(&entry-chunk.entries.data());e="The expanded animation frame payloads do not fit safely in their NSF chunk. The editable pose is preserved. [chunk="+std::to_string(failedChunk)+",entry="+std::to_string(failedEntry)+"]";return false;}
    for(std::size_t fi=0;fi<entry.animation.frames.size();++fi)if(affected[fi]){
     auto&previous=entry.animation.frames[fi];const auto desired=previous.vertices;
     NsfAnimationFrame decoded;
