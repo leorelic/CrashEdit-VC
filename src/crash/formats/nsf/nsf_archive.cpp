@@ -777,7 +777,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
    std::vector<bool>affected(entry.animation.frames.size(),false);
    bool entryAffected=false;
    for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
-    const auto&frame=entry.animation.frames[fi];
+    auto&frame=entry.animation.frames[fi];
     if(frame.linkedModelEid!=modelEid){
      if(!has(chunk.bytes,frame.rawOffset,frame.rawSize)){e="An animation frame payload is outside its NSF chunk.";return false;}
      payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
@@ -793,8 +793,29 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize)||frame.headerSize!=fakeHeader+frame.specialVertexCount*3U){
      e="An animation frame linked to this model has an invalid header boundary.";return false;
     }
-    for(const auto&v:frame.vertices)if(v.x<0||v.x>255||v.y<0||v.y>255||v.z<0||v.z>255){
-     e="A rebased animation frame still contains coordinates outside 0–255; its editable pose is preserved.";return false;
+    std::int64_t minimum[3]={INT64_MAX,INT64_MAX,INT64_MAX},maximum[3]={INT64_MIN,INT64_MIN,INT64_MIN};
+    for(const auto&v:frame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(unsigned axis=0;axis<3U;++axis){minimum[axis]=std::min<std::int64_t>(minimum[axis],values[axis]);maximum[axis]=std::max<std::int64_t>(maximum[axis],values[axis]);}}
+    std::int64_t shift[3]={0,0,0};bool needsRebase=false;
+    for(unsigned axis=0;axis<3U;++axis){
+     if(maximum[axis]-minimum[axis]>255){e="An animation frame linked to this model spans more than 255 local units on an axis; its pose remains editable but cannot be stored in the Crash 2 byte-coordinate format.";return false;}
+     if(minimum[axis]<0){shift[axis]=minimum[axis];needsRebase=true;}
+     else if(maximum[axis]>255){shift[axis]=maximum[axis]-255;needsRebase=true;}
+    }
+    if(needsRebase){
+     const std::int64_t offsets[3]={
+      static_cast<std::int64_t>(frame.xOffset)+shift[0]*4,
+      static_cast<std::int64_t>(frame.yOffset)+shift[2]*4,
+      static_cast<std::int64_t>(frame.zOffset)+shift[1]*4
+     };
+     for(const auto offset:offsets)if(offset<INT16_MIN||offset>INT16_MAX){e="An animation frame linked to this model needs an offset outside the signed 16-bit NSF range; its pose remains editable.";return false;}
+     for(auto&v:frame.vertices){v.x=static_cast<std::int32_t>(static_cast<std::int64_t>(v.x)-shift[0]);v.y=static_cast<std::int32_t>(static_cast<std::int64_t>(v.y)-shift[1]);v.z=static_cast<std::int32_t>(static_cast<std::int64_t>(v.z)-shift[2]);}
+     const std::size_t chunkIndex=static_cast<std::size_t>(&chunk-chunks_.data());
+     const std::size_t entryIndex=static_cast<std::size_t>(&entry-chunk.entries.data());
+     if(!setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,0U,static_cast<std::int32_t>(offsets[0]))||
+        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,1U,static_cast<std::int32_t>(offsets[1]))||
+        !setAnimationFrameHeaderValue(chunkIndex,entryIndex,fi,2U,static_cast<std::int32_t>(offsets[2]))){
+      e="Could not rebase an animation frame linked to the expanded model.";return false;
+     }
     }
     const std::size_t start=frame.specialVertexCount*24U;
     const std::size_t requiredBits=start+model.positions.size()*24U;
