@@ -836,7 +836,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
      bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
      for(unsigned b=0;b<7U;++b)bits[bit++]=static_cast<std::uint8_t>((encoded>>(6U-b))&1U);
     };
-    auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)&0xff;return delta>127?delta-256:delta;};
+    auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
      const auto&target=frame.vertices[pi+frame.specialVertexCount];
