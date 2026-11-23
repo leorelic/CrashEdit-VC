@@ -885,11 +885,10 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     // Keep compressed-position indices aligned with the frame's
-     // non-special vertex range.
-     const std::size_t frameVertexIndex=frame.specialVertexCount+pi;
-     if(frameVertexIndex>=frame.vertices.size()){e="Compressed model position index exceeds the linked animation frame.";return false;}
-     const auto&target=frame.vertices[frameVertexIndex];
+     // The compressed bitstream skips the special-vertex prefix, but the
+     // reference decoder maps compressed positions from frame vertex index 0.
+     if(pi>=frame.vertices.size()){e="Compressed model position index exceeds the linked animation frame.";return false;}
+     const auto&target=frame.vertices[pi];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
      const std::int32_t baseZ=(zAcc+position.z)&0xff;
      const std::int32_t baseY=(yAcc+position.y)&0xff;
@@ -1456,10 +1455,9 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    std::int32_t targetX=0,targetY=0,targetZ=0;
    // Model positions cover only non-special vertices; those start after the
    // special vertices stored directly in the animation frame header.
-   const std::size_t frameVertexIndex=frame.specialVertexCount+i;
-   if(frameVertexIndex>=frame.vertices.size())return false;
-   const auto&source=frame.vertices[frameVertexIndex];
-   if(!toByte(frameVertexIndex==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(frameVertexIndex==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(frameVertexIndex==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   if(i>=frame.vertices.size())return false;
+   const auto&source=frame.vertices[i];
+   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
    const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    const std::int32_t baseZ=(zAcc+p.z)&0xff;
    const std::int32_t baseY=(yAcc+p.y)&0xff;
