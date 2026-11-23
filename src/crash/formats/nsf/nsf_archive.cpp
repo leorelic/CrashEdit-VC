@@ -683,6 +683,18 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
     if(!entry.animation.isCrash3&&frame.linkedModelEid!=0U&&!model){e="Animation frame "+std::to_string(fi)+" references a model that is not available for Crash 2 save validation. The editable pose is preserved.";return false;}
     if(model&&model->compressed){
+     // Special vertices live in the frame header, not in the model's
+     // compressed-position table. Commit them independently before encoding
+     // the remaining compressed vertex stream.
+     for(std::size_t vi=0;vi<frame.specialVertexCount;++vi){
+      const auto v=frame.vertices[vi];
+      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,0U,v.x)||
+         !candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,1U,v.y)||
+         !candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,2U,v.z)){
+       e="Animation frame "+std::to_string(fi)+" contains a special vertex that cannot be represented in its Crash 2 frame header. The editable pose is preserved.";
+       return false;
+      }
+     }
      if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size()){
       e="Animation frame "+std::to_string(fi)+" has a compressed-position count plus special-vertex count that does not match its frame vertices. The editable pose is preserved.";
       return false;
