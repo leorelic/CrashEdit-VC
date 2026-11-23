@@ -244,6 +244,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const std::vector<NsfAnimationVertex> outOfRangePose{{-20,300,40},{50,60,70}};
  assert(compressedArchive.setAnimationFrameVertices(1,0,0,compressedBatchIndices,outOfRangePose));
  std::string encodingError;assert(!compressedArchive.commitAnimationEdits(encodingError));
+ std::vector<std::uint8_t> rejectedSave;assert(!compressedArchive.saveUncompressedBytes(rejectedSave,encodingError));assert(rejectedSave.empty());
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==-20);
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesEdited);
  std::vector<std::uint8_t> sourceBytes,poseOverlay;
