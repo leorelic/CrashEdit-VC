@@ -629,10 +629,85 @@ bool NsfArchive::setEntityPropertyInt(std::size_t chunkIndex,std::size_t entryIn
  }
  return false;
 }
-bool NsfArchive::saveUncompressedBytes(std::vector<std::uint8_t>&out,std::string&e)const{
+bool NsfArchive::saveUncompressedSourceBytes(std::vector<std::uint8_t>&out,std::string&e)const{
  out.clear();out.reserve(chunks_.size()*NsfChunkSize);
  for(const auto&c:chunks_){if(c.bytes.size()!=NsfChunkSize){e="Invalid in-memory NSF chunk size.";return false;}auto b=c.bytes;checksum(b);out.insert(out.end(),b.begin(),b.end());}
  e.clear();return true;
+}
+bool NsfArchive::saveUncompressedBytes(std::vector<std::uint8_t>&out,std::string&e)const{
+ NsfArchive candidate=*this;
+ if(!candidate.commitAnimationEdits(e)){out.clear();return false;}
+ return candidate.saveUncompressedSourceBytes(out,e);
+}
+bool NsfArchive::commitAnimationEdits(std::string&e){
+ NsfArchive candidate=*this;
+ for(std::size_t ci=0;ci<candidate.chunks_.size();++ci){
+  auto&chunk=candidate.chunks_[ci];
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   auto&entry=chunk.entries[ei];
+   if(!entry.valid||entry.type!=1U)continue;
+   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
+    auto&frame=entry.animation.frames[fi];
+    if(!frame.verticesEdited)continue;
+    if(!frame.verticesDecoded||frame.vertices.size()!=frame.vertexCount){e="Animation frame "+std::to_string(fi)+" has an incomplete editable pose.";return false;}
+    const NsfModel*model=nullptr;
+    for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
+     for(const auto&modelEntry:modelChunk.entries)
+      if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
+    if(model&&model->compressed){
+     if(frame.specialVertexCount!=0U){e="Animation frame "+std::to_string(fi)+" combines special vertices with compressed model positions; safe NSF re-encoding is not yet supported. The editable pose is preserved.";return false;}
+     if(frame.vertices.empty()||!candidate.encodeAnimationFrameVertex(ci,ei,fi,0U,0U,frame.vertices[0].x)){
+      e="Animation frame "+std::to_string(fi)+" cannot fit its edited pose into the model's existing compressed delta widths. The editable pose is preserved; no source data was changed.";
+      return false;
+     }
+    }else{
+     for(std::size_t vi=0;vi<frame.vertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
+      const auto&v=frame.vertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
+      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,axis,value)){
+       e="Animation frame "+std::to_string(fi)+" vertex "+std::to_string(vi)+" has coordinates that cannot be represented by the current NSF frame encoding. The editable pose is preserved; no source data was changed.";
+       return false;
+      }
+     }
+    }
+    frame.verticesEdited=false;
+   }
+  }
+ }
+ chunks_=std::move(candidate.chunks_);
+ e.clear();return true;
+}
+bool NsfArchive::saveAnimationEditOverlay(std::vector<std::uint8_t>&out,std::string&e)const{
+ out.clear();
+ auto put32=[&](std::uint32_t v){for(unsigned i=0;i<4U;++i)out.push_back(static_cast<std::uint8_t>(v>>(i*8U)));};
+ std::uint32_t count=0;
+ for(const auto&chunk:chunks_)for(const auto&entry:chunk.entries)for(const auto&frame:entry.animation.frames)if(frame.verticesEdited)++count;
+ put32(0x45534f50U);put32(1U);put32(count);
+ for(std::size_t ci=0;ci<chunks_.size();++ci)for(std::size_t ei=0;ei<chunks_[ci].entries.size();++ei){
+  const auto&entry=chunks_[ci].entries[ei];
+  for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
+   const auto&frame=entry.animation.frames[fi];if(!frame.verticesEdited)continue;
+   if(ci>UINT32_MAX||ei>UINT32_MAX||fi>UINT32_MAX||frame.vertices.size()>UINT32_MAX){e="Editable animation pose overlay exceeds its supported index range.";out.clear();return false;}
+   put32(static_cast<std::uint32_t>(ci));put32(static_cast<std::uint32_t>(ei));put32(static_cast<std::uint32_t>(fi));put32(static_cast<std::uint32_t>(frame.vertices.size()));
+   for(const auto&v:frame.vertices){put32(static_cast<std::uint32_t>(v.x));put32(static_cast<std::uint32_t>(v.y));put32(static_cast<std::uint32_t>(v.z));}
+  }
+ }
+ e.clear();return true;
+}
+bool NsfArchive::loadAnimationEditOverlay(const std::vector<std::uint8_t>&bytes,std::string&e){
+ auto get32=[&](std::size_t p){return std::uint32_t(bytes[p])|(std::uint32_t(bytes[p+1U])<<8U)|(std::uint32_t(bytes[p+2U])<<16U)|(std::uint32_t(bytes[p+3U])<<24U);};
+ if(bytes.size()<12U||get32(0)!=0x45534f50U||get32(4)!=1U){e="Editable animation pose overlay has an invalid header.";return false;}
+ const std::uint32_t count=get32(8);std::size_t p=12U;
+ NsfArchive candidate=*this;
+ for(std::uint32_t n=0;n<count;++n){
+  if(p>bytes.size()||bytes.size()-p<16U){e="Editable animation pose overlay is truncated.";return false;}
+  const std::size_t ci=get32(p),ei=get32(p+4U),fi=get32(p+8U),vc=get32(p+12U);p+=16U;
+  if(vc>16384U||p>bytes.size()||static_cast<std::size_t>(vc)>(bytes.size()-p)/12U){e="Editable animation pose overlay contains an invalid vertex count.";return false;}
+  std::vector<std::size_t>indices;std::vector<NsfAnimationVertex>vertices;indices.reserve(vc);vertices.reserve(vc);
+  for(std::size_t vi=0;vi<vc;++vi){indices.push_back(vi);vertices.push_back({static_cast<std::int32_t>(get32(p)),static_cast<std::int32_t>(get32(p+4U)),static_cast<std::int32_t>(get32(p+8U))});p+=12U;}
+  if(!candidate.setAnimationFrameVertices(ci,ei,fi,indices,vertices)){e="Editable animation pose overlay does not match the loaded NSF frame structure.";return false;}
+ }
+ if(p!=bytes.size()){e="Editable animation pose overlay contains trailing data.";return false;}
+ chunks_=std::move(candidate.chunks_);e.clear();return true;
 }
 bool NsfArchive::saveUncompressed(const std::filesystem::path&f,std::string&e)const{
  std::vector<std::uint8_t> bytes;if(!saveUncompressedBytes(bytes,e))return false;
@@ -1066,7 +1141,7 @@ bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size
  }
  return true;
 }
-bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value){
+bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value){
  if(chunkIndex>=chunks_.size()||axis>=3U)return false;
  auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
  auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=1||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
@@ -1146,24 +1221,26 @@ bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entr
 }
 
 
+bool NsfArchive::setAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value){
+ if(chunkIndex>=chunks_.size()||axis>=3U)return false;
+ auto&chunk=chunks_[chunkIndex];if(chunk.type!=0||entryIndex>=chunk.entries.size())return false;
+ auto&entry=chunk.entries[entryIndex];if(!entry.valid||entry.type!=1U||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ auto&frame=entry.animation.frames[frameIndex];if(!frame.verticesDecoded||vertexIndex>=frame.vertices.size())return false;
+ auto&vertex=frame.vertices[vertexIndex];if(axis==0U)vertex.x=value;else if(axis==1U)vertex.y=value;else vertex.z=value;
+ frame.verticesEdited=true;return true;
+}
 bool NsfArchive::setAnimationFrameVertices(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>&vertexIndices,const std::vector<NsfAnimationVertex>&vertices){
  if(vertexIndices.empty()||vertexIndices.size()!=vertices.size()||chunkIndex>=chunks_.size())return false;
- for(std::size_t i=0;i<vertexIndices.size();++i)
-  if(std::find(vertexIndices.begin(),vertexIndices.begin()+static_cast<std::ptrdiff_t>(i),vertexIndices[i])!=vertexIndices.begin()+static_cast<std::ptrdiff_t>(i))return false;
- NsfArchive candidate=*this;
+ if(chunks_[chunkIndex].type!=0||entryIndex>=chunks_[chunkIndex].entries.size())return false;
+ const auto&entry=chunks_[chunkIndex].entries[entryIndex];
+ if(!entry.valid||entry.type!=1U||!entry.animation.decoded||frameIndex>=entry.animation.frames.size())return false;
+ const auto&frame=entry.animation.frames[frameIndex];if(!frame.verticesDecoded)return false;
  for(std::size_t i=0;i<vertexIndices.size();++i){
-  const auto&target=vertices[i];
-  const std::int32_t values[3]={target.x,target.y,target.z};
-  for(std::size_t axis=0;axis<3U;++axis)
-   if(!candidate.setAnimationFrameVertex(chunkIndex,entryIndex,frameIndex,vertexIndices[i],axis,values[axis]))return false;
+  if(vertexIndices[i]>=frame.vertices.size()||std::find(vertexIndices.begin(),vertexIndices.begin()+static_cast<std::ptrdiff_t>(i),vertexIndices[i])!=vertexIndices.begin()+static_cast<std::ptrdiff_t>(i))return false;
  }
- if(entryIndex>=candidate.chunks_[chunkIndex].entries.size())return false;
- auto&destinationEntry=chunks_[chunkIndex].entries[entryIndex];
- const auto&sourceEntry=candidate.chunks_[chunkIndex].entries[entryIndex];
- if(frameIndex>=destinationEntry.animation.frames.size()||frameIndex>=sourceEntry.animation.frames.size())return false;
- chunks_[chunkIndex].bytes=candidate.chunks_[chunkIndex].bytes;
- destinationEntry.animation.frames[frameIndex]=sourceEntry.animation.frames[frameIndex];
- return true;
+ auto&destination=chunks_[chunkIndex].entries[entryIndex].animation.frames[frameIndex];
+ for(std::size_t i=0;i<vertexIndices.size();++i)destination.vertices[vertexIndices[i]]=vertices[i];
+ destination.verticesEdited=true;return true;
 }
 
 bool NsfArchive::setAnimationFrameVerticesRebased(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,const std::vector<std::size_t>&vertexIndices,const std::vector<NsfAnimationVertex>&vertices,std::int32_t xOffset,std::int32_t yOffset,std::int32_t zOffset){
@@ -1175,13 +1252,7 @@ bool NsfArchive::setAnimationFrameVerticesRebased(std::size_t chunkIndex,std::si
     !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,0U,xOffset)||
     !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,1U,yOffset)||
     !candidate.setAnimationFrameHeaderValue(chunkIndex,entryIndex,frameIndex,2U,zOffset))return false;
- if(entryIndex>=candidate.chunks_[chunkIndex].entries.size()||entryIndex>=chunks_[chunkIndex].entries.size())return false;
- auto&destination=chunks_[chunkIndex].entries[entryIndex];
- const auto&source=candidate.chunks_[chunkIndex].entries[entryIndex];
- if(frameIndex>=destination.animation.frames.size()||frameIndex>=source.animation.frames.size())return false;
- chunks_[chunkIndex].bytes=candidate.chunks_[chunkIndex].bytes;
- destination.animation.frames[frameIndex]=source.animation.frames[frameIndex];
- return true;
+ chunks_=std::move(candidate.chunks_);return true;
 }
 
 bool NsfArchive::setModelScale(std::size_t chunkIndex,std::size_t entryIndex,std::size_t axis,std::int32_t value){
