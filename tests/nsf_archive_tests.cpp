@@ -261,6 +261,25 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedReloaded[2].x==50&&compressedReloaded[2].y==60&&compressedReloaded[2].z==70);
  for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
 
+ // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
+ NsfArchive rebaseArchive;assert(rebaseArchive.loadBytes(vertexAnimation,e));rebaseArchive.decodeAnimationModels(true);
+ assert(rebaseArchive.setAnimationFrameVertex(0,0,0,0,0,-20));
+ std::vector<std::uint8_t> rebasedBytes;assert(rebaseArchive.saveUncompressedBytes(rebasedBytes,e));
+ NsfArchive rebasedRoundTrip;assert(rebasedRoundTrip.loadBytes(rebasedBytes,e));rebasedRoundTrip.decodeAnimationModels(true);
+ assert(rebasedRoundTrip.chunks()[0].entries[0].animation.frames[0].vertices[0].x==0);
+ assert(rebasedRoundTrip.chunks()[0].entries[0].animation.frames[0].xOffset==-80);
+
+ // Widening one model position's delta width expands the shared table and re-encodes linked frames.
+ std::vector<std::uint8_t> narrowModelChunk=compressedModelChunk;p32(narrowModelChunk,cmPositions,0x0000007fU);
+ std::vector<std::uint8_t> narrowArchiveBytes;narrowArchiveBytes.reserve(131072);narrowArchiveBytes.insert(narrowArchiveBytes.end(),narrowModelChunk.begin(),narrowModelChunk.end());narrowArchiveBytes.insert(narrowArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
+ NsfArchive narrowArchive;assert(narrowArchive.loadBytes(narrowArchiveBytes,e));narrowArchive.decodeAnimationModels(false);
+ assert(narrowArchive.chunks()[0].entries[0].model.positions[0].xBits==1U);
+ assert(narrowArchive.setAnimationFrameVertex(1,0,0,0,0,200));
+ std::vector<std::uint8_t> expandedBytes;assert(narrowArchive.saveUncompressedBytes(expandedBytes,e));
+ NsfArchive expandedRoundTrip;assert(expandedRoundTrip.loadBytes(expandedBytes,e));expandedRoundTrip.decodeAnimationModels(false);
+ assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].xBits==7U);
+ assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==200);
+
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
  std::vector<std::uint8_t> timelineChunk(65536);p16(timelineChunk,0,0x1234);p16(timelineChunk,2,0);p32(timelineChunk,4,8);p32(timelineChunk,8,2);
