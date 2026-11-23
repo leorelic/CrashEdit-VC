@@ -269,7 +269,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(specialCompressedModel,16,scmEntry);p32(specialCompressedModel,20,scmEntry+scmEntrySize);p32(specialCompressedModel,scmEntry,0x0100ffff);p32(specialCompressedModel,scmEntry+4,0x0200007b);p32(specialCompressedModel,scmEntry+8,2);p32(specialCompressedModel,scmEntry+12,scmItems);
  std::size_t scmOffset=scmTable;for(std::size_t i=0;i<scmItems;++i){p32(specialCompressedModel,scmEntry+16+i*4,static_cast<std::uint32_t>(scmOffset));scmOffset+=scmSizes[i];}p32(specialCompressedModel,scmEntry+16+scmItems*4,static_cast<std::uint32_t>(scmEntrySize));
  const std::size_t scmInfo=scmEntry+scmTable,scmPoly=scmInfo+0x50,scmColor=scmPoly+4,scmPositions=scmColor+4;
- p32(specialCompressedModel,scmInfo+0x38,3);p32(specialCompressedModel,scmInfo+0x3c,1);p32(specialCompressedModel,scmInfo+0x4c,1);
+ p32(specialCompressedModel,scmInfo+0x2c,1);p32(specialCompressedModel,scmInfo+0x38,3);p32(specialCompressedModel,scmInfo+0x3c,1);p32(specialCompressedModel,scmInfo+0x4c,1);
  p32(specialCompressedModel,scmPoly,0xffffffffU);p32(specialCompressedModel,scmColor,0x00010203U);p32(specialCompressedModel,scmPositions,0x000001ffU);p32(specialCompressedModel,scmPositions+4,0x000001ffU);
  std::vector<std::uint8_t> specialCompressedAnimation(65536);p16(specialCompressedAnimation,0,0x1234);p16(specialCompressedAnimation,2,0);p32(specialCompressedAnimation,4,7);p32(specialCompressedAnimation,8,1);
  constexpr std::size_t scaEntry=24,scaFrame=48,scaEntrySize=60;p32(specialCompressedAnimation,16,scaEntry);p32(specialCompressedAnimation,20,scaEntry+scaEntrySize);
