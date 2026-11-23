@@ -702,12 +702,31 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       e="Animation frame "+std::to_string(fi)+" has a compressed-position count plus special-vertex count that does not match its frame vertices. The editable pose is preserved.";
       return false;
      }
-     if(!model->positions.empty()){
-      const std::size_t firstCompressedVertex=frame.specialVertexCount;
-      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,firstCompressedVertex,0U,frame.vertices[firstCompressedVertex].x)){
-       if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,e))return false;
-       continue;
+     // A successful write of one component says nothing about the
+     // remaining temporal components: each position has independent X/Z/Y
+     // delta widths. Encode every compressed vertex and all three axes.
+     // Previously we probed only the first compressed vertex's X value and
+     // then cleared verticesEdited, silently dropping most edits whenever
+     // that one value happened to fit its existing width.
+     bool needsSharedExpansion=false;
+     for(std::size_t pi=0;pi<model->positions.size()&&!needsSharedExpansion;++pi){
+      const std::size_t vertexIndex=frame.specialVertexCount+pi;
+      const NsfAnimationVertex desired=desiredVertices[vertexIndex];
+      const std::int32_t components[3]={desired.x,desired.y,desired.z};
+      for(std::size_t axis=0;axis<3U;++axis){
+       if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vertexIndex,axis,components[axis])){
+        needsSharedExpansion=true;
+        break;
+       }
       }
+     }
+     if(needsSharedExpansion){
+      // The encoder may have written earlier components before encountering
+      // a narrow delta. Expansion must use the complete intended working
+      // pose, never this partially encoded intermediate state.
+      frame.vertices=desiredVertices;
+      if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,e))return false;
+      continue;
      }
     }else{
      for(std::size_t vi=0;vi<frame.vertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
