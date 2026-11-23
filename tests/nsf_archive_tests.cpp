@@ -277,7 +277,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(specialCompressedAnimation,scaFrame+8,3);p32(specialCompressedAnimation,scaFrame+12,0);p32(specialCompressedAnimation,scaFrame+16,0x0200007b);p32(specialCompressedAnimation,scaFrame+20,27);
  p32(specialCompressedAnimation,scaFrame+24,0x001e140aU);p32(specialCompressedAnimation,scaFrame+28,0);p32(specialCompressedAnimation,scaFrame+32,0);
  std::vector<std::uint8_t> specialCompressedBytes;specialCompressedBytes.insert(specialCompressedBytes.end(),specialCompressedModel.begin(),specialCompressedModel.end());specialCompressedBytes.insert(specialCompressedBytes.end(),specialCompressedAnimation.begin(),specialCompressedAnimation.end());
- NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
+ NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);std::fprintf(stderr,"model valid=%d type=%u decoded=%d error=%s animation error=%s\\n",int(specialCompressedArchive.chunks()[0].entries[0].valid),specialCompressedArchive.chunks()[0].entries[0].type,int(specialCompressedArchive.chunks()[0].entries[0].model.decoded),specialCompressedArchive.chunks()[0].entries[0].model.error.c_str(),specialCompressedArchive.chunks()[1].entries[0].animation.error.c_str());
  const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
  assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
