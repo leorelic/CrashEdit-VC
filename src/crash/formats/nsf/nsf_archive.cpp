@@ -781,8 +781,8 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     entryAffected=true;affected[fi]=true;
     if(entry.animation.isCrash3){e="Compressed model expansion is only enabled for the active Crash 2 animation format.";return false;}
     if(!frame.verticesDecoded||frame.vertices.size()!=frame.vertexCount||frame.vertexCount!=model.vertexCount||
-       frame.specialVertexCount!=model.specialVertexCount||model.positions.size()!=frame.vertexCount-frame.specialVertexCount){
-     e="An animation frame linked to this model has an incompatible vertex or special-vertex layout.";return false;
+       frame.specialVertexCount!=0U||model.specialVertexCount!=0U||model.positions.size()!=frame.vertexCount){
+     e="An animation frame linked to this model has an unsupported special-vertex or compressed-position layout.";return false;
     }
     const std::size_t fakeHeader=24U+static_cast<std::size_t>(frame.collisionCount)*0x28U;
     if(frame.rawSize<fakeHeader||!has(chunk.bytes,frame.rawOffset,frame.rawSize)||frame.headerSize!=fakeHeader+frame.specialVertexCount*3U){
@@ -834,7 +834,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     const auto&target=frame.vertices[pi+frame.specialVertexCount];
+     const auto&target=frame.vertices[pi];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
      const std::int32_t baseZ=(zAcc+position.z)&0xff;
      const std::int32_t baseY=(yAcc+position.y)&0xff;
