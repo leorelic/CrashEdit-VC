@@ -651,6 +651,33 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
     auto&frame=entry.animation.frames[fi];
     if(!frame.verticesEdited)continue;
     if(!frame.verticesDecoded||frame.vertices.size()!=frame.vertexCount){e="Animation frame "+std::to_string(fi)+" has an incomplete editable pose.";return false;}
+    // Crash 2 frame coordinates are bytes, but frame offsets can rebase a
+    // whole pose without changing its world-space placement. Do this only at
+    // save time; never clamp the working pose during editing.
+    if(!entry.animation.isCrash3&&!frame.vertices.empty()){
+     std::int64_t minimum[3]={INT64_MAX,INT64_MAX,INT64_MAX},maximum[3]={INT64_MIN,INT64_MIN,INT64_MIN};
+     for(const auto&v:frame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(unsigned axis=0;axis<3U;++axis){minimum[axis]=std::min<std::int64_t>(minimum[axis],values[axis]);maximum[axis]=std::max<std::int64_t>(maximum[axis],values[axis]);}}
+     std::int64_t shift[3]={0,0,0};bool requiresRebase=false;
+     for(unsigned axis=0;axis<3U;++axis){
+      if(maximum[axis]-minimum[axis]>255){e="Animation frame "+std::to_string(fi)+" spans more than 255 local units on an axis. The pose remains editable, but the original Crash 2 frame cannot represent that geometry.";return false;}
+      if(minimum[axis]<0){shift[axis]=minimum[axis];requiresRebase=true;}
+      else if(maximum[axis]>255){shift[axis]=maximum[axis]-255;requiresRebase=true;}
+     }
+     if(requiresRebase){
+      const std::int64_t offsets[3]={
+       static_cast<std::int64_t>(frame.xOffset)+shift[0]*4,
+       static_cast<std::int64_t>(frame.yOffset)+shift[2]*4,
+       static_cast<std::int64_t>(frame.zOffset)+shift[1]*4
+      };
+      for(const auto offset:offsets)if(offset<INT16_MIN||offset>INT16_MAX){e="Animation frame "+std::to_string(fi)+" needs an offset outside the signed 16-bit NSF range to preserve its edited pose. The pose remains editable.";return false;}
+      for(auto&v:frame.vertices){v.x=static_cast<std::int32_t>(static_cast<std::int64_t>(v.x)-shift[0]);v.y=static_cast<std::int32_t>(static_cast<std::int64_t>(v.y)-shift[1]);v.z=static_cast<std::int32_t>(static_cast<std::int64_t>(v.z)-shift[2]);}
+      if(!candidate.setAnimationFrameHeaderValue(ci,ei,fi,0U,static_cast<std::int32_t>(offsets[0]))||
+         !candidate.setAnimationFrameHeaderValue(ci,ei,fi,1U,static_cast<std::int32_t>(offsets[1]))||
+         !candidate.setAnimationFrameHeaderValue(ci,ei,fi,2U,static_cast<std::int32_t>(offsets[2]))){
+       e="Could not rebase animation frame "+std::to_string(fi)+" into the Crash 2 byte-coordinate space. The pose remains editable.";return false;
+      }
+     }
+    }
     const NsfModel*model=nullptr;
     for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
      for(const auto&modelEntry:modelChunk.entries)
@@ -670,8 +697,8 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
      if(!model->positions.empty()){
       const std::size_t firstCompressedVertex=frame.specialVertexCount;
       if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,firstCompressedVertex,0U,frame.vertices[firstCompressedVertex].x)){
-       e="Animation frame "+std::to_string(fi)+" cannot fit its edited pose into the model's existing compressed delta widths. The editable pose is preserved; no source data was changed.";
-       return false;
+       if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,e))return false;
+       continue;
       }
      }
     }else{
