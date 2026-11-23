@@ -3096,11 +3096,11 @@ void EditorUI::drawAnimationFrameEditor(){
       indices.push_back(static_cast<std::size_t>(selectedIndex));targets.push_back(target);
      }
      if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
-      status_="The multi-vertex edit is outside the Crash 2 0–255 byte-coordinate range or cannot be represented by the current compressed deltas; no vertices were changed.";
+      status_="Could not update the editable animation pose.";
     }
     ImGui::PopID();
    }
-   ImGui::TextDisabled("Edits are encoded back into the frame's temporal stream; unsupported values are rejected.");
+   ImGui::TextDisabled("Edits stay in the working pose. NSF coordinate and compression compatibility is checked when saving.");
   }else ImGui::TextDisabled("Click a vertex point in the 3D Animation Editor to inspect it.");
   ImGui::Separator();
   ImGui::Text("Frame Structure");
@@ -3155,12 +3155,11 @@ void EditorUI::drawAnimationFrameEditor(){
      ImGui::TableSetColumnIndex(0);ImGui::Text("%zu",vi);
      for(std::size_t axis=0;axis<3U;++axis){
       ImGui::TableSetColumnIndex(static_cast<int>(axis+1U));
-      int value=frame.specialVertices[vi][axis];
+      int value=axis==0U?frame.vertices[vi].x:axis==1U?frame.vertices[vi].y:frame.vertices[vi].z;
       const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
       ImGui::SetNextItemWidth(-1.0f);
       if(ImGui::InputInt(axisName,&value,1,8)){
-       if(value<0||value>255)status_="Special vertex coordinates must be between 0 and 255.";
-       else if(!nsf_.setAnimationFrameSpecialVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis,static_cast<std::uint8_t>(value)))status_="Could not write the special vertex coordinate.";
+       if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis,value))status_="Could not update the editable special-vertex pose.";
       }
      }
      ImGui::PopID();
@@ -3730,7 +3729,6 @@ void EditorUI::drawAnimationViewer(){
   };
    auto applyVertexDrag=[&](){
    if(!vertexDrag.active||vertexDrag.entry!=animationViewerEntry_||vertexDrag.frame!=poseFrameIndex)return;
-   const int maximumCoordinate=255;
    const float sx=vertexDrag.pivotX,sy=vertexDrag.pivotY,sz=vertexDrag.pivotZ;
    const ImVec2 delta(io.MousePos.x-vertexDrag.mouseStart.x,io.MousePos.y-vertexDrag.mouseStart.y);
    float rawDx=0.0f,rawDy=0.0f,rawDz=0.0f;
@@ -3766,15 +3764,15 @@ void EditorUI::drawAnimationViewer(){
      const long x=std::lround(pivotRawX+(static_cast<float>(v.x)-pivotRawX)*factor);
      const long y=std::lround(pivotRawY+(static_cast<float>(v.y)-pivotRawY)*factor);
      const long z=std::lround(pivotRawZ+(static_cast<float>(v.z)-pivotRawZ)*factor);
-     if(x<0||x>maximumCoordinate||y<0||y>maximumCoordinate||z<0||z>maximumCoordinate){
-      status_="Scale would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+     if(x<std::numeric_limits<std::int32_t>::min()||x>std::numeric_limits<std::int32_t>::max()||y<std::numeric_limits<std::int32_t>::min()||y>std::numeric_limits<std::int32_t>::max()||z<std::numeric_limits<std::int32_t>::min()||z>std::numeric_limits<std::int32_t>::max()){
+      status_="Scale exceeds the editor's supported coordinate precision.";
       return;
      }
      target.x=static_cast<int>(x);target.y=static_cast<int>(y);target.z=static_cast<int>(z);
      targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),std::vector<std::size_t>(vertexDrag.indices.begin(),vertexDrag.indices.end()),targets)){
-     if(status_!="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The scale reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+     status_="Could not update the editable animation pose.";
     }else invalidateBoneRestPoseForVertices(vertexDrag.indices);
     return;
    }
@@ -3788,15 +3786,15 @@ void EditorUI::drawAnimationViewer(){
     const long x=std::lround(static_cast<float>(target.x)+rawDx);
     const long y=std::lround(static_cast<float>(target.y)+rawDy);
     const long z=std::lround(static_cast<float>(target.z)+rawDz);
-    if(x<0||x>maximumCoordinate||y<0||y>maximumCoordinate||z<0||z>maximumCoordinate){
-     status_="Move would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+    if(x<std::numeric_limits<std::int32_t>::min()||x>std::numeric_limits<std::int32_t>::max()||y<std::numeric_limits<std::int32_t>::min()||y>std::numeric_limits<std::int32_t>::max()||z<std::numeric_limits<std::int32_t>::min()||z>std::numeric_limits<std::int32_t>::max()){
+     status_="Move exceeds the editor's supported coordinate precision.";
      return;
     }
     target.x=static_cast<int>(x);target.y=static_cast<int>(y);target.z=static_cast<int>(z);
     indices.push_back(static_cast<std::size_t>(vertexDrag.indices[i]));targets.push_back(target);
    }
    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-    if(status_!="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The move reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+    status_="Could not update the editable animation pose.";
    }else invalidateBoneRestPoseForVertices(vertexDrag.indices);
   };
 
@@ -4055,7 +4053,6 @@ void EditorUI::drawAnimationViewer(){
     return AnimationPoint(boneRotationDrag.pivot.x+rx,boneRotationDrag.pivot.y+ry,boneRotationDrag.pivot.z+rz);
    };
    std::vector<std::size_t>indices;std::vector<Crash::NsfAnimationVertex>targets;
-   const int maximumCoordinate=255;
    if(animation.isCrash3){
     indices.reserve(boneRotationDrag.indices.size());targets.reserve(boneRotationDrag.original.size());
     for(std::size_t i=0;i<boneRotationDrag.original.size();++i){
@@ -4066,15 +4063,15 @@ void EditorUI::drawAnimationViewer(){
      const long rotatedX=std::lround(wx/modelScaleX-static_cast<float>(frame.xOffset)/4.0f);
      const long rotatedZ=std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f);
      const long rotatedY=std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f);
-     if(rotatedX<0||rotatedX>maximumCoordinate||rotatedY<0||rotatedY>maximumCoordinate||rotatedZ<0||rotatedZ>maximumCoordinate){
-      if(status_!="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.")status_="Rotation would move one or more vertices outside the Crash coordinate range. The last valid pose is preserved.";
+     if(rotatedX<std::numeric_limits<std::int32_t>::min()||rotatedX>std::numeric_limits<std::int32_t>::max()||rotatedY<std::numeric_limits<std::int32_t>::min()||rotatedY>std::numeric_limits<std::int32_t>::max()||rotatedZ<std::numeric_limits<std::int32_t>::min()||rotatedZ>std::numeric_limits<std::int32_t>::max()){
+      status_="Rotation exceeds the editor's supported coordinate precision.";
       return;
      }
      target.x=static_cast<int>(rotatedX);target.z=static_cast<int>(rotatedZ);target.y=static_cast<int>(rotatedY);
      indices.push_back(static_cast<std::size_t>(boneRotationDrag.indices[i]));targets.push_back(target);
     }
     if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
-     if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+     status_="Could not update the editable animation pose.";
      return;
     }
    }else{
@@ -4090,15 +4087,9 @@ void EditorUI::drawAnimationViewer(){
      target.z=static_cast<int>(std::lround(wy/modelScaleY-static_cast<float>(frame.yOffset)/4.0f));
      target.y=static_cast<int>(std::lround(wz/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f));
     }
-    int minimum[3]={std::numeric_limits<int>::max(),std::numeric_limits<int>::max(),std::numeric_limits<int>::max()},maximum[3]={std::numeric_limits<int>::min(),std::numeric_limits<int>::min(),std::numeric_limits<int>::min()};
-    for(const auto&v:targets){const int values[3]={v.x,v.y,v.z};for(int a=0;a<3;++a){minimum[a]=std::min(minimum[a],values[a]);maximum[a]=std::max(maximum[a],values[a]);}}
-    int shift[3]={minimum[0]<0?minimum[0]:(maximum[0]>255?maximum[0]-255:0),minimum[1]<0?minimum[1]:(maximum[1]>255?maximum[1]-255:0),minimum[2]<0?minimum[2]:(maximum[2]>255?maximum[2]-255:0)};
-    for(int a=0;a<3;++a)if(maximum[a]-minimum[a]>255){status_="Rotation cannot fit the transformed geometry into the Crash 2 byte-coordinate range.";return;}
-    int newOffsets[3]={static_cast<int>(boneRotationDrag.initialOffsets[0])+shift[0]*4,static_cast<int>(boneRotationDrag.initialOffsets[1])+shift[2]*4,static_cast<int>(boneRotationDrag.initialOffsets[2])+shift[1]*4};
-    for(int a=0;a<3;++a){if(newOffsets[a]<std::numeric_limits<std::int16_t>::min()||newOffsets[a]>std::numeric_limits<std::int16_t>::max()){status_="Rotation would exceed the animation frame offset range.";return;}}
-    for(auto&v:targets){v.x-=shift[0];v.y-=shift[1];v.z-=shift[2];}
-    if(!nsf_.setAnimationFrameVerticesRebased(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets,newOffsets[0],newOffsets[1],newOffsets[2])){
-     if(status_!="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.")status_="The bone rotation reached an encoding limit; the last valid pose is being kept until you release the mouse.";
+    for(const auto&v:targets)if(v.x==std::numeric_limits<std::int32_t>::min()||v.x==std::numeric_limits<std::int32_t>::max()||v.y==std::numeric_limits<std::int32_t>::min()||v.y==std::numeric_limits<std::int32_t>::max()||v.z==std::numeric_limits<std::int32_t>::min()||v.z==std::numeric_limits<std::int32_t>::max()){status_="Rotation exceeds the editor's supported coordinate precision.";return;}
+    if(!nsf_.setAnimationFrameVertices(animationChunkIndex,animationEntryIndex,static_cast<std::size_t>(poseFrameIndex),indices,targets)){
+     status_="Could not update the editable animation pose.";
      return;
     }
    }
