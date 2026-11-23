@@ -681,7 +681,7 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
     for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
      for(const auto&modelEntry:modelChunk.entries)
       if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
-    if(frame.linkedModelEid!=0U&&!model){e="Animation frame "+std::to_string(fi)+" references a model that is not available for save validation. The editable pose is preserved.";return false;}
+    if(!entry.animation.isCrash3&&frame.linkedModelEid!=0U&&!model){e="Animation frame "+std::to_string(fi)+" references a model that is not available for Crash 2 save validation. The editable pose is preserved.";return false;}
     if(model&&model->compressed){
      if(frame.specialVertexCount!=0U){e="This compressed Crash 2 frame uses special vertices; safe re-encoding of that mixed layout is not yet supported. The editable pose is preserved.";return false;}
      if(model->positions.size()!=frame.vertices.size()){
