@@ -4,7 +4,7 @@ This file records verified project checkpoints and the remaining acceptance work
 
 ## 2026-11-23 — Animation vertex save reliability
 
-<badge>Checkpoint</badge> [`4b6592852d761d742358313b0250add7112e411e`](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e)
+**Checkpoint** [`4b6592852d761d742358313b0250add7112e411e`](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e)
 
 **Verified progress**
 - Fixed uncompressed Animation frame saving. The encoder re-decodes the frame after each component write; the save path now preserves the complete intended pose between writes and verifies the final decoded coordinates before accepting the edit.
