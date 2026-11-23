@@ -299,6 +299,7 @@ bool EditorUI::saveFiles(){
  std::string error;
  std::vector<std::uint8_t> nsdBytes,nsfBytes;
  if(!nsd_.saveBytes(nsdBytes,error)){status_="Save failed (NSD serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
+ if(!nsf_.commitAnimationEdits(error)){status_="Save failed (NSF animation encoding): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  if(!nsf_.saveUncompressedBytes(nsfBytes,error)){status_="Save failed (NSF serialization): "+error;Diagnostics::log(DiagnosticLevel::Error,status_);return false;}
  std::string dateStamp;
  if(editorPreferences.createDatedBackup){
@@ -325,14 +326,15 @@ bool EditorUI::saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& 
  std::error_code ec;std::filesystem::create_directories(historySnapshotDirectory_,ec);if(ec)return false;
  const auto path=historySnapshotDirectory_/(std::string("state-")+std::to_string(stateIndex)+".bin");
  std::vector<std::uint8_t>nsfBytes,nsdBytes;std::string error;
- if(!snapshot.nsf.saveUncompressedBytes(nsfBytes,error))return false;
+ std::vector<std::uint8_t>poseBytes;
+ if(!snapshot.nsf.saveUncompressedSourceBytes(nsfBytes,error)||!snapshot.nsf.saveAnimationEditOverlay(poseBytes,error))return false;
  if(nsdValid_&&!snapshot.nsd.saveBytes(nsdBytes,error))return false;
  std::ofstream out(path,std::ios::binary|std::ios::trunc);if(!out)return false;
- const std::uint32_t magic=0x48435645U,version=1U;
+ const std::uint32_t magic=0x48435645U,version=2U;
  const std::uint8_t hasNsd=nsdValid_?1U:0U;
  auto write=[&](const auto&value){out.write(reinterpret_cast<const char*>(&value),sizeof(value));};
  auto writeBytes=[&](const std::vector<std::uint8_t>&bytes){const std::uint64_t size=bytes.size();write(size);if(size)out.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(size));};
- write(magic);write(version);write(hasNsd);writeBytes(nsfBytes);writeBytes(nsdBytes);
+ write(magic);write(version);write(hasNsd);writeBytes(nsfBytes);writeBytes(nsdBytes);writeBytes(poseBytes);
  const std::uint64_t boneCount=snapshot.bones.size();write(boneCount);
  for(const auto&bone:snapshot.bones){
   const std::uint64_t nameSize=bone.name.size(),vertexCount=bone.vertices.size(),rotationCount=bone.frameRotations.size();
@@ -351,12 +353,14 @@ bool EditorUI::loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapsh
  auto read=[&](auto&value){in.read(reinterpret_cast<char*>(&value),sizeof(value));return static_cast<bool>(in);};
  auto readBytes=[&](std::vector<std::uint8_t>&bytes){std::uint64_t size=0;if(!read(size)||size>1024ULL*1024ULL*1024ULL)return false;bytes.resize(static_cast<std::size_t>(size));if(size)in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(size));return static_cast<bool>(in);};
  std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;std::string error;
- std::vector<std::uint8_t>nsfBytes,nsdBytes;
- if(!read(magic)||!read(version)||magic!=0x48435645U||version!=1U||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
+ std::vector<std::uint8_t>nsfBytes,nsdBytes,poseBytes;
+ if(!read(magic)||!read(version)||magic!=0x48435645U||(version!=1U&&version!=2U)||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
+ if(version>=2U&&!readBytes(poseBytes))return false;
  Crash::NsfArchive archive;if(!archive.loadBytes(nsfBytes,error))return false;
  if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3BetaMAY14||gameVersion_==GameVersion::Crash3)archive.decodeZones(gameVersion_==GameVersion::Crash3);
  archive.decodeGools(nsfGoolVersion(gameVersion_));
  if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3)archive.decodeAnimationModels(gameVersion_==GameVersion::Crash3);
+ if(version>=2U&&!archive.loadAnimationEditOverlay(poseBytes,error))return false;
  Crash::NsdFile level;if(hasNsd&&!level.loadBytes(nsdBytes,nsdVariant(gameVersion_),error))return false;
  std::uint64_t boneCount=0;if(!read(boneCount)||boneCount>100000U)return false;
  std::vector<BoneRigBone>bones;bones.reserve(static_cast<std::size_t>(boneCount));
@@ -381,17 +385,17 @@ void EditorUI::restoreHistoryState(std::size_t stateIndex){
  writeHistoryLog();
 }
 void EditorUI::refreshUndoBaselineBytes(){
- undoNsfBytes_.clear();undoNsdBytes_.clear();std::string error;
- if(nsfValid_)nsf_.saveUncompressedBytes(undoNsfBytes_,error);
+ undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();std::string error;
+ if(nsfValid_){nsf_.saveUncompressedSourceBytes(undoNsfBytes_,error);nsf_.saveAnimationEditOverlay(undoNsfPoseBytes_,error);}
  if(nsdValid_)nsd_.saveBytes(undoNsdBytes_,error);
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
 }
 void EditorUI::resetUndoHistory(){
- historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;undoBaselineValid_=false;undoNsfBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
+ historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;undoBaselineValid_=false;undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
  if(!nsfValid_)return;
  std::string error;
- if(!nsf_.saveUncompressedBytes(undoNsfBytes_,error))return;
- if(nsdValid_&&!nsd_.saveBytes(undoNsdBytes_,error)){undoNsfBytes_.clear();undoNsdBytes_.clear();return;}
+ if(!nsf_.saveUncompressedSourceBytes(undoNsfBytes_,error)||!nsf_.saveAnimationEditOverlay(undoNsfPoseBytes_,error))return;
+ if(nsdValid_&&!nsd_.saveBytes(undoNsdBytes_,error)){undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();return;}
  undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=true;
  historyLabels_.push_back("Original file state");
  if(!saveHistorySnapshot(0U,undoBaseline_)){historyLabels_.clear();undoBaselineValid_=false;status_="Could not create the temporary original-state history snapshot.";}
@@ -400,15 +404,15 @@ void EditorUI::resetUndoHistory(){
 void EditorUI::trackUndoHistory(){
  if(!nsfValid_||!undoBaselineValid_||ImGui::IsMouseDown(ImGuiMouseButton_Left))return;
  if(!ImGui::IsAnyItemActive()&&!ImGui::IsMouseReleased(ImGuiMouseButton_Left)&&!ImGui::IsMouseReleased(ImGuiMouseButton_Right))return;
- std::vector<std::uint8_t>nsfBytes,nsdBytes;std::string error;
- if(!nsf_.saveUncompressedBytes(nsfBytes,error))return;
+ std::vector<std::uint8_t>nsfBytes,nsfPoseBytes,nsdBytes;std::string error;
+ if(!nsf_.saveUncompressedSourceBytes(nsfBytes,error)||!nsf_.saveAnimationEditOverlay(nsfPoseBytes,error))return;
  if(nsdValid_&&!nsd_.saveBytes(nsdBytes,error))return;
  bool bonesEqual=boneRigBones_.size()==undoBaseline_.bones.size();
  if(bonesEqual)for(std::size_t i=0;i<boneRigBones_.size();++i){
   const auto&a=boneRigBones_[i];const auto&b=undoBaseline_.bones[i];
   if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations){bonesEqual=false;break;}
  }
- if(nsfBytes==undoNsfBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
+ if(nsfBytes==undoNsfBytes_&&nsfPoseBytes==undoNsfPoseBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
  if(historyCursor_+1U<historyLabels_.size()){
   for(std::size_t i=historyCursor_+1U;i<historySnapshotPaths_.size();++i){std::error_code ec;std::filesystem::remove(historySnapshotPaths_[i],ec);}
   historyLabels_.resize(historyCursor_+1U);historySnapshotPaths_.resize(historyCursor_+1U);
@@ -420,7 +424,7 @@ void EditorUI::trackUndoHistory(){
  const std::size_t nextIndex=historyLabels_.size();
  if(!saveHistorySnapshot(nextIndex,next)){status_="History snapshot could not be written to the temporary folder; the action was not added to Action History.";return;}
  historyLabels_.push_back(actionLabel);historyCursor_=nextIndex;
- undoBaseline_=std::move(next);undoNsfBytes_=std::move(nsfBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
+ undoBaseline_=std::move(next);undoNsfBytes_=std::move(nsfBytes);undoNsfPoseBytes_=std::move(nsfPoseBytes);undoNsdBytes_=std::move(nsdBytes);writeHistoryLog();
 }
 void EditorUI::clearHistoryLog(){
  historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;
