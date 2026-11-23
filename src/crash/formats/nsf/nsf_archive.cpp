@@ -656,10 +656,23 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
      for(const auto&modelEntry:modelChunk.entries)
       if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
     if(model&&model->compressed){
-     if(frame.specialVertexCount!=0U){e="Animation frame "+std::to_string(fi)+" combines special vertices with compressed model positions; safe NSF re-encoding is not yet supported. The editable pose is preserved.";return false;}
-     if(frame.vertices.empty()||!candidate.encodeAnimationFrameVertex(ci,ei,fi,0U,0U,frame.vertices[0].x)){
-      e="Animation frame "+std::to_string(fi)+" cannot fit its edited pose into the model's existing compressed delta widths. The editable pose is preserved; no source data was changed.";
+     if(frame.specialVertexCount>frame.vertices.size()||model->positions.size()!=frame.vertices.size()-frame.specialVertexCount){
+      e="Animation frame "+std::to_string(fi)+" has a special-vertex count that does not match its linked compressed model. The editable pose is preserved.";
       return false;
+     }
+     for(std::size_t vi=0;vi<frame.specialVertexCount;++vi)for(std::size_t axis=0;axis<3U;++axis){
+      const auto&v=frame.vertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
+      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,axis,value)){
+       e="Animation frame "+std::to_string(fi)+" special vertex "+std::to_string(vi)+" is outside the NSF byte-coordinate range. The editable pose is preserved.";
+       return false;
+      }
+     }
+     if(!model->positions.empty()){
+      const std::size_t firstCompressedVertex=frame.specialVertexCount;
+      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,firstCompressedVertex,0U,frame.vertices[firstCompressedVertex].x)){
+       e="Animation frame "+std::to_string(fi)+" cannot fit its edited pose into the model's existing compressed delta widths. The editable pose is preserved; no source data was changed.";
+       return false;
+      }
      }
     }else{
      for(std::size_t vi=0;vi<frame.vertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
