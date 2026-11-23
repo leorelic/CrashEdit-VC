@@ -710,10 +710,26 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       }
      }
     }else{
-     for(std::size_t vi=0;vi<frame.vertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
-      const NsfAnimationVertex v=frame.vertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
+     // The uncompressed encoder decodes the frame after each component write.
+     // Keep the complete desired pose separate so that decoding an early
+     // vertex cannot erase edits to vertices that have not been written yet.
+     const auto desiredVertices=frame.vertices;
+     for(std::size_t vi=0;vi<desiredVertices.size();++vi)for(std::size_t axis=0;axis<3U;++axis){
+      const NsfAnimationVertex v=desiredVertices[vi];const std::int32_t value=axis==0U?v.x:axis==1U?v.y:v.z;
       if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,axis,value)){
        e="Animation frame "+std::to_string(fi)+" vertex "+std::to_string(vi)+" has coordinates that cannot be represented by the current NSF frame encoding. The editable pose is preserved; no source data was changed.";
+       return false;
+      }
+      frame.vertices=desiredVertices;
+     }
+     if(!decodeAnimationVertices(frame,model,entry.animation.isCrash3)){
+      e="Could not verify the saved coordinates for animation frame "+std::to_string(fi)+": "+frame.vertexError;
+      return false;
+     }
+     for(std::size_t vi=0;vi<desiredVertices.size();++vi){
+      const auto&actual=frame.vertices[vi];const auto&desired=desiredVertices[vi];
+      if(actual.x!=desired.x||actual.y!=desired.y||actual.z!=desired.z){
+       e="Saved coordinates for animation frame "+std::to_string(fi)+" vertex "+std::to_string(vi)+" did not reproduce the editable pose exactly.";
        return false;
       }
      }
