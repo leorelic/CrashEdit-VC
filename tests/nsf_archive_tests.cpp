@@ -184,11 +184,11 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(a.loadBytes(vertexAnimation,e));a.decodeAnimationModels(true);const auto&va=a.chunks()[0].entries[0].animation;
  assert(va.decoded&&va.frames[0].verticesDecoded&&va.frames[0].vertices.size()==1);
  assert(va.frames[0].vertices[0].x==0&&va.frames[0].vertices[0].y==8&&va.frames[0].vertices[0].z==16);
- assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);assert(!a.setAnimationFrameVertex(0,0,0,0,1,255));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
+ assert(a.setAnimationFrameVertex(0,0,0,0,1,80));assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
  const std::vector<std::size_t> batchVertexIndices{0};
- const std::vector<NsfAnimationVertex> invalidBatchTargets{{0,300,16}};
- assert(!a.setAnimationFrameVertices(0,0,0,batchVertexIndices,invalidBatchTargets));
- assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==80);
+ const std::vector<NsfAnimationVertex> unrestrictedBatchTargets{{0,300,16}};
+ assert(a.setAnimationFrameVertices(0,0,0,batchVertexIndices,unrestrictedBatchTargets));
+ assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==300);
  const std::vector<NsfAnimationVertex> validBatchTargets{{0,88,16}};
  assert(a.setAnimationFrameVertices(0,0,0,batchVertexIndices,validBatchTargets));
  assert(a.chunks()[0].entries[0].animation.frames[0].vertices[0].y==88);
@@ -239,7 +239,20 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // Crash 2 frame coordinates use the full unsigned-byte range, including 255.
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,0,0,255));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==255);
- std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false);
+ std::vector<std::uint8_t> compressedEdited;assert(compressedArchive.saveUncompressedBytes(compressedEdited,e));NsfArchive compressedRoundTrip;assert(compressedRoundTrip.loadBytes(compressedEdited,e));compressedRoundTrip.decodeAnimationModels(false); for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
+ // A pose that cannot fit the source delta widths remains editable and survives history serialization.
+ const std::vector<NsfAnimationVertex> outOfRangePose{{-20,300,40},{0,10,0},{50,60,70}};
+ assert(compressedArchive.setAnimationFrameVertices(1,0,0,compressedBatchIndices,outOfRangePose));
+ std::string encodingError;assert(!compressedArchive.commitAnimationEdits(encodingError));
+ assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==-20);
+ std::vector<std::uint8_t> sourceBytes,poseOverlay;
+ assert(compressedArchive.saveUncompressedSourceBytes(sourceBytes,e));
+ assert(compressedArchive.saveAnimationEditOverlay(poseOverlay,e));
+ NsfArchive overlayRoundTrip;assert(overlayRoundTrip.loadBytes(sourceBytes,e));overlayRoundTrip.decodeAnimationModels(false);
+ assert(overlayRoundTrip.loadAnimationEditOverlay(poseOverlay,e));
+ const auto&restoredPose=overlayRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(restoredPose[0].x==-20&&restoredPose[0].y==300&&restoredPose[0].z==40);
+
  const auto&compressedReloaded=compressedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(compressedReloaded[0].x==255&&compressedReloaded[0].y==30&&compressedReloaded[0].z==40);
  assert(compressedReloaded[1].x==0&&compressedReloaded[1].y==10&&compressedReloaded[1].z==0);
