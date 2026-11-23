@@ -865,9 +865,17 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
      encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
     }
+    // Store temporal bits in byte-stream order. The decoder reads each
+    // little-endian NSF word and then normalizes its byte order before
+    // consuming the bitstream, so packing a whole word and writing it
+    // little-endian here would reverse each group of four bytes twice.
     for(std::size_t wi=0;wi<wordCount;++wi){
-     std::uint32_t word=0;for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
-     for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
+     for(unsigned byte=0;byte<4U;++byte){
+      std::uint8_t value=0;
+      for(unsigned bitIndex=0;bitIndex<8U;++bitIndex)
+       value=static_cast<std::uint8_t>((value<<1U)|bits[wi*32U+byte*8U+bitIndex]);
+      payload[fakeHeader+wi*4U+byte]=value;
+     }
     }
     payloads.push_back(std::move(payload));
    }
