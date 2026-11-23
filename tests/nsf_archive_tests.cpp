@@ -208,6 +208,49 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].yOffset==-8);
  assert(vertexRoundTrip.chunks()[0].entries[0].animation.frames[0].zOffset==4);
 
+ // Regression: uncompressed Crash 2 saves must preserve edits to later
+ // vertices. Each component encoder decodes the frame, so the commit routine
+ // must restore the full desired pose between component writes.
+ std::vector<std::uint8_t> uncompressedModelChunk(65536);p16(uncompressedModelChunk,0,0x1234);p16(uncompressedModelChunk,2,0);p32(uncompressedModelChunk,4,6);p32(uncompressedModelChunk,8,1);
+ constexpr std::size_t umEntry=24,umItems=5,umTable=16+(umItems+1)*4,umEntrySize=umTable+0x50;
+ p32(uncompressedModelChunk,16,umEntry);p32(uncompressedModelChunk,20,umEntry+umEntrySize);
+ p32(uncompressedModelChunk,umEntry,0x0100ffff);p32(uncompressedModelChunk,umEntry+4,0x0200007b);p32(uncompressedModelChunk,umEntry+8,2);p32(uncompressedModelChunk,umEntry+12,umItems);
+ p32(uncompressedModelChunk,umEntry+16,umTable);for(std::size_t i=1;i<=umItems;++i)p32(uncompressedModelChunk,umEntry+16+i*4,umTable+0x50);
+ p32(uncompressedModelChunk,umEntry+umTable+0x38,3);
+ std::vector<std::uint8_t> uncompressedAnimationChunk(65536);p16(uncompressedAnimationChunk,0,0x1234);p16(uncompressedAnimationChunk,2,0);p32(uncompressedAnimationChunk,4,7);p32(uncompressedAnimationChunk,8,1);
+ constexpr std::size_t uaEntry=24,uaFrame=48,uaFrameSize=36,uaEntrySize=24+uaFrameSize;
+ p32(uncompressedAnimationChunk,16,uaEntry);p32(uncompressedAnimationChunk,20,uaEntry+uaEntrySize);
+ p32(uncompressedAnimationChunk,uaEntry,0x0100ffff);p32(uncompressedAnimationChunk,uaEntry+4,0x0200007c);p32(uncompressedAnimationChunk,uaEntry+8,1);p32(uncompressedAnimationChunk,uaEntry+12,1);
+ p32(uncompressedAnimationChunk,uaEntry+16,24);p32(uncompressedAnimationChunk,uaEntry+20,uaEntrySize);
+ p32(uncompressedAnimationChunk,uaFrame+8,3);p32(uncompressedAnimationChunk,uaFrame+12,0);p32(uncompressedAnimationChunk,uaFrame+16,0x0200007b);p32(uncompressedAnimationChunk,uaFrame+20,24);
+ const std::vector<NsfAnimationVertex> uncompressedBasePose{{10,20,30},{40,50,60},{70,80,90}};
+ std::vector<std::uint8_t> logicalBits(96U,0U),temporalBits(96U,0U);std::size_t logicalBit=0;
+ for(const auto&vertex:uncompressedBasePose)for(const auto value:{vertex.x,vertex.y,vertex.z})
+  for(unsigned bit=0;bit<8U;++bit)logicalBits[logicalBit++]=static_cast<std::uint8_t>((static_cast<std::uint32_t>(value)>>(7U-bit))&1U);
+ for(std::size_t base=0;base<temporalBits.size();base+=32U)for(std::size_t byte=0;byte<4U;++byte)for(std::size_t bit=0;bit<8U;++bit)
+  temporalBits[base+byte*8U+bit]=logicalBits[base+24U-byte*8U+bit];
+ for(std::size_t word=0;word<3U;++word){std::uint32_t raw=0;for(std::size_t bit=0;bit<32U;++bit)raw=(raw<<1U)|temporalBits[word*32U+bit];p32(uncompressedAnimationChunk,uaFrame+24U+word*4U,raw);}
+ std::vector<std::uint8_t> uncompressedArchiveBytes;uncompressedArchiveBytes.reserve(131072U);
+ uncompressedArchiveBytes.insert(uncompressedArchiveBytes.end(),uncompressedModelChunk.begin(),uncompressedModelChunk.end());
+ uncompressedArchiveBytes.insert(uncompressedArchiveBytes.end(),uncompressedAnimationChunk.begin(),uncompressedAnimationChunk.end());
+ NsfArchive uncompressedEditArchive;assert(uncompressedEditArchive.loadBytes(uncompressedArchiveBytes,e));uncompressedEditArchive.decodeAnimationModels(false);
+ assert(uncompressedEditArchive.chunks()[0].entries[0].model.decoded&&!uncompressedEditArchive.chunks()[0].entries[0].model.compressed);
+ assert(uncompressedEditArchive.chunks()[1].entries[0].animation.frames[0].vertices==uncompressedBasePose);
+ std::vector<NsfAnimationVertex> uncompressedExpected=uncompressedBasePose;
+ uncompressedExpected[1].y=81;uncompressedExpected[2].x=95;uncompressedExpected[2].z=101;
+ assert(uncompressedEditArchive.setAnimationFrameVertex(1,0,0,1,1,81));
+ assert(uncompressedEditArchive.setAnimationFrameVertex(1,0,0,2,0,95));
+ assert(uncompressedEditArchive.setAnimationFrameVertex(1,0,0,2,2,101));
+ std::vector<std::uint8_t> uncompressedSaved;assert(uncompressedEditArchive.saveUncompressedBytes(uncompressedSaved,e));
+ NsfArchive uncompressedReload;assert(uncompressedReload.loadBytes(uncompressedSaved,e));uncompressedReload.decodeAnimationModels(false);
+ const auto&uncompressedSavedVertices=uncompressedReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(uncompressedSavedVertices.size()==uncompressedExpected.size());
+ for(std::size_t vi=0;vi<uncompressedExpected.size();++vi){
+  assert(uncompressedSavedVertices[vi].x==uncompressedExpected[vi].x);
+  assert(uncompressedSavedVertices[vi].y==uncompressedExpected[vi].y);
+  assert(uncompressedSavedVertices[vi].z==uncompressedExpected[vi].z);
+ }
+
  // Compressed Model positions use signed, variable-width X-Z-Y deltas.
  std::vector<std::uint8_t> compressedModelChunk(65536);p16(compressedModelChunk,0,0x1234);p16(compressedModelChunk,2,0);p32(compressedModelChunk,4,6);p32(compressedModelChunk,8,1);
  constexpr std::size_t cmEntry=24,cmItems=6,cmTable=16+(cmItems+1)*4;const std::size_t cmSizes[]={0x50,12,52,12,4,12};std::size_t cmEntrySize=cmTable;for(auto n:cmSizes)cmEntrySize+=n;
