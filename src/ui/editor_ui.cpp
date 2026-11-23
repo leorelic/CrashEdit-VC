@@ -3084,18 +3084,23 @@ void EditorUI::drawAnimationFrameEditor(){
     ImGui::TextUnformatted(axisLabels[axis]);
     ImGui::SetNextItemWidth(vertexFieldWidth);
     if(ImGui::InputInt("##VertexCoordinate",&vertexValues[axis])){
-     const int delta=vertexValues[axis]-selectedCoordinate[axis];
+     const std::int64_t delta=static_cast<std::int64_t>(vertexValues[axis])-selectedCoordinate[axis];
      std::vector<std::size_t> indices;
      std::vector<Crash::NsfAnimationVertex> targets;
      indices.reserve(animationSelectedVertices_.size());targets.reserve(animationSelectedVertices_.size());
+     bool coordinateOverflow=false;
      for(const int selectedIndex:animationSelectedVertices_){
       if(selectedIndex<0||static_cast<std::size_t>(selectedIndex)>=frame.vertices.size())continue;
       const auto&source=frame.vertices[static_cast<std::size_t>(selectedIndex)];
       auto target=source;
-      if(axis==0U)target.x+=delta;else if(axis==1U)target.y+=delta;else target.z+=delta;
+      const std::int64_t current=axis==0U?source.x:axis==1U?source.y:source.z;
+      const std::int64_t edited=current+delta;
+      if(edited<std::numeric_limits<std::int32_t>::min()||edited>std::numeric_limits<std::int32_t>::max()){coordinateOverflow=true;break;}
+      if(axis==0U)target.x=static_cast<std::int32_t>(edited);else if(axis==1U)target.y=static_cast<std::int32_t>(edited);else target.z=static_cast<std::int32_t>(edited);
       indices.push_back(static_cast<std::size_t>(selectedIndex));targets.push_back(target);
      }
-     if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
+     if(coordinateOverflow)status_="The edit exceeds the editor's supported coordinate precision.";
+     else if(indices.size()!=animationSelectedVertices_.size()||!nsf_.setAnimationFrameVertices(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),indices,targets))
       status_="Could not update the editable animation pose.";
     }
     ImGui::PopID();
