@@ -914,7 +914,6 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     decoded.verticesEdited=false;previous=std::move(decoded);
    }
   }
- }
  e.clear();return true;
 }
 
