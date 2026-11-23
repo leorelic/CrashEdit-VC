@@ -678,6 +678,10 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       }
      }
     }
+    // Keep an immutable copy of the intended pose. Encoding helpers decode the
+    // frame again as they write it, so checking only their return value is not
+    // enough: the serialized bytes must reproduce every requested component.
+    const auto expectedPose=frame.vertices;
     const NsfModel*model=nullptr;
     for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
      for(const auto&modelEntry:modelChunk.entries)
@@ -718,6 +722,28 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       }
      }
     }
+    // Reparse the exact payload now resident in the candidate chunk and decode
+    // it from scratch. This validates both ordinary encoding and shared-model
+    // expansion, rather than trusting the in-memory frame updated by the writer.
+    NsfAnimationFrame verifiedFrame;
+    const NsfItem savedItem{frame.rawOffset,frame.rawSize};
+    if(!parseAnimationFrame(chunk.bytes,savedItem,entry.animation.isCrash3,verifiedFrame)){
+     e="Saved animation frame "+std::to_string(fi)+" could not be parsed again: "+verifiedFrame.error;return false;
+    }
+    verifiedFrame.linkedModelEid=frame.linkedModelEid;
+    if(!decodeAnimationVertices(verifiedFrame,model,entry.animation.isCrash3)){
+     e="Saved animation frame "+std::to_string(fi)+" could not be decoded again: "+verifiedFrame.vertexError;return false;
+    }
+    if(verifiedFrame.vertices.size()!=expectedPose.size()){
+     e="Saved animation frame "+std::to_string(fi)+" changed its vertex count. The editable pose is preserved.";return false;
+    }
+    for(std::size_t vi=0;vi<expectedPose.size();++vi){
+     const auto&actual=verifiedFrame.vertices[vi];const auto&expected=expectedPose[vi];
+     if(actual.x!=expected.x||actual.y!=expected.y||actual.z!=expected.z){
+      e="Saved animation frame "+std::to_string(fi)+" failed exact pose verification at vertex "+std::to_string(vi)+". The editable pose is preserved.";return false;
+     }
+    }
+    frame=std::move(verifiedFrame);
     frame.verticesEdited=false;
    }
   }
