@@ -768,7 +768,9 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::stri
  for(auto&chunk:chunks_){
   if(chunk.type!=0||!chunk.entryTableValid)continue;
   for(auto&entry:chunk.entries){
-   if(!entry.valid||entry.type!=1U||!entry.animation.decoded||entry.animation.frames.empty())continue;
+   if(!entry.valid||entry.type!=1U)continue;
+   if(!entry.animation.decoded){e="Cannot expand a shared model position table while an animation entry is undecoded. The editable pose is preserved.";return false;}
+   if(entry.animation.frames.empty())continue;
    std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
    std::vector<bool>affected(entry.animation.frames.size(),false);
    bool entryAffected=false;
