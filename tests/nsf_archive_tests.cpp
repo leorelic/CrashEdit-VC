@@ -306,15 +306,19 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(rebasedRoundTrip.chunks()[0].entries[0].animation.frames[0].xOffset==-80);
 
  // Widening one model position's delta width expands the shared table and re-encodes linked frames.
- std::vector<std::uint8_t> narrowModelChunk=compressedModelChunk;p32(narrowModelChunk,cmPositions,0x0000007fU);
+ std::vector<std::uint8_t> narrowModelChunk=compressedModelChunk;
+ for(std::size_t i=0;i<3U;++i)p32(narrowModelChunk,cmPositions+i*4U,0x00000049U);
  std::vector<std::uint8_t> narrowArchiveBytes;narrowArchiveBytes.reserve(131072);narrowArchiveBytes.insert(narrowArchiveBytes.end(),narrowModelChunk.begin(),narrowModelChunk.end());narrowArchiveBytes.insert(narrowArchiveBytes.end(),compressedAnimationChunk.begin(),compressedAnimationChunk.end());
  NsfArchive narrowArchive;assert(narrowArchive.loadBytes(narrowArchiveBytes,e));narrowArchive.decodeAnimationModels(false);
  assert(narrowArchive.chunks()[0].entries[0].model.positions[0].xBits==1U);
- assert(narrowArchive.setAnimationFrameVertex(1,0,0,0,0,200));
+ assert(narrowArchive.chunks()[0].entries[0].model.positions[0].yBits==1U&&narrowArchive.chunks()[0].entries[0].model.positions[0].zBits==1U);
+ assert(narrowArchive.setAnimationFrameVertex(1,0,0,0,0,2));
  std::vector<std::uint8_t> expandedBytes;assert(narrowArchive.saveUncompressedBytes(expandedBytes,e));
  NsfArchive expandedRoundTrip;assert(expandedRoundTrip.loadBytes(expandedBytes,e));expandedRoundTrip.decodeAnimationModels(false);
  assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].xBits==7U);
- assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==200);
+ assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].yBits==1U&&expandedRoundTrip.chunks()[0].entries[0].model.positions[0].zBits==1U);
+ assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[1].xBits==1U&&expandedRoundTrip.chunks()[0].entries[0].model.positions[1].yBits==1U&&expandedRoundTrip.chunks()[0].entries[0].model.positions[1].zBits==1U);
+ assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==2);
 
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
