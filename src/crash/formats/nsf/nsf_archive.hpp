@@ -128,7 +128,7 @@ struct NsfAnimationFrame {
  std::vector<std::array<std::uint8_t,3>> specialVertices;
  std::vector<NsfAnimationCollision> collisions;
  std::vector<NsfAnimationVertex> vertices;
- bool verticesDecoded=false,modelResolved=false;
+ bool verticesDecoded=false,modelResolved=false,verticesEdited=false;
  std::string vertexError;
  std::vector<std::uint32_t> temporalWords;
  std::size_t rawOffset=0,rawSize=0;
@@ -192,6 +192,10 @@ public:
  bool load(const std::filesystem::path&,std::string&); bool loadBytes(const std::vector<std::uint8_t>&,std::string&);
  bool saveUncompressed(const std::filesystem::path&,std::string&) const;
  bool saveUncompressedBytes(std::vector<std::uint8_t>&,std::string&) const;
+ bool saveUncompressedSourceBytes(std::vector<std::uint8_t>&,std::string&) const;
+ bool commitAnimationEdits(std::string&);
+ bool saveAnimationEditOverlay(std::vector<std::uint8_t>&,std::string&) const;
+ bool loadAnimationEditOverlay(const std::vector<std::uint8_t>&,std::string&);
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
  std::vector<NsfEntryLocation> findEntriesByEid(std::uint32_t eid) const;
  std::size_t compressedChunkCount()const noexcept;
@@ -222,6 +226,7 @@ public:
  bool setModelTriangleTexture(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::uint8_t textureIndex,bool animated);
  bool setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::size_t corner,std::uint8_t colorIndex);
 private:
+ bool encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value);
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  bool crash3Retail_=false;
  bool goolDecoded_=false,animationModelsDecoded_=false,animationModelsCrash3_=false;
