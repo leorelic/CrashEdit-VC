@@ -419,7 +419,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    frame.vertices[frame.specialVertexCount+i]={xAcc,yAcc,zAcc};
   }
  }else{
-  const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
+  const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
   if(bits.size()<required+start)return fail("Animation uncompressed vertex bitstream is truncated.");
   std::vector<std::uint8_t> reordered(bits.size());
   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
@@ -1496,7 +1496,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
     for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
   bits.swap(physical);
  }else{
-  const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
+  const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
   if(bits.size()<required||vertexIndex<frame.specialVertexCount)return false;
   std::vector<std::uint8_t>reordered(bits.size());
   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
