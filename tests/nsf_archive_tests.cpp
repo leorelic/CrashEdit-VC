@@ -263,7 +263,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
 
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
- p32(crash2RebaseAnimation,vaFrame+8,1);p32(crash2RebaseAnimation,vaFrame+12,0);p32(crash2RebaseAnimation,vaFrame+16,0x0200007b);p32(crash2RebaseAnimation,vaFrame+20,24);p32(crash2RebaseAnimation,vaFrame+24,0x03020100);
+ p32(crash2RebaseAnimation,vaFrame+8,1);p32(crash2RebaseAnimation,vaFrame+12,0);p32(crash2RebaseAnimation,vaFrame+16,0);p32(crash2RebaseAnimation,vaFrame+20,24);p32(crash2RebaseAnimation,vaFrame+24,0x03020100);
  NsfArchive rebaseArchive;assert(rebaseArchive.loadBytes(crash2RebaseAnimation,e));rebaseArchive.decodeAnimationModels(false);
  assert(rebaseArchive.setAnimationFrameVertex(0,0,0,0,0,-20));
  std::vector<std::uint8_t> rebasedBytes;assert(rebaseArchive.saveUncompressedBytes(rebasedBytes,e));
