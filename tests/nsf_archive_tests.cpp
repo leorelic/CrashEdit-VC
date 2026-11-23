@@ -262,6 +262,35 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(compressedReloaded[2].x==50&&compressedReloaded[2].y==60&&compressedReloaded[2].z==70);
  for(std::size_t i=0;i<40U;++i)assert(compressedRoundTrip.chunks()[1].bytes[caFrame+24U+i]==static_cast<std::uint8_t>(0xa0U+i));
 
+ // Crash 2 compressed frames keep special vertices in the frame header and
+ // decode the model's compressed positions after that special-vertex prefix.
+ std::vector<std::uint8_t> specialCompressedModel(65536);p16(specialCompressedModel,0,0x1234);p16(specialCompressedModel,2,0);p32(specialCompressedModel,4,6);p32(specialCompressedModel,8,1);
+ constexpr std::size_t scmEntry=24,scmItems=6,scmTable=16+(scmItems+1)*4;const std::size_t scmSizes[]={0x50,4,4,0,0,8};std::size_t scmEntrySize=scmTable;for(auto n:scmSizes)scmEntrySize+=n;
+ p32(specialCompressedModel,16,scmEntry);p32(specialCompressedModel,20,scmEntry+scmEntrySize);p32(specialCompressedModel,scmEntry,0x0100ffff);p32(specialCompressedModel,scmEntry+4,0x0200007b);p32(specialCompressedModel,scmEntry+8,2);p32(specialCompressedModel,scmEntry+12,scmItems);
+ std::size_t scmOffset=scmTable;for(std::size_t i=0;i<scmItems;++i){p32(specialCompressedModel,scmEntry+16+i*4,static_cast<std::uint32_t>(scmOffset));scmOffset+=scmSizes[i];}p32(specialCompressedModel,scmEntry+16+scmItems*4,static_cast<std::uint32_t>(scmEntrySize));
+ const std::size_t scmInfo=scmEntry+scmTable,scmPoly=scmInfo+0x50,scmColor=scmPoly+4,scmPositions=scmColor+4;
+ p32(specialCompressedModel,scmInfo+0x38,3);p32(specialCompressedModel,scmInfo+0x3c,1);p32(specialCompressedModel,scmInfo+0x4c,1);
+ p32(specialCompressedModel,scmPoly,0xffffffffU);p32(specialCompressedModel,scmColor,0x00010203U);p32(specialCompressedModel,scmPositions,0x000001ffU);p32(specialCompressedModel,scmPositions+4,0x000001ffU);
+ std::vector<std::uint8_t> specialCompressedAnimation(65536);p16(specialCompressedAnimation,0,0x1234);p16(specialCompressedAnimation,2,0);p32(specialCompressedAnimation,4,7);p32(specialCompressedAnimation,8,1);
+ constexpr std::size_t scaEntry=24,scaFrame=48,scaEntrySize=60;p32(specialCompressedAnimation,16,scaEntry);p32(specialCompressedAnimation,20,scaEntry+scaEntrySize);
+ p32(specialCompressedAnimation,scaEntry,0x0100ffff);p32(specialCompressedAnimation,scaEntry+4,0x0200007b);p32(specialCompressedAnimation,scaEntry+8,1);p32(specialCompressedAnimation,scaEntry+12,1);p32(specialCompressedAnimation,scaEntry+16,24);p32(specialCompressedAnimation,scaEntry+20,scaEntrySize);
+ p32(specialCompressedAnimation,scaFrame+8,3);p32(specialCompressedAnimation,scaFrame+12,0);p32(specialCompressedAnimation,scaFrame+16,0x0200007b);p32(specialCompressedAnimation,scaFrame+20,27);
+ p32(specialCompressedAnimation,scaFrame+24,0x001e140aU);p32(specialCompressedAnimation,scaFrame+28,0);p32(specialCompressedAnimation,scaFrame+32,0);
+ std::vector<std::uint8_t> specialCompressedBytes;specialCompressedBytes.insert(specialCompressedBytes.end(),specialCompressedModel.begin(),specialCompressedModel.end());specialCompressedBytes.insert(specialCompressedBytes.end(),specialCompressedAnimation.begin(),specialCompressedAnimation.end());
+ NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
+ const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
+ assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
+ assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
+ assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
+ const std::vector<std::size_t> specialEditIndices{0,2};
+ const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
+ assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
+ std::vector<std::uint8_t> specialSaved;assert(specialCompressedArchive.saveUncompressedBytes(specialSaved,e));
+ NsfArchive specialReload;assert(specialReload.loadBytes(specialSaved,e));specialReload.decodeAnimationModels(false);
+ const auto&specialReloaded=specialReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
+ assert(specialReloaded[2].x==44&&specialReloaded[2].y==55&&specialReloaded[2].z==66);
+
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
  p32(crash2RebaseAnimation,vaFrame+8,1);p32(crash2RebaseAnimation,vaFrame+12,0);p32(crash2RebaseAnimation,vaFrame+16,0);p32(crash2RebaseAnimation,vaFrame+20,24);p32(crash2RebaseAnimation,vaFrame+24,0x03020100);
