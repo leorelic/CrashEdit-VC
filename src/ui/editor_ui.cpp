@@ -3585,29 +3585,9 @@ void EditorUI::drawAnimationViewer(){
    if(!candidate.verticesDecoded)continue;
    const auto*candidateModel=findModel(animation.isCrash3?candidate.linkedModelEid:candidate.modelEid);
    for(const auto&v:candidate.vertices)includeCameraPoint(transformVertex(v,candidate,candidateModel));
-   if(animationFrameBoundsVisible_){
-    // The guide can be much larger than the posed mesh. Include its corners
-    // when fitting the camera, otherwise animations with small poses and large
-    // model scales show only a clipped section of the coordinate volume.
-    constexpr float modelScaleDenominator=3200.0f*128.0f;
-    constexpr float fallbackScale=1.0f/128.0f;
-    const float sx=candidateModel?static_cast<float>(candidateModel->scaleX)/modelScaleDenominator:fallbackScale;
-    const float sy=candidateModel?static_cast<float>(candidateModel->scaleY)/modelScaleDenominator:fallbackScale;
-    const float sz=candidateModel?static_cast<float>(candidateModel->scaleZ)/modelScaleDenominator:fallbackScale;
-    const float scaleX=std::fabs(sx)>1.0e-8f?sx:fallbackScale;
-    const float scaleY=std::fabs(sy)>1.0e-8f?sy:fallbackScale;
-    const float scaleZ=std::fabs(sz)>1.0e-8f?sz:fallbackScale;
-    const float coordinateLimit=255.0f*static_cast<float>(animation.isCrash3?8:1);
-    for(int corner=0;corner<8;++corner){
-     const float x=(corner&1)?coordinateLimit:0.0f;
-     const float y=(corner&2)?coordinateLimit:0.0f;
-     const float z=(corner&4)?coordinateLimit:0.0f;
-     includeCameraPoint(AnimationPoint(
-      (x+static_cast<float>(candidate.xOffset)/4.0f)*scaleX,
-      (z+static_cast<float>(candidate.yOffset)/4.0f)*scaleY,
-      (y+static_cast<float>(candidate.zOffset)/4.0f)*scaleZ));
-    }
-   }
+   // The coordinate guide is an informational overlay, not scene geometry.
+   // Do not include its full volume in camera fitting: doing so makes compact
+   // poses appear tiny and causes the camera target to jump when the guide is toggled.
   }
   if(!haveBounds){boundsMin=AnimationPoint{-1,-1,-1};boundsMax=AnimationPoint{1,1,1};}
   const AnimationPoint center((boundsMin.x+boundsMax.x)*0.5f,(boundsMin.y+boundsMax.y)*0.5f,(boundsMin.z+boundsMax.z)*0.5f);
