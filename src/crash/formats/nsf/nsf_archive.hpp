@@ -227,6 +227,7 @@ public:
  bool setModelTriangleColorIndex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t triangleIndex,std::size_t corner,std::uint8_t colorIndex);
 private:
  bool encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::size_t vertexIndex,std::size_t axis,std::int32_t value);
+ bool expandCompressedModelPositions(std::uint32_t modelEid,std::string& error);
  static bool decodeChunk(const std::vector<std::uint8_t>&,std::size_t&,NsfChunk&,std::string&);
  bool crash3Retail_=false;
  bool goolDecoded_=false,animationModelsDecoded_=false,animationModelsCrash3_=false;
