@@ -280,16 +280,21 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
  const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
  assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
- assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
+ // CrashEdit's Crash 2 reference decoder skips the special-byte prefix in
+ // the temporal stream, then writes compressed positions from vertex index 0.
+ // The model has two compressed positions (vertexCount - positionBase), so
+ // the first two decoded vertices come from the model/temporal data, not the
+ // raw special-byte prefix.
+ assert(specialFrame.vertices[0].x==0&&specialFrame.vertices[0].y==0&&specialFrame.vertices[0].z==0);
  assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
- const std::vector<std::size_t> specialEditIndices{0,2};
+ const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
  assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
  std::vector<std::uint8_t> specialSaved;if(!specialCompressedArchive.saveUncompressedBytes(specialSaved,e)){std::fprintf(stderr,"special compressed save failed: %s\\n",e.c_str());std::abort();}
  NsfArchive specialReload;assert(specialReload.loadBytes(specialSaved,e));specialReload.decodeAnimationModels(false);
  const auto&specialReloaded=specialReload.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
- assert(specialReloaded[2].x==44&&specialReloaded[2].y==55&&specialReloaded[2].z==66);
+ assert(specialReloaded[1].x==44&&specialReloaded[1].y==55&&specialReloaded[1].z==66);
 
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
