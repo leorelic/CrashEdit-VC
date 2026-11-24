@@ -392,14 +392,15 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
-  // Special vertex bytes share the first temporal word's storage. Convert
-  // each little-endian word to physical byte order so the prefix skip lands
-  // immediately after those header bytes.
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
+  // Only frames with special vertices have a header prefix sharing the
+  // first temporal word. Ordinary compressed frames retain native word order.
+  if(frame.specialVertexCount!=0U){
+   std::vector<std::uint8_t> reordered(bits.size());
+   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+    for(std::size_t byte=0;byte<4U;++byte)
+     for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
+   bits.swap(reordered);
+  }
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -885,12 +886,14 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      const std::uint32_t word=u32(payload,fakeHeader+wi*4U);
      for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
     }
-    // Decode the shared special-header prefix in physical byte order.
-    std::vector<std::uint8_t> reordered(bits.size());
-    for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-     for(std::size_t byte=0;byte<4U;++byte)
-      for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-    bits.swap(reordered);
+    // Only a non-empty special prefix requires conversion to physical order.
+    if(frame.specialVertexCount!=0U){
+     std::vector<std::uint8_t> reordered(bits.size());
+     for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+      for(std::size_t byte=0;byte<4U;++byte)
+       for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
+     bits.swap(reordered);
+    }
     std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
     auto encodeSigned=[&](std::int32_t delta){
      bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
@@ -908,11 +911,13 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
     }
-    std::vector<std::uint8_t> physical(bits.size());
-    for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-     for(std::size_t byte=0;byte<4U;++byte)
-      for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-    bits.swap(physical);
+    if(frame.specialVertexCount!=0U){
+     std::vector<std::uint8_t> physical(bits.size());
+     for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+      for(std::size_t byte=0;byte<4U;++byte)
+       for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
+     bits.swap(physical);
+    }
     for(std::size_t wi=0;wi<wordCount;++wi){
      std::uint32_t word=0;
      for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
@@ -1459,13 +1464,15 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
-  // Match decodeAnimationVertices(): edit after the special-header prefix
-  // in physical byte order, then restore little-endian word order for storage.
-  std::vector<std::uint8_t> reordered(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-  bits.swap(reordered);
+  // Match decodeAnimationVertices(): only a non-empty special-vertex
+  // prefix requires conversion to physical byte order.
+  if(frame.specialVertexCount!=0U){
+   std::vector<std::uint8_t> reordered(bits.size());
+   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+    for(std::size_t byte=0;byte<4U;++byte)
+     for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
+   bits.swap(reordered);
+  }
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1490,11 +1497,13 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    if(!encodeSigned(p.xBits,dx)||!encodeSigned(p.zBits,dz)||!encodeSigned(p.yBits,dy))return false;
    xAcc=targetX;yAcc=targetY;zAcc=targetZ;
   }
-  std::vector<std::uint8_t> physical(bits.size());
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-  bits.swap(physical);
+  if(frame.specialVertexCount!=0U){
+   std::vector<std::uint8_t> physical(bits.size());
+   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+    for(std::size_t byte=0;byte<4U;++byte)
+     for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
+   bits.swap(physical);
+  }
  }else{
   const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
   if(bits.size()<required||vertexIndex<frame.specialVertexCount)return false;
