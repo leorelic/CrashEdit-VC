@@ -276,6 +276,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
  assert(compressedArchive.chunks().size()==2&&compressedArchive.chunks()[0].entries[0].model.compressed);
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
+ // Frames without special vertices must preserve the native word bit order.
+ // The 0xa0.. payload makes accidental per-word byte reversal observable.
+ const auto&compressedInitial=compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(compressedInitial[0].x==-93&&compressedInitial[0].y==-95&&compressedInitial[0].z==-94);
+ assert(compressedInitial[1].x==-96&&compressedInitial[1].y==-90&&compressedInitial[1].z==-89);
+ assert(compressedInitial[2].x==-91&&compressedInitial[2].y==-85&&compressedInitial[2].z==-92);
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
  const std::vector<std::size_t> compressedBatchIndices{0,2};
