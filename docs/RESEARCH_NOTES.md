@@ -415,3 +415,15 @@ Checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leore
 Next: compare the gizmo's allowed coordinate range, frame boundary/offset metadata, compressed or uncompressed encoder constraints, and save validation for the exact failing vertex/axis. Record the first rejected coordinate and rejection reason; do not speculate or silently clamp/drop/wrap the edit. Verify movement beyond the old limit, save/reopen, then original-game behavior independently.
 
 The temporal-prefix correction above remains valid and should not be reverted. Native regression and private sample checks are code-level evidence only; user has not yet confirmed the coordinate-limit issue fixed.
+
+
+### Animation coordinate / payload-capacity source trace — 2026-11-26
+
+New source-confirmed detail is recorded in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md), based on CrashEdit-RE `Frame.cs` / `ModelPosition.cs` and native `src/crash/formats/nsf/nsf_archive.cpp` / `src/ui/editor_ui.cpp`:
+
+- Crash 2 frame `HeaderSize` defines a special-vertex prefix after the 24-byte fixed header and 0x28-byte collision records; temporal words begin at the fixed/collision boundary and overlap that prefix. The frame item’s size/alignment and NSF chunk capacity are different boundaries.
+- Local coordinates are unsigned byte values (0–255); compressed ModelPosition delta widths can be narrower than the full byte range. Width 7 is signed-byte delta width and resets that axis accumulator; decoded accumulators wrap modulo 256.
+- A valid edited frame can be rebased into byte local coordinates only when each axis span is at most 255 and adjusted signed-16-bit offsets remain valid.
+- When current compressed widths reject an edit, native save tries widening the shared Model’s position records to width 7 and rebuilding every Animation entry that references it. If an enlarged payload fails to fit a chunk, the UI raises the chunk-relocation prompt. This is an archive-capacity failure triggered by encoding fallback—not proof that the vertex coordinate itself needs a new chunk.
+
+No implementation change is justified yet. Record the exact blocked frame/vertex/axis and the failed encoder/capacity stage from the real sample before patching. Preserve the `ff5359a` baseline and do not revive the special-byte restoration patch.
