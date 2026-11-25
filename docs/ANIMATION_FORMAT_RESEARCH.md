@@ -158,7 +158,7 @@ Earlier entries in this document and `RESEARCH_NOTES.md` incorrectly recommended
 
 - For Crash 2, the fixed frame header is 24 bytes; each collision record is 0x28 bytes. `fakeHeader = 24 + collisionCount * 0x28`.
 - `HeaderSize` is validated against `fakeHeader` and the frame item size. The special-vertex prefix is `(HeaderSize - fakeHeader) / 3` vertices; its byte count must be divisible by 3.
-- The temporal words are read from `fakeHeader` to the end of the frame item, **not from HeaderSize**. Therefore the special-vertex raw bytes and temporal-word stream alias the same payload prefix. Do not treat `HeaderSize` as a separate temporal-data start or restore stale raw prefix bytes after temporal serialization.
+- The temporal words are read from `fakeHeader` to the end of the frame item, **not from HeaderSize**. The special-vertex prefix occupies the first `specialVertexCount * 24` bits of that temporal stream; compressed deltas begin immediately after that prefix. Do not treat `HeaderSize` as a separate temporal-data start. The expansion routine may preserve exactly those prefix bytes, but must not write beyond the prefix into delta bits.
 - The frame item’s own byte length and 32-bit temporal alignment are separate from the NSF chunk’s 64 KiB capacity.
 
 ### Coordinate representation
@@ -193,3 +193,18 @@ Keep the `ff5359a` preview/save checkpoint intact. Do not change the encoder unt
 Current `tests/nsf_archive_tests.cpp` contains synthetic checks for a narrow compressed delta width being expanded to width 7, a coordinate edit to 255, save-time rebasing, special-vertex serialization, and preservation of an unencodable working pose. `tests/real_sample_compatibility_tests.cpp` compares decoded hashes/Model topology for real `El1eG/El1eV` and `Cr10G/Cr10V`, and exercises an uncompressed `BT10V` edit; it does not currently perform a real compressed Cr10/El1e edit that forces Model-width expansion and then save/reopen.
 
 Therefore, the current tests support the general encoder/decoder mechanism but do not establish that the fallback succeeds for a real shared Model with multiple linked Animations or that the exact user-reported chunk prompt path is correct. Next regression should use the private retail sample, capture the actual ModelPosition records and first rejected delta, and test the complete edited pose through width expansion, all linked Animation payload rebuilds, save/reopen, and (separately) in-game.
+
+
+### Implemented fix: expanded Model position destination index — 2026-11-26
+
+**Confirmed native defect:** `expandCompressedModelPositions` rebuilt a frame by mapping Model position `pi` to frame vertex `specialVertexCount + pi`. This disagreed with the CrashEdit-RE decoder: compressed Model position `pi` is written to `verts[pi]`; `SpecialVertexCount` advances the temporal bit cursor and renderer topology offset, but does not offset the decoder destination. The expansion therefore re-encoded shifted vertex targets in models with a special-vertex prefix, which could corrupt the pose after widening.
+
+Fixed on `cpp-port-foundation`:
+- Expansion now encodes target `frame.vertices[pi]`, matching the reference decoder's destination indexing.
+- Added a synthetic regression with one special vertex, two compressed positions, a narrow X delta width on the second position, and a move to X=200. It forces width-7 expansion, checks the expanded pose, then saves/reloads and checks the pose again.
+- Code commit: [e6cf1ff](https://github.com/leorelic/CrashEdit-VC/commit/e6cf1ff023bb17d753cbb16fb9de3f27f180c559)
+- Regression commit: [3f98348](https://github.com/leorelic/CrashEdit-VC/commit/3f983481bde2e50d8493c0ae05f23dd646595e69)
+
+The expansion's special-prefix byte preservation writes only the prefix region (exactly `specialVertexCount * 3` bytes); compressed delta encoding starts at the corresponding bit boundary. That prefix preservation is not the cause of the shifted-vertex defect. This corrects the earlier overly broad note that restoring any prefix bytes necessarily overwrites delta bits.
+
+This is an implementation correction plus synthetic regression; CI and real retail sample validation are still pending.
