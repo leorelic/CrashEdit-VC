@@ -124,11 +124,11 @@ Do not declare an animation-decoding milestone until:
 
 ## Current state
 
-- User-confirmed preview milestone: latest build looks correct again; checkpoint `ff5359af45779fcd29b3827a563215b433cef1ac`. The user is continuing testing.
-- Native tests and private real-sample validation passed for the latest patch sequence, including compressed `Cr10G/Cr10V` and `El1eG/El1eV` sample data.
-- Windows and Ubuntu CI passed for the checkpoint; macOS was queued at last status check. Verify current workflow status before claiming the entire matrix is green.
-- Original-game save/load and broad compatibility remain open until user reports those results.
-- Preserve exact-pose verification and do not reintroduce raw special-prefix restoration after temporal-word serialization.
+- Recovery checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac): user reports the animation preview looks correct again and has confirmed saving works. Treat this as a stable baseline, not resolution of the original transform-limit defect.
+- Original defect still open: some vertices cannot be moved past a particular X/Y/Z gizmo location; the editor wrongly prompts for a new NSF chunk, and the edit is still not applied. Investigate the actual Animation frame coordinate/encoding boundary and the gizmo/save validation path. Chunk expansion should not be offered as the remedy unless a separate, demonstrated chunk-capacity problem exists.
+- Determine the precise boundary from source and controlled sample edits: record the frame/vertex, requested and current coordinates, axis, encoded base/width/reset state, frame offset/boundary fields, and exact rejection path. Compare the limit used by the gizmo with the limit accepted by the encoder and serialized frame.
+- Preserve exact-pose verification. Do not silently clamp, wrap, drop, or misroute an edit. Confirm the previously blocked movement is applied and survives save/reopen; validate original-game behavior separately.
+- Native tests and private real-sample checks passed for representative compressed `Cr10G/Cr10V` and `El1eG/El1eV` resources. This is code-level evidence, not user confirmation that the coordinate-limit issue is resolved.
 
 ## Relationship to the existing project research log
 
