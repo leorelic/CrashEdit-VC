@@ -434,3 +434,12 @@ No implementation change is justified yet. Record the exact blocked frame/vertex
 The synthetic NSF tests already exercise narrow compressed delta rejection, width-7 expansion, coordinate 255, save-time rebasing, special-prefix serialization, and preservation of an unencodable working pose. The real `Cr10G/Cr10V` and `El1eG/El1eV` compatibility workflow currently validates decoded hashes/topology, not a compressed real-sample edit that forces width expansion and rebuilds all Animations sharing the Model. The uncompressed real edit fixture is `BT10V`.
 
 This distinction matters: synthetic coverage proves the code path in a constructed fixture, not capacity behavior or shared-Model effects in retail data. See the regression audit in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md). Next validation should record the actual blocked ModelPosition width/base and exact failing delta on the private sample, then test full-pose equality after expansion and every affected Animation payload rebuild.
+
+
+### Compressed expansion vertex-index bug fixed — 2026-11-26
+
+Applied a source-backed correction to `expandCompressedModelPositions`: it previously selected the rebuild target as `frame.specialVertexCount + ModelPositionIndex`, while CrashEdit-RE's decoder writes compressed Model position `i` to frame vertex `i`. The special count advances the temporal bit cursor/topology offset, not the compressed decoder's destination index. Expansion now uses `frame.vertices[pi]`.
+
+Added a synthetic test that forces a narrow delta-width expansion in a frame with one special vertex, then checks the pose before and after save/reload. Code: [e6cf1ff](https://github.com/leorelic/CrashEdit-VC/commit/e6cf1ff023bb17d753cbb16fb9de3f27f180c559); test: [3f98348](https://github.com/leorelic/CrashEdit-VC/commit/3f983481bde2e50d8493c0ae05f23dd646595e69). Detailed analysis and correction to the earlier prefix-byte note are in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md).
+
+Not yet verified: CI build/test results, retail sample edit/save/reopen, or in-game behavior. Do not mark the coordinate-limit issue resolved until those checks pass.
