@@ -128,3 +128,9 @@ Do not declare an animation-decoding milestone until:
 - Compressed/special-vertex visual correctness: **open**.
 - Recent compressed bit-order changes and tests require reconciliation with the RE behavior above before being treated as stable.
 - Next action: inspect current native decode/renderer against this specification and compare the actual Snow Go frame data; do not start another speculative byte-order patch.
+
+## Verified save-path pitfall: special prefix aliases temporal bytes
+
+The special vertex prefix and temporal words overlap at the same frame-relative offset. When writing updated temporal words, those writes can overwrite the raw special-vertex bytes even though the compressed delta cursor starts after the special prefix. Preserve the edited special prefix explicitly after temporal-word serialization, then re-decode the frame.
+
+Regression: `nsf_archive_tests` edits a special vertex and a compressed model vertex, saves/reloads, and checks both coordinates. CI exposed this ordering bug at the special vertex reload assertion. Fix commit: `d6beb80a9a975a3e8faa2082e6e1b06732275898`. This is code-level round-trip evidence; it does not establish the Cr10V/Cr10G visual issue as resolved.
