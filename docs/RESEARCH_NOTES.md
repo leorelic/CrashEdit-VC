@@ -185,6 +185,8 @@ Treat the relationship between SLST and scenery authoring as a research question
 
 ## Documentation and evidence policy
 
+Focused subsystem research documents are companions to this living log, not replacements for it. In particular, read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) alongside the animation/Model evidence recorded below and in this log. Preserve the existing `airumu/CrashEdit` `t/net9` source baseline and the real-sample parity results; do not repeat prior source investigations unless a reproducible mismatch requires it. When a subsystem document adds detail, cross-link it here or from the relevant roadmap rather than maintaining conflicting duplicate specifications.
+
 For every significant discovery, record:
 1. The exact file/sample, instruction word, record, or behavior examined.
 2. Whether the claim is source-confirmed, sample-confirmed, implemented/tested, or inferred.
