@@ -149,3 +149,10 @@ The broader research log already records important source/sample evidence:
 Keep that evidence intact. The current visual defect does not invalidate those specific data-parity results, but neither do those results prove the complete native renderer is visually correct. Treat the issue as a separate unresolved end-to-end checkpoint: compare the same affected frame in RE and VC through decoded vertices, Model-local indices, final index offsets, coordinate transforms, materials/textures, and rasterized output. Do not re-run or replace already documented research unless a new reproducible discrepancy requires it.
 
 The existing `MODEL_EDITOR_ROADMAP.md` also contains the Model-entry research and planned validation. Update that roadmap when a finding affects Model topology, texture/material resolution, or Model serialization; update this document for frame/temporal decoding; and update `RESEARCH_NOTES.md` for cross-subsystem findings or milestone evidence. Cross-link rather than copy long sections.
+
+
+## Verified compressed-expansion write-order regression (2026-11-25)
+
+CI caught a save/reload regression at tests/nsf_archive_tests.cpp:346: the edited special vertex did not survive expansion of a compressed Model position table. In expandCompressedModelPositions(), the code copied special XYZ bytes into the payload, encoded the compressed temporal bit array, then serialized temporal words over the same payload bytes. Because the special prefix intentionally aliases the first temporal bytes, this final serialization clobbered the special vertex.
+
+Correct order: serialize all temporal words first, then restore each special vertex's raw XYZ bytes at fakeHeader + vi*3. This is not a compressed bit-order conversion; it preserves the format's overlapping raw prefix. Regression coverage edits both a special vertex and a compressed Model vertex, saves, reloads, and checks the special XYZ values. Patch: a4d6228 (2026-11-25). CI must pass on all platforms before treating the save-path fix as verified.
