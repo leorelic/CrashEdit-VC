@@ -879,14 +879,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      const std::uint32_t word=u32(payload,fakeHeader+wi*4U);
      for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
     }
-    // Only a non-empty special prefix requires conversion to physical order.
-    if(frame.specialVertexCount!=0U){
-     std::vector<std::uint8_t> reordered(bits.size());
-     for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-      for(std::size_t byte=0;byte<4U;++byte)
-       for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-     bits.swap(reordered);
-    }
+    // Keep compressed deltas in RE's temporal-bit order.
     std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
     auto encodeSigned=[&](std::int32_t delta){
      bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
@@ -903,13 +896,6 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      const std::int32_t baseY=(yAcc+position.y)&0xff;
      encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
-    }
-    if(frame.specialVertexCount!=0U){
-     std::vector<std::uint8_t> physical(bits.size());
-     for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-      for(std::size_t byte=0;byte<4U;++byte)
-       for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-     bits.swap(physical);
     }
     for(std::size_t wi=0;wi<wordCount;++wi){
      std::uint32_t word=0;
