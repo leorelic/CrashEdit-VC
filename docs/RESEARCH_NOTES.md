@@ -427,3 +427,10 @@ New source-confirmed detail is recorded in [ANIMATION_FORMAT_RESEARCH.md](ANIMAT
 - When current compressed widths reject an edit, native save tries widening the shared Model’s position records to width 7 and rebuilding every Animation entry that references it. If an enlarged payload fails to fit a chunk, the UI raises the chunk-relocation prompt. This is an archive-capacity failure triggered by encoding fallback—not proof that the vertex coordinate itself needs a new chunk.
 
 No implementation change is justified yet. Record the exact blocked frame/vertex/axis and the failed encoder/capacity stage from the real sample before patching. Preserve the `ff5359a` baseline and do not revive the special-byte restoration patch.
+
+
+### Real-sample animation edit coverage gap — 2026-11-26
+
+The synthetic NSF tests already exercise narrow compressed delta rejection, width-7 expansion, coordinate 255, save-time rebasing, special-prefix serialization, and preservation of an unencodable working pose. The real `Cr10G/Cr10V` and `El1eG/El1eV` compatibility workflow currently validates decoded hashes/topology, not a compressed real-sample edit that forces width expansion and rebuilds all Animations sharing the Model. The uncompressed real edit fixture is `BT10V`.
+
+This distinction matters: synthetic coverage proves the code path in a constructed fixture, not capacity behavior or shared-Model effects in retail data. See the regression audit in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md). Next validation should record the actual blocked ModelPosition width/base and exact failing delta on the private sample, then test full-pose equality after expansion and every affected Animation payload rebuild.
