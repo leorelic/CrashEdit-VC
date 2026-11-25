@@ -380,6 +380,20 @@ void NsfArchive::decodeZones(bool crash3Retail){crash3Retail_=crash3Retail;
 
 
 
+static void temporalBitsToLogical(std::vector<std::uint8_t>&bits){
+ for(std::size_t base=0;base+32U<=bits.size();base+=32U){
+  std::array<std::uint8_t,32>group{};
+  for(std::size_t byte=0;byte<4U;++byte)for(std::size_t bit=0;bit<8U;++bit)group[byte*8U+bit]=bits[base+24U-byte*8U+bit];
+  std::copy(group.begin(),group.end(),bits.begin()+static_cast<std::ptrdiff_t>(base));
+ }
+}
+static void logicalBitsToTemporal(std::vector<std::uint8_t>&bits){
+ for(std::size_t base=0;base+32U<=bits.size();base+=32U){
+  std::array<std::uint8_t,32>group{};
+  std::copy_n(bits.begin()+static_cast<std::ptrdiff_t>(base),32U,group.begin());
+  for(std::size_t byte=0;byte<4U;++byte)for(std::size_t bit=0;bit<8U;++bit)bits[base+24U-byte*8U+bit]=group[byte*8U+bit];
+ }
+}
 static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model,bool crash3){
  auto fail=[&](const char*message){frame.vertexError=message;return false;};
  if(frame.vertexCount>16384U||frame.specialVertexCount>frame.vertexCount)return fail("Animation vertex count is invalid.");
@@ -391,6 +405,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
  // Compressed deltas are read in the original temporal-word bit order.
  // Only uncompressed byte coordinates use the per-word byte permutation below.
+ if(model&&model->decoded&&model->compressed&&frame.specialVertexCount>0U)temporalBitsToLogical(bits);
  const auto&compressedBits=bits;
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
@@ -880,6 +895,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      const std::uint32_t word=u32(payload,fakeHeader+wi*4U);
      for(unsigned bit=0;bit<32U;++bit)bits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
     }
+    if(frame.specialVertexCount>0U)temporalBitsToLogical(bits);
       std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
     auto encodeSigned=[&](std::int32_t delta){
      bits[bit++]=delta<0?1U:0U;const std::uint32_t encoded=static_cast<std::uint32_t>(delta<0?delta+128:delta);
@@ -897,6 +913,7 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      encodeSigned(deltaFor(target.x,baseX));encodeSigned(deltaFor(target.z,baseZ));encodeSigned(deltaFor(target.y,baseY));
      xAcc=target.x;yAcc=target.y;zAcc=target.z;
     }
+    if(frame.specialVertexCount>0U)logicalBitsToTemporal(bits);
     for(std::size_t wi=0;wi<wordCount;++wi){
      std::uint32_t word=0;
      for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
@@ -1450,7 +1467,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
-  temporalBitsToLogical(bits);
+  if(frame.specialVertexCount>0U)temporalBitsToLogical(bits);
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
   // CrashEdit-RE reads and writes compressed deltas directly in temporal-bit order.
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
@@ -1495,6 +1512,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    for(std::size_t byte=0;byte<4U;++byte)
     for(std::size_t b=0;b<8U;++b)bits[base+byte*8U+b]=reordered[base+24U-byte*8U+b];
  }
+ if(model&&model->compressed&&frame.specialVertexCount>0U)logicalBitsToTemporal(bits);
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){
   std::uint32_t word=0;for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|bits[wordIndex*32U+bit];
   frame.temporalWords[wordIndex]=word;
