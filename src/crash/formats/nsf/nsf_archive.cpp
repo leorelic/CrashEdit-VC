@@ -403,7 +403,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  }
  std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
- temporalBitsToLogical(bits);
+ if(model&&model->decoded&&model->compressed)temporalBitsToLogical(bits);
  const auto&compressedBits=bits;
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
@@ -1464,9 +1464,9 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  if(!has(chunk.bytes,temporalOffset,frame.temporalWords.size()*4U))return false;
  std::vector<std::uint8_t>bits;bits.reserve(frame.temporalWords.size()*32U);
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
- temporalBitsToLogical(bits);
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
+  temporalBitsToLogical(bits);
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
   // CrashEdit-RE reads and writes compressed deltas directly in temporal-bit order.
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
@@ -1511,7 +1511,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    for(std::size_t byte=0;byte<4U;++byte)
     for(std::size_t b=0;b<8U;++b)bits[base+byte*8U+b]=reordered[base+24U-byte*8U+b];
  }
- logicalBitsToTemporal(bits);
+ if(model&&model->compressed)logicalBitsToTemporal(bits);
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){
   std::uint32_t word=0;for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|bits[wordIndex*32U+bit];
   frame.temporalWords[wordIndex]=word;
