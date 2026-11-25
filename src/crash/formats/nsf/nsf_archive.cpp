@@ -1500,15 +1500,6 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   const std::size_t offset=temporalOffset+wordIndex*4U;if(!has(chunk.bytes,offset,4U))return false;
   for(unsigned byte=0;byte<4U;++byte)chunk.bytes[offset+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
  }
- // The special-vertex prefix aliases the first temporal bytes in the frame.
- // Restore the edited raw prefix after writing temporal words, otherwise the
- // stale leading temporal bits overwrite the special vertex coordinates.
- for(std::size_t vi=0;vi<frame.specialVertexCount;++vi)
-  for(std::size_t axisIndex=0;axisIndex<3U;++axisIndex){
-   const std::size_t offset=frame.rawOffset+fakeHeader+vi*3U+axisIndex;
-   if(!has(chunk.bytes,offset,1U))return false;
-   chunk.bytes[offset]=frame.specialVertices[vi][axisIndex];
-  }
  return decodeAnimationVertices(frame,model,crash3);
 }
 

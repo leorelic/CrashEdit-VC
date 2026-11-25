@@ -1,6 +1,6 @@
 # Crash 2 animation format research and recovery roadmap
 
-Status: active investigation; the current compressed/special-vertex rendering issue is **not resolved**.
+Status: active investigation; the compressed decoder destination and temporal-prefix save behavior have been re-aligned with CrashEdit-RE source. CI, real-sample, and in-game validation are still required; the visual compatibility defect remains open.
 Reference baseline: [CrashEdit-RE, airumu/CrashEdit, branch t/net9](https://github.com/airumu/CrashEdit/tree/t/net9).
 Primary source files:
 - `Crash/Formats/Crash Formats/Animation/Frame.cs`
@@ -58,9 +58,9 @@ RE's compressed frame decoder:
 3. Resets an axis accumulator to zero when that axis width is 7.
 4. Reads signed delta fields in **X, Z, Y** order. Each field is one sign bit followed by the configured number of magnitude bits, sign-extended.
 5. Adds the Model base (X base is shifted left by one; Z and Y are not) and delta to the corresponding accumulator, then wraps each accumulator to 8 bits.
-6. Writes decoded compressed positions to the Model-linked portion of the frame, after the direct special-vertex prefix.
+6. Writes decoded compressed positions to `verts[i]`, starting at frame vertex index zero, as `Frame.MakeVertices()` does in CrashEdit-RE. `SpecialVertexCount` controls the temporal cursor and the renderer's triangle-index offset; it does not shift this decoder destination.
 
-The renderer uses the compressed Model's reconstructed triangle indices with an added `specialVertexCount` vertex-index offset. Keep the distinction between a frame's full vertex array (special prefix plus compressed Model vertices) and Model-local vertex indices explicit at every call site.
+The renderer uses the compressed Model's reconstructed triangle indices with an added `specialVertexCount` vertex-index offset. This is distinct from `Frame.MakeVertices()`, which writes compressed Model positions beginning at output index zero. Preserve this source behavior rather than assuming the decoder destination is `specialVertexCount + modelPositionIndex`.
 
 ## Uncompressed frame bit order (RE source-confirmed)
 
@@ -82,7 +82,7 @@ When diagnosing a model that appears flat, skewed, tiny, or partly missing, insp
 
 ## Known investigation mistake to avoid
 
-Recent native patches changed compressed bit ordering and changed a synthetic special-vertex test's expected value to agree with that patch. The RE source shows the compressed decoder consumes the temporal array directly; it does not use the uncompressed byte-lane reorder. Treat those patches/tests as investigation history, not as an authoritative specification. Re-check the current native branch and test expectations against this document before relying on them.
+Recent native patches and research notes incorrectly inferred that compressed Model positions must be written after the special-vertex prefix. The cited CrashEdit-RE `Frame.MakeVertices()` source writes them at `verts[i]` starting from zero; `AnimationRenderer` separately adds `frame.SpecialVertexCount` when indexing triangles. Also, `Frame.SaveC2()` serializes the temporal words over the overlapping prefix bytes and does not restore those bytes afterward. Restoring direct XYZ bytes after temporal-word serialization overwrites compressed delta bits and breaks save/reload. Keep the corrected source-based synthetic test and exact pose round-trip assertion; do not assert that the overlapping raw bytes remain unchanged after compressed editing.
 
 The user has reported that some models/animations render correctly while others (including Cr10V / Cr10G-linked models) do not. This remains an open visual compatibility defect. Do not call it fixed based solely on CI.
 
