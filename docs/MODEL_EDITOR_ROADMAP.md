@@ -398,3 +398,8 @@ This remains intentionally last, after the editing and Scenery/Geometry prioriti
 - [ ] Revisit Orthographic only as a complete renderer-wide feature, including hardware rendering, overlays, picking, collision geometry and gizmos.
 
 Existing navigation and editing shortcuts remain unchanged: W/A/S/D, Shift-modified movement, Q/E, R, mouse orbit/pan, wheel zoom, playback, selection, transforms, face editing, collision tools and bone tools.
+
+
+## Animation preview milestone update — 2026-11-26
+
+The user reports that the latest compressed/special-vertex animation preview looks correct again at [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac), and will continue testing. The latest native regression and private sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV` resources. This supports the Model-to-Animation linkage and compressed position path but does not yet establish universal model/render compatibility or original-game save/load. Keep those acceptance items open and follow [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) for the corrected temporal-prefix save behavior.
