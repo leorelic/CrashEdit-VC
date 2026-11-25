@@ -711,6 +711,15 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
        if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,ci,ei,e))return false;
        continue;
       }
+      // The encoder must reproduce the complete edited pose after decoding
+      // the just-written temporal words. Never silently accept a lossy save.
+      for(std::size_t vi=0;vi<desiredVertices.size();++vi){
+       const auto&actual=frame.vertices[vi];const auto&desired=desiredVertices[vi];
+       if(actual.x!=desired.x||actual.y!=desired.y||actual.z!=desired.z){
+        e="Compressed animation frame "+std::to_string(fi)+" did not reproduce edited vertex "+std::to_string(vi)+" exactly. The editable pose is preserved.";
+        return false;
+       }
+      }
      }
     }else{
      // The uncompressed encoder decodes the frame after each component write.
