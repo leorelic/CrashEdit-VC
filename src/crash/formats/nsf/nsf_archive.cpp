@@ -389,16 +389,8 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  }
  std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
- // Crash 2 compressed deltas are bit-packed in the frame's byte order. The
- // temporal words are read as little-endian integers, so reverse each word's
- // byte lanes (without reversing bits within a byte) before decoding them.
- std::vector<std::uint8_t> compressedBits=bits;
- if(frame.specialVertexCount!=0U){
-  compressedBits.assign(bits.size(),0U);
-  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-   for(std::size_t byte=0;byte<4U;++byte)
-    for(std::size_t bit=0;bit<8U;++bit)compressedBits[base+byte*8U+bit]=bits[base+(3U-byte)*8U+bit];
- }
+ // CrashEdit-RE consumes compressed deltas directly from the temporal bit array.
+ const auto&compressedBits=bits;
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
@@ -1465,15 +1457,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
   if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
-  // Match decodeAnimationVertices(): only a non-empty special-vertex
-  // prefix requires conversion to physical byte order.
-  if(frame.specialVertexCount!=0U){
-   std::vector<std::uint8_t> reordered(bits.size());
-   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-    for(std::size_t byte=0;byte<4U;++byte)
-     for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-   bits.swap(reordered);
-  }
+  // CrashEdit-RE reads and writes compressed deltas directly in temporal-bit order.
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
@@ -1497,13 +1481,6 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
    const std::int32_t dx=deltaFor(targetX,baseX),dz=deltaFor(targetZ,baseZ),dy=deltaFor(targetY,baseY);
    if(!encodeSigned(p.xBits,dx)||!encodeSigned(p.zBits,dz)||!encodeSigned(p.yBits,dy))return false;
    xAcc=targetX;yAcc=targetY;zAcc=targetZ;
-  }
-  if(frame.specialVertexCount!=0U){
-   std::vector<std::uint8_t> physical(bits.size());
-   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-    for(std::size_t byte=0;byte<4U;++byte)
-     for(std::size_t b=0;b<8U;++b)physical[base+byte*8U+b]=bits[base+24U-byte*8U+b];
-   bits.swap(physical);
   }
  }else{
   const std::size_t required=start+(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
