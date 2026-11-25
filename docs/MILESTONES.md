@@ -4,6 +4,23 @@
 
 This file records verified project checkpoints and the remaining acceptance work at each milestone. A checkpoint is a known-good rollback/reference point, not a claim that the entire editor or every game-data variant is complete.
 
+## 2026-11-26 — Compressed animation rendering and save/reload milestone
+
+**Checkpoint:** [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac)
+
+**User-confirmed progress**
+- User reports the latest animation preview looks correct again after the compressed/special-vertex fixes.
+- The save path no longer restores stale special-vertex XYZ bytes over the serialized temporal stream. The overlapping prefix is treated consistently with CrashEdit-RE's temporal serialization behavior.
+- Compressed frame save verifies the re-decoded pose; the special-vertex cache is refreshed from the bytes actually serialized.
+- The current native regression suite and private real-sample validation passed for the latest patch sequence, including representative `Cr10G/Cr10V` and `El1eG/El1eV` data.
+- Windows and Ubuntu CI jobs passed on the checkpoint. The macOS job was still queued at last status check; do not call the full platform matrix green until it completes.
+
+**Scope and remaining validation**
+- This is a user-confirmed preview milestone, not a declaration that every animation or model layout is compatible.
+- User will continue testing. Keep original-game save/load and broader animation coverage open until those tests are reported.
+- Recheck latest CI status before using the checkpoint as a fully validated release baseline.
+- Keep the exact-pose save assertion; do not silently accept lossy compressed edits.
+
 ## 2026-11-23 — Animation vertex save reliability
 
 **Checkpoint** [`4b6592852d761d742358313b0250add7112e411e`](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e)
