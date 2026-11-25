@@ -406,6 +406,12 @@ The 2026-11-25 note above was incorrect: restoring raw special XYZ bytes *after*
 Latest user report: the animation preview looks correct again. Native tests and private real-sample checks passed for the latest patch sequence; Windows and Ubuntu CI passed, with macOS queued at last check. User is continuing game testing. Do not treat this as universal animation or in-game save validation.
 
 
-## Animation milestone — 2026-11-26
+## Animation recovery checkpoint and unresolved vertex limit — 2026-11-26
 
-User-confirmed: the latest compressed/special-vertex animation preview looks correct again at `ff5359af45779fcd29b3827a563215b433cef1ac`; further testing is underway. The source-based correction is to avoid restoring stale special-vertex raw XYZ bytes after temporal serialization. Keep exact pose re-decode verification and update the cache from serialized bytes. Native regression tests and private real-sample checks passed for the latest patch sequence, including representative Crash 2 `Cr10G/Cr10V` and `El1eG/El1eV` resources. Windows and Ubuntu CI passed; macOS was queued at last check. Original-game save/load and broader compatibility remain open. Refer to [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) for format details.
+Checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac): user-confirmed animation preview looks correct again and saving works. This restores a stable baseline; it does not solve the original transform defect.
+
+**Current user-reported defect:** certain vertices hit a location limit on the X/Y/Z gizmo. The editor incorrectly asks to move the Animation entry into a new NSF chunk, yet the requested edit still is not applied. The investigation is about Animation frame boundaries and coordinate/encoding limits. Chunk relocation is not a valid fix unless a separate chunk-capacity failure is demonstrated.
+
+Next: compare the gizmo's allowed coordinate range, frame boundary/offset metadata, compressed or uncompressed encoder constraints, and save validation for the exact failing vertex/axis. Record the first rejected coordinate and rejection reason; do not speculate or silently clamp/drop/wrap the edit. Verify movement beyond the old limit, save/reopen, then original-game behavior independently.
+
+The temporal-prefix correction above remains valid and should not be reverted. Native regression and private sample checks are code-level evidence only; user has not yet confirmed the coordinate-limit issue fixed.
