@@ -134,3 +134,18 @@ Do not declare an animation-decoding milestone until:
 The special vertex prefix and temporal words overlap at the same frame-relative offset. When writing updated temporal words, those writes can overwrite the raw special-vertex bytes even though the compressed delta cursor starts after the special prefix. Preserve the edited special prefix explicitly after temporal-word serialization, then re-decode the frame.
 
 Regression: `nsf_archive_tests` edits a special vertex and a compressed model vertex, saves/reloads, and checks both coordinates. CI exposed this ordering bug at the special vertex reload assertion. Fix commit: `d6beb80a9a975a3e8faa2082e6e1b06732275898`. This is code-level round-trip evidence; it does not establish the Cr10V/Cr10G visual issue as resolved.
+
+
+## Relationship to the existing project research log
+
+This focused document supplements—not replaces—[`RESEARCH_NOTES.md`](RESEARCH_NOTES.md). Read both before modifying animation or Model decoding/rendering.
+
+The broader research log already records important source/sample evidence:
+- CrashEdit-RE baseline: `airumu/CrashEdit`, branch `t/net9` (not the legacy cbhacks repository).
+- `Frame.MakeVertices()` compressed temporal decoding in signed X-Z-Y order, special-prefix handling, and ModelPosition packed base/width fields.
+- Real `El1eG/El1eV` and `Cr10G/Cr10V` structure counts and triangle-record comparisons.
+- The private sample workflow's golden checks for decoded frame vertex streams and triangle records, plus raw-entry preservation on save/reload.
+
+Keep that evidence intact. The current visual defect does not invalidate those specific data-parity results, but neither do those results prove the complete native renderer is visually correct. Treat the issue as a separate unresolved end-to-end checkpoint: compare the same affected frame in RE and VC through decoded vertices, Model-local indices, final index offsets, coordinate transforms, materials/textures, and rasterized output. Do not re-run or replace already documented research unless a new reproducible discrepancy requires it.
+
+The existing `MODEL_EDITOR_ROADMAP.md` also contains the Model-entry research and planned validation. Update that roadmap when a finding affects Model topology, texture/material resolution, or Model serialization; update this document for frame/temporal decoding; and update `RESEARCH_NOTES.md` for cross-subsystem findings or milestone evidence. Cross-link rather than copy long sections.
