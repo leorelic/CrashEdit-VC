@@ -403,7 +403,8 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  }
  std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
- if(model&&model->decoded&&model->compressed)temporalBitsToLogical(bits);
+ // Compressed deltas are read in the original temporal-word bit order.
+ // Only uncompressed byte coordinates use the per-word byte permutation below.
  const auto&compressedBits=bits;
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
