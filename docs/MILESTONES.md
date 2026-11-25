@@ -1,5 +1,7 @@
 # CrashEdit-VC milestones
 
+> Active investigation: compressed/special-vertex animation rendering remains unresolved. Before continuing, read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md), which records the RE source findings, decoding order, known pitfalls, and acceptance roadmap. Do not declare a new animation milestone until its sample and in-game acceptance gates are met.
+
 This file records verified project checkpoints and the remaining acceptance work at each milestone. A checkpoint is a known-good rollback/reference point, not a claim that the entire editor or every game-data variant is complete.
 
 ## 2026-11-23 — Animation vertex save reliability
