@@ -351,6 +351,25 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
  assert(specialReloaded[1].x==44&&specialReloaded[1].y==55&&specialReloaded[1].z==66);
 
+ // Width expansion must preserve CrashEdit-RE's vertex destination indexing
+ // when the frame has a special-vertex prefix: Model position i writes verts[i],
+ // while SpecialVertexCount only advances the temporal bit cursor.
+ std::vector<std::uint8_t> narrowSpecialBytes=specialCompressedBytes;
+ p32(narrowSpecialBytes,scmPositions+4U,0x000001f9U); // second position: X width 1, Z/Y width 7
+ NsfArchive narrowSpecialArchive;assert(narrowSpecialArchive.loadBytes(narrowSpecialBytes,e));narrowSpecialArchive.decodeAnimationModels(false);
+ assert(narrowSpecialArchive.chunks()[0].entries[0].model.positions[1].xBits==1U);
+ assert(narrowSpecialArchive.setAnimationFrameVertex(1,0,0,1,0,200));
+ assert(narrowSpecialArchive.commitAnimationEdits(e));
+ assert(narrowSpecialArchive.chunks()[0].entries[0].model.positions[1].xBits==7U);
+ const auto&expandedSpecial=narrowSpecialArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(expandedSpecial[0].x==10&&expandedSpecial[0].y==20&&expandedSpecial[0].z==30);
+ assert(expandedSpecial[1].x==200&&expandedSpecial[1].y==0&&expandedSpecial[1].z==0);
+ std::vector<std::uint8_t> expandedSpecialBytes;assert(narrowSpecialArchive.saveUncompressedSourceBytes(expandedSpecialBytes,e));
+ NsfArchive expandedSpecialReload;assert(expandedSpecialReload.loadBytes(expandedSpecialBytes,e));expandedSpecialReload.decodeAnimationModels(false);
+ const auto&expandedSpecialPose=expandedSpecialReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(expandedSpecialPose[0].x==10&&expandedSpecialPose[0].y==20&&expandedSpecialPose[0].z==30);
+ assert(expandedSpecialPose[1].x==200&&expandedSpecialPose[1].y==0&&expandedSpecialPose[1].z==0);
+
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
  p32(crash2RebaseAnimation,vaFrame+8,1);p32(crash2RebaseAnimation,vaFrame+12,0);p32(crash2RebaseAnimation,vaFrame+16,0);p32(crash2RebaseAnimation,vaFrame+20,24);p32(crash2RebaseAnimation,vaFrame+24,0x03020100);
