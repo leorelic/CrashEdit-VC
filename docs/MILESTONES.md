@@ -1,45 +1,152 @@
 # CrashEdit-VC milestones
 
-> Active investigation: animation vertex transform limits remain unresolved. Read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md) before changing frame boundaries, coordinate limits, or chunk-expansion behavior.
+> Active investigation: animation vertex transform limits remain unresolved. Read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md), [RESEARCH_NOTES.md](RESEARCH_NOTES.md), and [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) before changing frame boundaries, coordinate limits, or chunk-expansion behavior.
 
-This file records verified project checkpoints and the remaining acceptance work at each milestone. A checkpoint is a known-good rollback/reference point, not a claim that the entire editor or every game-data variant is complete.
+This file is the concise project-history index of verified milestones. It records implemented checkpoints and user-confirmed outcomes separately from pending work. A milestone is not a claim that every file variant or workflow is complete.
 
-## 2026-11-26 — Animation preview/save recovery checkpoint
+## Native C++ application foundation
 
-**Checkpoint:** [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac)
+- Established the native C++20/CMake application with Dear ImGui docking, GLFW and OpenGL, plus Windows/Linux/macOS CI.
+- Built the workspace around resource hierarchy navigation, a persistent 3D zone viewport, bottom-docked tools, search, console/diagnostics, NSF open/drag-and-drop, and GOOL inspection.
+- Added application preferences in `cevc.ini` rather than beside opened NSF files in `imgui.ini`.
+- Added paired NSF/NSD save staging and recovery, with optional independent backups.
+- Added native NSF parsing, entry navigation, and preservation-oriented raw resource handling.
 
-**Confirmed status**
-- User reports the animation preview looks correct again.
-- User subsequently confirmed that saving works.
+These are foundational implementation milestones; broad retail archive and game validation remains a separate acceptance requirement.
+
+## NSD editing and zone workflow
+
+- Implemented native inspection and editing for ProtoNSD, OldNSD, standard Crash 2 NSD, and Crash 3 NSD layouts, retaining opaque/prelude/compression data where supported.
+- Added spawn-point editing: add/delete/reorder/copy/paste, EID and coordinate changes, camera values, GOOL map inspection/editing, and Get Spawn from selected object/checkpoint data.
+- Added staged paired NSF/NSD save behavior and recovery if replacing one output fails.
+- Recorded the examined Crash 2 `00_eZ` spawn/checkpoint comparison as a sample-specific regression, not a universal coordinate rule.
+
+**Still pending:** broad real-level round trips and original-game validation across NSD variants.
+
+## Scenery renderer and viewport
+
+- Added GPU scenery rendering with textured Crash 2 scenery, transparency, and a software fallback.
+- Traced scenery texture entities to connect decoded texture pages to actual polygon rendering; texture-page matching alone was insufficient.
+- Added depth-buffer controls and corrected overlay/object occlusion behavior when depth testing is enabled.
+- Corrected skybox scale against the original viewer for the examined zone and added neighboring-zone rendering.
+- Added viewport camera/renderer/diagnostic controls.
+
+Renderer parity in a viewer is not proof of game-runtime behavior; retain representative scenery regression files.
+
+## GOOL and native instruction research
+
+- Implemented native GOOL entry/header, instruction, data-pool, state-map/state-descriptor, and Crash 2 frame-group parsing with bounded diagnostics and raw-data retention.
+- Audited Crash 2 opcode operand formats against the original CrashEdit source, including writable destination references, special source-reference encodings, unresolved references, and version-scoped opcode assignments.
+- Added native MIPS decoding for common R3000A instructions and documented the parser's exact GOOL/MIPS mode-return raw-word convention.
+- Identified a valid PS1 COP2/GTE instruction in a real GOOL native-code stream; this is documented research, not implemented GTE decoding.
+- Inspected real GOOL samples `DispC` and `WillC`, confirming their item layouts and frame-group records consume the sample data exactly.
+
+The longer opcode audit and corrections live in [gool-crash2-instruction-audit.md](gool-crash2-instruction-audit.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md). Read the source-correction note before changing the MIPS mode-return sentinel.
+
+## Animation vertex inspection milestone — 2026-11-09
+
+**User-confirmed:** interactive vertex inspection works in the 3D Animation Editor.
+
+- Toggle vertex markers from viewport settings or V.
+- Hover/select individual vertices; selected vertex coordinates appear in the Animation Frame Editor.
+- Marker rendering respects depth/object position and works in wireframe independently of Collision Viewer.
+- Corrected marker rendering state so animation blend state does not make markers black.
+
+This milestone is inspection/selection only; it did not yet establish safe temporal vertex serialization.
+
+## Model format research and structural Model Editor
+
+- Re-audited the authoritative reference against CrashEdit-RE, `airumu/CrashEdit` branch `t/net9` (not the deprecated cbhacks source).
+- Confirmed Model topology/material data is separate from pose-specific Animation frame data; the Model contains polygon commands, colors, texture descriptors, TPAG references, extended textures, and optional compressed-position records.
+- Implemented the structural Model Editor pages: General, Polygons, Colors, Textures, Extended Textures, and conditional Positions.
+- Added raw polygon command inspection alongside reconstructed triangles; retained the stateful command-stream interpretation rather than treating each word as a conventional index.
+- Added native Model decoding and regression comparisons for real `El1eG` and `Cr10G` samples.
+
+Do not add a Model Vertices page: visible pose vertices are reconstructed from Animation frames. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) for the integrated Model/Animation design and remaining serializer work.
+
+## Face selection, material editing, and Face Texture Selector
+
+- Added stable reconstructed-triangle/rendered-face mapping, depth-aware hover and click selection, and selected-face identity/reference display.
+- Added face-level color editing, per-corner color references, texture assignment, and texture-descriptor editing with bounded validation.
+- Added in-viewport Face Texture Selector for moving a face's existing UV mapping across the atlas while preserving its relative UV shape.
+- Fixed selector image/hit-test fitting and the UV4 constraint that incorrectly restricted placement of the visible UV1–UV3 triangle.
+- Commits: [2d4b731](https://github.com/leorelic/CrashEdit-VC/commit/2d4b731), [7043352](https://github.com/leorelic/CrashEdit-VC/commit/7043352), [1e6a172](https://github.com/leorelic/CrashEdit-VC/commit/1e6a172).
+- **User-confirmed 2026-11-12:** TNT Box atlas selection/placement works. This validation is specific to that tested model/descriptor path.
+
+## First in-game NSF texture mod — 2026-11-12
+
+**User-confirmed end-to-end:** edited TNT Box face texture in CrashEdit-VC, saved the NSF, reopened it successfully in CrashEdit-RE, then tested it in Crash 2; the supplied screenshot showed the edited textures rendering in-game.
+
+Verified chain: VC edit → NSF save → RE reopen → original game.
+
+This proves the tested fixed-size texture-descriptor edit/save path, not universal model/color-mode compatibility or variable-size Model serialization.
+
+## NSF chunk expansion for Animation Append/Insert — 2026-11-12
+
+- Confirmed type-0 NSF chunks have a 64 KiB buffer and entry-offset table with a terminal used-data offset.
+- Added capacity preflight, user confirmation, complete raw-entry relocation to a new type-0 chunk, source chunk table rebuild, validation before commit, selection/resource refresh, and retry of the requested append/insert.
+- Added synthetic overflow, preservation, append, and save/reload regression coverage.
+- Implementation checkpoint: [c200773](https://github.com/leorelic/CrashEdit-VC/commit/c200773d4354096dcd84805b8868d1b0f8f8bb15).
+- **User-confirmed:** frame-growth relocation workflow worked as intended; CI passed Windows, Ubuntu, and macOS in [workflow 43152396834](https://github.com/leorelic/CrashEdit-VC/actions/runs/43152396834).
+
+This is a genuine archive-capacity feature for Append/Insert. It is not a remedy for animation coordinate/encoding limits; do not conflate the two issues.
+
+## TNT Box animation / GOOL relationship research — paused
+
+- Preserved original, unmodified `BT10V` as the correct one-frame Animation relationship sample for `BT10G` and BoxSC.
+- Examined BoxSC state descriptors and instruction references, but the `ANIM`/`ANIF` runtime semantics are not yet sufficient to infer a complete state machine.
+- Decision: pause the temporary state-machine viewer; resume when GOOL decompilation/readable script work can explain the execution semantics. Keep existing GOOL inspector and State Descriptions unchanged.
+
+## Animation/Model editor sprint — 2026-11-19
+
+### Vertex selection and camera input
+- Added click replace, Shift-add, Ctrl-remove, and drag-box selection; improved hover picking/depth tie-break and selected/hovered markers.
+- Separated camera input from selection: middle-drag orbit, right-drag pan, wheel zoom; gated camera controls while selection/transform/collision interactions own the pointer.
+- Dense-model usability and X-ray selection remain pending user validation.
+
+### Bone Rig sidecar and per-frame rest poses
+- Added editor-only Bone Rig sidecar data with vertex membership, pivots, per-frame rotation, rest positions, and frame offsets.
+- Sidecar v2 persists per-frame rest data while v1 remains readable; load validation rejects invalid frame keys, non-finite values, duplicate assignments, invalid parents, and hierarchy cycles.
+- Rotation recalculates from cached rest poses rather than repeatedly rotating quantized positions. Move/Scale and membership/pivot edits invalidate affected rest caches.
+- Parent links remain metadata only; child transforms do not yet propagate through a hierarchy.
+
+### Transform and archive regression
+- Added numerical pivot editing/recentering and optional bone-pivot Move/Scale.
+- Transform operations reject out-of-range or unrepresentable results rather than silently clamping; retain the last valid pose.
+- Added synthetic tests for atomic rejection, rebasing, compressed multi-vertex edits, collision-byte preservation, and save/reload.
+
+### Real Crash 2 Model/Animation parity
+- Compared all 64 `El1eG` and 574 `Cr10G` reconstructed triangles against CrashEdit-RE, including vertex indices, corner colors, texture refs/flags, and triangle type/subtype.
+- Confirmed sample frame counts and Model links: `El1eV` 7 frames × 38 vertices; `Cr10V` 11 frames × 309 vertices.
+- Native sample harness checks golden hashes and entry save/reload preservation for these private samples. This is entry-level compatibility evidence, not full archive/game validation.
+- Reference/sample workflow: [private sample workflow 44416679912](https://github.com/leorelic/CrashEdit-VC-Game-Samples/actions/runs/44416679912).
+
+## Animation vertex save reliability — 2026-11-23
+
+**Checkpoint:** [4b6592852d761d742358313b0250add7112e411e](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e).
+
+- Fixed uncompressed Animation frame saving by preserving the complete desired pose between component writes and verifying final decoded coordinates.
+- Added a synthetic multi-vertex/multi-axis save and reload regression.
+- **User-confirmed in-game:** Crash's `Cr10V` ear-vertex edits and `BT10V` edits persist when representable by the frame encoding.
+- Known limitation: `Cr10V` edits can still be rejected outside the frame encoder's representable range even if they appear within the viewer boundary.
+- Earlier reference [bf646ab](https://github.com/leorelic/CrashEdit-VC/commit/bf646ab4c18cc7a4a9111cd556774816b62c4bbd) is superseded for ongoing work by the November 23 checkpoint.
+
+## Animation preview/save recovery checkpoint — 2026-11-26
+
+**Checkpoint:** [ff5359af45779fcd29b3827a563215b433cef1ac](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac).
+
+- User reports the animation preview looks correct again and saving works.
 - This is a stable recovery/reference checkpoint, **not a fix for the original vertex-transform limitation**.
-- Code-level native regression and private real-sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV` data. These tests do not substitute for user testing in the editor or original game.
+- Native regression and private real-sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV`; automated checks are not user in-game validation.
 
-**Original issue still open**
-- Certain vertices cannot be moved beyond a particular X/Y/Z gizmo location.
-- The editor incorrectly prompts to move the Animation entry into a new NSF chunk, but the requested vertex edit still is not applied after that operation.
-- The working hypothesis to investigate is a mismatch between frame coordinate/encoding limits, gizmo transform bounds, and the save/validation path—not NSF chunk capacity. Do not treat chunk relocation as a solution unless evidence shows the entry itself cannot fit in its chunk.
-- Research Animation frame boundaries and coordinate limits from CrashEdit-RE source, real frames, and controlled edits. Identify the exact rejected coordinate and reason before changing bounds.
+## Current unresolved issue — Animation vertex coordinate/encoding limits
 
-**Guardrails**
-- Preserve `ff5359a` as the current known-good preview/save baseline while investigating.
-- Do not claim the coordinate-limit issue is fixed until a vertex can be moved past the previously blocked location, the edit is applied, saved, reopened, and tested in-game as applicable.
+**User-reported:** certain vertices cannot move beyond a particular location on the X/Y/Z gizmo. The editor incorrectly prompts to move the Animation entry into a new NSF chunk, but the requested edit still does not apply.
+
+- Investigate actual Animation frame boundaries, coordinate representation/encoding limits, gizmo bounds, and save validation using CrashEdit-RE source and controlled real-sample edits.
+- Record the exact frame, vertex, axis, current/requested coordinate, and rejection reason before changing code.
+- Chunk relocation is not the solution unless a separate actual chunk-capacity failure is demonstrated.
 - Do not silently clamp, wrap, drop, or redirect the requested edit.
+- Acceptance: move past the previously blocked location, apply the edit, save/reopen, then test in-game independently where applicable.
 
-## 2026-11-23 — Animation vertex save reliability
-
-**Checkpoint** [`4b6592852d761d742358313b0250add7112e411e`](https://github.com/leorelic/CrashEdit-VC/commit/4b6592852d761d742358313b0250add7112e411e)
-
-**Verified progress**
-- Fixed uncompressed Animation frame saving. The encoder re-decodes the frame after each component write; the save path now preserves the complete intended pose between writes and verifies the final decoded coordinates before accepting the edit.
-- Added a synthetic regression that edits later vertices on multiple axes, saves and reloads the NSF, and checks every resulting coordinate.
-- User-confirmed in-game: edits to Crash's `Cr10V` ear vertices save and work when representable by the frame encoding.
-- User-confirmed in-game: edits to `BT10V` now persist after saving instead of reverting to the default pose.
-- The earlier working `Cr10V` path remains intact; this fix addresses the uncompressed frame path rather than replacing the compressed/special-vertex implementation.
-
-**Still open**
-- `Cr10V` ear edits can still be rejected when they exceed the frame encoder's representable range, even when the coordinates appear to be inside the viewer's displayed boundary. Reconcile the visual boundary with the true serialization constraints without silently clamping or dropping edits.
-- Continue testing other Crash 2 animations and model/frame layouts; success on `Cr10V` and `BT10V` does not establish universal compatibility.
-- Validate full NSF/NSD archive preservation and broader original-game loading after edits.
-- Keep topology changes and variable-size Model serialization disabled until dependent resources can be updated and round-tripped safely.
-
-**Previous reference checkpoint:** [`bf646ab4c18cc7a4a9111cd556774816b62c4bbd`](https://github.com/leorelic/CrashEdit-VC/commit/bf646ab4c18cc7a4a9111cd556774816b62c4bbd). The November 23 checkpoint supersedes it for ongoing work.
+Preserve `ff5359a` as the known-good preview/save baseline while investigating.
