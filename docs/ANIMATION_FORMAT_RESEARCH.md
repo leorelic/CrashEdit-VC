@@ -186,3 +186,10 @@ For the exact blocked edit, capture: game/version; animation EID, chunk/entry an
 4. **Boundary/index mismatch:** special-prefix count, compressed-position count, vertex index, or temporal cursor differs from the reference; compare exact bit/byte offsets before changing code.
 
 Keep the `ff5359a` preview/save checkpoint intact. Do not change the encoder until the failing sample produces one of these exact, logged outcomes and the relevant source/sample parity check.
+
+
+### Regression coverage audit — 2026-11-26
+
+Current `tests/nsf_archive_tests.cpp` contains synthetic checks for a narrow compressed delta width being expanded to width 7, a coordinate edit to 255, save-time rebasing, special-vertex serialization, and preservation of an unencodable working pose. `tests/real_sample_compatibility_tests.cpp` compares decoded hashes/Model topology for real `El1eG/El1eV` and `Cr10G/Cr10V`, and exercises an uncompressed `BT10V` edit; it does not currently perform a real compressed Cr10/El1e edit that forces Model-width expansion and then save/reopen.
+
+Therefore, the current tests support the general encoder/decoder mechanism but do not establish that the fallback succeeds for a real shared Model with multiple linked Animations or that the exact user-reported chunk prompt path is correct. Next regression should use the private retail sample, capture the actual ModelPosition records and first rejected delta, and test the complete edited pose through width expansion, all linked Animation payload rebuilds, save/reopen, and (separately) in-game.
