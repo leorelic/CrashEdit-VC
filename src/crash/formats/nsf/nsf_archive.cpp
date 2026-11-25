@@ -897,7 +897,9 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     const std::size_t frameVertexIndex=frame.specialVertexCount+pi;
+     // CrashEdit-RE decodes compressed Model positions into frame vertices starting at index 0.
+     // SpecialVertexCount advances the temporal bit cursor, not the destination vertex index.
+     const std::size_t frameVertexIndex=pi;
      if(frameVertexIndex>=frame.vertices.size()){e="Compressed model position index exceeds the linked animation frame.";return false;}
      const auto&target=frame.vertices[frameVertexIndex];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
