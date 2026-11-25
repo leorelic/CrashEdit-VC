@@ -330,11 +330,11 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive specialCompressedArchive;assert(specialCompressedArchive.loadBytes(specialCompressedBytes,e));specialCompressedArchive.decodeAnimationModels(false);
  const auto&specialFrame=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0];
  assert(specialFrame.verticesDecoded&&specialFrame.specialVertexCount==1&&specialFrame.vertices.size()==3);
- // Special vertices occupy only the frame header. The compressed temporal
- // bitstream starts after that header and contains the two model positions.
- assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
- // RE consumes compressed temporal bits directly after the 24-bit special prefix.
- assert(specialFrame.vertices[1].x==10&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
+ // The temporal cursor skips the 24-bit special-vertex prefix, but the
+ // reference decoder maps compressed positions from vertex index zero,
+ // overwriting the initially read special vertex.
+ assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==0&&specialFrame.vertices[0].z==0);
+ assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
  const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
