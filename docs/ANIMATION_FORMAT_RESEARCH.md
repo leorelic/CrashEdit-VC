@@ -148,3 +148,41 @@ The existing `MODEL_EDITOR_ROADMAP.md` also contains the Model-entry research an
 ## Correction to earlier save-path notes (2026-11-26)
 
 Earlier entries in this document and `RESEARCH_NOTES.md` incorrectly recommended restoring raw special XYZ bytes after temporal-word serialization. That recommendation was wrong for the verified CrashEdit-RE behavior. The temporal stream intentionally aliases the prefix; serializing temporal words last clobbers stale raw XYZ, and restoring those bytes afterward clobbers compressed deltas. The current implementation keeps the temporal serialization authoritative, checks the re-decoded pose, and refreshes cache data from the serialized bytes. Do not revive the old restore-after-serialization patch.
+
+
+## Source trace: frame prefix, compressed-coordinate limits, and chunk prompt (2026-11-26)
+
+**Source-confirmed:** compared CrashEdit-RE `airumu/CrashEdit` branch `t/net9` (`Frame.cs`, `ModelPosition.cs`) with the current native implementation (`src/crash/formats/nsf/nsf_archive.cpp`, `src/ui/editor_ui.cpp`). This is a code-path explanation; the exact user's failing frame/vertex/axis still needs a controlled sample trace.
+
+### Frame layout and boundary
+
+- For Crash 2, the fixed frame header is 24 bytes; each collision record is 0x28 bytes. `fakeHeader = 24 + collisionCount * 0x28`.
+- `HeaderSize` is validated against `fakeHeader` and the frame item size. The special-vertex prefix is `(HeaderSize - fakeHeader) / 3` vertices; its byte count must be divisible by 3.
+- The temporal words are read from `fakeHeader` to the end of the frame item, **not from HeaderSize**. Therefore the special-vertex raw bytes and temporal-word stream alias the same payload prefix. Do not treat `HeaderSize` as a separate temporal-data start or restore stale raw prefix bytes after temporal serialization.
+- The frame item’s own byte length and 32-bit temporal alignment are separate from the NSF chunk’s 64 KiB capacity.
+
+### Coordinate representation
+
+- Crash 2 decoded local XYZ components are unsigned bytes, 0–255. Frame offsets are signed 16-bit values; the renderer adds the frame offset (divided by 4) and then applies linked Model scale.
+- Compressed ModelPosition records provide per-axis bases and delta widths. Width 7 is the full signed-byte delta width and also resets that axis accumulator. The decoder accumulates each axis modulo 256.
+- Native encoder `encodeAnimationFrameVertex` rejects local values outside 0–255. For compressed positions it computes a shortest modulo-256 signed delta and verifies that delta against each record’s width. A narrow width can reject a target even when the target itself is a valid byte coordinate.
+- Save-time Crash 2 rebasing can shift a whole frame into the 0–255 local byte range while adjusting signed-16-bit frame offsets, provided each axis span is at most 255 and the adjusted offsets remain representable. A pose spanning more than 255 local units on an axis cannot be represented by one byte-coordinate frame.
+
+### Why the chunk prompt can appear
+
+- When a compressed edit cannot be encoded with the Model’s current widths, `commitAnimationEdits` calls `expandCompressedModelPositions`.
+- That fallback changes every compressed position’s X/Y/Z widths to 7 and rebuilds all Animation entries/frames that share the Model, because the Model position table is shared. The enlarged temporal payloads may be substantially larger.
+- If rebuilding one affected Animation entry does not fit its existing NSF chunk, the expansion returns an error containing that chunk/entry. `EditorUI::saveFiles` converts this specific payload-capacity error into the “move Animation entry to a new chunk” prompt.
+- Thus the prompt is a downstream **archive-capacity failure during compressed-Model expansion**, not a coordinate-space limit. Relocation can provide room, but it cannot by itself resolve a frame whose axis span exceeds 255, an offset overflow, a malformed special-prefix layout, or an encoding mismatch.
+- The expansion is performed on a candidate archive during save, so a failed commit preserves the working pose and does not commit the partial Model-width changes.
+
+### Next controlled trace (no speculative patch)
+
+For the exact blocked edit, capture: game/version; animation EID, chunk/entry and frame index; linked Model EID and its chunk/entry; selected vertex and axis; current/requested local coordinate; frame offsets; `HeaderSize`, collision count, special count; ModelPosition base and X/Z/Y widths/reset bits for every compressed record up to the edited vertex; frame byte size and current chunk used-end. Then distinguish these outcomes:
+
+1. **Encoder-width rejection:** requested byte coordinate is valid, but the current delta width rejects it; verify width-7 fallback reconstructs the entire edited pose.
+2. **Frame-space rejection:** local frame span exceeds 255 or required rebased offsets exceed signed 16-bit; no chunk move can fix this.
+3. **Payload capacity:** width expansion is valid but one or more shared Animation entries cannot fit their current chunk; identify the exact entry named by the capacity error and relocate only that proven entry, then retry.
+4. **Boundary/index mismatch:** special-prefix count, compressed-position count, vertex index, or temporal cursor differs from the reference; compare exact bit/byte offsets before changing code.
+
+Keep the `ff5359a` preview/save checkpoint intact. Do not change the encoder until the failing sample produces one of these exact, logged outcomes and the relevant source/sample parity check.
