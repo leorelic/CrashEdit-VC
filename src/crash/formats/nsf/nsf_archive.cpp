@@ -392,10 +392,13 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  // Crash 2 compressed deltas are bit-packed in the frame's byte order. The
  // temporal words are read as little-endian integers, so reverse each word's
  // byte lanes (without reversing bits within a byte) before decoding them.
- std::vector<std::uint8_t> compressedBits;compressedBits.reserve(bits.size());
- for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-  for(std::size_t byte=0;byte<4U;++byte)
-   for(std::size_t bit=0;bit<8U;++bit)compressedBits.push_back(bits[base+(3U-byte)*8U+bit]);
+ std::vector<std::uint8_t> compressedBits=bits;
+ if(frame.specialVertexCount!=0U){
+  compressedBits.assign(bits.size(),0U);
+  for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+   for(std::size_t byte=0;byte<4U;++byte)
+    for(std::size_t bit=0;bit<8U;++bit)compressedBits[base+byte*8U+bit]=bits[base+(3U-byte)*8U+bit];
+ }
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
