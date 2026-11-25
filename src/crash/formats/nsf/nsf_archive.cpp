@@ -411,7 +411,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    zAcc=(zAcc+dz+p.z)&0xff;
    // Special vertices occupy the leading frame slots and are stored in the
    // frame header; compressed positions begin immediately after that prefix.
-   frame.vertices[frame.specialVertexCount+i]={xAcc,yAcc,zAcc};
+   frame.vertices[i]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
