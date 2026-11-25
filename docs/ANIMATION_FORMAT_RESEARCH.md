@@ -82,9 +82,9 @@ When diagnosing a model that appears flat, skewed, tiny, or partly missing, insp
 
 ## Known investigation mistake to avoid
 
-Recent native patches and research notes incorrectly inferred that compressed Model positions must be written after the special-vertex prefix. The cited CrashEdit-RE `Frame.MakeVertices()` source writes them at `verts[i]` starting from zero; `AnimationRenderer` separately adds `frame.SpecialVertexCount` when indexing triangles. Also, `Frame.SaveC2()` serializes the temporal words over the overlapping prefix bytes and does not restore those bytes afterward. Restoring direct XYZ bytes after temporal-word serialization overwrites compressed delta bits and breaks save/reload. Keep the corrected source-based synthetic test and exact pose round-trip assertion; do not assert that the overlapping raw bytes remain unchanged after compressed editing.
+The compressed Model position destination and special-prefix save behavior were previously misdiagnosed. CrashEdit-RE `Frame.MakeVertices()` writes compressed positions to `verts[i]` starting at zero; `SpecialVertexCount` controls the temporal cursor and renderer triangle-index offset. `Frame.SaveC2()` serializes temporal words over the overlapping prefix and does not restore old raw XYZ bytes afterward.
 
-The user has reported that some models/animations render correctly while others (including Cr10V / Cr10G-linked models) do not. This remains an open visual compatibility defect. Do not call it fixed based solely on CI.
+Do **not** restore stale special-vertex bytes after temporal serialization: that overwrites compressed delta bits. The native save path now verifies the re-decoded pose and refreshes its special-vertex cache from the bytes actually serialized. This behavior is source-aligned and regression-tested. See the 2026-11-26 milestone and the correction in `RESEARCH_NOTES.md`.
 
 ## Roadmap and acceptance gates
 
@@ -124,17 +124,11 @@ Do not declare an animation-decoding milestone until:
 
 ## Current state
 
-- User-confirmed uncompressed save milestone: see `docs/MILESTONES.md`, 2026-11-23 checkpoint `4b6592852d761d742358313b0250add7112e411e`.
-- Compressed/special-vertex visual correctness: **open**.
-- Recent compressed bit-order changes and tests require reconciliation with the RE behavior above before being treated as stable.
-- Next action: inspect current native decode/renderer against this specification and compare the actual Snow Go frame data; do not start another speculative byte-order patch.
-
-## Verified save-path pitfall: special prefix aliases temporal bytes
-
-The special vertex prefix and temporal words overlap at the same frame-relative offset. When writing updated temporal words, those writes can overwrite the raw special-vertex bytes even though the compressed delta cursor starts after the special prefix. Preserve the edited special prefix explicitly after temporal-word serialization, then re-decode the frame.
-
-Regression: `nsf_archive_tests` edits a special vertex and a compressed model vertex, saves/reloads, and checks both coordinates. CI exposed this ordering bug at the special vertex reload assertion. Fix commit: `d6beb80a9a975a3e8faa2082e6e1b06732275898`. This is code-level round-trip evidence; it does not establish the Cr10V/Cr10G visual issue as resolved.
-
+- User-confirmed preview milestone: latest build looks correct again; checkpoint `ff5359af45779fcd29b3827a563215b433cef1ac`. The user is continuing testing.
+- Native tests and private real-sample validation passed for the latest patch sequence, including compressed `Cr10G/Cr10V` and `El1eG/El1eV` sample data.
+- Windows and Ubuntu CI passed for the checkpoint; macOS was queued at last status check. Verify current workflow status before claiming the entire matrix is green.
+- Original-game save/load and broad compatibility remain open until user reports those results.
+- Preserve exact-pose verification and do not reintroduce raw special-prefix restoration after temporal-word serialization.
 
 ## Relationship to the existing project research log
 
@@ -151,8 +145,6 @@ Keep that evidence intact. The current visual defect does not invalidate those s
 The existing `MODEL_EDITOR_ROADMAP.md` also contains the Model-entry research and planned validation. Update that roadmap when a finding affects Model topology, texture/material resolution, or Model serialization; update this document for frame/temporal decoding; and update `RESEARCH_NOTES.md` for cross-subsystem findings or milestone evidence. Cross-link rather than copy long sections.
 
 
-## Verified compressed-expansion write-order regression (2026-11-25)
+## Correction to earlier save-path notes (2026-11-26)
 
-CI caught a save/reload regression at tests/nsf_archive_tests.cpp:346: the edited special vertex did not survive expansion of a compressed Model position table. In expandCompressedModelPositions(), the code copied special XYZ bytes into the payload, encoded the compressed temporal bit array, then serialized temporal words over the same payload bytes. Because the special prefix intentionally aliases the first temporal bytes, this final serialization clobbered the special vertex.
-
-Correct order: serialize all temporal words first, then restore each special vertex's raw XYZ bytes at fakeHeader + vi*3. This is not a compressed bit-order conversion; it preserves the format's overlapping raw prefix. Regression coverage edits both a special vertex and a compressed Model vertex, saves, reloads, and checks the special XYZ values. Patch: a4d6228 (2026-11-25). CI must pass on all platforms before treating the save-path fix as verified.
+Earlier entries in this document and `RESEARCH_NOTES.md` incorrectly recommended restoring raw special XYZ bytes after temporal-word serialization. That recommendation was wrong for the verified CrashEdit-RE behavior. The temporal stream intentionally aliases the prefix; serializing temporal words last clobbers stale raw XYZ, and restoring those bytes afterward clobbers compressed deltas. The current implementation keeps the temporal serialization authoritative, checks the re-decoded pose, and refreshes cache data from the serialized bytes. Do not revive the old restore-after-serialization patch.
