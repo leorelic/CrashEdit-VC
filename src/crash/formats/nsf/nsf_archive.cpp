@@ -392,15 +392,6 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
-  // Only frames with special vertices have a header prefix sharing the
-  // first temporal word. Ordinary compressed frames retain native word order.
-  if(frame.specialVertexCount!=0U){
-   std::vector<std::uint8_t> reordered(bits.size());
-   for(std::size_t base=0;base+32U<=bits.size();base+=32U)
-    for(std::size_t byte=0;byte<4U;++byte)
-     for(std::size_t b=0;b<8U;++b)reordered[base+24U-byte*8U+b]=bits[base+byte*8U+b];
-   bits.swap(reordered);
-  }
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
    if(bit>=bits.size())return false;
@@ -417,7 +408,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    zAcc=(zAcc+dz+p.z)&0xff;
    // Special vertices occupy the leading frame slots and are stored in the
    // frame header; compressed positions begin immediately after that prefix.
-   frame.vertices[frame.specialVertexCount+i]={xAcc,yAcc,zAcc};
+   frame.vertices[i]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
