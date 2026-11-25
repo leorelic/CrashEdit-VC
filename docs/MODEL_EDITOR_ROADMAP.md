@@ -400,6 +400,10 @@ This remains intentionally last, after the editing and Scenery/Geometry prioriti
 Existing navigation and editing shortcuts remain unchanged: W/A/S/D, Shift-modified movement, Q/E, R, mouse orbit/pan, wheel zoom, playback, selection, transforms, face editing, collision tools and bone tools.
 
 
-## Animation preview milestone update — 2026-11-26
+## Animation recovery checkpoint and unresolved coordinate limit — 2026-11-26
 
-The user reports that the latest compressed/special-vertex animation preview looks correct again at [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac), and will continue testing. The latest native regression and private sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV` resources. This supports the Model-to-Animation linkage and compressed position path but does not yet establish universal model/render compatibility or original-game save/load. Keep those acceptance items open and follow [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) for the corrected temporal-prefix save behavior.
+Checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac): user-confirmed preview looks correct again and saving works. This is a known-good recovery baseline, not resolution of the original Animation vertex transform issue.
+
+The remaining defect: some vertices cannot move beyond a particular X/Y/Z gizmo location. The editor incorrectly offers moving the Animation entry to a new NSF chunk, but the edit still does not apply. Investigate frame boundaries and actual coordinate/encoding limits, comparing gizmo bounds with frame metadata, encoder representability, and save validation. Do not use chunk relocation as a workaround without evidence of chunk-capacity exhaustion.
+
+Acceptance: reproduce and record the exact frame, vertex, axis, current/requested coordinate, and rejection reason; move past the former limit; confirm the edit applies and survives save/reopen; test original-game behavior separately. Keep exact-pose checks and never silently clamp, wrap, or discard edits. See [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
