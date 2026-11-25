@@ -1,25 +1,29 @@
 # CrashEdit-VC milestones
 
-> Active investigation: compressed/special-vertex animation rendering remains unresolved. Before continuing, read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md), which records the RE source findings, decoding order, known pitfalls, and acceptance roadmap. Do not declare a new animation milestone until its sample and in-game acceptance gates are met.
+> Active investigation: animation vertex transform limits remain unresolved. Read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md) before changing frame boundaries, coordinate limits, or chunk-expansion behavior.
 
 This file records verified project checkpoints and the remaining acceptance work at each milestone. A checkpoint is a known-good rollback/reference point, not a claim that the entire editor or every game-data variant is complete.
 
-## 2026-11-26 — Compressed animation rendering and save/reload milestone
+## 2026-11-26 — Animation preview/save recovery checkpoint
 
 **Checkpoint:** [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac)
 
-**User-confirmed progress**
-- User reports the latest animation preview looks correct again after the compressed/special-vertex fixes.
-- The save path no longer restores stale special-vertex XYZ bytes over the serialized temporal stream. The overlapping prefix is treated consistently with CrashEdit-RE's temporal serialization behavior.
-- Compressed frame save verifies the re-decoded pose; the special-vertex cache is refreshed from the bytes actually serialized.
-- The current native regression suite and private real-sample validation passed for the latest patch sequence, including representative `Cr10G/Cr10V` and `El1eG/El1eV` data.
-- Windows and Ubuntu CI jobs passed on the checkpoint. The macOS job was still queued at last status check; do not call the full platform matrix green until it completes.
+**Confirmed status**
+- User reports the animation preview looks correct again.
+- User subsequently confirmed that saving works.
+- This is a stable recovery/reference checkpoint, **not a fix for the original vertex-transform limitation**.
+- Code-level native regression and private real-sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV` data. These tests do not substitute for user testing in the editor or original game.
 
-**Scope and remaining validation**
-- This is a user-confirmed preview milestone, not a declaration that every animation or model layout is compatible.
-- User will continue testing. Keep original-game save/load and broader animation coverage open until those tests are reported.
-- Recheck latest CI status before using the checkpoint as a fully validated release baseline.
-- Keep the exact-pose save assertion; do not silently accept lossy compressed edits.
+**Original issue still open**
+- Certain vertices cannot be moved beyond a particular X/Y/Z gizmo location.
+- The editor incorrectly prompts to move the Animation entry into a new NSF chunk, but the requested vertex edit still is not applied after that operation.
+- The working hypothesis to investigate is a mismatch between frame coordinate/encoding limits, gizmo transform bounds, and the save/validation path—not NSF chunk capacity. Do not treat chunk relocation as a solution unless evidence shows the entry itself cannot fit in its chunk.
+- Research Animation frame boundaries and coordinate limits from CrashEdit-RE source, real frames, and controlled edits. Identify the exact rejected coordinate and reason before changing bounds.
+
+**Guardrails**
+- Preserve `ff5359a` as the current known-good preview/save baseline while investigating.
+- Do not claim the coordinate-limit issue is fixed until a vertex can be moved past the previously blocked location, the edit is applied, saved, reopened, and tested in-game as applicable.
+- Do not silently clamp, wrap, drop, or redirect the requested edit.
 
 ## 2026-11-23 — Animation vertex save reliability
 
