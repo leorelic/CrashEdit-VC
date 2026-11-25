@@ -389,14 +389,21 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
  }
  std::vector<std::uint8_t> bits;bits.reserve(frame.temporalWords.size()*32U);
  for(const auto word:frame.temporalWords)for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));
+ // Crash 2 compressed deltas are bit-packed in the frame's byte order. The
+ // temporal words are read as little-endian integers, so reverse each word's
+ // byte lanes (without reversing bits within a byte) before decoding them.
+ std::vector<std::uint8_t> compressedBits;compressedBits.reserve(bits.size());
+ for(std::size_t base=0;base+32U<=bits.size();base+=32U)
+  for(std::size_t byte=0;byte<4U;++byte)
+   for(std::size_t bit=0;bit<8U;++bit)compressedBits.push_back(bits[base+(3U-byte)*8U+bit]);
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->decoded&&model->compressed){
   if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return fail("Model compressed-position count and frame special-vertex count do not match the frame vertex count.");
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto readSigned=[&](std::uint8_t width,std::int32_t&value)->bool{
-   if(bit>=bits.size())return false;
-   const bool negative=bits[bit++]!=0;value=negative?-(1<<width):0;
-   for(unsigned b=0;b<width;++b){if(bit>=bits.size())return false;value|=static_cast<std::int32_t>(bits[bit++])<<(width-1U-b);}
+   if(bit>=compressedBits.size())return false;
+   const bool negative=compressedBits[bit++]!=0;value=negative?-(1<<width):0;
+   for(unsigned b=0;b<width;++b){if(bit>=compressedBits.size())return false;value|=static_cast<std::int32_t>(compressedBits[bit++])<<(width-1U-b);}
    return true;
   };
   for(std::size_t i=0;i<model->positions.size();++i){
