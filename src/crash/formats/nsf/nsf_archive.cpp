@@ -1509,6 +1509,16 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   const std::size_t offset=temporalOffset+wordIndex*4U;if(!has(chunk.bytes,offset,4U))return false;
   for(unsigned byte=0;byte<4U;++byte)chunk.bytes[offset+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
  }
+ // The special-vertex bytes are a raw view into the temporal-word payload.
+ // Refresh their cache from the bytes we actually serialized; do not restore
+ // the old XYZ values, which would overwrite compressed delta bits.
+ if(frame.specialVertices.size()<frame.specialVertexCount)return false;
+ for(std::size_t vi=0;vi<frame.specialVertexCount;++vi)
+  for(std::size_t axisIndex=0;axisIndex<3U;++axisIndex){
+   const std::size_t offset=temporalOffset+vi*3U+axisIndex;
+   if(!has(chunk.bytes,offset,1U))return false;
+   frame.specialVertices[vi][axisIndex]=chunk.bytes[offset];
+  }
  return decodeAnimationVertices(frame,model,crash3);
 }
 

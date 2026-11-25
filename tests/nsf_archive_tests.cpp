@@ -340,7 +340,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
  assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
- std::vector<std::uint8_t> specialSaved;if(!specialCompressedArchive.saveUncompressedBytes(specialSaved,e)){std::fprintf(stderr,"special compressed save failed: %s\\n",e.c_str());std::abort();}
+ NsfArchive specialCommitted=specialCompressedArchive;
+ assert(specialCommitted.commitAnimationEdits(e));
+ const auto&committedSpecialFrame=specialCommitted.chunks()[1].entries[0].animation.frames[0];
+ for(std::size_t axis=0;axis<3U;++axis)
+  assert(committedSpecialFrame.specialVertices[0][axis]==specialCommitted.chunks()[1].bytes[scaFrame+24U+axis]);
+ std::vector<std::uint8_t> specialSaved;assert(specialCommitted.saveUncompressedSourceBytes(specialSaved,e));
  NsfArchive specialReload;assert(specialReload.loadBytes(specialSaved,e));specialReload.decodeAnimationModels(false);
  const auto&specialReloaded=specialReload.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
