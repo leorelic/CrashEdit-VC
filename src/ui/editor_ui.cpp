@@ -3086,8 +3086,9 @@ void EditorUI::drawAnimationFrameEditor(){
    for(std::size_t axis=0;axis<3U;++axis){
     ImGui::PushID(static_cast<int>(axis));
     ImGui::TextUnformatted(axisLabels[axis]);
+    char selectedCoordinateId[64];std::snprintf(selectedCoordinateId,sizeof(selectedCoordinateId),"##SelectedVertexCoordinate_%zu_%zu_%zu_%zu",chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),axis);
     ImGui::SetNextItemWidth(vertexFieldWidth);
-    if(ImGui::InputInt("##VertexCoordinate",&vertexValues[axis])){
+    if(ImGui::InputInt(selectedCoordinateId,&vertexValues[axis])){
      const std::int64_t delta=static_cast<std::int64_t>(vertexValues[axis])-selectedCoordinate[axis];
      std::vector<std::size_t> indices;
      std::vector<Crash::NsfAnimationVertex> targets;
