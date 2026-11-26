@@ -3917,7 +3917,6 @@ void EditorUI::drawAnimationViewer(){
    const auto&p=displayPositions[vertexIndex];const CameraPoint point=toCamera(p.x,p.y,p.z);if(point.depth<=0.1f)return false;
    if(!model||!model->polygonsDecoded||model->triangles.empty())return true;
    const ImVec2 sample=projectCamera(point);float nearestSurface=std::numeric_limits<float>::max();
-   const int triangleOffset=0;
    for(const auto&tri:model->triangles){
     const int ia=tri.a,ib=tri.b,ic=tri.c;
     if(ia<0||ib<0||ic<0||static_cast<std::size_t>(ia)>=displayPositions.size()||static_cast<std::size_t>(ib)>=displayPositions.size()||static_cast<std::size_t>(ic)>=displayPositions.size())continue;
