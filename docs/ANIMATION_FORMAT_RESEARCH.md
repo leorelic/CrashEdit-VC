@@ -259,3 +259,14 @@ Current native `setAnimationFrameVertex()` sets `verticesEdited=true` even when 
 There is also a concrete source asymmetry to investigate: native `decodeAnimationVertices()` was deliberately restored to the RE-compatible baseline that writes compressed ModelPosition record `i` to `frame.vertices[i]`, while native `encodeAnimationFrameVertex()` currently sources record `i` from `frame.vertices[i + specialVertexCount]`. RE's `Frame.MakeVertices()` confirms the former decode destination. Native `commitAnimationEdits()` verifies the post-encode decoded pose against the desired pose, so this mismatch is a plausible cause of no-op save rejection. This is not yet declared the proven runtime cause; add focused Cr10V no-op and edit-then-restore tests first.
 
 **Next:** establish no-op and restore-to-original save regressions; trace first/last compressed positions and special-prefix boundary indices; compare each temporal bit against RE; then evaluate converting the linked Model + Animation to an uncompressed pair before editing. Keep the confirmed renderer/preview mapping untouched.
+
+
+## Editor terminology: Normal and Complex
+
+The 3D Animation Editor displays an **Animation Type** label based on the linked Model for the currently displayed frame:
+
+- **Normal** = linked Model is uncompressed (`NsfModel::compressed == false`).
+- **Complex** = linked Model is compressed (`NsfModel::compressed == true`).
+- **Unknown** = linked Model cannot be resolved; do not infer a type.
+
+The displayed frame's Model reference is selected using the existing Crash 2 `modelEid` / Crash 3 `linkedModelEid` logic. The label therefore follows frame playback. This terminology deliberately does not use `specialVertexCount`: special vertices are a separate frame-layout concept and must not be conflated with compressed Model positions.
