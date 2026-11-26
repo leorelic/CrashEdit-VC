@@ -410,7 +410,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
    // CrashEdit-RE's Frame.MakeVertices() writes compressed positions to verts[i].
-   frame.vertices[i]={xAcc,yAcc,zAcc};
+   frame.vertices[i+frame.specialVertexCount]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
@@ -975,8 +975,8 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     // CrashEdit-RE's Frame.MakeVertices() writes compressed positions to verts[pi].
-     const std::size_t frameVertexIndex=pi;
+     // Compressed Model vertices follow the special-vertex prefix in the editor's unified pose.
+     const std::size_t frameVertexIndex=pi+frame.specialVertexCount;
      if(frameVertexIndex>=frame.vertices.size()){e="Compressed model position index exceeds the linked animation frame.";return false;}
      const auto&target=frame.vertices[frameVertexIndex];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
@@ -1597,11 +1597,12 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t i=0;i<model->positions.size();++i){
    const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
    std::int32_t targetX=0,targetY=0,targetZ=0;
-   // Match the fallback decoder: compressed positions are written from
-   // vertex index zero, even though the temporal cursor skips the header prefix.
-   if(i>=frame.vertices.size())return false;
-   const auto&source=frame.vertices[i];
-   if(!toByte(i==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(i==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(i==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
+   // The editor stores special vertices at the front of the unified pose array.
+   // ModelPosition i therefore maps to frame vertex i + specialVertexCount.
+   const std::size_t frameVertexIndex=i+frame.specialVertexCount;
+   if(frameVertexIndex>=frame.vertices.size())return false;
+   const auto&source=frame.vertices[frameVertexIndex];
+   if(!toByte(frameVertexIndex==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(frameVertexIndex==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(frameVertexIndex==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
    const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    const std::int32_t baseZ=(zAcc+p.z)&0xff;
    const std::int32_t baseY=(yAcc+p.y)&0xff;
