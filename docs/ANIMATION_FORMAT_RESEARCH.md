@@ -58,9 +58,7 @@ RE's compressed frame decoder:
 3. Resets an axis accumulator to zero when that axis width is 7.
 4. Reads signed delta fields in **X, Z, Y** order. Each field is one sign bit followed by the configured number of magnitude bits, sign-extended.
 5. Adds the Model base (X base is shifted left by one; Z and Y are not) and delta to the corresponding accumulator, then wraps each accumulator to 8 bits.
-6. Writes decoded compressed positions to `verts[i]`, starting at frame vertex index zero, exactly as `Frame.MakeVertices()` does in CrashEdit-RE. This is intentionally distinct from the renderer's triangle index, which adds `SpecialVertexCount`. The special XYZ records remain in the raw frame header; do not shift compressed decoder destinations by the special count.
-
-The renderer uses the compressed Model's reconstructed triangle indices with an added `specialVertexCount` vertex-index offset. This is distinct from `Frame.MakeVertices()`, which writes compressed Model positions beginning at output index zero. Preserve this source behavior: the renderer offset does not imply that the decoder or expansion routine should write to `specialVertexCount + modelPositionIndex`.
+6. CrashEdit-RE's `Frame.MakeVertices()` writes compressed positions to its model-local `verts[i]` list. The native editor uses a unified `frame.vertices` array: special vertices occupy indices `0..specialVertexCount-1`, and the renderer adds `specialVertexCount` to Model-local triangle indices. The native port must translate model-local compressed position `i` to unified frame index `i + specialVertexCount` in its decoder, encoder, and expansion routine. Do not copy the RE-local array index directly into the native unified array.
 
 ## Uncompressed frame bit order (RE source-confirmed)
 
@@ -82,7 +80,7 @@ When diagnosing a model that appears flat, skewed, tiny, or partly missing, insp
 
 ## Known investigation mistake to avoid
 
-The 2026-11-26 width-expansion diagnosis incorrectly claimed that compressed Model position `pi` should be mapped to frame vertex `specialVertexCount + pi`. CrashEdit-RE `Frame.MakeVertices()` explicitly writes to `verts[i]`; the renderer's `+ SpecialVertexCount` is a separate topology indexing operation. The native expansion must therefore encode `frame.vertices[pi]`, not a shifted vertex. A test failure exposed that mistaken change; the code and regression were corrected to match RE. Do not treat the failed hypothesis as a confirmed format defect.
+The earlier conclusion that native compressed Model position `pi` should map to `frame.vertices[pi]` incorrectly treated CrashEdit-RE's model-local `verts` list as the native unified frame array. Native `frame.vertices` already stores the special prefix at indices `0..specialVertexCount-1`, and native triangle indices add that prefix. Therefore the native decoder, encoder, and width-expansion rebuild must map ModelPosition `pi` to `frame.vertices[specialVertexCount + pi]`. The previous unshifted tests reinforced the wrong port mapping and left the final specialVertexCount frame vertices unencoded. This correction is based on the native representation and renderer indexing, not a claim that RE's model-local list itself is shifted.
 
 The separate temporal-prefix serialization finding remains: temporal words overlap the special-prefix bytes, and restoring stale raw XYZ after temporal serialization overwrites compressed delta bits. Keep serialized temporal bytes authoritative and verify the re-decoded pose.
 
@@ -217,3 +215,10 @@ The first pending-pose preservation implementation matched entries by EID and fr
 The restoration now keys each pending pose by its original chunk index, entry index, and frame index. When the selected entry is removed from its source chunk, entries after it are mapped to their shifted index; the selected entry maps to entry 0 of the newly appended destination chunk. A synthetic regression uses duplicate EIDs for the moved and retained entries and checks both distinct poses through save/reload.
 
 The latest UI change also gives each special-vertex coordinate input a row-and-axis ID with a hidden label, avoiding reliance on repeated visible X/Y/Z labels. CI and the user's actual Cr10V workflow still need validation.
+
+
+### Native unified-frame indexing and shared Model isolation — 2026-11-26
+
+A real Cr10V frame has 309 unified editor vertices and 4 special vertices, leaving 305 compressed Model positions. The native decoder had written those 305 model-local positions into unified indices 0–304, overwriting the special prefix and leaving unified indices 305–308 untouched. The renderer maps Model-local triangle index i to unified frame index i + specialVertexCount. Thus the final four unified vertices could be selected and edited in the viewport but were never sourced from or written to the compressed Model stream. The decoder, encoder, and expansion writer now use the same prefix offset; tests were updated to assert special and compressed vertices occupy their proper unified slots.
+
+A second save issue is shared Model mutation: widening a ModelPosition table changes the decode contract for every Animation referencing that Model. Rebuilding all linked entries can overflow unrelated chunks and cause repeated relocation prompts. The current patch uses a non-mutating encode probe to determine whether an edited Animation's current widths reject its pose; only then does it clone the compressed Model into a new type-0 chunk with an unused EID and redirect that Animation's frames to the clone before width expansion. This keeps other Animations on the original Model. Synthetic shared-model save/reload regression and CI are pending; actual Cr10V testing remains the acceptance gate.
