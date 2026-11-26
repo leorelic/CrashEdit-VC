@@ -3285,6 +3285,11 @@ void EditorUI::drawAnimationViewer(){
  ImGui::SameLine();
  if(Crash::isValidEid(linkedModelEid))ImGui::TextDisabled("Selected Model EID: %s",Crash::eidToEName(linkedModelEid).c_str());
  else ImGui::TextDisabled("Selected Model EID: %08X",linkedModelEid);
+ ImGui::SameLine();
+ // Animation format classification follows the linked Model position encoding.
+ // specialVertexCount is a separate frame-layout property and is not this type.
+ if(model)ImGui::TextColored(model->compressed?ImVec4(0.95f,0.72f,0.28f,1.0f):ImVec4(0.45f,0.82f,0.58f,1.0f),"Animation Type: %s",model->compressed?"Complex":"Normal");
+ else ImGui::TextDisabled("Animation Type: Unknown (linked Model unavailable)");
  {
   ImGui::SameLine();
   std::string currentAnimationLabel="No linked animation";
