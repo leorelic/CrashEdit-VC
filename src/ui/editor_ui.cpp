@@ -4392,7 +4392,7 @@ void EditorUI::drawAnimationViewer(){
        std::vector<Vertex> faceEdges;faceEdges.reserve(model->triangles.size()*6U);
        auto edgeChannel=[](ImU32 value,int shift){return float((value>>shift)&255U)/255.0f;};
        for(std::size_t ti=0;ti<model->triangles.size();++ti){
-        const auto&tri=model->triangles[ti];const int ids[3]={tri.a,tri.b,tri.c};
+        const auto&tri=model->triangles[ti];const int offset=static_cast<int>(frame.specialVertexCount);const int ids[3]={tri.a+offset,tri.b+offset,tri.c+offset};
         const ImU32 color=static_cast<int>(ti)==animationSelectedFace_?IM_COL32(255,185,55,255):(static_cast<int>(ti)==animationHoveredFace_?IM_COL32(255,75,75,255):IM_COL32(90,175,245,225));
         for(int edge=0;edge<3;++edge){
          const int ia=ids[edge],ib=ids[(edge+1)%3];
