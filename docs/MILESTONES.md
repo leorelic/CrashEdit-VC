@@ -153,3 +153,10 @@ Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/
 - Acceptance: requested coordinates persist, the pose is exact after reload, no unrelated Animation entry is relocated, and the UI remains free of the ID warning.
 
 Preserve `ff5359a` as the known-good preview/save baseline while investigating.
+
+
+### CI follow-up — shared Model clone assertion — 2026-11-26
+
+Run [45889595019](https://github.com/leorelic/CrashEdit-VC/actions/runs/45889595019) built successfully on all platforms but failed the same `nsf_archive_tests.cpp:443` assertion on macOS, Windows, and Ubuntu. The test expected the original shared Model to be widened in place, while the intended fix now clones the Model and widens only the edited Animation's clone. Updated regression in `c2f0da5` checks original Model width remains 1, edited Animation points to a different Model EID, pose remains X=200 after save/reload, and the linked clone has width 7.
+
+Docs/research memo recorded in `a8602ec`. CI for the corrected assertion is pending. No user-side Cr10V acceptance test has passed yet; retain this as an active issue, not a completed milestone.
