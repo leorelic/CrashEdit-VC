@@ -536,3 +536,10 @@ No claim is made that free vertex editing is fixed. This correction is about res
 
 
 Renderer audit follow-up: the prior renderer restoration missed the face-edge overlay loop, which still used raw Model triangle indices. That loop now also applies `specialVertexCount` before indexing the frame pose (`8ccb5cd`). This was an independent overlay/picking inconsistency; the primary surface-preview regression was the shifted decoder destination, now restored to the `ff5359a` baseline. Keep all renderer consumers on the same baseline offset until the edit/save mapping is proven.
+
+
+### Special-prefix edit/save mismatch is now an explicit regression — 2026-11-27
+
+With the baseline decoder restored, the synthetic special-prefix edit case no longer pretends to prove a successful save. It edits a special vertex and a compressed Model vertex in the working pose, then verifies that `commitAnimationEdits()` rejects the lossy round trip and leaves the original working pose intact. The previous shifted-index save/reload assertions were removed because they depended on the decoder mapping that broke Cr10V preview.
+
+Source trace: baseline `decodeAnimationVertices()` writes compressed position `i` to `frame.vertices[i]`; renderer Model triangle lookup uses `triangleIndex + specialVertexCount`; `encodeAnimationFrameVertex()` addresses ModelPosition `i` from the editable frame slot `i + specialVertexCount`. This asymmetry is a concrete candidate for the edit/save mismatch, and it must be resolved with a per-vertex trace against CrashEdit-RE and Cr10V rather than by changing preview decoding again. A vertex coordinate above X=80 is not itself outside Crash 2's byte range; inspect that ModelPosition's axis width, encoded base, previous accumulator, and requested signed delta.
