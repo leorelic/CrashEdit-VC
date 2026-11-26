@@ -270,3 +270,16 @@ The 3D Animation Editor displays an **Animation Type** label based on the linked
 - **Unknown** = linked Model cannot be resolved; do not infer a type.
 
 The displayed frame's Model reference is selected using the existing Crash 2 `modelEid` / Crash 3 `linkedModelEid` logic. The label therefore follows frame playback. This terminology deliberately does not use `specialVertexCount`: special vertices are a separate frame-layout concept and must not be conflated with compressed Model positions.
+
+
+## User-tested editor terminology: Normal / Complex — 2026-11-27
+
+The 3D Animation Editor displays **Animation Type** from the linked Model's compressed-position representation:
+
+- **Normal**: linked Model is uncompressed (`NsfModel::compressed == false`). User-confirmed sample: `BT10V` / `BT10G`.
+- **Complex**: linked Model is compressed (`NsfModel::compressed == true`). User-confirmed sample: `Cr10V` / `Cr10G`.
+- **Unknown**: linked Model cannot be resolved; do not guess.
+
+The user verified both labels in the running editor. The label follows the Model reference for the currently displayed frame, is informational only, and does not change the renderer or serializer. Do not classify by `specialVertexCount`; special vertices are a distinct frame-layout concept.
+
+Checkpoint: [e4aa8e5](https://github.com/leorelic/CrashEdit-VC/commit/e4aa8e57107e88467b3b05b9a36aa7dce975dfbc). This identification milestone does not mean Complex animation vertex editing is solved. Keep the known-good Cr10V preview behavior intact while investigating Complex edit/save support separately.
