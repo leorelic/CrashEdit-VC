@@ -730,13 +730,13 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
   if(sourceEntry.offset>sourceChunk.bytes.size()||sourceEntry.size>sourceChunk.bytes.size()-sourceEntry.offset||sourceEntry.size>NsfChunkSize-24U){
    e="The compressed Model entry cannot be safely cloned into a fresh NSF chunk.";return false;
   }
-  std::uint32_t cloneEid=0x7fffffffU;
+  std::uint32_t cloneEid=0x02000001U;
   for(;;){
    bool used=false;
    for(const auto&chunk:candidate.chunks_)for(const auto&entry:chunk.entries)if(entry.valid&&entry.eid==cloneEid){used=true;break;}
    if(!used)break;
-   if(cloneEid<=1U){e="No unused valid EID is available for an isolated animation Model.";return false;}
-   cloneEid-=2U;
+   if(cloneEid>=0x7ffffffdU){e="No unused valid EID is available for an isolated animation Model.";return false;}
+   cloneEid+=2U;
   }
   std::vector<std::uint8_t>cloneBytes(NsfChunkSize,0U);
   cloneBytes[0]=0x34U;cloneBytes[1]=0x12U;
