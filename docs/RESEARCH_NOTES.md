@@ -436,10 +436,12 @@ The synthetic NSF tests already exercise narrow compressed delta rejection, widt
 This distinction matters: synthetic coverage proves the code path in a constructed fixture, not capacity behavior or shared-Model effects in retail data. See the regression audit in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md). Next validation should record the actual blocked ModelPosition width/base and exact failing delta on the private sample, then test full-pose equality after expansion and every affected Animation payload rebuild.
 
 
-### Compressed expansion vertex-index bug fixed — 2026-11-26
+### Correction: compressed expansion destination hypothesis was wrong — 2026-11-26
 
-Applied a source-backed correction to `expandCompressedModelPositions`: it previously selected the rebuild target as `frame.specialVertexCount + ModelPositionIndex`, while CrashEdit-RE's decoder writes compressed Model position `i` to frame vertex `i`. The special count advances the temporal bit cursor/topology offset, not the compressed decoder's destination index. Expansion now uses `frame.vertices[pi]`.
+The prior note claiming a compressed expansion vertex-index bug was incorrect. CrashEdit-RE `Frame.MakeVertices()` writes compressed Model position `i` to `verts[i]`; the renderer's separate `+ SpecialVertexCount` triangle index does not shift that destination. We briefly changed expansion to `specialVertexCount + pi`, and the next CI run failed on the expanded-pose assertion. The implementation was restored to `frame.vertices[pi]`.
 
-Added a synthetic test that forces a narrow delta-width expansion in a frame with one special vertex, then checks the pose before and after save/reload. Code: [e6cf1ff](https://github.com/leorelic/CrashEdit-VC/commit/e6cf1ff023bb17d753cbb16fb9de3f27f180c559); test: [3f98348](https://github.com/leorelic/CrashEdit-VC/commit/3f983481bde2e50d8493c0ae05f23dd646595e69). Detailed analysis and correction to the earlier prefix-byte note are in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md).
+The same regression fixture had an invalid packed width word (`0x1f9` encoded X width 7, not width 1); it was corrected to `0x7f`. The updated test exercises the narrow-width-to-width-7 expansion while asserting the actual reference destination indexing and save/reload behavior.
 
-Not yet verified: CI build/test results, retail sample edit/save/reopen, or in-game behavior. Do not mark the coordinate-limit issue resolved until those checks pass.
+Relevant commits: [fixture fix](https://github.com/leorelic/CrashEdit-VC/commit/ed21d4c97e606bb9acd6237fb3f1bf243a5aa872), [wrong shifted-index attempt](https://github.com/leorelic/CrashEdit-VC/commit/c9027db85b567a43ec25a3c18da697c04c8d195e), [source-aligned code correction](https://github.com/leorelic/CrashEdit-VC/commit/a4e015407111393ab2b81891b27e7988775b99ce), [test correction](https://github.com/leorelic/CrashEdit-VC/commit/d3aa54664ae168fb7f87d5bac71067535da5a23b), and [research correction](https://github.com/leorelic/CrashEdit-VC/commit/91c92c500c34eed0bc4ae371f734cc342d0c3adb).
+
+This does **not** solve the original coordinate-limit/chunk-prompt issue. CI and real retail sample/game verification remain pending.
