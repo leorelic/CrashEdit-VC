@@ -164,3 +164,19 @@ Preserve `ff5359a` as the known-good preview/save baseline while investigating.
 - The shifted decoder mapping and removed renderer offset caused the repeated corrupted-preview builds. Do not reintroduce either change.
 - This is a renderer/preview recovery only. The original per-vertex coordinate/encoding limit and chunk-relocation/save issue remains unresolved. Solve it in the edit/encode path without disturbing the verified preview mapping.
 - Reference baseline: [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac). Current research is in [RESEARCH_NOTES.md](RESEARCH_NOTES.md) and [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md).
+
+
+## Animation format identification — Normal / Complex — 2026-11-27
+
+**Checkpoint:** [e4aa8e5](https://github.com/leorelic/CrashEdit-VC/commit/e4aa8e57107e88467b3b05b9a36aa7dce975dfbc) — *Document animation format labels*.
+
+**User-confirmed:** the 3D Animation Editor now displays the format classification beside the selected Model information, and the user verified the label in the running build.
+
+- **Normal** identifies an Animation frame whose linked Model is uncompressed (`NsfModel::compressed == false`). User-tested reference: `BT10V` linked to `BT10G`.
+- **Complex** identifies an Animation frame whose linked Model uses compressed ModelPosition records (`NsfModel::compressed == true`). User-tested reference: `Cr10V` linked to `Cr10G`.
+- **Unknown** is displayed when the linked Model cannot be resolved; the UI does not guess.
+- Classification follows the currently displayed frame's Model reference, using the existing Crash 2 `modelEid` / Crash 3 `linkedModelEid` resolution path.
+- `specialVertexCount` and special vertices are independent frame-layout concepts; they do not determine Normal versus Complex.
+- The label is informational only. It does not alter decoding, rendering, editing, or serialization.
+
+The user supplied screenshots confirming `BT10V` displays **Normal** and `Cr10V` displays **Complex**. Preserve these as representative UI/regression references when changing animation identification. This milestone establishes clear editor terminology and identification; it does **not** claim that Complex animation vertex editing or unrestricted coordinate serialization is solved. The Cr10V preview recovery contract and the outstanding Complex edit/save investigation remain as documented above.
