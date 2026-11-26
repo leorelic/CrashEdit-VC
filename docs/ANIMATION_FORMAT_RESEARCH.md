@@ -241,3 +241,21 @@ The user tested the recovery build and confirmed the Cr10V preview looks correct
 - Decoder storage and edit/save indexing must be treated as separate mappings until proven against the retail Cr10V sample and CrashEdit-RE. Do not change the preview path to solve the coordinate-edit limitation.
 
 The current source decoder was compared directly to `ff5359a` and matched. User visual confirmation was received on 2026-11-27. This is a preview recovery checkpoint only; unrestricted vertex editing remains unresolved.
+
+
+## CrashEdit-RE source comparison: compressed-frame editing is read-only in the reference UI
+
+Inspected the correct reference: [airumu/CrashEdit, `t/net9`](https://github.com/airumu/CrashEdit/tree/t/net9), specifically `Frame.cs`, `FrameVertex.cs`, `ModelPosition.cs`, `ModelEntry.cs`, `FrameBox.cs`, and `AnimationRenderer.cs`.
+
+- RE's `Frame.MakeVertices(model)` starts the temporal cursor at `SpecialVertexCount * 24`, decodes ModelPosition records in X-Z-Y order, and stores record `i` at `verts[i]`.
+- RE's renderer separately looks up a polygon vertex at `verts[tri.Vertex + frame.SpecialVertexCount]`. Model polygon index conversion applies a negative initial index bias for compressed Models. Do not collapse these distinct conversions into one guessed indexing rule.
+- RE's legacy `FrameBox` labels compressed Model vertices read-only, and `UpdateTemporals()` immediately returns for compressed Models. `Frame.SaveC2()` writes the temporal bit array as-is; it does not encode changed cached positions back into compressed ModelPosition deltas.
+- RE does expose `ModelEntry.ConvertCompressedToUncompressed()` and `DecompressFrame()`, which create an uncompressed Model/frame representation. This is a candidate safer editing architecture, subject to Cr10V sample tests and correct EID/reference handling.
+
+### Native save-failure candidate
+
+Current native `setAnimationFrameVertex()` sets `verticesEdited=true` even when the new component equals the existing value. A change followed by restoring the original coordinate therefore remains dirty and enters save processing.
+
+There is also a concrete source asymmetry to investigate: native `decodeAnimationVertices()` was deliberately restored to the RE-compatible baseline that writes compressed ModelPosition record `i` to `frame.vertices[i]`, while native `encodeAnimationFrameVertex()` currently sources record `i` from `frame.vertices[i + specialVertexCount]`. RE's `Frame.MakeVertices()` confirms the former decode destination. Native `commitAnimationEdits()` verifies the post-encode decoded pose against the desired pose, so this mismatch is a plausible cause of no-op save rejection. This is not yet declared the proven runtime cause; add focused Cr10V no-op and edit-then-restore tests first.
+
+**Next:** establish no-op and restore-to-original save regressions; trace first/last compressed positions and special-prefix boundary indices; compare each temporal bit against RE; then evaluate converting the linked Model + Animation to an uncompressed pair before editing. Keep the confirmed renderer/preview mapping untouched.
