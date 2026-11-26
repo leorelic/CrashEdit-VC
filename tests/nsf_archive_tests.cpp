@@ -440,8 +440,20 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(narrowArchive.setAnimationFrameVertex(1,0,0,0,0,200));
  std::vector<std::uint8_t> expandedBytes;assert(narrowArchive.saveUncompressedBytes(expandedBytes,e));
  NsfArchive expandedRoundTrip;assert(expandedRoundTrip.loadBytes(expandedBytes,e));expandedRoundTrip.decodeAnimationModels(false);
- assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].xBits==7U);
- assert(expandedRoundTrip.chunks()[1].entries[0].animation.frames[0].vertices[0].x==200);
+ // Width expansion must affect the edited animation's cloned Model, not the
+ // original Model still shared by unrelated animations.
+ assert(expandedRoundTrip.chunks()[0].entries[0].model.positions[0].xBits==1U);
+ const auto&expandedEditedFrame=expandedRoundTrip.chunks()[1].entries[0].animation.frames[0];
+ assert(expandedEditedFrame.vertices[0].x==200);
+ assert(expandedEditedFrame.linkedModelEid!=0x0200007bU);
+ bool foundExpandedClone=false;
+ for(const auto&expandedChunk:expandedRoundTrip.chunks())for(const auto&expandedEntry:expandedChunk.entries){
+  if(expandedEntry.valid&&expandedEntry.type==2U&&expandedEntry.eid==expandedEditedFrame.linkedModelEid){
+   assert(expandedEntry.model.positions[0].xBits==7U);
+   foundExpandedClone=true;
+  }
+ }
+ assert(foundExpandedClone);
 
  // Animation timeline frame operations duplicate the exact raw frame payload,
  // update entry/item offsets, and survive NSF save/reload.
