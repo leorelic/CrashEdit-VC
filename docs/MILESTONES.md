@@ -143,7 +143,9 @@ This is a genuine archive-capacity feature for Append/Insert. It is not a remedy
 
 **User-reported:** certain vertices cannot move beyond a particular location on the X/Y/Z gizmo. The editor prompts to move the Animation entry into a new NSF chunk, but the requested edit does not apply.
 
-**Corrections after the unchanged real-sample test: the native unified frame array was incorrectly writing compressed Model positions at unshifted indices, overwriting the special prefix and leaving the final specialVertexCount vertices unencoded. Decoder, encoder, and expansion now map ModelPosition i to frame.vertices[specialVertexCount+i], matching the renderer's triangle index offset. The native special-vertex setter also refreshes temporal-word cache from the raw bytes before decoding; otherwise a special edit could be overwritten by stale compressed bits in a non-word-aligned prefix. Shared Model expansion probes existing widths and clones the compressed Model only when the edited pose needs width expansion, redirecting only that Animation so unrelated animations retain the original Model. Pending-pose relocation uses exact entry location (duplicate-EID regression), and both selected/special vertex coordinate widgets have explicit unique IDs.
+**Correction to earlier implementation notes:** the shifted unified-frame mapping claim below was wrong for preview rendering and was reverted. The decoder now matches the known-good `ff5359a` implementation, and renderer triangle consumers retain their special-vertex offset. The user visually confirmed Cr10V preview recovery on 2026-11-27. Do not change this decoder/renderer pairing while investigating the independent edit/save coordinate-limit problem.
+
+The separate save-side work remains documented in the research notes: shared Model expansion/clone isolation, pending-pose relocation identity, and coordinate-input IDs are distinct concerns. They must not be treated as proof that unrestricted vertex editing works.
 
 Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/commit/9c7b26b1eae4c799cb20c19854ee0a8765f18724), [7309155](https://github.com/leorelic/CrashEdit-VC/commit/7309155e1cc58379163a4acf996fecf4fecad321), [aba9be9](https://github.com/leorelic/CrashEdit-VC/commit/aba9be96b897149ab656a158da6c2040824c714e), [c084b97](https://github.com/leorelic/CrashEdit-VC/commit/c084b97a953d8146219b7445feb4961fda851994), and [9feefdd](https://github.com/leorelic/CrashEdit-VC/commit/9feefdda2e0eb88aac222b73dab2bd9cc854127e).
 
@@ -153,3 +155,12 @@ Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/
 - Acceptance: requested coordinates persist, the pose is exact after reload, no unrelated Animation entry is relocated, and the UI remains free of the ID warning.
 
 Preserve `ff5359a` as the known-good preview/save baseline while investigating.
+
+
+## Animation preview recovery — user-confirmed 2026-11-27
+
+- **Known-good preview contract:** `decodeAnimationVertices()` matches `ff5359a`; compressed ModelPosition `i` is assigned to `frame.vertices[i]`. Renderer Model triangle indices continue to use `triangleIndex + specialVertexCount` in all relevant render/picking/overlay paths.
+- User tested the recovery build and confirmed Cr10V renders correctly again.
+- The shifted decoder mapping and removed renderer offset caused the repeated corrupted-preview builds. Do not reintroduce either change.
+- This is a renderer/preview recovery only. The original per-vertex coordinate/encoding limit and chunk-relocation/save issue remains unresolved. Solve it in the edit/encode path without disturbing the verified preview mapping.
+- Reference baseline: [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac). Current research is in [RESEARCH_NOTES.md](RESEARCH_NOTES.md) and [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md).
