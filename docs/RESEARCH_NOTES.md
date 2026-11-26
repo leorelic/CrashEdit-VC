@@ -514,3 +514,22 @@ The user reported that the Cr10V preview remained visibly corrupted after the re
 **Correct invariant for the current unified frame array:** ModelPosition `i` maps to `frame.vertices[i + specialVertexCount]`; Model triangle index `t` resolves to `frame.vertices[t + specialVertexCount]`. The prefix is applied once at each conversion between Model-local indices and the unified frame vertex array. Do not remove the renderer offset unless the frame storage representation and all related indexing paths are changed together and verified against the retail Cr10V sample.
 
 CI and the user's visual validation are pending. Do not mark the preview regression resolved until Cr10V renders normally in the next build.
+
+
+### Correction: preserve the baseline animation preview vertex mapping — 2026-11-27
+
+The recent Cr10V preview regressions came from changing the decoder's destination indexing based on an incorrect interpretation of the unified editor pose. The prior notes claiming that compressed ModelPosition `i` must decode to `frame.vertices[i + specialVertexCount]` were not validated against the actual renderer and were wrong for the known-good preview path.
+
+The known-good `ff5359a` implementation has a specific asymmetric contract:
+
+- `decodeAnimationVertices()` decodes compressed Model positions into `frame.vertices[i]` (after reading the temporal stream starting at `specialVertexCount * 24` bits).
+- The animation renderer resolves Model-local triangle indices using the existing `triangleIndex + specialVertexCount` offset.
+- The save encoder uses the editable frame pose and the Model-local-to-frame offset when writing ModelPosition records.
+
+Changing decoder destinations to `i + specialVertexCount` while leaving the established renderer offset in place made the renderer read `triangleIndex + 2 * specialVertexCount` from the decoded pose. For Cr10V's 4-special-vertex prefix this shifted the rendered lookup by 8 slots relative to Model-local indices and corrupted the preview. Removing the renderer offset was also wrong; it did not restore the original decode/render relationship.
+
+**Recovery action:** restored the decoder function from the `ff5359a` baseline and restored the special-vertex offset in the renderer. The synthetic special-prefix decode/edit test was reset to its baseline expectations. The renderer must remain unchanged while the edit/save mapping is investigated separately.
+
+**Important unresolved research question:** preview decode and edit/save currently appear to use different index conversions. Do not “unify” them based on the `frame.vertices` container alone. Trace CrashEdit-RE's `Frame.MakeVertices()`, `Frame.Save()`, ModelPosition ordering, special vertex header bytes, and the retail Cr10V Model triangle index range together. Build a sample-backed table for each relevant vertex: Model-local index, decoded frame slot, renderer slot, edit-selected slot, encoder source slot, ModelPosition record, and resulting saved/reloaded coordinate. This is the necessary route to understand why specific vertices hit different limits without destabilizing preview.
+
+No claim is made that free vertex editing is fixed. This correction is about restoring the known-good preview path and identifying the remaining mapping mismatch.
