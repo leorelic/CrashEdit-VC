@@ -454,6 +454,40 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expansionReloaded.chunks()[0].entries[0].eid==0x0200007eU&&expansionReloaded.chunks()[0].entries[0].type==99);
  assert(expansionReloaded.chunks()[0].entries[0].items[0].size==exFollowingSize-24U);
  
+ // Regression: relocating one entry must preserve dirty poses in both the moved
+ // entry and entries left behind in the source chunk.
+ std::vector<std::uint8_t> pendingPoseChunk(65536);
+ p16(pendingPoseChunk,0,0x1234);p16(pendingPoseChunk,2,0);p32(pendingPoseChunk,8,2);
+ p32(pendingPoseChunk,16,28);p32(pendingPoseChunk,20,80);p32(pendingPoseChunk,24,132);
+ auto writePendingAnimation=[&](std::size_t entryOffset,std::uint32_t eid){
+  p32(pendingPoseChunk,entryOffset,0x0100ffff);p32(pendingPoseChunk,entryOffset+4,eid);
+  p32(pendingPoseChunk,entryOffset+8,1);p32(pendingPoseChunk,entryOffset+12,1);
+  p32(pendingPoseChunk,entryOffset+16,24);p32(pendingPoseChunk,entryOffset+20,52);
+  const std::size_t frameOffset=entryOffset+24;
+  p32(pendingPoseChunk,frameOffset+8,1);p32(pendingPoseChunk,frameOffset+12,0);
+  p32(pendingPoseChunk,frameOffset+16,0);p32(pendingPoseChunk,frameOffset+20,24);
+ };
+ writePendingAnimation(28,0x0200007dU);writePendingAnimation(80,0x0200007eU);
+ NsfArchive pendingPoseArchive;assert(pendingPoseArchive.loadBytes(pendingPoseChunk,e));pendingPoseArchive.decodeAnimationModels(false);
+ const std::vector<std::size_t> pendingIndices{0};
+ const std::vector<NsfAnimationVertex> pendingFirstPose{{17,23,29}},pendingSecondPose{{31,37,41}};
+ assert(pendingPoseArchive.setAnimationFrameVertices(0,0,0,pendingIndices,pendingFirstPose));
+ assert(pendingPoseArchive.setAnimationFrameVertices(0,1,0,pendingIndices,pendingSecondPose));
+ std::size_t pendingDestination=0;assert(pendingPoseArchive.moveEntryToNewChunk(0,0,pendingDestination,e));
+ assert(pendingDestination==1U&&pendingPoseArchive.chunks()[0].entries[0].eid==0x0200007eU);
+ assert(pendingPoseArchive.chunks()[1].entries[0].eid==0x0200007dU);
+ const auto&retainedSourcePose=pendingPoseArchive.chunks()[0].entries[0].animation.frames[0];
+ const auto&retainedMovedPose=pendingPoseArchive.chunks()[1].entries[0].animation.frames[0];
+ assert(retainedSourcePose.verticesEdited&&retainedSourcePose.vertices[0].x==31&&retainedSourcePose.vertices[0].y==37&&retainedSourcePose.vertices[0].z==41);
+ assert(retainedMovedPose.verticesEdited&&retainedMovedPose.vertices[0].x==17&&retainedMovedPose.vertices[0].y==23&&retainedMovedPose.vertices[0].z==29);
+ std::vector<std::uint8_t> pendingPoseSaved;assert(pendingPoseArchive.saveUncompressedBytes(pendingPoseSaved,e));
+ NsfArchive pendingPoseReloaded;assert(pendingPoseReloaded.loadBytes(pendingPoseSaved,e));pendingPoseReloaded.decodeAnimationModels(false);
+ assert(pendingPoseReloaded.chunks()[0].entries[0].animation.frames[0].vertices[0].x==31);
+ assert(pendingPoseReloaded.chunks()[0].entries[0].animation.frames[0].vertices[0].y==37);
+ assert(pendingPoseReloaded.chunks()[0].entries[0].animation.frames[0].vertices[0].z==41);
+ assert(pendingPoseReloaded.chunks()[1].entries[0].animation.frames[0].vertices[0].x==17);
+ assert(pendingPoseReloaded.chunks()[1].entries[0].animation.frames[0].vertices[0].y==23);
+ assert(pendingPoseReloaded.chunks()[1].entries[0].animation.frames[0].vertices[0].z==29);
  NsfArchive oneFrameGuard=timelineArchive;
  assert(oneFrameGuard.deleteAnimationFrame(0,0,0));
  assert(oneFrameGuard.deleteAnimationFrame(0,0,0));

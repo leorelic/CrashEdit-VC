@@ -141,9 +141,11 @@ This is a genuine archive-capacity feature for Append/Insert. It is not a remedy
 
 ## Current unresolved issue — Animation vertex coordinate/encoding limits
 
-**User-reported:** certain vertices cannot move beyond a particular location on the X/Y/Z gizmo. The editor incorrectly prompts to move the Animation entry into a new NSF chunk, but the requested edit still does not apply.
+**User-reported:** certain vertices cannot move beyond a particular location on the X/Y/Z gizmo. The editor prompts to move the Animation entry into a new NSF chunk, but the requested edit does not apply.
 
-- Investigate actual Animation frame boundaries, coordinate representation/encoding limits, gizmo bounds, and save validation using CrashEdit-RE source and controlled real-sample edits.
+**Source-confirmed relocation defect found:** compressed Model position-width expansion can enlarge Animation payloads beyond the current 64 KiB chunk. The relocation path reparsed raw entries and discarded pending decoded vertex poses, so the retry could save the old pose. A fix now snapshots and restores dirty Animation poses across relocation; a regression covers edits in both the moved entry and the remaining source chunk. CI and real-sample validation are pending.
+
+- Continue investigating the underlying compressed delta/coordinate representation and save validation using CrashEdit-RE source and controlled real-sample edits; the relocation-pose-loss defect is separately addressed.
 - Record the exact frame, vertex, axis, current/requested coordinate, and rejection reason before changing code.
 - Chunk relocation is not the solution unless a separate actual chunk-capacity failure is demonstrated.
 - Do not silently clamp, wrap, drop, or redirect the requested edit.

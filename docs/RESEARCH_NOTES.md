@@ -445,3 +445,14 @@ The same regression fixture had an invalid packed width word (`0x1f9` encoded X 
 Relevant commits: [fixture fix](https://github.com/leorelic/CrashEdit-VC/commit/ed21d4c97e606bb9acd6237fb3f1bf243a5aa872), [wrong shifted-index attempt](https://github.com/leorelic/CrashEdit-VC/commit/c9027db85b567a43ec25a3c18da697c04c8d195e), [source-aligned code correction](https://github.com/leorelic/CrashEdit-VC/commit/a4e015407111393ab2b81891b27e7988775b99ce), [test correction](https://github.com/leorelic/CrashEdit-VC/commit/d3aa54664ae168fb7f87d5bac71067535da5a23b), and [research correction](https://github.com/leorelic/CrashEdit-VC/commit/91c92c500c34eed0bc4ae371f734cc342d0c3adb).
 
 This does **not** solve the original coordinate-limit/chunk-prompt issue. CI and real retail sample/game verification remain pending.
+
+### Pending animation pose lost during NSF chunk relocation — 2026-11-26
+
+Source inspection identified why accepting the compressed-animation payload capacity prompt could lose a vertex edit:
+
+- Compressed Model position-width expansion can enlarge Animation frame payloads until an entry no longer fits its current 64 KiB type-0 chunk. The save path reports the exact chunk/entry and asks to relocate it.
+- NsfArchive::moveEntryToNewChunk() rebuilds and reparses the source and destination chunks, then calls decodeAnimationModels(). Dirty vertex poses live in decoded NsfAnimationFrame::vertices with verticesEdited=true; they are not yet in raw entry bytes. Reparse therefore discarded pending pose edits before the retrying save.
+- The relocation path now snapshots every dirty Animation pose by entry EID and frame index, reparses/decodes the chunks, then reapplies each complete pose and marks it dirty again. Failure to restore is atomic and reports an error rather than silently dropping the edit.
+- Added a synthetic regression with two pending Animation poses: relocate one entry, verify both the moved pose and the pose remaining in the source chunk are retained, then save/reload and compare coordinates.
+
+This addresses edit preservation across the relocation/retry workflow. It does not independently prove that every compressed vertex delta or every real Cr10V pose is representable; keep the coordinate/encoding investigation and retail-sample/game validation open until the user confirms the boundary edit applies and survives save/reopen.
