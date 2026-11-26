@@ -1249,15 +1249,17 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
  const std::size_t remainingCount=count-1U;
  const std::size_t newTableEnd=20U+remainingCount*4U;
 
- struct PendingAnimationPose { std::uint32_t eid; std::size_t frameIndex; std::vector<NsfAnimationVertex> vertices; };
+ struct PendingAnimationPose { std::size_t chunkIndex; std::size_t entryIndex; std::size_t frameIndex; std::vector<NsfAnimationVertex> vertices; };
  std::vector<PendingAnimationPose> pendingPoses;
- for(const auto&sourceChunk:chunks_){
+ for(std::size_t sourceChunkIndex=0;sourceChunkIndex<chunks_.size();++sourceChunkIndex){
+  const auto&sourceChunk=chunks_[sourceChunkIndex];
   if(sourceChunk.type!=0U||!sourceChunk.entryTableValid)continue;
-  for(const auto&sourceEntry:sourceChunk.entries){
+  for(std::size_t sourceEntryIndex=0;sourceEntryIndex<sourceChunk.entries.size();++sourceEntryIndex){
+   const auto&sourceEntry=sourceChunk.entries[sourceEntryIndex];
    if(!sourceEntry.valid||sourceEntry.type!=1U)continue;
    for(std::size_t fi=0;fi<sourceEntry.animation.frames.size();++fi){
     const auto&frame=sourceEntry.animation.frames[fi];
-    if(frame.verticesEdited)pendingPoses.push_back({sourceEntry.eid,fi,frame.vertices});
+    if(frame.verticesEdited)pendingPoses.push_back({sourceChunkIndex,sourceEntryIndex,fi,frame.vertices});
    }
   }
  }
@@ -1322,27 +1324,40 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
  candidate.decodeZones(candidate.crash3Retail_);
  if(candidate.animationModelsDecoded_)candidate.decodeAnimationModels(candidate.animationModelsCrash3_);
  // Chunk reparsing reconstructs frames from raw bytes; pending poses are not
- // serialized yet. Restore every dirty pose by stable EID/frame identity.
+ // serialized yet. Restore by original chunk/entry/frame identity, not EID:
+ // archives may contain duplicate EIDs, and EID-only matching can apply one
+ // animation's pose to another entry.
  for(const auto&pending:pendingPoses){
-  bool restored=false;
-  for(const auto&location:candidate.findEntriesByEid(pending.eid)){
-   if(location.chunkIndex>=candidate.chunks_.size())continue;
-   auto&targetChunk=candidate.chunks_[location.chunkIndex];
-   if(location.entryIndex>=targetChunk.entries.size())continue;
-   auto&targetEntry=targetChunk.entries[location.entryIndex];
-   if(!targetEntry.valid||targetEntry.type!=1U||pending.frameIndex>=targetEntry.animation.frames.size())continue;
-   auto&targetFrame=targetEntry.animation.frames[pending.frameIndex];
-   if(!targetFrame.verticesDecoded||targetFrame.vertices.size()!=pending.vertices.size()){
-    error="Could not restore a pending animation pose after NSF chunk relocation.";return false;
+  std::size_t targetChunkIndex=pending.chunkIndex;
+  std::size_t targetEntryIndex=pending.entryIndex;
+  if(pending.chunkIndex==chunkIndex){
+   if(pending.entryIndex==entryIndex){
+    targetChunkIndex=candidate.chunks_.size()-1U;
+    targetEntryIndex=0U;
+   }else if(pending.entryIndex>entryIndex){
+    targetEntryIndex=pending.entryIndex-1U;
    }
-   std::vector<std::size_t>indices;indices.reserve(pending.vertices.size());
-   for(std::size_t vi=0;vi<pending.vertices.size();++vi)indices.push_back(vi);
-   if(!candidate.setAnimationFrameVertices(location.chunkIndex,location.entryIndex,pending.frameIndex,indices,pending.vertices)){
-    error="Could not reapply pending animation vertex edits after NSF chunk relocation.";return false;
-   }
-   restored=true;break;
   }
-  if(!restored){error="A pending animation edit could not be found after NSF chunk relocation.";return false;}
+  if(targetChunkIndex>=candidate.chunks_.size()){
+   error="Could not locate a pending animation pose after NSF chunk relocation.";return false;
+  }
+  auto&targetChunk=candidate.chunks_[targetChunkIndex];
+  if(targetEntryIndex>=targetChunk.entries.size()){
+   error="Could not locate a pending animation entry after NSF chunk relocation.";return false;
+  }
+  auto&targetEntry=targetChunk.entries[targetEntryIndex];
+  if(!targetEntry.valid||targetEntry.type!=1U||pending.frameIndex>=targetEntry.animation.frames.size()){
+   error="Could not restore a pending animation pose after NSF chunk relocation.";return false;
+  }
+  auto&targetFrame=targetEntry.animation.frames[pending.frameIndex];
+  if(!targetFrame.verticesDecoded||targetFrame.vertices.size()!=pending.vertices.size()){
+   error="Could not restore a pending animation pose after NSF chunk relocation.";return false;
+  }
+  std::vector<std::size_t>indices;indices.reserve(pending.vertices.size());
+  for(std::size_t vi=0;vi<pending.vertices.size();++vi)indices.push_back(vi);
+  if(!candidate.setAnimationFrameVertices(targetChunkIndex,targetEntryIndex,pending.frameIndex,indices,pending.vertices)){
+   error="Could not reapply pending animation vertex edits after NSF chunk relocation.";return false;
+  }
  }
  *this=std::move(candidate);
  newChunkIndex=chunks_.size()-1U;
