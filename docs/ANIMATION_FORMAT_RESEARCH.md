@@ -340,3 +340,44 @@ Because the user explicitly wants to retain current EIDs, the operation must ove
 - In-game acceptance is mandatory: the unchanged converted sample must play in the original Crash 2 game/emulator. Then edit one vertex in the converted Normal animation, save/reopen, and verify playback again.
 
 **Status:** UI insertion point and archive integration constraints identified. The menu/operation is not implemented yet; do not expose a nonfunctional menu item or claim conversion support until the archive-level atomic conversion and regression tests exist.
+
+## Experimental batch conversion workflow — 2026-11-27
+
+User-approved direction: provide **Experimental → Convert Model/Animation**. Activating it opens a dedicated window in which the user selects a Complex Model; the window then lists every Animation in the archive that references that Model. The intended operation is a coordinated batch conversion of the selected Model and all of its linked Animations, rather than a context-menu action on one Animation entry.
+
+### Workflow and resource scope
+
+- Add a **Convert Model/Animation** button under the existing Experimental tab.
+- Open a dedicated conversion window. Populate its Model selector with eligible Complex Models in the currently loaded archive.
+- Once a Model is selected, enumerate every Animation frame/resource that references its EID. Show enough identifying information to distinguish entries (name when available, EID, frame count, and conversion eligibility/reason).
+- Default to converting every linked Animation together; do not silently omit a linked Animation. If partial selection is exposed, clearly explain that every remaining reference must still be compatible with the converted Model. The safe initial behavior is to require all linked Animations to pass validation and convert as one batch.
+- Convert the Model and its linked Animation frame payloads together, preserving existing Model and Animation EIDs. Do not create duplicate resources or change references in this first implementation.
+- Report the complete conversion result and any validation failure before applying changes.
+
+### Saving is part of the feature, not a later enhancement
+
+The operation must modify the archive's real resource representation so the normal NSF/NSD save path writes the converted Model and Animation entries. It is not sufficient to convert only decoded in-memory viewer data. After conversion:
+
+1. The archive must be marked dirty and the ordinary Save / Save As path must serialize the converted Model and every converted Animation entry, including updated item sizes, entry offsets, and chunk sizes as required.
+2. Reopening the saved archive must parse the Model as uncompressed/Normal and every linked Animation frame as Normal, with all EIDs resolving correctly.
+3. All frame poses, special vertices, collision/header bytes, texture/material data, and triangle-to-vertex rendering semantics must remain correct.
+4. Saving must not depend on a special export path or leave the original Complex payloads in the file while only the preview changes.
+5. The operation must be atomic: construct and validate a candidate archive first; only replace live archive state and mark it dirty after every resource has converted and archive-level validation succeeds. Any failure leaves the original archive byte-for-byte unchanged.
+
+### Shared Model and linked Animation handling
+
+This UI explicitly addresses shared Model references by making the Model the selection root and displaying all referencing Animations. Before conversion, build the complete reference set from the archive, not merely the currently visible hierarchy rows. A Model must never become Normal while any Animation still referencing it retains Complex temporal data. Initially, convert all compatible references as one transaction or reject the batch with a precise per-Animation reason. Do not silently convert a subset.
+
+### Required tests and acceptance
+
+- Model selector lists only supported Complex Models; Normal and unresolved/unsupported resources are not offered as convertible targets.
+- Reference enumeration finds every Animation linked to the selected Model, including multiple Animation entries and multiple frames.
+- Batch conversion preserves existing EIDs and references and does not create duplicates.
+- Reject unsupported/malformed linked Animations, unrepresentable coordinates, item/chunk capacity failures, and incomplete reference sets atomically.
+- Cover specialVertexCount zero and nonzero, multiple linked Animations, every frame, and archive chunk-boundary/size changes.
+- Verify decoded poses and rendered triangle references before and after conversion.
+- Save the converted archive through the normal save path, close/reopen it, and verify all resources reparse as Normal and remain editable through the existing Normal path.
+- Edit a vertex after conversion, save/reopen again, and verify the edit persists.
+- Finally load the saved NSF/NSD in the original Crash 2 game/emulator and verify animation playback. Editor preview and archive reparse alone do not prove game compatibility.
+
+**Status:** workflow approved; implementation not started. Preserve the known-good Cr10V preview/renderer baseline. The conversion itself remains unproven for original-game compatibility until the game test passes.
