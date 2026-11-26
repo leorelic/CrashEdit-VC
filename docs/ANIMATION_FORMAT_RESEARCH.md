@@ -314,3 +314,29 @@ CrashEdit-RE has `ModelEntry.ConvertCompressedToUncompressed()`, proving a conve
 Treat the conversion as structurally plausible, not proven in-game. The target is the game's existing Normal/uncompressed representation. Validate all frames, world-space poses, special vertices, collision/header data, polygon-to-vertex mapping, ModelEID references/shared users, NSF reparse, and original-game playback. Then edit one vertex and repeat save/reopen/game playback.
 
 Keep two eventual strategies: genuine Complex delta encoding and explicit Complex-to-Normal conversion. Conversion must be user-invoked, previewable, atomic, and rollback-safe; never silently convert during ordinary save. Preserve the verified Cr10V renderer/decoder.
+## UI operation requirement: Convert to Normal — 2026-11-27
+
+User-requested workflow: right-click a Complex Animation entry in Resource Hierarchy and choose **Convert to Normal**. Conversion overwrites the existing resources in place, retaining their EIDs; no new Model/Animation EIDs or duplicate resources are introduced in this first version.
+
+Implementation constraints discovered in the native archive/UI:
+
+- The Resource Hierarchy's `drawResourceContext` lambda handles right-click menus for chunk, entry, item, and frame nodes. The Animation entry row is the `drawResourceContext(1, chunk, entry, -1, ...)` call inside `EditorUI::drawHierarchy()`; add the operation specifically for valid decoded type-1 Animation entries whose linked Model is Complex.
+- Native archive data is represented by `NsfEntry.items` and `NsfChunk.bytes`; `NsfArchive::chunks()` is const-only. A conversion API belongs on `NsfArchive`, not as direct UI byte mutation.
+- `NsfArchive::decodeAnimationModels()` resolves each frame's linked Model EID and decodes the frame. For Crash 2, frame `modelEid` is the linked Model EID.
+- A Model's compressed representation is a sixth item (ModelPosition records). Its info item stores the special-vertex count at offset `0x4C`; the normal Model parser uses the same field as its polygon vertex base metadata. Do not blindly zero it or rewrite polygon words: the renderer/model polygon index convention must be preserved.
+- Animation frame items have variable sizes. Existing `replaceAnimationFramePayloads()` can rebuild an Animation entry's item payloads and repair following entry offsets, but Model entries need a corresponding safe item-list rebuild path.
+- Existing `encodeAnimationFrameVertex()` already has a Normal/uncompressed temporal writer branch, including the Normal byte-lane permutation. A conversion implementation may reuse that logic only after the candidate Model has been rebuilt/reparsed as uncompressed and after frame payload capacity has been prepared; do not change the established decoder/renderer mapping.
+
+### Shared-resource and atomicity rules
+
+Because the user explicitly wants to retain current EIDs, the operation must overwrite the existing Model EID and Animation EID. Before mutation, enumerate every valid Animation frame in the archive whose `linkedModelEid` equals the target Model EID. All such frames must be converted in the same candidate archive; otherwise the shared Model would become Normal while other referencing Animations still contain Complex temporal data. If any referencing animation is undecoded, has an incompatible frame layout, cannot be represented in Normal's byte-coordinate range after safe frame-offset rebasing, or cannot be rebuilt within NSF chunk capacity, abort the entire operation without mutating the live archive.
+
+### UI and validation acceptance
+
+- Menu item appears only on decoded Complex Animation entry rows; it is absent for Normal entries, non-animation entries, and unsupported game versions/layouts.
+- Menu action calls one archive-level conversion operation on a candidate copy. On success replace the live archive, refresh decoded animation/model state, preserve selection and viewer target, and add one undo-history action. On failure show a specific reason and leave original archive bytes and decoded state unchanged.
+- Keep original EIDs, chunk/entry identity, texture/material data, collisions, frame offsets/world-space poses, special-vertex prefix, and triangle-to-vertex rendering semantics.
+- Test multiple Animations sharing one Model, a single Animation, specialVertexCount=0 and nonzero, all frames, chunk-capacity failure, unsupported frame rejection, save/reopen, and byte-for-byte no-change on failed conversion.
+- In-game acceptance is mandatory: the unchanged converted sample must play in the original Crash 2 game/emulator. Then edit one vertex in the converted Normal animation, save/reopen, and verify playback again.
+
+**Status:** UI insertion point and archive integration constraints identified. The menu/operation is not implemented yet; do not expose a nonfunctional menu item or claim conversion support until the archive-level atomic conversion and regression tests exist.
