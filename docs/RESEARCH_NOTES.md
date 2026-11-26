@@ -436,11 +436,11 @@ The synthetic NSF tests already exercise narrow compressed delta rejection, widt
 This distinction matters: synthetic coverage proves the code path in a constructed fixture, not capacity behavior or shared-Model effects in retail data. See the regression audit in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md). Next validation should record the actual blocked ModelPosition width/base and exact failing delta on the private sample, then test full-pose equality after expansion and every affected Animation payload rebuild.
 
 
-### Correction: compressed expansion destination hypothesis was wrong — 2026-11-26
+### Correction: native unified-frame vertex mapping — 2026-11-26
 
-The prior note claiming a compressed expansion vertex-index bug was incorrect. CrashEdit-RE `Frame.MakeVertices()` writes compressed Model position `i` to `verts[i]`; the renderer's separate `+ SpecialVertexCount` triangle index does not shift that destination. We briefly changed expansion to `specialVertexCount + pi`, and the next CI run failed on the expanded-pose assertion. The implementation was restored to `frame.vertices[pi]`.
+The earlier conclusion that the native expansion destination should remain `frame.vertices[pi]` was incorrect: it treated CrashEdit-RE's model-local `verts` list as the native unified frame array. Native `frame.vertices` already stores the special prefix at indices 0 through specialVertexCount-1, and the renderer adds that prefix to Model-local triangle indices. The native decoder, encoder, and expansion routine therefore must map ModelPosition i to `frame.vertices[specialVertexCount + i]`. The old unshifted tests accidentally encoded the wrong port mapping and left the final specialVertexCount vertices outside the compressed stream.
 
-The same regression fixture had an invalid packed width word (`0x1f9` encoded X width 7, not width 1); it was corrected to `0x7f`. The updated test exercises the narrow-width-to-width-7 expansion while asserting the actual reference destination indexing and save/reload behavior.
+The narrow-width fixture still uses `0x7f` for a one-bit X width on its second ModelPosition record. The corrected regression now asserts the native unified-frame prefix mapping and verifies that a width-7 clone saves and reloads the edited compressed vertex at its proper frame index.
 
 Relevant commits: [fixture fix](https://github.com/leorelic/CrashEdit-VC/commit/ed21d4c97e606bb9acd6237fb3f1bf243a5aa872), [wrong shifted-index attempt](https://github.com/leorelic/CrashEdit-VC/commit/c9027db85b567a43ec25a3c18da697c04c8d195e), [source-aligned code correction](https://github.com/leorelic/CrashEdit-VC/commit/a4e015407111393ab2b81891b27e7988775b99ce), [test correction](https://github.com/leorelic/CrashEdit-VC/commit/d3aa54664ae168fb7f87d5bac71067535da5a23b), and [research correction](https://github.com/leorelic/CrashEdit-VC/commit/91c92c500c34eed0bc4ae371f734cc342d0c3adb).
 
@@ -473,3 +473,10 @@ The relocation routine copies only the selected raw entry into the new type-0 ch
 The Decoded Vertices special-coordinate controls also used repeated visible X/Y/Z labels. Each input now has an explicit vertex-row and axis ID plus a hidden label. This is intended to eliminate the reported Dear ImGui conflicting-ID warning; user confirmation remains pending.
 
 The coordinate limit itself remains a separate encoding issue: Crash 2 local frame coordinates are byte values (0–255), while compressed ModelPosition records store per-vertex delta widths and accumulators. A target coordinate such as X=81 is valid as a byte, but the delta from that record's base/previous accumulator can exceed its current width. Widening the shared Model's records rebuilds linked Animation frame payloads; only if that expanded payload exceeds the entry chunk's 64 KiB capacity should relocation be requested. A chunk move cannot fix a frame whose axis span exceeds 255 or whose rebased frame offsets exceed signed 16-bit.
+
+
+### Shared compressed Model isolation — 2026-11-26
+
+The previous save path widened a ModelPosition table shared by multiple Animations. If any linked Animation payload exceeded its 64 KiB chunk, commit returned failure and discarded its working archive copy. The UI then moved the reported entry in the original archive and retried from scratch; additional linked animations could fail and prompt further moves. This is why the capacity dialog could cascade through several animations without completing the requested edit.
+
+The current patch probes the edited pose against existing widths without mutating the source. If expansion is actually required, it clones the compressed Model to a new unused EID and redirects only that Animation's frame references, then widens/rebuilds the clone. This keeps other Animations on the original Model and makes any capacity relocation target the edited Animation. Shared-model synthetic save/reload test and CI are pending.
