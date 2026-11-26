@@ -470,8 +470,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expansionReloaded.chunks()[0].entries[0].eid==0x0200007eU&&expansionReloaded.chunks()[0].entries[0].type==99);
  assert(expansionReloaded.chunks()[0].entries[0].items[0].size==exFollowingSize-24U);
  
- // Regression: relocating one entry must preserve dirty poses in both the moved
- // entry and entries left behind in the source chunk.
+ // Regression: relocation restores dirty poses by exact entry location even
+ // when moved and retained Animation entries share the same EID.
  std::vector<std::uint8_t> pendingPoseChunk(65536);
  p16(pendingPoseChunk,0,0x1234);p16(pendingPoseChunk,2,0);p32(pendingPoseChunk,8,2);
  p32(pendingPoseChunk,16,28);p32(pendingPoseChunk,20,80);p32(pendingPoseChunk,24,132);
@@ -483,14 +483,14 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
   p32(pendingPoseChunk,frameOffset+8,1);p32(pendingPoseChunk,frameOffset+12,0);
   p32(pendingPoseChunk,frameOffset+16,0);p32(pendingPoseChunk,frameOffset+20,24);
  };
- writePendingAnimation(28,0x0200007dU);writePendingAnimation(80,0x0200007eU);
+ writePendingAnimation(28,0x0200007dU);writePendingAnimation(80,0x0200007dU);
  NsfArchive pendingPoseArchive;assert(pendingPoseArchive.loadBytes(pendingPoseChunk,e));pendingPoseArchive.decodeAnimationModels(false);
  const std::vector<std::size_t> pendingIndices{0};
  const std::vector<NsfAnimationVertex> pendingFirstPose{{17,23,29}},pendingSecondPose{{31,37,41}};
  assert(pendingPoseArchive.setAnimationFrameVertices(0,0,0,pendingIndices,pendingFirstPose));
  assert(pendingPoseArchive.setAnimationFrameVertices(0,1,0,pendingIndices,pendingSecondPose));
  std::size_t pendingDestination=0;assert(pendingPoseArchive.moveEntryToNewChunk(0,0,pendingDestination,e));
- assert(pendingDestination==1U&&pendingPoseArchive.chunks()[0].entries[0].eid==0x0200007eU);
+ assert(pendingDestination==1U&&pendingPoseArchive.chunks()[0].entries[0].eid==0x0200007dU);
  assert(pendingPoseArchive.chunks()[1].entries[0].eid==0x0200007dU);
  const auto&retainedSourcePose=pendingPoseArchive.chunks()[0].entries[0].animation.frames[0];
  const auto&retainedMovedPose=pendingPoseArchive.chunks()[1].entries[0].animation.frames[0];
