@@ -407,3 +407,14 @@ Checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leore
 The remaining defect: some vertices cannot move beyond a particular X/Y/Z gizmo location. The editor incorrectly offers moving the Animation entry to a new NSF chunk, but the edit still does not apply. Investigate frame boundaries and actual coordinate/encoding limits, comparing gizmo bounds with frame metadata, encoder representability, and save validation. Do not use chunk relocation as a workaround without evidence of chunk-capacity exhaustion.
 
 Acceptance: reproduce and record the exact frame, vertex, axis, current/requested coordinate, and rejection reason; move past the former limit; confirm the edit applies and survives save/reopen; test original-game behavior separately. Keep exact-pose checks and never silently clamp, wrap, or discard edits. See [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+### Normal / Complex Animation editing separation
+
+- [x] Identify linked Model compression in the 3D Animation Editor as Normal (uncompressed) or Complex (compressed); user-confirmed on BT10V/BT10G and Cr10V/Cr10G.
+- [ ] Preserve the existing Normal edit/save path as a regression baseline.
+- [ ] Keep Complex editing research-only until its index mapping and serialization are proven; do not reuse the Normal encoder implicitly.
+- [ ] Trace Complex frame slots, special-prefix slots, Model-local polygon indices, ModelPosition records, and temporal bit ranges against Cr10V and CrashEdit-RE.
+- [ ] Add Complex no-op and edit-then-restore save regressions.
+- [ ] Evaluate true Complex delta encoding versus explicit, isolated Complex-to-Normal conversion. Conversion must preserve all frame poses, special vertices, collisions/header fields, Model references, polygon rendering, and unrelated Animations.
+- [ ] Enable Complex editing only after save/reopen and original-game validation. Preserve the user-confirmed Cr10V preview baseline (ff5359a).
+
+Research details: ANIMATION_FORMAT_RESEARCH.md and RESEARCH_NOTES.md.
