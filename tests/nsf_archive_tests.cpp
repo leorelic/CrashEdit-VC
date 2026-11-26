@@ -355,7 +355,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // when the frame has a special-vertex prefix: Model position i writes verts[i],
  // while SpecialVertexCount only advances the temporal bit cursor.
  std::vector<std::uint8_t> narrowSpecialBytes=specialCompressedBytes;
- p32(narrowSpecialBytes,scmPositions+4U,0x000001f9U); // second position: X width 1, Z/Y width 7
+ p32(narrowSpecialBytes,scmPositions+4U,0x0000007fU); // second position: X width 1, Z/Y width 7
  NsfArchive narrowSpecialArchive;assert(narrowSpecialArchive.loadBytes(narrowSpecialBytes,e));narrowSpecialArchive.decodeAnimationModels(false);
  assert(narrowSpecialArchive.chunks()[0].entries[0].model.positions[1].xBits==1U);
  assert(narrowSpecialArchive.setAnimationFrameVertex(1,0,0,1,0,200));
