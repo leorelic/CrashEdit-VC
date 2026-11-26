@@ -229,3 +229,15 @@ A second save issue is shared Model mutation: widening a ModelPosition table cha
 A previous research conclusion proposed moving decoded compressed ModelPosition `i` to `frame.vertices[i + specialVertexCount]`. That conclusion was not verified against the baseline renderer and caused a preview regression. In the known-good `ff5359a` code, compressed positions decode to `frame.vertices[i]`; renderer Model triangle lookup still applies `+ specialVertexCount`. The editor/save path's ModelPosition-to-frame mapping is a separate conversion and must not be inferred from decoder storage.
 
 The regression fix restores the original `decodeAnimationVertices()` implementation and retains the renderer's original special-vertex offset. Keep this preview behavior stable. Investigate edit/save independently by tracing the exact CrashEdit-RE decode, selection, encode, and triangle-index conventions against the private Cr10V sample. Specifically compare Model-local vertex index, decoded frame slot, selected frame slot, encoded ModelPosition slot, and save/reload slot. Do not change preview decoding or renderer indexing until this end-to-end mapping is demonstrated by a real sample and regression.
+
+
+### User-confirmed Cr10V preview recovery — 2026-11-27
+
+The user tested the recovery build and confirmed the Cr10V preview looks correct again. The source was compared against the known-good `ff5359a` checkpoint:
+
+- `decodeAnimationVertices()` is identical to the `ff5359a` implementation. In the compressed path it reads the temporal stream from `specialVertexCount * 24` bits and stores decoded ModelPosition record `i` at `frame.vertices[i]`.
+- The renderer continues to resolve Model triangle indices with `+ frame.specialVertexCount`. This offset is present in main triangle rendering, face picking/selection, face-edge overlay, and vertex/surface picking.
+- **This exact decoder/renderer pairing is the known-good, user-visually-confirmed Cr10V preview contract.** Do not shift decoder destinations to `i + specialVertexCount`, and do not remove the renderer offset. Both attempted changes caused corrupted previews in prior builds.
+- Decoder storage and edit/save indexing must be treated as separate mappings until proven against the retail Cr10V sample and CrashEdit-RE. Do not change the preview path to solve the coordinate-edit limitation.
+
+The current source decoder was compared directly to `ff5359a` and matched. User visual confirmation was received on 2026-11-27. This is a preview recovery checkpoint only; unrestricted vertex editing remains unresolved.
