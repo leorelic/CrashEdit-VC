@@ -596,3 +596,16 @@ More importantly, the current native compressed encoder `encodeAnimationFrameVer
 - Evaluate a deliberate conversion-to-uncompressed edit workflow as an alternative to reimplementing compressed delta mutation. Keep the source Model/Animation untouched until the converted pair can be saved/reloaded and all references are redirected safely.
 
 **Do not change the renderer or the user-confirmed `ff5359a` preview decoder contract while doing these tests.**
+
+
+### Animation Editor format label: Normal / Complex — 2026-11-27
+
+The 3D Animation Editor now identifies the displayed frame's animation format using its linked Model's `NsfModel::compressed` flag:
+
+- **Normal**: linked Model is uncompressed (`model.compressed == false`).
+- **Complex**: linked Model uses compressed ModelPosition records (`model.compressed == true`).
+- **Unknown**: the linked Model cannot currently be resolved; the UI must not guess.
+
+The classification is evaluated for the currently displayed frame, so it follows frame playback when the animation references different Models. For Crash 3-style references the existing `linkedModelEid` path is used; otherwise the frame's `modelEid` is used.
+
+Important terminology guardrail: frame `specialVertexCount` / special vertices are a separate frame-layout concept. They are **not** the criterion for Normal versus Complex. The label describes the linked Model's position encoding, not a claim that every other part of the Animation entry has a wholly separate binary container format.
