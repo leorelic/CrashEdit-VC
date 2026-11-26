@@ -409,8 +409,8 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    xAcc=(xAcc+dx+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
-   // Special vertices occupy the leading frame slots; compressed Model positions follow them.
-   frame.vertices[static_cast<std::size_t>(frame.specialVertexCount)+i]={xAcc,yAcc,zAcc};
+   // CrashEdit-RE's Frame.MakeVertices() writes compressed positions to verts[i].
+   frame.vertices[i]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
@@ -896,8 +896,8 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
     auto deltaFor=[](std::int32_t target,std::int32_t base){std::int32_t delta=(target-base)%256;if(delta<0)delta+=256;return delta>127?delta-256:delta;};
     for(std::size_t pi=0;pi<model.positions.size();++pi){
      const auto&position=model.positions[pi];if(position.xBits==7U)xAcc=0;if(position.yBits==7U)yAcc=0;if(position.zBits==7U)zAcc=0;
-     // Special vertices occupy the leading frame slots; compressed Model positions follow them.
-     const std::size_t frameVertexIndex=static_cast<std::size_t>(frame.specialVertexCount)+pi;
+     // CrashEdit-RE's Frame.MakeVertices() writes compressed positions to verts[pi].
+     const std::size_t frameVertexIndex=pi;
      if(frameVertexIndex>=frame.vertices.size()){e="Compressed model position index exceeds the linked animation frame.";return false;}
      const auto&target=frame.vertices[frameVertexIndex];
      const std::int32_t baseX=(xAcc+(static_cast<std::int32_t>(position.x)<<1U))&0xff;
