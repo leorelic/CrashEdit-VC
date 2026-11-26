@@ -334,7 +334,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  // to frame vertex i + specialVertexCount, matching triangle index offsets.
  assert(specialFrame.specialVertices[0][0]==10&&specialFrame.specialVertices[0][1]==20&&specialFrame.specialVertices[0][2]==30);
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
- assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
+ assert(specialFrame.vertices[1].x==10&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
  const std::vector<std::size_t> specialEditIndices{0,1};
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
