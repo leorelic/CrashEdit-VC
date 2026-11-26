@@ -336,8 +336,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
  assert(specialFrame.vertices[1].x==10&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
- const std::vector<std::size_t> specialEditIndices{0};
- const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31}};
+ const std::vector<std::size_t> specialEditIndices{0,1};
+ const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{11,0,0}};
  assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
  NsfArchive specialCommitted=specialCompressedArchive;
  if(!specialCommitted.commitAnimationEdits(e)){std::cerr<<"special-prefix commit failed: "<<e<<"\\n";assert(false);}
@@ -358,14 +358,15 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive narrowSpecialAliasArchive;assert(narrowSpecialAliasArchive.loadBytes(narrowSpecialAliasBytes,e));narrowSpecialAliasArchive.decodeAnimationModels(false);
  assert(narrowSpecialAliasArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].x==22);
  assert(narrowSpecialAliasArchive.setAnimationFrameVertex(1,0,0,0,0,25));
+ assert(narrowSpecialAliasArchive.setAnimationFrameVertex(1,0,0,1,0,37)); // first compressed delta aliases special X for this non-word-aligned fixture
  assert(narrowSpecialAliasArchive.setAnimationFrameVertex(1,0,0,2,0,200));
  assert(narrowSpecialAliasArchive.commitAnimationEdits(e));
  const auto&narrowAliasExpanded=narrowSpecialAliasArchive.chunks()[1].entries[0].animation.frames[0].vertices;
- assert(narrowAliasExpanded[0].x==25&&narrowAliasExpanded[2].x==200);
+ assert(narrowAliasExpanded[0].x==25&&narrowAliasExpanded[1].x==37&&narrowAliasExpanded[2].x==200);
  std::vector<std::uint8_t> narrowAliasSaved;assert(narrowSpecialAliasArchive.saveUncompressedSourceBytes(narrowAliasSaved,e));
  NsfArchive narrowAliasReload;assert(narrowAliasReload.loadBytes(narrowAliasSaved,e));narrowAliasReload.decodeAnimationModels(false);
  const auto&narrowAliasReloaded=narrowAliasReload.chunks()[1].entries[0].animation.frames[0].vertices;
- assert(narrowAliasReloaded[0].x==25&&narrowAliasReloaded[2].x==200);
+ assert(narrowAliasReloaded[0].x==25&&narrowAliasReloaded[1].x==37&&narrowAliasReloaded[2].x==200);
  // Width expansion must encode compressed vertices after the special-vertex prefix.
  std::vector<std::uint8_t> narrowSpecialBytes=specialCompressedBytes;
  p32(narrowSpecialBytes,scmPositions+4U,0x0000007fU); // second position: X width 1, Z/Y width 7
