@@ -304,3 +304,13 @@ Preserve the known-good Cr10V decoder/renderer pairing from ff5359a. Do not shif
 Before enabling Complex editing: inventory BT10V/BT10G and Cr10V/Cr10G; trace every index and temporal bit around the special prefix; add no-op and edit-then-restore save tests; then compare a true Complex delta encoder against isolated Complex-to-Normal conversion. Conversion must preserve every frame pose, special vertices, collision/header data, polygon rendering, shared Model users, and archive/game behavior after save/reopen.
 
 Do not claim Complex editing is solved. Keep Normal's existing working editing path stable and do not route Complex edits into it without an explicit, validated conversion step.
+## Complex-to-Normal conversion and in-game compatibility (2026-11-27)
+
+CrashEdit-RE has `ModelEntry.ConvertCompressedToUncompressed()`, proving a conversion approach was explored in that project. It does not establish that the output is game-compatible, and its current helper has two warning signs that must be resolved before porting:
+
+- `DecompressModel()` drops the ModelPosition table but reuses Info and PolyData. `ConvertIndices()` changes its initial vertex-index bias based on whether Positions is null (`-Info[0x4C]` for compressed, zero for uncompressed). Keeping the same polygon stream while changing this condition can alter triangle vertex mapping.
+- `MakeTemporals()` iterates `vertexCount - specialVertexCount` but reads `vertices[i]` from index zero, despite the uncompressed frame decoder reading ordinary coordinates from index `specialVertexCount`. Special-prefix preservation therefore needs a precise round-trip proof.
+
+Treat the conversion as structurally plausible, not proven in-game. The target is the game's existing Normal/uncompressed representation. Validate all frames, world-space poses, special vertices, collision/header data, polygon-to-vertex mapping, ModelEID references/shared users, NSF reparse, and original-game playback. Then edit one vertex and repeat save/reopen/game playback.
+
+Keep two eventual strategies: genuine Complex delta encoding and explicit Complex-to-Normal conversion. Conversion must be user-invoked, previewable, atomic, and rollback-safe; never silently convert during ordinary save. Preserve the verified Cr10V renderer/decoder.
