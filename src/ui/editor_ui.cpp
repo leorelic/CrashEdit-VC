@@ -3173,8 +3173,9 @@ void EditorUI::drawAnimationFrameEditor(){
       ImGui::TableSetColumnIndex(static_cast<int>(axis+1U));
       int value=axis==0U?frame.vertices[vi].x:axis==1U?frame.vertices[vi].y:frame.vertices[vi].z;
       ImGui::PushID(static_cast<int>(axis));
+      char coordinateId[64];std::snprintf(coordinateId,sizeof(coordinateId),"##SpecialVertexCoordinate_%zu_%zu_%zu_%zu_%zu",chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis);
       ImGui::SetNextItemWidth(-1.0f);
-      if(ImGui::InputInt("##SpecialVertexCoordinate",&value,1,8)){
+      if(ImGui::InputInt(coordinateId,&value,1,8)){
        if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis,value))status_="Could not update the editable special-vertex pose.";
       }
       ImGui::PopID();
