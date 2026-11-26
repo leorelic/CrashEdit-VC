@@ -426,7 +426,7 @@ New source-confirmed detail is recorded in [ANIMATION_FORMAT_RESEARCH.md](ANIMAT
 - A valid edited frame can be rebased into byte local coordinates only when each axis span is at most 255 and adjusted signed-16-bit offsets remain valid.
 - When current compressed widths reject an edit, native save tries widening the shared Model’s position records to width 7 and rebuilding every Animation entry that references it. If an enlarged payload fails to fit a chunk, the UI raises the chunk-relocation prompt. This is an archive-capacity failure triggered by encoding fallback—not proof that the vertex coordinate itself needs a new chunk.
 
-The previous 'no implementation change justified' conclusion is superseded by the native unified-frame indexing defect documented below. The exact retail Cr10V vertex/axis still needs the user's test, but the representation mismatch is proven in source: native frame.vertices includes the special prefix while compressed ModelPosition decoding/encoding had used unshifted model-local indices. The code now maps compressed positions after the special prefix and isolates shared Models when a width expansion is needed. Preserve the `ff5359a` renderer baseline and do not revive the post-serialization raw-special restore.
+The previous conclusion in this paragraph was premature. The preview baseline has an asymmetric decoder/renderer mapping; the shifted decoder experiment corrupted the renderer and has been reverted. Coordinate editing remains under investigation. Preserve `ff5359a` preview behavior and do not revive the post-serialization raw-special restore.
 
 
 ### Real-sample animation edit coverage gap — 2026-11-26
@@ -438,7 +438,7 @@ This distinction matters: synthetic coverage proves the code path in a construct
 
 ### Correction: native unified-frame vertex mapping — 2026-11-26
 
-The earlier conclusion that the native expansion destination should remain `frame.vertices[pi]` was incorrect: it treated CrashEdit-RE's model-local `verts` list as the native unified frame array. Native `frame.vertices` already stores the special prefix at indices 0 through specialVertexCount-1, and the renderer adds that prefix to Model-local triangle indices. The native decoder, encoder, and expansion routine therefore must map ModelPosition i to `frame.vertices[specialVertexCount + i]`. The old unshifted tests accidentally encoded the wrong port mapping and left the final specialVertexCount vertices outside the compressed stream.
+The earlier conclusion that decoder destinations must be shifted was incorrect for the known-good preview path. The baseline decoder writes compressed ModelPosition i to `frame.vertices[i]`, while the renderer retains its specialVertexCount triangle offset. Do not change decoder indexing based solely on the unified frame container; encoder/edit mapping is a separate unresolved conversion.
 
 The narrow-width fixture still uses `0x7f` for a one-bit X width on its second ModelPosition record. The corrected regression now asserts the native unified-frame prefix mapping and verifies that a width-7 clone saves and reloads the edited compressed vertex at its proper frame index.
 
@@ -484,7 +484,7 @@ The current patch probes the edited pose against existing widths without mutatin
 
 ### Root cause from native unified pose vs Model-local indices — 2026-11-26
 
-The unchanged Cr10V test exposed that earlier synthetic tests and the native decoder shared the same wrong assumption. CrashEdit-RE's `Frame.MakeVertices()` writes into its model-local `verts` array, but the native editor stores special vertices at the front of one full `frame.vertices` array. Native rendering offsets Model-local triangle indices by `specialVertexCount`. The port had decoded, encoded, and expanded ModelPosition i at unified index i, which overwrote special vertices and left the tail of the frame unencoded. For Cr10V (309 frame vertices, 4 special, 305 compressed Model positions), unified vertices 305–308 were never handled by the compressed stream. The native decoder, encoder, and expansion writer now use i+specialVertexCount; tests assert the final compressed vertex survives.
+Cr10V preview compatibility was not established by the prior synthetic indexing test. The decoder-shift patch based on this paragraph was reverted after it broke the renderer. The exact Cr10V Model-local, decoded-frame, renderer, selected-vertex, and encoder index relationship still needs to be measured against the retail sample and CrashEdit-RE source. Do not infer that vertices 305–308 are missing solely from the counts.
 
 A coordinate such as X=81 is not a fixed-format boundary: local coordinates are bytes 0–255, while a narrow ModelPosition delta may reject a change from its base/previous accumulator. If the width probe rejects the pose, the native save path now clones the compressed Model to a new unused EID and redirects only the edited Animation before width-7 expansion. This prevents widening a shared Model from forcing unrelated Animations to be relocated. The real Cr10V save/reopen/game validation remains unverified.
 
@@ -507,11 +507,11 @@ When diagnosing a failed edit, record the exact frame, unified vertex index, axi
 The user reported that the Cr10V preview remained visibly corrupted after the renderer-offset removal. Reinspection corrected the previous diagnosis.
 
 - Model triangle indices are Model-local indices. The Animation frame's displayed vertex array includes a special-vertex prefix, so renderer/picking/edge-overlay access must use `triangleIndex + specialVertexCount`.
-- The current unified decode maps compressed Model position `i` to frame vertex `i + specialVertexCount`. With that mapping, the renderer must still add the prefix when resolving a Model triangle index. The earlier conclusion that the renderer should use Model triangle indices directly was wrong.
+- The decoder has been restored to the baseline destination `frame.vertices[i]`; renderer Model triangle lookup retains `+ specialVertexCount`. The previous shifted decode and direct-index renderer experiments were both reverted.
 - Commit `51f98dc` removed that offset from animation surface picking, face selection, face drawing, and edge overlay. This caused the renderer to read special/incorrect vertices for Model triangles and explains the mesh appearing severely distorted.
 - Restored the prefix offset in all those renderer paths in commit `4edbfb3690f3ff7bc4e52375778ad627a795cfd5`.
 
-**Correct invariant for the current unified frame array:** ModelPosition `i` maps to `frame.vertices[i + specialVertexCount]`; Model triangle index `t` resolves to `frame.vertices[t + specialVertexCount]`. The prefix is applied once at each conversion between Model-local indices and the unified frame vertex array. Do not remove the renderer offset unless the frame storage representation and all related indexing paths are changed together and verified against the retail Cr10V sample.
+**Known-good preview invariant:** compressed ModelPosition `i` decodes to `frame.vertices[i]`; Model triangle index `t` resolves through the renderer's `frame.vertices[t + specialVertexCount]` lookup. This is the baseline behavior to preserve. The editable pose/encoder mapping is not yet proven to be identical and must be investigated separately.
 
 CI and the user's visual validation are pending. Do not mark the preview regression resolved until Cr10V renders normally in the next build.
 
