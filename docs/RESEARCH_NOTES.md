@@ -665,3 +665,32 @@ Reference source files:
 6. Only after the above should Complex vertex controls be enabled. Until then, Complex must be clearly identified and must not silently pretend edits are saveable.
 
 **Non-negotiable guardrail:** keep the user's visually confirmed Cr10V preview behavior from ff5359a intact. Any alternate mapping or conversion experiment must be isolated in tests/a candidate archive and must not replace the working preview path without sample-backed visual verification.
+## Complex-to-Normal conversion: original-game compatibility investigation — 2026-11-27
+
+**Question:** if a Complex (compressed ModelPosition) animation is converted to Normal (uncompressed byte-coordinate frame temporals), will Crash 2 play it?
+
+**Current conclusion:** structurally plausible, but NOT YET PROVEN in-game. This is a format-to-format conversion, not a new runtime feature: the target representation is the existing uncompressed Model + uncompressed Animation frame layout. A successful editor preview or NSF reparse is insufficient; acceptance requires the converted NSF/NSD to load and play in the original game/emulator.
+
+### CrashEdit-RE conversion helper audit
+
+Inspected `ModelEntry.ConvertCompressedToUncompressed`, `DecompressModel`, `DecompressFrame`, `MakeTemporals`, `Frame.MakeVertices`, `Frame.SaveC2`, and `ModelEntry.ConvertIndices` on `airumu/CrashEdit:t/net9`.
+
+RE's helper is useful evidence that conversion was contemplated, but it is NOT a safe reference implementation to port unchanged. Two concrete red flags:
+
+1. `DecompressModel()` removes the ModelPosition table but reuses the same `Info` and `PolyData`. `ConvertIndices()` uses a different initial vertex-index bias depending on whether `Positions` is null: compressed models start at `-Info[0x4C]`, while uncompressed models start at zero. Therefore simply nulling Positions while retaining the polygon stream changes the derived triangle-to-vertex mapping when the stored special count is nonzero. A correct conversion must explicitly preserve the rendered vertex mapping, either by transforming polygon indices/metadata as appropriate or by another proven mapping strategy.
+2. `DecompressFrame()` calls `MakeVertices(model)` then `MakeTemporals()`. `MakeTemporals()` loops `vertexCount - specialVertexCount` iterations but reads `vertices[i]` starting at zero, then inserts/copies a special-prefix-sized bit region. This appears inconsistent with the uncompressed decoder, which reads ordinary vertex coordinates beginning at frame slot `specialVertexCount`, while the special vertices are separately stored in the frame header. Treat this as a likely conversion defect until a byte-level round-trip test proves otherwise.
+
+Other required checks: preserve frame `HeaderSize` and raw special-vertex bytes consistently; preserve all collision records and frame offsets; ensure each frame's ModelEID resolves to the intended converted Model; isolate the converted Model if any other Animation/GOOL frame group shares the original Model EID; update all intended references atomically; preserve EIDs and entry/chunk integrity without accidentally changing unrelated resources.
+
+### Game-compatibility test design
+
+1. Start from the checked-in Crash 2 sample NSF/NSD and record hashes plus parsed resource inventory.
+2. Convert a copy of Cr10V + its linked Cr10G Model to Normal. Do not overwrite the source sample.
+3. For every frame, compare the decoded world-space vertex pose before/after conversion, including special vertices, first/last compressed vertices, collision records, offsets, and frame count. Compare rendered triangle vertex references, not only vertex arrays.
+4. Reparse the written NSF from disk and repeat the full comparisons. Verify the Animation entry and Model entry resolve by EID and that unrelated animations retain their original linked Models and poses.
+5. Load the converted NSF/NSD in the original Crash 2 game/emulator and exercise the actual Cr10V animation. Confirm it plays across all frames, with correct geometry, texture/material association, collision behavior, and no resource-load failure.
+6. Only after an unchanged conversion passes game playback, edit one vertex, save/reopen, repeat the binary/pose checks, and test game playback again.
+
+### Product decision
+
+Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Complex-to-Normal conversion. Conversion must be an explicit archive operation with a preview/diff and safe rollback, not an invisible save fallback. It must clone/isolate shared Model resources where necessary and must not change the working Cr10V preview decoder/renderer. No claim of in-game compatibility is allowed until step 5 passes.
