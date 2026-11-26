@@ -621,3 +621,47 @@ The 3D Animation Editor's format label was tested by the user in the running bui
 The UI classification is derived from the linked Model's `NsfModel::compressed` flag, follows the displayed frame's Model reference, and shows Unknown rather than guessing when the Model cannot be resolved. `specialVertexCount` is not part of this classification. The label is display-only and must not change renderer/decode/save behavior.
 
 Checkpoint declared by the user: [e4aa8e5](https://github.com/leorelic/CrashEdit-VC/commit/e4aa8e57107e88467b3b05b9a36aa7dce975dfbc). The label's source definition is documented in the animation format research. This milestone does not resolve Complex vertex edit/serialization limitations; preserve the user-confirmed Cr10V preview contract while continuing that separate investigation.
+
+## Separate Normal and Complex Animation editing paths — 2026-11-27
+
+**Decision:** do not route Normal and Complex frame edits through one assumed serializer. Keep the user-confirmed Normal path as the stable baseline. Complex editing is a research-first workstream; do not change its renderer/decoder while researching its encoder or conversion.
+
+### Classification boundary
+
+The editor's labels describe the linked Model representation: Normal means the linked Model is uncompressed; Complex means its ModelPosition table is compressed. This is not determined by specialVertexCount, which remains a separate frame-layout property.
+
+### CrashEdit-RE source findings (direct inspection, branch airumu/CrashEdit:t/net9)
+
+Inspected Frame.cs, FrameVertex.cs, ModelEntry.cs, ModelPosition.cs, and FrameBox.cs:
+
+1. Frame.MakeVertices(model) has two distinct decode paths. With a ModelPosition table it decodes compressed deltas from the temporal bitstream, starting at SpecialVertexCount * 24 bits, in X-Z-Y component order, with per-axis accumulators and width-7 resets. Without a compressed ModelPosition table it reads byte coordinates from the uncompressed temporal stream after the special prefix.
+2. Frame.SaveC2() serializes Temporals as stored. It does not regenerate compressed deltas from cached Positions.
+3. RE's FrameBox marks compressed vertices as read-only and UpdateTemporals() returns immediately for compressed frames. The cached position view is not evidence of a working Complex encoder/save path.
+4. RE contains ModelEntry.ConvertCompressedToUncompressed(), DecompressModel(), and DecompressFrame(). The helper constructs an uncompressed Model and regenerates uncompressed frame temporals from decoded positions. This proves a conversion concept exists in RE; it does not prove that copying the helper directly is safe for our archive model.
+5. RE's conversion helper constructs the converted Model with the original Model EID and the converted Animation with the original Animation EID. In an NSF where other animations share the Model EID, a native implementation must isolate/repoint references deliberately rather than replacing a shared Model globally.
+6. The inspected MakeTemporals() loops over vertexCount - specialVertexCount but reads vertices[i] and inserts a prefix into the output. Special-vertex ordering/preservation during conversion therefore needs an explicit byte/slot-level test; do not assume this helper preserves every special vertex correctly merely because it exists.
+
+Reference source files:
+- https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/Frame.cs
+- https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/FrameVertex.cs
+- https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntry.cs
+- https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelPosition.cs
+- https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controls/FrameBox.cs
+
+### Native code implications
+
+- Current NsfModel::compressed is the authoritative UI classification source.
+- Current decodeAnimationVertices() intentionally follows the verified preview mapping: special vertices in the leading frame slots; compressed ModelPosition record i stored at frame.vertices[i]; renderer triangle consumers apply the separate special-vertex offset. Preserve this decoder/renderer pair.
+- Current setAnimationFrameVertex() sets verticesEdited=true unconditionally, including when the supplied component equals its current value. Normal and Complex dirty-state handling should be audited separately; a no-op must not trigger unnecessary encoding.
+- Existing Complex save code attempts to encode the compressed ModelPosition representation and has a documented decode/encode indexing asymmetry candidate. Do not assume that path is valid until a real Cr10V trace and focused regression prove it.
+
+### Required Complex research sequence (no renderer changes)
+
+1. Establish per-frame inventory for BT10V/BT10G (Normal) and Cr10V/Cr10G (Complex): EIDs, frame counts, vertex counts, special counts, ModelPosition counts, raw frame sizes, Model references, and all other Animations sharing each Model EID.
+2. For Cr10V, trace selected vertex indices end-to-end: frame-header special slot, decoded frame.vertices slot, Model-local polygon index, ModelPosition record index, temporal bit start/end, and saved/reloaded slot. Include first and last compressed positions and vertices on both sides of the special-prefix boundary.
+3. Add read-only/no-op and edit-then-restore tests before modifying the Complex encoder. Compare source bytes and decoded poses.
+4. Evaluate two separate product strategies: (A) implement a true Complex ModelPosition delta encoder; (B) explicitly convert an isolated Complex Model + its target Animation to Normal representation before enabling edits. Compare fidelity, special-vertex preservation, shared EID references, chunk capacity, and save/reload.
+5. Conversion acceptance must prove all frame poses are identical before/after conversion, special vertices and collision/header data are preserved, polygon indices still render correctly, only intended Animation references the converted Model, no unrelated animation changes, and save/reopen works. Also test original-game playback.
+6. Only after the above should Complex vertex controls be enabled. Until then, Complex must be clearly identified and must not silently pretend edits are saveable.
+
+**Non-negotiable guardrail:** keep the user's visually confirmed Cr10V preview behavior from ff5359a intact. Any alternate mapping or conversion experiment must be isolated in tests/a candidate archive and must not replace the working preview path without sample-backed visual verification.
