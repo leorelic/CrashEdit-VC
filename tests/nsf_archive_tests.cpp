@@ -340,7 +340,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31}};
  assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
  NsfArchive specialCommitted=specialCompressedArchive;
- assert(specialCommitted.commitAnimationEdits(e));
+ if(!specialCommitted.commitAnimationEdits(e)){std::cerr<<"special-prefix commit failed: "<<e<<"\\n";assert(false);}
  const auto&committedSpecialFrame=specialCommitted.chunks()[1].entries[0].animation.frames[0];
  for(std::size_t axis=0;axis<3U;++axis)
   assert(committedSpecialFrame.specialVertices[0][axis]==specialCommitted.chunks()[1].bytes[scaFrame+24U+axis]);
