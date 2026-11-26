@@ -58,9 +58,9 @@ RE's compressed frame decoder:
 3. Resets an axis accumulator to zero when that axis width is 7.
 4. Reads signed delta fields in **X, Z, Y** order. Each field is one sign bit followed by the configured number of magnitude bits, sign-extended.
 5. Adds the Model base (X base is shifted left by one; Z and Y are not) and delta to the corresponding accumulator, then wraps each accumulator to 8 bits.
-6. Writes decoded compressed positions to `verts[i]`, starting at frame vertex index zero, as `Frame.MakeVertices()` does in CrashEdit-RE. `SpecialVertexCount` controls the temporal cursor and the renderer's triangle-index offset; it does not shift this decoder destination.
+6. Writes decoded compressed positions to `verts[i]`, starting at frame vertex index zero, exactly as `Frame.MakeVertices()` does in CrashEdit-RE. This is intentionally distinct from the renderer's triangle index, which adds `SpecialVertexCount`. The special XYZ records remain in the raw frame header; do not shift compressed decoder destinations by the special count.
 
-The renderer uses the compressed Model's reconstructed triangle indices with an added `specialVertexCount` vertex-index offset. This is distinct from `Frame.MakeVertices()`, which writes compressed Model positions beginning at output index zero. Preserve this source behavior rather than assuming the decoder destination is `specialVertexCount + modelPositionIndex`.
+The renderer uses the compressed Model's reconstructed triangle indices with an added `specialVertexCount` vertex-index offset. This is distinct from `Frame.MakeVertices()`, which writes compressed Model positions beginning at output index zero. Preserve this source behavior: the renderer offset does not imply that the decoder or expansion routine should write to `specialVertexCount + modelPositionIndex`.
 
 ## Uncompressed frame bit order (RE source-confirmed)
 
@@ -82,9 +82,9 @@ When diagnosing a model that appears flat, skewed, tiny, or partly missing, insp
 
 ## Known investigation mistake to avoid
 
-The compressed Model position destination and special-prefix save behavior were previously misdiagnosed. CrashEdit-RE `Frame.MakeVertices()` writes compressed positions to `verts[i]` starting at zero; `SpecialVertexCount` controls the temporal cursor and renderer triangle-index offset. `Frame.SaveC2()` serializes temporal words over the overlapping prefix and does not restore old raw XYZ bytes afterward.
+The 2026-11-26 width-expansion diagnosis incorrectly claimed that compressed Model position `pi` should be mapped to frame vertex `specialVertexCount + pi`. CrashEdit-RE `Frame.MakeVertices()` explicitly writes to `verts[i]`; the renderer's `+ SpecialVertexCount` is a separate topology indexing operation. The native expansion must therefore encode `frame.vertices[pi]`, not a shifted vertex. A test failure exposed that mistaken change; the code and regression were corrected to match RE. Do not treat the failed hypothesis as a confirmed format defect.
 
-Do **not** restore stale special-vertex bytes after temporal serialization: that overwrites compressed delta bits. The native save path now verifies the re-decoded pose and refreshes its special-vertex cache from the bytes actually serialized. This behavior is source-aligned and regression-tested. See the 2026-11-26 milestone and the correction in `RESEARCH_NOTES.md`.
+The separate temporal-prefix serialization finding remains: temporal words overlap the special-prefix bytes, and restoring stale raw XYZ after temporal serialization overwrites compressed delta bits. Keep serialized temporal bytes authoritative and verify the re-decoded pose.
 
 ## Roadmap and acceptance gates
 
@@ -195,16 +195,16 @@ Current `tests/nsf_archive_tests.cpp` contains synthetic checks for a narrow com
 Therefore, the current tests support the general encoder/decoder mechanism but do not establish that the fallback succeeds for a real shared Model with multiple linked Animations or that the exact user-reported chunk prompt path is correct. Next regression should use the private retail sample, capture the actual ModelPosition records and first rejected delta, and test the complete edited pose through width expansion, all linked Animation payload rebuilds, save/reopen, and (separately) in-game.
 
 
-### Implemented fix: expanded Model position destination index — 2026-11-26
+### Width-expansion special-prefix regression correction — 2026-11-26
 
-**Confirmed native defect:** `expandCompressedModelPositions` rebuilt a frame by mapping Model position `pi` to frame vertex `specialVertexCount + pi`. This disagreed with the CrashEdit-RE decoder: compressed Model position `pi` is written to `verts[pi]`; `SpecialVertexCount` advances the temporal bit cursor and renderer topology offset, but does not offset the decoder destination. The expansion therefore re-encoded shifted vertex targets in models with a special-vertex prefix, which could corrupt the pose after widening.
+The earlier claim that `expandCompressedModelPositions` had a destination-index defect was **wrong**. The reference source `Frame.MakeVertices()` writes compressed positions to `verts[i]`, and the renderer separately adds `SpecialVertexCount` when indexing triangles. We changed expansion to `specialVertexCount + pi`; CI then failed on the regression's expected expanded pose. Inspection of the actual RE source confirmed the original `pi` mapping was correct, so the code was restored to `frame.vertices[pi]`.
 
-Fixed on `cpp-port-foundation`:
-- Expansion now encodes target `frame.vertices[pi]`, matching the reference decoder's destination indexing.
-- Added a synthetic regression with one special vertex, two compressed positions, a narrow X delta width on the second position, and a move to X=200. It forces width-7 expansion, checks the expanded pose, then saves/reloads and checks the pose again.
-- Code commit: [e6cf1ff](https://github.com/leorelic/CrashEdit-VC/commit/e6cf1ff023bb17d753cbb16fb9de3f27f180c559)
-- Regression commit: [3f98348](https://github.com/leorelic/CrashEdit-VC/commit/3f983481bde2e50d8493c0ae05f23dd646595e69)
+The synthetic test had a second issue: its packed position fixture used `0x1f9`, which encoded X width 7, not width 1. That was corrected to `0x7f`. The test now exercises the width-1-to-width-7 expansion while asserting the reference decoder's unshifted destination behavior and save/reload pose.
 
-The expansion's special-prefix byte preservation writes only the prefix region (exactly `specialVertexCount * 3` bytes); compressed delta encoding starts at the corresponding bit boundary. That prefix preservation is not the cause of the shifted-vertex defect. This corrects the earlier overly broad note that restoring any prefix bytes necessarily overwrites delta bits.
+Commits:
+- Invalid fixture correction: [ed21d4c](https://github.com/leorelic/CrashEdit-VC/commit/ed21d4c97e606bb9acd6237fb3f1bf243a5aa872)
+- Incorrect shifted-index attempt (reverted): [c9027db](https://github.com/leorelic/CrashEdit-VC/commit/c9027db85b567a43ec25a3c18da697c04c8d195e)
+- Source-aligned correction: [a4e0154](https://github.com/leorelic/CrashEdit-VC/commit/a4e015407111393ab2b81891b27e7988775b99ce)
+- Regression aligned with RE: [d3aa546](https://github.com/leorelic/CrashEdit-VC/commit/d3aa54664ae168fb7f87d5bac71067535da5a23b)
 
-This is an implementation correction plus synthetic regression; CI and real retail sample validation are still pending.
+The exact user-reported coordinate-limit/chunk-prompt defect remains unresolved. CI and real retail sample/game validation are still required.
