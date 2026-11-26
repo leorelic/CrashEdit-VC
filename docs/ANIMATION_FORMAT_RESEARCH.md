@@ -208,3 +208,12 @@ Commits:
 - Regression aligned with RE: [d3aa546](https://github.com/leorelic/CrashEdit-VC/commit/d3aa54664ae168fb7f87d5bac71067535da5a23b)
 
 The exact user-reported coordinate-limit/chunk-prompt defect remains unresolved. CI and real retail sample/game validation are still required.
+
+
+### Relocation identity regression — 2026-11-26
+
+The first pending-pose preservation implementation matched entries by EID and frame index. That key is not unique: an NSF may contain multiple Animation entries with the same EID. In that case, restoration could reapply a dirty pose to the wrong entry and overwrite another pending pose, even though the raw relocation operation copies only the selected entry.
+
+The restoration now keys each pending pose by its original chunk index, entry index, and frame index. When the selected entry is removed from its source chunk, entries after it are mapped to their shifted index; the selected entry maps to entry 0 of the newly appended destination chunk. A synthetic regression uses duplicate EIDs for the moved and retained entries and checks both distinct poses through save/reload.
+
+The latest UI change also gives each special-vertex coordinate input a row-and-axis ID with a hidden label, avoiding reliance on repeated visible X/Y/Z labels. CI and the user's actual Cr10V workflow still need validation.
