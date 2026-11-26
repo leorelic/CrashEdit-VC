@@ -3172,11 +3172,12 @@ void EditorUI::drawAnimationFrameEditor(){
      for(std::size_t axis=0;axis<3U;++axis){
       ImGui::TableSetColumnIndex(static_cast<int>(axis+1U));
       int value=axis==0U?frame.vertices[vi].x:axis==1U?frame.vertices[vi].y:frame.vertices[vi].z;
-      const char*axisName=axis==0U?"X":axis==1U?"Y":"Z";
+      ImGui::PushID(static_cast<int>(axis));
       ImGui::SetNextItemWidth(-1.0f);
-      if(ImGui::InputInt(axisName,&value,1,8)){
+      if(ImGui::InputInt("##SpecialVertexCoordinate",&value,1,8)){
        if(!nsf_.setAnimationFrameVertex(chunkIndex,entryIndex,static_cast<std::size_t>(frameIndex),vi,axis,value))status_="Could not update the editable special-vertex pose.";
       }
+      ImGui::PopID();
      }
      ImGui::PopID();
     }
