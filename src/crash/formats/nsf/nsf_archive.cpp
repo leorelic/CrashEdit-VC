@@ -644,6 +644,85 @@ bool NsfArchive::saveUncompressedBytes(std::vector<std::uint8_t>&out,std::string
 }
 bool NsfArchive::commitAnimationEdits(std::string&e){
  NsfArchive candidate=*this;
+ // A compressed ModelPosition table is shared by every Animation that
+ // references its EID. Widening that table forces every linked frame payload
+ // to be rebuilt and can overflow unrelated animation chunks. Clone the
+ // compressed Model for each dirty Animation/model pair and redirect only
+ // that Animation's frames before widening the clone.
+ struct ModelCloneTarget { std::size_t chunkIndex,entryIndex; std::uint32_t modelEid; };
+ std::vector<ModelCloneTarget> cloneTargets;
+ const std::size_t originalChunkCount=candidate.chunks_.size();
+ for(std::size_t ci=0;ci<originalChunkCount;++ci){
+  const auto&chunk=candidate.chunks_[ci];
+  if(chunk.type!=0U||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   const auto&entry=chunk.entries[ei];
+   if(!entry.valid||entry.type!=1U||!entry.animation.decoded)continue;
+   for(const auto&frame:entry.animation.frames){
+    if(!frame.verticesEdited||frame.linkedModelEid==0U)continue;
+    bool compressedModel=false;
+    for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0U&&modelChunk.entryTableValid)
+     for(const auto&modelEntry:modelChunk.entries)
+      if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded&&modelEntry.model.compressed){compressedModel=true;break;}
+    if(!compressedModel)continue;
+    const bool alreadyListed=std::any_of(cloneTargets.begin(),cloneTargets.end(),[&](const ModelCloneTarget&target){return target.chunkIndex==ci&&target.entryIndex==ei&&target.modelEid==frame.linkedModelEid;});
+    if(!alreadyListed)cloneTargets.push_back({ci,ei,frame.linkedModelEid});
+   }
+  }
+ }
+ auto write32=[](std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32_t value){
+  for(unsigned byte=0;byte<4U;++byte)bytes[offset+byte]=static_cast<std::uint8_t>(value>>(byte*8U));
+ };
+ for(const auto&target:cloneTargets){
+  NsfEntryLocation modelLocation{};bool modelFound=false;
+  for(std::size_t ci=0;ci<candidate.chunks_.size()&&!modelFound;++ci){
+   const auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
+   for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+    const auto&entry=chunk.entries[ei];
+    if(entry.valid&&entry.type==2U&&entry.eid==target.modelEid&&entry.model.decoded&&entry.model.compressed){modelLocation={ci,ei};modelFound=true;break;}
+   }
+  }
+  if(!modelFound){e="Could not locate the compressed Model entry needed to isolate this animation edit.";return false;}
+  const auto&sourceChunk=candidate.chunks_[modelLocation.chunkIndex];
+  const auto&sourceEntry=sourceChunk.entries[modelLocation.entryIndex];
+  if(sourceEntry.offset>sourceChunk.bytes.size()||sourceEntry.size>sourceChunk.bytes.size()-sourceEntry.offset||sourceEntry.size>NsfChunkSize-24U){
+   e="The compressed Model entry cannot be safely cloned into a fresh NSF chunk.";return false;
+  }
+  std::uint32_t cloneEid=0x7fffffffU;
+  for(;;){
+   bool used=false;
+   for(const auto&chunk:candidate.chunks_)for(const auto&entry:chunk.entries)if(entry.valid&&entry.eid==cloneEid){used=true;break;}
+   if(!used)break;
+   if(cloneEid<=1U){e="No unused valid EID is available for an isolated animation Model.";return false;}
+   cloneEid-=2U;
+  }
+  std::vector<std::uint8_t>cloneBytes(NsfChunkSize,0U);
+  cloneBytes[0]=0x34U;cloneBytes[1]=0x12U;
+  write32(cloneBytes,8U,1U);write32(cloneBytes,16U,24U);
+  write32(cloneBytes,20U,static_cast<std::uint32_t>(24U+sourceEntry.size));
+  std::copy_n(sourceChunk.bytes.begin()+static_cast<std::ptrdiff_t>(sourceEntry.offset),sourceEntry.size,cloneBytes.begin()+24);
+  write32(cloneBytes,28U,cloneEid);
+  std::size_t parseOffset=0;NsfChunk clonedChunk;std::string parseError;
+  if(!candidate.decodeChunk(cloneBytes,parseOffset,clonedChunk,parseError)||parseOffset!=NsfChunkSize||
+     !clonedChunk.entryTableValid||clonedChunk.entries.size()!=1U||!clonedChunk.entries[0].valid||clonedChunk.entries[0].type!=2U){
+   e="Could not parse the isolated Model clone: "+parseError;return false;
+  }
+  NsfModel clonedModel;
+  if(!parseModel(clonedChunk.bytes,clonedChunk.entries[0],clonedModel)||!clonedModel.decoded||!clonedModel.compressed){
+   e="Could not decode the isolated compressed Model clone: "+clonedModel.error;return false;
+  }
+  clonedChunk.entries[0].model=std::move(clonedModel);
+  candidate.chunks_.push_back(std::move(clonedChunk));
+  auto&animation=candidate.chunks_[target.chunkIndex].entries[target.entryIndex].animation;
+  for(std::size_t fi=0;fi<animation.frames.size();++fi){
+   if(animation.frames[fi].linkedModelEid!=target.modelEid)continue;
+   if(!candidate.setAnimationFrameHeaderValue(target.chunkIndex,target.entryIndex,fi,4U,static_cast<std::int32_t>(cloneEid))){
+    e="Could not redirect an edited Animation frame to its isolated Model clone.";return false;
+   }
+   animation.frames[fi].linkedModelEid=cloneEid;
+   animation.frames[fi].modelResolved=true;
+  }
+ }
  for(std::size_t ci=0;ci<candidate.chunks_.size();++ci){
   auto&chunk=candidate.chunks_[ci];
   for(std::size_t ei=0;ei<chunk.entries.size();++ei){
