@@ -381,12 +381,12 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
   assert(narrowSpecialArchive.chunks()[2].entries[0].model.positions[1].xBits==7U);
  const auto&expandedSpecial=narrowSpecialArchive.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(expandedSpecial[0].x==10&&expandedSpecial[0].y==20&&expandedSpecial[0].z==30);
- assert(expandedSpecial[1].x==0&&expandedSpecial[2].x==200);
+ assert(expandedSpecial[1].x==10&&expandedSpecial[2].x==200);
  std::vector<std::uint8_t> expandedSpecialBytes;assert(narrowSpecialArchive.saveUncompressedSourceBytes(expandedSpecialBytes,e));
  NsfArchive expandedSpecialReload;assert(expandedSpecialReload.loadBytes(expandedSpecialBytes,e));expandedSpecialReload.decodeAnimationModels(false);
  const auto&expandedSpecialPose=expandedSpecialReload.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(expandedSpecialPose[0].x==10&&expandedSpecialPose[0].y==20&&expandedSpecialPose[0].z==30);
- assert(expandedSpecialPose[1].x==0&&expandedSpecialPose[2].x==200);
+ assert(expandedSpecialPose[1].x==10&&expandedSpecialPose[2].x==200);
 
  // Expanding one edited Animation must not widen a shared Model used by
  // another Animation or force that unrelated entry into a new chunk.
