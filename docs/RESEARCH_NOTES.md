@@ -609,3 +609,15 @@ The 3D Animation Editor now identifies the displayed frame's animation format us
 The classification is evaluated for the currently displayed frame, so it follows frame playback when the animation references different Models. For Crash 3-style references the existing `linkedModelEid` path is used; otherwise the frame's `modelEid` is used.
 
 Important terminology guardrail: frame `specialVertexCount` / special vertices are a separate frame-layout concept. They are **not** the criterion for Normal versus Complex. The label describes the linked Model's position encoding, not a claim that every other part of the Animation entry has a wholly separate binary container format.
+
+
+### User-confirmed Normal / Complex classification — 2026-11-27
+
+The 3D Animation Editor's format label was tested by the user in the running build:
+
+- Retail sample `BT10V` / linked Model `BT10G` displays **Animation Type: Normal**.
+- Retail sample `Cr10V` / linked Model `Cr10G` displays **Animation Type: Complex**; the user also confirmed the Cr10V character preview is visually correct in this build.
+
+The UI classification is derived from the linked Model's `NsfModel::compressed` flag, follows the displayed frame's Model reference, and shows Unknown rather than guessing when the Model cannot be resolved. `specialVertexCount` is not part of this classification. The label is display-only and must not change renderer/decode/save behavior.
+
+Checkpoint declared by the user: [e4aa8e5](https://github.com/leorelic/CrashEdit-VC/commit/e4aa8e57107e88467b3b05b9a36aa7dce975dfbc). The label's source definition is documented in the animation format research. This milestone does not resolve Complex vertex edit/serialization limitations; preserve the user-confirmed Cr10V preview contract while continuing that separate investigation.
