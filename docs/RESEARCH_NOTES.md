@@ -559,3 +559,40 @@ Source trace: baseline `decodeAnimationVertices()` writes compressed position `i
 **Regression guardrails:** before any future animation decoder/renderer change, compare the decoder function and all renderer index consumers against `ff5359a`; run the Cr10V sample regression; verify the rendered preview visually. A test that only checks decoded coordinates or save/reload is not a substitute for this visual acceptance check. Any experiment with a different vertex mapping must be isolated behind a test or branch and must not replace this working preview path until it passes the real Cr10V visual comparison.
 
 **Still unresolved:** this recovery does not solve free vertex editing or the original coordinate-limit/chunk-relocation prompt. Investigate those in the encoder/edit path without changing the verified preview decode/render pair.
+
+
+### CrashEdit-RE edit/save comparison and no-op save failure investigation — 2026-11-27
+
+Reference baseline is **airumu/CrashEdit, branch `t/net9`** (CrashEdit: Re), as established earlier in this document. The legacy `Almamu/CrashEdit` tree contains the old fixed-width animation format and is not the relevant implementation for Crash 2 compressed frames; do not substitute it for CrashEdit-RE.
+
+#### What CrashEdit-RE actually does
+
+Source files inspected:
+- [`Frame.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/Frame.cs)
+- [`FrameVertex.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Animation/FrameVertex.cs)
+- [`ModelPosition.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelPosition.cs)
+- [`ModelEntry.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/Crash/Formats/Crash%20Formats/Model/ModelEntry.cs)
+- [`FrameBox.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Controls/FrameBox.cs)
+- [`AnimationRenderer.cs`](https://github.com/airumu/CrashEdit/blob/t/net9/CrashEdit/Utils/OpenTK%20Integration/AnimationRenderer.cs)
+
+1. `Frame.MakeVertices(model)` decodes compressed ModelPosition records in order and writes record `i` into `verts[i]`. Its temporal bit cursor starts at `SpecialVertexCount * 24`, and the per-record component order is X, Z, Y. It does **not** write to `verts[i + SpecialVertexCount]`.
+2. CrashEdit-RE's renderer resolves Model triangle indices as `verts[tri.Vertex + frame.SpecialVertexCount]`. The Model's converted polygon indices have a negative starting bias for compressed Models (see `ModelEntry.ConvertIndices()`). Keep this renderer convention paired with the RE decoder; do not infer the decoder's destination from the renderer lookup alone.
+3. `Frame.SaveC2()` serializes the existing `Temporals` bit array. It does not regenerate compressed Model deltas from edited `Positions`.
+4. The legacy `FrameBox` explicitly labels compressed Model vertices as read-only (`Vertice(s) (read-only)`). Its `UpdateTemporals()` returns immediately when `isCompresed` is true. The numeric position widgets modify cached `frame.Positions`, but they do not encode those edits into the compressed temporal stream. Thus RE's normal editor does not provide a compressed-frame vertex-edit/save implementation to port directly.
+5. RE has an explicit conversion path in `ModelEntry.ConvertCompressedToUncompressed()` / `DecompressFrame()`: it creates an uncompressed Model and new uncompressed frame temporal data. This is a possible architecture for safe editing, but it must be sample-tested for EID/reference isolation, special-vertex semantics, and correct frame-to-Model linkage before adopting it.
+
+#### Concrete native candidate for the current “change a coordinate, restore it, save fails” symptom
+
+The current native `setAnimationFrameVertex()` writes the supplied component and sets `frame.verticesEdited = true` unconditionally, even if the supplied value equals the current value. There is no original-pose comparison in that setter. Therefore returning a coordinate to its original displayed value does not clear the dirty state; save still enters `commitAnimationEdits()`.
+
+More importantly, the current native compressed encoder `encodeAnimationFrameVertex()` reads ModelPosition record `i` from `frame.vertices[i + frame.specialVertexCount]`, while the restored known-good decoder (and CrashEdit-RE `Frame.MakeVertices()`) writes decoded record `i` to `frame.vertices[i]`. This is a concrete decode/encode index asymmetry in the current source. `commitAnimationEdits()` then attempts a compressed encode and checks whether the decoded result reproduces the full desired pose; this is a plausible direct explanation for save rejection even when the user restores the original coordinate. It is a **source-grounded candidate, not yet a proven runtime diagnosis** until reproduced with a focused test on the Cr10V sample.
+
+#### Next research/tests — do these before another renderer change
+
+- Add a no-op regression: load Cr10V, decode, call `setAnimationFrameVertex` with the exact current component value, then save. It must succeed and preserve source bytes.
+- Add a change-then-restore regression: edit one component to a different value, restore the exact original value, then save. It must succeed and preserve the original animation entry bytes.
+- Instrument a Cr10V frame's full mapping for selected vertex indices: Model polygon index, renderer lookup index, decoder output slot, ModelPosition record index, encoder source slot, and round-trip slot. Include special-prefix boundary indices and first/last compressed records.
+- Compare native compressed encoder bit writes directly against RE's `Frame.MakeVertices()` decoder and `ModelPosition` fields. Do not assume RE's normal `Frame.SaveC2()` encodes edited compressed vertices: source inspection shows it only serializes `Temporals`.
+- Evaluate a deliberate conversion-to-uncompressed edit workflow as an alternative to reimplementing compressed delta mutation. Keep the source Model/Animation untouched until the converted pair can be saved/reloaded and all references are redirected safely.
+
+**Do not change the renderer or the user-confirmed `ff5359a` preview decoder contract while doing these tests.**
