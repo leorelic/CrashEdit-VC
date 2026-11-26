@@ -409,7 +409,7 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    xAcc=(xAcc+dx+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
-   // CrashEdit-RE's Frame.MakeVertices() writes compressed positions to verts[i].
+   // RE's verts[i] is model-local; the native unified pose stores the special prefix first.
    frame.vertices[i+frame.specialVertexCount]={xAcc,yAcc,zAcc};
   }
  }else{
