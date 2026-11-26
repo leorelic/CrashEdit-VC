@@ -911,14 +911,10 @@ bool NsfArchive::expandCompressedModelPositions(std::uint32_t modelEid,std::size
      for(unsigned bitIndex=0;bitIndex<32U;++bitIndex)word=(word<<1U)|bits[wi*32U+bitIndex];
      for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
     }
-    // The special-vertex prefix aliases the first temporal bytes. Restore its
-    // authoritative raw XYZ bytes after temporal-word serialization.
-    for(std::size_t vi=0;vi<frame.specialVertexCount;++vi){
-     const auto&v=frame.vertices[vi];const std::size_t offset=fakeHeader+vi*3U;
-     payload[offset]=static_cast<std::uint8_t>(v.x);
-     payload[offset+1U]=static_cast<std::uint8_t>(v.y);
-     payload[offset+2U]=static_cast<std::uint8_t>(v.z);
-    }
+    // Special XYZ bytes alias the temporal bitstream. The raw prefix seeds
+    // its unused prefix bits above; after encoding, serialized temporal words
+    // are authoritative. Restoring raw XYZ here can overwrite compressed
+    // deltas that share a physical byte with the prefix.
     payloads.push_back(std::move(payload));
    }
    if(!entryAffected)continue;

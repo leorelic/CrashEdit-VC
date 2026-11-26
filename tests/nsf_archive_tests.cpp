@@ -350,6 +350,22 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
  assert(specialReloaded[1].x==44&&specialReloaded[1].y==55&&specialReloaded[1].z==66);
 
+ // Regression: restoring raw special XYZ after temporal serialization can
+ // overwrite the first compressed delta when the prefix is not word-aligned.
+ std::vector<std::uint8_t> narrowSpecialAliasBytes=specialCompressedBytes;
+ p32(narrowSpecialAliasBytes,scmPositions,0x0c0001ffU); // X base 6, X/Z/Y widths 7
+ p32(narrowSpecialAliasBytes,scmPositions+4U,0x0000007fU); // second position: X width 1
+ NsfArchive narrowSpecialAliasArchive;assert(narrowSpecialAliasArchive.loadBytes(narrowSpecialAliasBytes,e));narrowSpecialAliasArchive.decodeAnimationModels(false);
+ assert(narrowSpecialAliasArchive.chunks()[1].entries[0].animation.frames[0].vertices[0].x==22);
+ assert(narrowSpecialAliasArchive.setAnimationFrameVertex(1,0,0,0,0,25));
+ assert(narrowSpecialAliasArchive.setAnimationFrameVertex(1,0,0,1,0,200));
+ assert(narrowSpecialAliasArchive.commitAnimationEdits(e));
+ const auto&narrowAliasExpanded=narrowSpecialAliasArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(narrowAliasExpanded[0].x==25&&narrowAliasExpanded[1].x==200);
+ std::vector<std::uint8_t> narrowAliasSaved;assert(narrowSpecialAliasArchive.saveUncompressedSourceBytes(narrowAliasSaved,e));
+ NsfArchive narrowAliasReload;assert(narrowAliasReload.loadBytes(narrowAliasSaved,e));narrowAliasReload.decodeAnimationModels(false);
+ const auto&narrowAliasReloaded=narrowAliasReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(narrowAliasReloaded[0].x==25&&narrowAliasReloaded[1].x==200);
  // Width expansion must preserve CrashEdit-RE's compressed destination indexing with a special prefix.
  std::vector<std::uint8_t> narrowSpecialBytes=specialCompressedBytes;
  p32(narrowSpecialBytes,scmPositions+4U,0x0000007fU); // second position: X width 1, Z/Y width 7

@@ -456,3 +456,11 @@ Source inspection identified why accepting the compressed-animation payload capa
 - Added a synthetic regression with two pending Animation poses: relocate one entry, verify both the moved pose and the pose remaining in the source chunk are retained, then save/reload and compare coordinates.
 
 This addresses edit preservation across the relocation/retry workflow. It does not independently prove that every compressed vertex delta or every real Cr10V pose is representable; keep the coordinate/encoding investigation and retail-sample/game validation open until the user confirms the boundary edit applies and survives save/reopen.
+
+### Special-prefix raw-byte restore could overwrite compressed deltas — 2026-11-26
+
+A final source/code consistency check found that compressed Model expansion serialized the temporal words and then wrote the raw special XYZ bytes back over the same physical prefix. This is unsafe when byte-lane ordering maps part of that prefix to compressed bits at or after the temporal cursor. The format research already establishes that the temporal stream overlaps the special prefix and that serialized temporal bytes must remain authoritative.
+
+- Removed the post-serialization raw XYZ restore. The initial raw prefix still seeds the temporal bit array; the final encoded words are now left intact and the rebuilt frame's decoded pose is checked for exact equality.
+- Added a regression with one special vertex, a nonzero compressed X base, and a narrow second-vertex delta. Editing the special pose and forcing width-7 expansion previously made the restore overwrite the first compressed delta; the test now checks the edited pose both immediately and after save/reload.
+- The private Cr10V sample has 309 frame vertices, 4 special vertices, and 305 compressed Model positions in each of its 11 frames. Its 4-vertex prefix occupies the first 96 temporal bits, so the existing raw-prefix restore does not overlap Cr10V's delta cursor in this particular sample. The new test covers the general non-word-aligned case; retain the Cr10V sample/game test as final validation.
