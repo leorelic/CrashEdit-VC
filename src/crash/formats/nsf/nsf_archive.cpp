@@ -645,12 +645,53 @@ bool NsfArchive::saveUncompressedBytes(std::vector<std::uint8_t>&out,std::string
 bool NsfArchive::commitAnimationEdits(std::string&e){
  NsfArchive candidate=*this;
  // A compressed ModelPosition table is shared by every Animation that
- // references its EID. Widening that table forces every linked frame payload
- // to be rebuilt and can overflow unrelated animation chunks. Clone the
- // compressed Model for each dirty Animation/model pair and redirect only
- // that Animation's frames before widening the clone.
+ // references its EID. Only isolate an Animation when a non-mutating save probe
+ // proves its current per-vertex widths cannot encode the edited pose.
  struct ModelCloneTarget { std::size_t chunkIndex,entryIndex; std::uint32_t modelEid; };
  std::vector<ModelCloneTarget> cloneTargets;
+ auto requiresModelExpansion=[&](std::size_t ci,std::size_t ei,std::size_t fi)->bool{
+  if(ci>=candidate.chunks_.size()||ei>=candidate.chunks_[ci].entries.size())return false;
+  const auto&sourceEntry=candidate.chunks_[ci].entries[ei];
+  if(!sourceEntry.valid||sourceEntry.type!=1U||fi>=sourceEntry.animation.frames.size())return false;
+  const auto&sourceFrame=sourceEntry.animation.frames[fi];
+  if(!sourceFrame.verticesEdited||!sourceFrame.verticesDecoded||sourceFrame.vertices.empty())return false;
+  NsfArchive probe=candidate;
+  auto&probeFrame=probe.chunks_[ci].entries[ei].animation.frames[fi];
+  std::int64_t minimum[3]={INT64_MAX,INT64_MAX,INT64_MAX},maximum[3]={INT64_MIN,INT64_MIN,INT64_MIN};
+  for(const auto&v:probeFrame.vertices){const std::int32_t values[3]={v.x,v.y,v.z};for(unsigned axis=0;axis<3U;++axis){minimum[axis]=std::min<std::int64_t>(minimum[axis],values[axis]);maximum[axis]=std::max<std::int64_t>(maximum[axis],values[axis]);}}
+  std::int64_t shift[3]={0,0,0};
+  for(unsigned axis=0;axis<3U;++axis){
+   if(maximum[axis]-minimum[axis]>255)return false;
+   if(minimum[axis]<0)shift[axis]=minimum[axis];
+   else if(maximum[axis]>255)shift[axis]=maximum[axis]-255;
+  }
+  const std::int64_t offsets[3]={static_cast<std::int64_t>(probeFrame.xOffset)+shift[0]*4,
+                                  static_cast<std::int64_t>(probeFrame.yOffset)+shift[2]*4,
+                                  static_cast<std::int64_t>(probeFrame.zOffset)+shift[1]*4};
+  for(const auto offset:offsets)if(offset<INT16_MIN||offset>INT16_MAX)return false;
+  for(auto&v:probeFrame.vertices){v.x=static_cast<std::int32_t>(static_cast<std::int64_t>(v.x)-shift[0]);v.y=static_cast<std::int32_t>(static_cast<std::int64_t>(v.y)-shift[1]);v.z=static_cast<std::int32_t>(static_cast<std::int64_t>(v.z)-shift[2]);}
+  if(shift[0]||shift[1]||shift[2]){
+   if(!probe.setAnimationFrameHeaderValue(ci,ei,fi,0U,static_cast<std::int32_t>(offsets[0]))||
+      !probe.setAnimationFrameHeaderValue(ci,ei,fi,1U,static_cast<std::int32_t>(offsets[1]))||
+      !probe.setAnimationFrameHeaderValue(ci,ei,fi,2U,static_cast<std::int32_t>(offsets[2])))return false;
+  }
+  const auto desired=probeFrame.vertices;
+  for(std::size_t vi=0;vi<probeFrame.specialVertexCount;++vi){
+   const auto v=desired[vi];
+   if(!probe.encodeAnimationFrameVertex(ci,ei,fi,vi,0U,v.x)||
+      !probe.encodeAnimationFrameVertex(ci,ei,fi,vi,1U,v.y)||
+      !probe.encodeAnimationFrameVertex(ci,ei,fi,vi,2U,v.z))return false;
+  }
+  probeFrame.vertices=desired;
+  const auto modelIndex=probeFrame.specialVertexCount;
+  if(modelIndex>=probeFrame.vertices.size())return false;
+  if(!probe.encodeAnimationFrameVertex(ci,ei,fi,modelIndex,0U,probeFrame.vertices[modelIndex].x))return true;
+  for(std::size_t vi=0;vi<desired.size();++vi){
+   const auto&actual=probeFrame.vertices[vi];const auto&expected=desired[vi];
+   if(actual.x!=expected.x||actual.y!=expected.y||actual.z!=expected.z)return true;
+  }
+  return false;
+ };
  const std::size_t originalChunkCount=candidate.chunks_.size();
  for(std::size_t ci=0;ci<originalChunkCount;++ci){
   const auto&chunk=candidate.chunks_[ci];
@@ -658,8 +699,9 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
   for(std::size_t ei=0;ei<chunk.entries.size();++ei){
    const auto&entry=chunk.entries[ei];
    if(!entry.valid||entry.type!=1U||!entry.animation.decoded)continue;
-   for(const auto&frame:entry.animation.frames){
-    if(!frame.verticesEdited||frame.linkedModelEid==0U)continue;
+   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
+    const auto&frame=entry.animation.frames[fi];
+    if(!frame.verticesEdited||frame.linkedModelEid==0U||!requiresModelExpansion(ci,ei,fi))continue;
     bool compressedModel=false;
     for(const auto&modelChunk:candidate.chunks_)if(modelChunk.type==0U&&modelChunk.entryTableValid)
      for(const auto&modelEntry:modelChunk.entries)
