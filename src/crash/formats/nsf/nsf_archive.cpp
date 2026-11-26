@@ -1591,6 +1591,16 @@ bool NsfArchive::setAnimationFrameSpecialVertex(std::size_t chunkIndex,std::size
  chunk.bytes[frame.rawOffset+relative]=value;
  frame.specialVertices[vertexIndex][axis]=value;
  if(frame.verticesDecoded){
+  // Special XYZ bytes overlap the temporal-word storage. Refresh the cached
+  // words from the bytes just edited before decoding, otherwise the working
+  // pose keeps stale compressed deltas and save can overwrite the special edit.
+  const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U;
+  const std::size_t temporalOffset=frame.rawOffset+fakeHeader;
+  for(std::size_t wi=0;wi<frame.temporalWords.size();++wi){
+   const std::size_t offset=temporalOffset+wi*4U;
+   if(!has(chunk.bytes,offset,4U))return false;
+   frame.temporalWords[wi]=u32(chunk.bytes,offset);
+  }
   const NsfModel*linkedModel=nullptr;
   for(const auto&modelChunk:chunks_){if(modelChunk.type!=0||!modelChunk.entryTableValid)continue;for(const auto&modelEntry:modelChunk.entries)if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){linkedModel=&modelEntry.model;break;}if(linkedModel)break;}
   decodeAnimationVertices(frame,linkedModel,entry.animation.isCrash3);
