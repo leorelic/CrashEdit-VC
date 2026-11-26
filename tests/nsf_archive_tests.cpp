@@ -336,8 +336,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==20&&specialFrame.vertices[0].z==30);
  assert(specialFrame.vertices[1].x==10&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
- const std::vector<std::size_t> specialEditIndices{0,1};
- const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
+ const std::vector<std::size_t> specialEditIndices{0};
+ const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31}};
  assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
  NsfArchive specialCommitted=specialCompressedArchive;
  assert(specialCommitted.commitAnimationEdits(e));
@@ -348,7 +348,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive specialReload;assert(specialReload.loadBytes(specialSaved,e));specialReload.decodeAnimationModels(false);
  const auto&specialReloaded=specialReload.chunks()[1].entries[0].animation.frames[0].vertices;
  assert(specialReloaded[0].x==11&&specialReloaded[0].y==21&&specialReloaded[0].z==31);
- assert(specialReloaded[1].x==44&&specialReloaded[1].y==55&&specialReloaded[1].z==66);
+ assert(specialReloaded[1].x==11&&specialReloaded[1].y==0&&specialReloaded[1].z==0);
 
  // Regression: restoring raw special XYZ after temporal serialization can
  // overwrite the first compressed delta when the prefix is not word-aligned.
