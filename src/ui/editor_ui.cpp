@@ -3918,7 +3918,7 @@ void EditorUI::drawAnimationViewer(){
    if(!model||!model->polygonsDecoded||model->triangles.empty())return true;
    const ImVec2 sample=projectCamera(point);float nearestSurface=std::numeric_limits<float>::max();
    for(const auto&tri:model->triangles){
-    const int ia=tri.a,ib=tri.b,ic=tri.c;
+    const int offset=static_cast<int>(frame.specialVertexCount);const int ia=tri.a+offset,ib=tri.b+offset,ic=tri.c+offset;
     if(ia<0||ib<0||ic<0||static_cast<std::size_t>(ia)>=displayPositions.size()||static_cast<std::size_t>(ib)>=displayPositions.size()||static_cast<std::size_t>(ic)>=displayPositions.size())continue;
     const auto&p0=displayPositions[static_cast<std::size_t>(ia)];const auto&p1=displayPositions[static_cast<std::size_t>(ib)];const auto&p2=displayPositions[static_cast<std::size_t>(ic)];
     const CameraPoint c0=toCamera(p0.x,p0.y,p0.z),c1=toCamera(p1.x,p1.y,p1.z),c2=toCamera(p2.x,p2.y,p2.z);
@@ -4198,7 +4198,7 @@ void EditorUI::drawAnimationViewer(){
   if(animationFaceEditing_&&hovered&&!viewportToolbarOwnsMouse&&model&&model->polygonsDecoded){
    const ImVec2 mouse=io.MousePos;
    for(std::size_t ti=0;ti<model->triangles.size();++ti){
-    const auto&tri=model->triangles[ti];const int ids[3]={tri.a,tri.b,tri.c};
+    const auto&tri=model->triangles[ti];const int offset=static_cast<int>(frame.specialVertexCount);const int ids[3]={tri.a+offset,tri.b+offset,tri.c+offset};
     if(ids[0]<0||ids[1]<0||ids[2]<0||static_cast<std::size_t>(ids[0])>=displayPositions.size()||static_cast<std::size_t>(ids[1])>=displayPositions.size()||static_cast<std::size_t>(ids[2])>=displayPositions.size())continue;
     const auto&p0=displayPositions[static_cast<std::size_t>(ids[0])];const auto&p1=displayPositions[static_cast<std::size_t>(ids[1])];const auto&p2=displayPositions[static_cast<std::size_t>(ids[2])];
     const CameraPoint c0=toCamera(p0.x,p0.y,p0.z),c1=toCamera(p1.x,p1.y,p1.z),c2=toCamera(p2.x,p2.y,p2.z);
@@ -4328,7 +4328,7 @@ void EditorUI::drawAnimationViewer(){
        const bool nocull=tri.triangleSubtype==0||tri.triangleSubtype==2;
        const bool flip=((tri.triangleType==2)^(tri.triangleSubtype==3))&&!nocull;
        const int order[3]={flip?2:0,1,flip?0:2};
-       const int baseVertices[3]={tri.a,tri.b,tri.c},baseColors[3]={tri.colorA,tri.colorB,tri.colorC};
+       const int frameVertexOffset=static_cast<int>(frame.specialVertexCount);const int baseVertices[3]={tri.a+frameVertexOffset,tri.b+frameVertexOffset,tri.c+frameVertexOffset},baseColors[3]={tri.colorA,tri.colorB,tri.colorC};
        const int vi[3]={baseVertices[order[0]],baseVertices[order[1]],baseVertices[order[2]]};
        const int ci[3]={baseColors[order[0]],baseColors[order[1]],baseColors[order[2]]};
        if(vi[0]<0||vi[1]<0||vi[2]<0||std::size_t(vi[0])>=frame.vertices.size()||std::size_t(vi[1])>=frame.vertices.size()||std::size_t(vi[2])>=frame.vertices.size())continue;
