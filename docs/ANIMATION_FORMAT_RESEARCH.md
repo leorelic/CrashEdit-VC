@@ -283,3 +283,24 @@ The 3D Animation Editor displays **Animation Type** from the linked Model's comp
 The user verified both labels in the running editor. The label follows the Model reference for the currently displayed frame, is informational only, and does not change the renderer or serializer. Do not classify by `specialVertexCount`; special vertices are a distinct frame-layout concept.
 
 Checkpoint: [e4aa8e5](https://github.com/leorelic/CrashEdit-VC/commit/e4aa8e57107e88467b3b05b9a36aa7dce975dfbc). This identification milestone does not mean Complex animation vertex editing is solved. Keep the known-good Cr10V preview behavior intact while investigating Complex edit/save support separately.
+
+## Separate editing strategies for Normal and Complex — research memo (2026-11-27)
+
+Normal and Complex are linked-Model encoding classifications, not values inferred from specialVertexCount.
+
+### Reference behavior
+
+Direct inspection of CrashEdit-RE (airumu/CrashEdit:t/net9) confirms:
+
+- Frame.MakeVertices(model) uses the ModelPosition delta decoder for Complex and the byte-coordinate temporal decoder for Normal.
+- Frame.SaveC2() writes the temporal bit array as-is; it does not encode edited cached positions into Complex ModelPosition deltas.
+- RE's FrameBox marks Complex vertices read-only, and its temporal updater returns immediately for compressed frames. Thus RE is a decode/view reference, not a working Complex editing implementation.
+- RE does provide ConvertCompressedToUncompressed(), which builds an uncompressed Model and uncompressed frame temporal streams. This is a candidate architecture, not a proven drop-in solution. Its conversion helper reuses the original Model/Animation EIDs, and its special-prefix handling needs independent verification. Shared Model references and special-vertex ordering must be handled safely in CrashEdit-VC.
+
+### CrashEdit-VC guardrails and research plan
+
+Preserve the known-good Cr10V decoder/renderer pairing from ff5359a. Do not shift decoded compressed positions or remove the renderer's special-vertex offset while studying editing. Treat decode storage, renderer polygon lookup, edit selection, and save encoding as distinct index mappings until traced against the real Cr10V sample.
+
+Before enabling Complex editing: inventory BT10V/BT10G and Cr10V/Cr10G; trace every index and temporal bit around the special prefix; add no-op and edit-then-restore save tests; then compare a true Complex delta encoder against isolated Complex-to-Normal conversion. Conversion must preserve every frame pose, special vertices, collision/header data, polygon rendering, shared Model users, and archive/game behavior after save/reopen.
+
+Do not claim Complex editing is solved. Keep Normal's existing working editing path stable and do not route Complex edits into it without an explicit, validated conversion step.
