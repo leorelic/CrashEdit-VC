@@ -500,3 +500,17 @@ A compressed ModelPosition table may be referenced by multiple Animation entries
 The regression in `tests/nsf_archive_tests.cpp` must compare the original Model and untouched Animation against their baseline, and separately verify that the edited Animation references a different Model EID whose expanded position width is 7 and whose edited pose survives save/reload. It must not expect the shared original Model to be widened in place. This is a format/ownership invariant, not merely a test detail.
 
 When diagnosing a failed edit, record the exact frame, unified vertex index, axis, original/requested coordinate, Model-local index after subtracting specialVertexCount, current encoded width/base or previous accumulator, and whether failure occurs in width probing, frame rebuilding, signed offset rebasing, or chunk capacity. A generic CI result or an isolated assertion does not establish the retail sample's actual coordinate limit. Preserve the `ff5359a` preview/save baseline while investigating.
+
+
+### Animation preview regression: special-vertex offset applied twice — 2026-11-27
+
+The user reported that Cr10V's animation preview became severely corrupted after the compressed-position unified-frame mapping change. Source inspection found a direct indexing mismatch; this is not a generic rendering issue.
+
+- A native Animation frame stores the special vertices in the leading slots of its unified `frame.vertices` array. The compressed Model positions fill the remaining slots at `specialVertexCount + modelPositionIndex`. For Cr10V this is 4 special vertices + 305 compressed positions = 309 frame vertices.
+- Model triangle indices already address the complete Model vertex table (0 through 308). Once the decoder stores the full Model vertex table in the unified frame array, triangle indices must be used directly against `frame.vertices`.
+- The animation renderer still added `specialVertexCount` to Model triangle indices in its triangle drawing, face selection/hover, face-edge overlay, and vertex visibility tests. That applied the prefix offset a second time: indices 0–3 were skipped and indices at the end ran past the 309-vertex frame. This explains the exploded/jagged geometry in the user's screenshot.
+- Corrected `src/ui/editor_ui.cpp` to use Model triangle indices directly in all four paths, keeping the unified frame-array mapping in `src/crash/formats/nsf/nsf_archive.cpp`.
+
+**Correction to the earlier unified-frame note:** the statement that the renderer should add `specialVertexCount` to triangle indices was wrong. The offset belongs in the decoder/encoder mapping from ModelPosition index to the unified frame vertex array, not in the renderer's Model triangle indices. Do not reintroduce triangle offsets while `frame.vertices` contains the complete Model vertex table.
+
+The source-level mismatch is fixed in commit `51f98dcebf7cfedfd7e3543d72a0040f5b3e745d`. CI and user visual validation are still pending; this is not yet considered resolved.
