@@ -388,6 +388,34 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(expandedSpecialPose[0].x==10&&expandedSpecialPose[0].y==20&&expandedSpecialPose[0].z==30);
  assert(expandedSpecialPose[1].x==0&&expandedSpecialPose[2].x==200);
 
+ // Expanding one edited Animation must not widen a shared Model used by
+ // another Animation or force that unrelated entry into a new chunk.
+ std::vector<std::uint8_t> sharedModelBytes=narrowSpecialBytes;
+ std::vector<std::uint8_t> sharedSecondAnimation(sharedModelBytes.begin()+65536,sharedModelBytes.end());
+ p32(sharedSecondAnimation,scaEntry+4U,0x0200007cU);
+ sharedModelBytes.insert(sharedModelBytes.end(),sharedSecondAnimation.begin(),sharedSecondAnimation.end());
+ NsfArchive sharedModelArchive;assert(sharedModelArchive.loadBytes(sharedModelBytes,e));sharedModelArchive.decodeAnimationModels(false);
+ assert(sharedModelArchive.chunks().size()==3U);
+ assert(sharedModelArchive.chunks()[1].entries[0].animation.frames[0].modelEid==0x0200007bU);
+ assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
+ assert(sharedModelArchive.setAnimationFrameVertex(1,0,0,2,0,200));
+ assert(sharedModelArchive.commitAnimationEdits(e));
+ assert(sharedModelArchive.chunks().size()==4U);
+ assert(sharedModelArchive.chunks()[0].entries[0].model.positions[1].xBits==1U);
+ const auto isolatedModelEid=sharedModelArchive.chunks()[1].entries[0].animation.frames[0].modelEid;
+ assert(isolatedModelEid!=0x0200007bU);
+ assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
+ assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].vertices[2].x==0);
+ const auto isolatedModelLocations=sharedModelArchive.findEntriesByEid(isolatedModelEid);
+ assert(isolatedModelLocations.size()==1U&&isolatedModelLocations[0].chunkIndex==3U);
+ assert(sharedModelArchive.chunks()[3].entries[0].model.positions[1].xBits==7U);
+ std::vector<std::uint8_t> sharedModelSaved;assert(sharedModelArchive.saveUncompressedSourceBytes(sharedModelSaved,e));
+ NsfArchive sharedModelReload;assert(sharedModelReload.loadBytes(sharedModelSaved,e));sharedModelReload.decodeAnimationModels(false);
+ assert(sharedModelReload.chunks()[1].entries[0].animation.frames[0].vertices[2].x==200);
+ assert(sharedModelReload.chunks()[1].entries[0].animation.frames[0].modelEid==isolatedModelEid);
+ assert(sharedModelReload.chunks()[2].entries[0].animation.frames[0].vertices[2].x==0);
+ assert(sharedModelReload.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
+
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
  p32(crash2RebaseAnimation,vaFrame+8,1);p32(crash2RebaseAnimation,vaFrame+12,0);p32(crash2RebaseAnimation,vaFrame+16,0);p32(crash2RebaseAnimation,vaFrame+20,24);p32(crash2RebaseAnimation,vaFrame+24,0x03020100);
