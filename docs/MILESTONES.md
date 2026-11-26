@@ -145,7 +145,7 @@ This is a genuine archive-capacity feature for Append/Insert. It is not a remedy
 
 **Corrections after the unchanged real-sample test: the native unified frame array was incorrectly writing compressed Model positions at unshifted indices, overwriting the special prefix and leaving the final specialVertexCount vertices unencoded. Decoder, encoder, and expansion now map ModelPosition i to frame.vertices[specialVertexCount+i], matching the renderer's triangle index offset. The native special-vertex setter also refreshes temporal-word cache from the raw bytes before decoding; otherwise a special edit could be overwritten by stale compressed bits in a non-word-aligned prefix. Shared Model expansion probes existing widths and clones the compressed Model only when the edited pose needs width expansion, redirecting only that Animation so unrelated animations retain the original Model. Pending-pose relocation uses exact entry location (duplicate-EID regression), and both selected/special vertex coordinate widgets have explicit unique IDs.
 
-Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/commit/9c7b26b1eae4c799cb20c19854ee0a8765f18724), [7309155](https://github.com/leorelic/CrashEdit-VC/commit/7309155e1cc58379163a4acf996fecf4fecad321), [aba9be9](https://github.com/leorelic/CrashEdit-VC/commit/aba9be96b897149ab656a158da6c2040824c714e), [c084b97](https://github.com/leorelic/CrashEdit-VC/commit/c084b97a953d8146219b7445feb4961fda851994), and [9feefdd](https://github.com/leorelic/CrashEdit-VC/commit/9feefdda2e0eb88aac222b73dab2bd9cc854127e). The latest CI run is [45889342090](https://github.com/leorelic/CrashEdit-VC/actions/runs/45889342090); CI is pending and no real Cr10V save/reopen/game test has passed yet.
+Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/commit/9c7b26b1eae4c799cb20c19854ee0a8765f18724), [7309155](https://github.com/leorelic/CrashEdit-VC/commit/7309155e1cc58379163a4acf996fecf4fecad321), [aba9be9](https://github.com/leorelic/CrashEdit-VC/commit/aba9be96b897149ab656a158da6c2040824c714e), [c084b97](https://github.com/leorelic/CrashEdit-VC/commit/c084b97a953d8146219b7445feb4961fda851994), and [9feefdd](https://github.com/leorelic/CrashEdit-VC/commit/9feefdda2e0eb88aac222b73dab2bd9cc854127e).
 
 - After a passing build, test the Cr10V right-ear edit in the real 4-special-vertex frame; verify the pose survives save/reopen.
 - If a capacity prompt appears, confirm only the edited Cr10V Animation entry is moved; unrelated animations must remain in their original chunks.
@@ -153,10 +153,3 @@ Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/
 - Acceptance: requested coordinates persist, the pose is exact after reload, no unrelated Animation entry is relocated, and the UI remains free of the ID warning.
 
 Preserve `ff5359a` as the known-good preview/save baseline while investigating.
-
-
-### CI follow-up — shared Model clone assertion — 2026-11-26
-
-Run [45889595019](https://github.com/leorelic/CrashEdit-VC/actions/runs/45889595019) built successfully on all platforms but failed the same `nsf_archive_tests.cpp:443` assertion on macOS, Windows, and Ubuntu. The test expected the original shared Model to be widened in place, while the intended fix now clones the Model and widens only the edited Animation's clone. Updated regression in `c2f0da5` checks original Model width remains 1, edited Animation points to a different Model EID, pose remains X=200 after save/reload, and the linked clone has width 7.
-
-Docs/research memo recorded in `a8602ec`. CI for the corrected assertion is pending. No user-side Cr10V acceptance test has passed yet; retain this as an active issue, not a completed milestone.
