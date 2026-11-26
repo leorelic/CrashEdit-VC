@@ -399,6 +399,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(sharedModelArchive.chunks().size()==3U);
  assert(sharedModelArchive.chunks()[1].entries[0].animation.frames[0].modelEid==0x0200007bU);
  assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
+ const auto untouchedAnimationPose=sharedModelArchive.chunks()[2].entries[0].animation.frames[0].vertices;
  assert(sharedModelArchive.setAnimationFrameVertex(1,0,0,2,0,200));
  assert(sharedModelArchive.commitAnimationEdits(e));
  assert(sharedModelArchive.chunks().size()==4U);
@@ -406,7 +407,9 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  const auto isolatedModelEid=sharedModelArchive.chunks()[1].entries[0].animation.frames[0].modelEid;
  assert(isolatedModelEid!=0x0200007bU);
  assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
- assert(sharedModelArchive.chunks()[2].entries[0].animation.frames[0].vertices[2].x==0);
+ const auto&retainedPose=sharedModelArchive.chunks()[2].entries[0].animation.frames[0].vertices;
+ assert(retainedPose.size()==untouchedAnimationPose.size());
+ for(std::size_t vi=0;vi<retainedPose.size();++vi)assert(retainedPose[vi].x==untouchedAnimationPose[vi].x&&retainedPose[vi].y==untouchedAnimationPose[vi].y&&retainedPose[vi].z==untouchedAnimationPose[vi].z);
  const auto isolatedModelLocations=sharedModelArchive.findEntriesByEid(isolatedModelEid);
  assert(isolatedModelLocations.size()==1U&&isolatedModelLocations[0].chunkIndex==3U);
  assert(sharedModelArchive.chunks()[3].entries[0].model.positions[1].xBits==7U);
@@ -414,7 +417,9 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive sharedModelReload;assert(sharedModelReload.loadBytes(sharedModelSaved,e));sharedModelReload.decodeAnimationModels(false);
  assert(sharedModelReload.chunks()[1].entries[0].animation.frames[0].vertices[2].x==200);
  assert(sharedModelReload.chunks()[1].entries[0].animation.frames[0].modelEid==isolatedModelEid);
- assert(sharedModelReload.chunks()[2].entries[0].animation.frames[0].vertices[2].x==0);
+ const auto&retainedReloadPose=sharedModelReload.chunks()[2].entries[0].animation.frames[0].vertices;
+ assert(retainedReloadPose.size()==untouchedAnimationPose.size());
+ for(std::size_t vi=0;vi<retainedReloadPose.size();++vi)assert(retainedReloadPose[vi].x==untouchedAnimationPose[vi].x&&retainedReloadPose[vi].y==untouchedAnimationPose[vi].y&&retainedReloadPose[vi].z==untouchedAnimationPose[vi].z);
  assert(sharedModelReload.chunks()[2].entries[0].animation.frames[0].modelEid==0x0200007bU);
 
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
