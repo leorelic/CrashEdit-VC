@@ -409,8 +409,9 @@ static bool decodeAnimationVertices(NsfAnimationFrame&frame,const NsfModel*model
    xAcc=(xAcc+dx+(static_cast<std::int32_t>(p.x)<<1U))&0xff;
    yAcc=(yAcc+dy+p.y)&0xff;
    zAcc=(zAcc+dz+p.z)&0xff;
-   // RE's verts[i] is model-local; the native unified pose stores the special prefix first.
-   frame.vertices[i+frame.specialVertexCount]={xAcc,yAcc,zAcc};
+   // Special vertices occupy the leading frame slots and are stored in the
+   // frame header; compressed positions begin immediately after that prefix.
+   frame.vertices[i]={xAcc,yAcc,zAcc};
   }
  }else{
   const std::size_t required=(static_cast<std::size_t>(frame.vertexCount)-frame.specialVertexCount)*24U;
