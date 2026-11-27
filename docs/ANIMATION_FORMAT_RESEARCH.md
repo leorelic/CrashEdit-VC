@@ -482,3 +482,10 @@ Diagnostic run #1454 compiled on Ubuntu and failed the capacity test before ente
 ### Capacity-relocation regression fixture: model vertex-count field
 
 CI runs #1455 and #1456 built successfully but failed before entering conversion: the synthetic capacity model was not decoded as Complex. Inspection of `parseModel()` showed the fixture had changed `ModelInfo + 0x2c` (polygon-word count) to 100, while compressed ModelPosition count is derived from `vertexCount` at `+0x38` minus the special-vertex base at `+0x4c`. The test now leaves polygon-word count intact and sets `+0x38` to 100, matching the 100 compressed-position records. Removed the unused frame-byte calculation as well. This corrects the fixture's header semantics; the relocation/conversion assertion still requires a passing CI run.
+
+
+### Capacity-relocation regression: force a genuine payload expansion
+
+Run #1457 finally decoded the synthetic 100-position Complex Model, and `convertComplexModelToNormal()` returned success, but the test's `chunks().size()==3` assertion failed on Ubuntu, macOS, and Windows. The prior fixture accidentally supplied 300 temporal bytes for 100 vertices: the converter's Normal output also required 300 bytes (75 words), so the frame did not grow and the source chunk still had enough entry capacity. This was a test-design failure, not evidence that relocation had executed.
+
+The fixture now supplies a 264-byte source temporal stream (66 words, enough for the all-zero 7-bit source coordinates) while the Normal payload requires 300 bytes (75 words). This forces a 36-byte payload increase against a chunk with only 16 bytes of tail room. The regression asserts relocation to a third chunk and checks the relocated frame's raw size is exactly 64 + 300 bytes, then continues through Save/reopen. CI must pass this stronger test before relocation is considered verified.
