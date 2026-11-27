@@ -2002,6 +2002,7 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
 
   }
  }
+ }
  if(linkedFrameCount==0U){error="No decoded Animation frames reference the selected Model EID.";return false;}
  auto&modelChunk=candidate.chunks_[modelLocation.chunkIndex];
  auto&modelEntry=modelChunk.entries[modelLocation.entryIndex];
