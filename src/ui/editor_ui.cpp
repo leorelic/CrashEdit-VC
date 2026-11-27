@@ -5475,12 +5475,11 @@ void EditorUI::drawBoneRigEditor(){
  }
  ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
  ImGui::Separator();ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
- if(ImGui::Button("Create Empty Bone")){
+ if(ImGui::Button("Create Empty Bone",ImVec2(-1.0f,0.0f))){
   std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
   boneRigBones_.push_back(BoneRigBone{name,{}});boneRigSelectedBone_=static_cast<int>(boneRigBones_.size()-1U);std::snprintf(boneRigName_,sizeof(boneRigName_),"Bone");
  }
- ImGui::SameLine();
- if(ImGui::Button("Create From Selection")){
+ if(ImGui::Button("Create From Selection",ImVec2(-1.0f,0.0f))){
   if(animationSelectedVertices_.empty()){
    status_="Select one or more vertices in the viewport before creating a bone.";
   }else{
