@@ -318,12 +318,14 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacityFillerEntry);p32(capacityAnimationChunk,24,capacityUsedEnd);
  p32(capacityAnimationChunk,28,0U);
  p32(capacityAnimationChunk,capacityAnimEntry,0x0100ffff);p32(capacityAnimationChunk,capacityAnimEntry+4,0x0200007b);p32(capacityAnimationChunk,capacityAnimEntry+8,1);p32(capacityAnimationChunk,capacityAnimEntry+12,1);p32(capacityAnimationChunk,capacityAnimEntry+16,24);p32(capacityAnimationChunk,capacityAnimEntry+20,capacityAnimEntryBytes);
- p32(capacityAnimationChunk,capacityFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacityFrame+12,1);p32(capacityAnimationChunk,capacityFrame+16,0x0200007b);p32(capacityAnimationChunk,capacityFrame+20,24);
+ p32(capacityAnimationChunk,capacityFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacityFrame+12,0U); // Crash 2 +12 is collisionCount, not specialVertexCount.
+ p32(capacityAnimationChunk,capacityFrame+16,0x0200007b);p32(capacityAnimationChunk,capacityFrame+20,24);
  for(std::size_t bi=0;bi<capacitySourceTemporalBytes;++bi)capacityAnimationChunk[capacityFrame+24U+bi]=0U;
  p32(capacityAnimationChunk,capacityFillerEntry,0x0100ffff);p32(capacityAnimationChunk,capacityFillerEntry+4,0x02000099);p32(capacityAnimationChunk,capacityFillerEntry+8,0);p32(capacityAnimationChunk,capacityFillerEntry+12,0);p32(capacityAnimationChunk,capacityFillerEntry+16,20);
  std::vector<std::uint8_t> capacityArchiveBytes;capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityModelChunk.begin(),capacityModelChunk.end());capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityAnimationChunk.begin(),capacityAnimationChunk.end());
  NsfArchive capacityConversion;assert(capacityConversion.loadBytes(capacityArchiveBytes,e));capacityConversion.decodeAnimationModels(false);
  assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
+ assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].collisionCount==0U&&capacityConversion.chunks()[1].entries[0].animation.frames[0].headerSize==24U&&capacityConversion.chunks()[1].entries[0].animation.frames[0].specialVertexCount==0U);
  const bool capacityConverted=capacityConversion.convertComplexModelToNormal(0x0200007bU,e);if(!capacityConverted)std::cerr<<"Capacity conversion failed: "<<e<<"\n";assert(capacityConverted);
  assert(capacityConversion.chunks().size()==3U);
  assert(capacityConversion.chunks()[2].entries[0].animation.frames[0].rawSize==24U+300U);
