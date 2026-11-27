@@ -196,3 +196,15 @@ The user supplied screenshots confirming `BT10V` displays **Normal** and `Cr10V`
 **Major milestone — user-confirmed 2026-11-27:** the user saved the converted archive through CrashEdit-RE (CE-RE), then tested that saved file in Crash 2 and reported that it worked correctly in-game. This confirms the tested converted Model and linked Animations survive conversion, packed chunk relocation, archive save/round-trip, and actual game loading/playback. The milestone is [90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357).
 
 Scope is the tested resource set; continue validating other models/animation layouts and Zone load-list edge cases separately. Detailed evidence and limits are recorded in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+
+
+## Complex-to-Normal conversion unlocks larger Crash ear edits — 2026-11-27
+
+**User-confirmed major practical milestone:** after converting Crash's Complex Model/Animation resources to Normal, the user can move Crash's ear to much larger positions that were previously not possible. CrashEdit-VC saves the edited model successfully.
+
+This is a follow-up to the [90f4a99 conversion/game-compatibility milestone](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357):
+- The converted Model and linked Animations were saved through CrashEdit-RE and confirmed to work in Crash 2.
+- The new user test confirms larger ear-position edits can be made in the converted Normal representation and saved by CrashEdit-VC.
+- The earlier Complex coordinate/edit limitation is therefore practically bypassed for the tested resource by conversion, without claiming unrestricted editing of every Model or coordinate.
+
+**Scope / follow-up:** exact coordinate limits and broad model coverage remain unmeasured. Reopen the larger edited save in CE-RE and test it in-game to confirm the edited pose—not only the unchanged converted animation—survives the full pipeline. Zone load-list and chunk-capacity edge cases remain separate validation items.
