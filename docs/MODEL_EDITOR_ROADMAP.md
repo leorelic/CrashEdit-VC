@@ -296,7 +296,8 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 - [x] Scale requires the corresponding opposite faces and scales both boundaries symmetrically.
 - [x] Give gizmo handles mouse-input priority over camera orbit.
 - [x] Remove Free Move from Collision Editing; it remains available for vertex editing.
-- [x] Preserve the raw 0x28-byte collision record and transactional frame/archive write path.- [x] User-confirmed working after local build and interaction testing (2026-11-13).
+- [x] Preserve the raw 0x28-byte collision record and transactional frame/archive write path.
+- [x] User-confirmed working after local build and interaction testing (2026-11-13).
 
 Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2e` fixed gizmo input priority, additive selection, and symmetric scaling.
 
