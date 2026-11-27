@@ -134,18 +134,13 @@ The parser includes the instruction after the return pattern as the delay-slot i
 
 The native MIPS decoder now covers the supported R3000A subset plus the modeled COP0/COP2/GTE forms described in [GOOL_ROADMAP.md](GOOL_ROADMAP.md). Register operand ordering for `jalr` and source-register selection for `mthi`/`mtlo` were corrected during source/encoding review. Keep raw words visible for verification.
 
-## COP2 / PlayStation GTE finding — research only, not implemented
+## COP2 / PlayStation GTE support — implementation status
 
-A real instruction word observed in the GOOL native-code stream was `0x49BE0BE0`, which the original CrashEdit decoder displays as `???`.
+A real instruction word observed in the GOOL native-code stream, `0x49BE0BE0`, exposed a valid PS1 COP2/GTE command that the original CrashEdit decoder displays as unknown. Its low six-bit function is `0x20` (`NCT`, Normal Color Triple).
 
-This can be identified without an entry in CrashEdit's source by decoding the MIPS fields:
-- Primary opcode is `0x12` (decimal 18), the COP2 instruction family.
-- On PlayStation 1, COP2 is the Geometry Transformation Engine (GTE) interface.
-- The low six-bit command function is `0x20`, which identifies the GTE `NCT` (Normal Color Triple) command.
+CrashEdit-VC has since implemented structural decoding for COP2 transfers, branches, load/store forms, GTE command selectors/flags, and verified effects for a supported set of GTE commands. This is project-authored disassembly/inspection, not GTE emulation. Unknown commands, malformed/reserved encodings, and unsupported forms remain loss-preserving and explicitly unanalyzed.
 
-This is an encoding-level identification, not a feature copied from CrashEdit. It shows that the original decoder's `???` can conceal a valid PS1-specific instruction.
-
-**Status:** research finding only. COP2/GTE support has not been implemented. Before implementation, audit the full COP2 encoding space: GTE command words, control/data register transfers, and load/store forms. Decode command flags and register indices rather than merely printing a mnemonic. Preserve raw words for unknown/reserved forms. This is a disassembler task, not a GTE emulator.
+See [GOOL_ROADMAP.md](GOOL_ROADMAP.md) for the implemented coverage and remaining limitations, and [gool-crash2-instruction-audit.md](gool-crash2-instruction-audit.md) for the opcode/operand audit.
 
 ## MIPS decoder comparison with original CrashEdit
 
@@ -624,7 +619,7 @@ Reference source files:
 
 **Question:** if a Complex (compressed ModelPosition) animation is converted to Normal (uncompressed byte-coordinate frame temporals), will Crash 2 play it?
 
-**Current conclusion:** structurally plausible, but NOT YET PROVEN in-game. This is a format-to-format conversion, not a new runtime feature: the target representation is the existing uncompressed Model + uncompressed Animation frame layout. A successful editor preview or NSF reparse is insufficient; acceptance requires the converted NSF/NSD to load and play in the original game/emulator.
+**Historical pre-validation conclusion:** conversion was structurally plausible but not yet proven in-game at the time this note was written. That uncertainty was later resolved for the tested resource set: the user confirmed converted playback and the larger edited Crash ear position after VC save, CE-RE round-trip, and original-game playback. See the validation milestones below and [MILESTONES.md](MILESTONES.md).
 
 ### CrashEdit-RE conversion helper audit
 
@@ -648,7 +643,7 @@ Other required checks: preserve frame `HeaderSize` and raw special-vertex bytes 
 
 ### Product decision
 
-Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Complex-to-Normal conversion. Conversion must be an explicit archive operation with a preview/diff and safe rollback, not an invisible save fallback. It must clone/isolate shared Model resources where necessary and must not change the working Cr10V preview decoder/renderer. No claim of in-game compatibility is allowed until step 5 passes.
+Keep both strategies distinct: (A) a genuine Complex delta encoder remains future work; (B) explicit Complex-to-Normal conversion is implemented and user-validated in-game for the tested resource. Conversion must remain an explicit archive operation with safe rollback, isolate shared Model resources where necessary, and preserve the working Cr10V preview decoder/renderer. Do not generalize the single tested result to every resource layout.
 
 ## Complex-to-Normal conversion: packed relocation and chunk capacity
 
@@ -662,7 +657,7 @@ Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Compl
 - Do not reorganize unrelated pre-existing chunks.
 - Show Remaining space in Properties based on the terminal used-data offset, not the fixed 64 KiB buffer size.
 
-The regression now uses two linked Animations of deliberately different frame counts: the short entry relocates first, and the longer entry's aggregate frame growth then forces a second relocation and asserts that they share one destination chunk, keep distinct EIDs, reparse, and survive Save/reopen. The source chunk retains its unrelated filler. Do not mark this correction as a milestone until CI passes.
+The regression uses two linked Animations of deliberately different frame counts and verifies they share a destination chunk, keep distinct EIDs, reparse, and survive Save/reopen while the source chunk retains its unrelated filler. The capacity-aware packing implementation is recorded in [MILESTONES.md](MILESTONES.md); CI evidence and platform scope are stated there.
 
 ## Complex-to-Normal conversion: user-confirmed in-game validation — 2026-11-27
 
