@@ -736,3 +736,21 @@ This extends the [90f4a99 in-game conversion milestone](https://github.com/leore
 **Next validation:** save the larger ear edit, reopen the resulting NSF in CrashEdit-RE, and test the edited converted resource in Crash 2. Compare the target vertex coordinates/pose before conversion, after conversion, after edit/save/reopen, and in-game. Record the exact vertex, axis, requested coordinate, and tested resource EIDs if further limits appear.
 
 This user-confirmed result supersedes the earlier statement that larger-coordinate editing after conversion was only a proposed strategy; it does not supersede the separate remaining-work notes for broad resource coverage, Zone load-list limits, or exhaustive coordinate-range testing.
+
+
+## User-confirmed edited ear survives CE-RE and original-game playback — 2026-11-27
+
+**End-to-end validation completed:** the user has now tested the *edited* larger Crash ear position in the original game and confirmed that it works. This closes the exact follow-up validation left open in the preceding entry.
+
+Confirmed sequence for the tested resource:
+1. Convert the Complex Model and linked Animations to Normal.
+2. Move Crash's ear to a substantially larger position that was not possible in the original Complex representation.
+3. Save the edited model through CrashEdit-VC.
+4. Save/reopen the file through CrashEdit-RE (CE-RE).
+5. Load the edited result in Crash 2 and confirm the larger ear position works in-game.
+
+**Conclusion:** for this tested resource and edit, Complex-to-Normal conversion enables larger vertex-position edits, and the edited result survives the editor save, CE-RE round trip, and original-game loading/playback. This is stronger evidence than the earlier unchanged-conversion test: the actual modified geometry—not merely the converted baseline—has now passed in-game validation.
+
+**Custom-animation relevance:** this validates a necessary building block for custom animation authoring: editable converted geometry can be saved and consumed by the original game. It does not yet establish a complete custom-animation workflow. Remaining work includes editing/keyframing frame poses, reliably serializing all intended frame changes, maintaining Model/Animation EID references and chunk/Zone constraints, and testing complete multi-frame custom animations in-game.
+
+Keep the earlier scope limits: this is a confirmed test case, not proof of unlimited coordinate range or compatibility with every Model/Animation layout.
