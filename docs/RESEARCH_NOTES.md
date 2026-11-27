@@ -54,9 +54,7 @@ Compatibility checks mirror observed CrashEdit behavior: warn for zero spawn rec
 
 ## GOOL research boundary
 
-**ManDude / GOOC is excluded from this project’s GOOL research.** Its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. Do not inspect or use the repository as a source of GOOL decompilation guidance, code, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns. Do not use it as a feature checklist or design reference.
-
-GOOL research must proceed independently from CrashEdit-VC's own implementation, Crash 2 samples and runtime behavior, and technical sources whose use is compatible with the project's MIT licensing. This is a settled project boundary, not an open research task.
+GOOC is excluded from this project's GOOL research. The scoped restriction is maintained in [GOOL_ROADMAP.md](GOOL_ROADMAP.md); the complete project-wide policy is in [MILESTONES.md](MILESTONES.md).
 
 ## GOOL container and data research
 
