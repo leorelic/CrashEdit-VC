@@ -329,6 +329,8 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 
 #### Next priority — usable bone creation and per-frame posing
 
+- [x] Add a direct **Create From Selection** workflow that creates a bone from the current viewport selection, transfers those vertices out of any previous groups, and initializes the pivot from the group's current-frame center; selecting a bone in the list now also selects/highlights its assigned vertices in the viewport.
+- [x] Include per-frame rest-pose vertex contents and rest offsets in undo-history change detection so editor-only pose-cache changes are not silently omitted from history.
 - [ ] Make the workflow for selecting a group of vertices and creating a bone for that group fast, clear, and predictable; retain the existing multi-selection and one-bone-per-vertex rules unless research demonstrates a better safe model.
 - [ ] Make bone creation, naming, selection, vertex assignment/removal, and saved-rig management feel like one coherent rigging workflow rather than disconnected utility controls.
 - [ ] Improve the visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
