@@ -718,3 +718,21 @@ This closes the previously pending game-compatibility validation for the tested 
 - Accepted milestone/checkpoint: [90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357).
 - Scope: user-tested converted Model and linked Animations, with the saved file round-tripped through CE-RE before in-game testing.
 - Do not generalize this single successful test to every Complex Model, Animation layout, special-vertex configuration, or Zone load-list scenario. Retain representative regression coverage and test additional resource sets as they arise.
+
+
+## User-confirmed large Crash ear edits after Complex-to-Normal conversion — 2026-11-27
+
+**Major practical finding (user-tested):** after converting Crash's Complex Model/Animation resources to Normal, the user can move Crash's ear to substantially larger positions that were previously blocked by the Complex edit/encoding limitation. CrashEdit-VC saves the edited model successfully.
+
+This extends the [90f4a99 in-game conversion milestone](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357): the converted Model/linked Animations were already confirmed to survive CE-RE save and original-game playback; the new report confirms the converted Normal representation also permits larger ear-position edits and those edits save in CrashEdit-VC.
+
+**Evidence and scope**
+- User reported the larger ear positions were previously not possible before conversion.
+- User reported the converted model saves successfully with those larger positions.
+- This is user-tested behavior on the resource/edit case they exercised, not a claim that all vertices, axes, Models, or arbitrary coordinates are unbounded.
+- The exact maximum representable coordinate and any remaining Normal-frame byte/encoding limits have not been measured.
+- Preserve the known-good Complex preview decoder/renderer contract; this result supports the explicit conversion workflow rather than changing Complex decoding.
+
+**Next validation:** save the larger ear edit, reopen the resulting NSF in CrashEdit-RE, and test the edited converted resource in Crash 2. Compare the target vertex coordinates/pose before conversion, after conversion, after edit/save/reopen, and in-game. Record the exact vertex, axis, requested coordinate, and tested resource EIDs if further limits appear.
+
+This user-confirmed result supersedes the earlier statement that larger-coordinate editing after conversion was only a proposed strategy; it does not supersede the separate remaining-work notes for broad resource coverage, Zone load-list limits, or exhaustive coordinate-range testing.
