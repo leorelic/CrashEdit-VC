@@ -1339,7 +1339,7 @@ bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::siz
  return newUsedEnd<0||newUsedEnd>static_cast<std::ptrdiff_t>(NsfChunkSize);
 }
 
-bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t&newChunkIndex,std::string&error,std::size_t finalEntrySizeHint){
+bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t&newChunkIndex,std::string&error,std::size_t finalEntrySizeHint,std::size_t*newEntryIndex){
  auto fail=[&](const char*message){error=message;return false;};
  if(chunkIndex>=chunks_.size())return fail("The source chunk no longer exists.");
  const auto&source=chunks_[chunkIndex];
@@ -1481,6 +1481,7 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
    error="Could not reapply pending animation vertex edits after NSF chunk relocation.";return false;
   }
  }
+ if(newEntryIndex)*newEntryIndex=relocatedEntryIndex;
  *this=std::move(candidate);
  error.clear();return true;
 }
@@ -2070,16 +2071,16 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
   if(finalTrailing>NsfChunkSize-finalEntrySize){error="The converted Animation entry exceeds a 64 KiB NSF chunk.";return false;}
   finalEntrySize+=finalTrailing;
   if(finalEntrySize>NsfChunkSize-24U){error="The converted Animation entry exceeds the capacity of a new 64 KiB NSF chunk.";return false;}
-  std::size_t newChunkIndex=0;
-  if(!candidate.moveEntryToNewChunk(ci,ei,newChunkIndex,error,finalEntrySize))return false;
-  if(newChunkIndex>=candidate.chunks_.size()||candidate.chunks_[newChunkIndex].entries.size()!=1U){
-   error="Animation relocation did not produce a single-entry destination chunk.";return false;
+  std::size_t newChunkIndex=0,relocatedEntryIndex=0;
+  if(!candidate.moveEntryToNewChunk(ci,ei,newChunkIndex,error,finalEntrySize,&relocatedEntryIndex))return false;
+  if(newChunkIndex>=candidate.chunks_.size()||relocatedEntryIndex>=candidate.chunks_[newChunkIndex].entries.size()){
+   error="Animation relocation did not produce a valid destination entry.";return false;
   }
   poses.clear();payloads.clear();linkedFrames=0;
-  if(!buildPayloads(newChunkIndex,0U,payloads,poses,linkedFrames))return false;
+  if(!buildPayloads(newChunkIndex,relocatedEntryIndex,payloads,poses,linkedFrames))return false;
   if(linkedFrames==0U){error="Relocated Animation no longer references the selected Model.";return false;}
-  if(!replaceAnimationFramePayloads(candidate.chunks_[newChunkIndex],candidate.chunks_[newChunkIndex].entries[0],payloads)){
-   error="The converted Animation entry itself exceeds the 64 KiB capacity of a new NSF chunk; conversion was aborted without changing the archive.";return false;
+  if(!replaceAnimationFramePayloads(candidate.chunks_[newChunkIndex],candidate.chunks_[newChunkIndex].entries[relocatedEntryIndex],payloads)){
+   error="The converted Animation entry exceeds the capacity of its selected NSF destination chunk; conversion was aborted without changing the archive.";return false;
   }
   linkedFrameCount+=linkedFrames;
   expected.insert(expected.end(),std::make_move_iterator(poses.begin()),std::make_move_iterator(poses.end()));

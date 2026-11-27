@@ -703,7 +703,7 @@ Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Compl
 - Try the latest conversion-created packing chunk before allocating another.
 - Include the growing entry-offset table, prefix padding, all complete raw entries and the incoming entry in capacity calculations.
 - Rebuild and reparse the table and terminal used-data offset after appending.
-- Preserve pending edited poses by chunk/entry/frame identity even when the relocated entry is appended at index 1+.
+- Preserve pending edited poses by chunk/entry/frame identity even when the relocated entry is appended at index 1+. The converter carries the actual destination entry index through relocation and rebuilds that entry, rather than assuming every destination chunk has exactly one entry.
 - Do not reorganize unrelated pre-existing chunks.
 - Show Remaining space in Properties based on the terminal used-data offset, not the fixed 64 KiB buffer size.
 
