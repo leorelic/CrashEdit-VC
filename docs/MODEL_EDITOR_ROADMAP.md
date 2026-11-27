@@ -1,5 +1,9 @@
 # Model Editor roadmap
 
+## Model/Animation research boundary
+
+**Airumu / Blender_CrashXform is excluded from Model/Animation Editor research.** It is GPL-3.0. Do not inspect or restudy the project, use its video or repository as a design reference, port or adapt its code, reproduce its implementation, or incorporate its dependencies, assets, or generated output. Keep Model/Animation Editor work independently implemented under CrashEdit-VC's MIT license. The project's overall repository-exclusion policy is recorded in [MILESTONES.md](MILESTONES.md).
+
 ## Reference baseline and scope
 
 **Authoritative comparison target:** [CrashEdit-RE — airumu/CrashEdit, branch t/net9](https://github.com/airumu/CrashEdit/tree/t/net9). The README identifies this as CrashEdit: Re and documents its Model / Compressed Model editors. Future research must use CrashEdit-RE and the appropriate t/net branch. Do not use cbhacks/CrashEdit or its deprecated branches as the project's reference implementation.
