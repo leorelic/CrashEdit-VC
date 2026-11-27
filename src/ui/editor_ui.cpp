@@ -4066,6 +4066,7 @@ void EditorUI::drawAnimationViewer(){
     if(distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
    }
   }
+  bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
   if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
    boneRigSelectedBone_=hoveredBone;animationSelectedVertices_=boneRigBones_[static_cast<std::size_t>(hoveredBone)].vertices;
@@ -4117,7 +4118,6 @@ void EditorUI::drawAnimationViewer(){
                          pivot.y+radius*(u.y*std::cos(angle)+v.y*std::sin(angle)),
                          pivot.z+radius*(u.z*std::cos(angle)+v.z*std::sin(angle)));
   };
-  bool boneRotationStarted=false;
   if(selectedBoneValid()&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!viewportToolbarOwnsMouse){
    const AnimationPoint pivot=bonePivotWorld();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);float bestDistance=22.0f;int pickedAxis=-1;
@@ -4774,9 +4774,12 @@ void EditorUI::drawAnimationViewer(){
    const ImU32 boneColor=static_cast<int>(bi)==boneRigSelectedBone_?IM_COL32(255,205,90,255):IM_COL32(95,185,230,225);
    if(ends.first.x==ends.second.x&&ends.first.y==ends.second.y&&ends.first.z==ends.second.z){boneOverlay->AddCircleFilled(a,5.0f,boneColor,16);continue;}
    const float dx=b.x-a.x,dy=b.y-a.y,length=std::sqrt(dx*dx+dy*dy);if(length<1.0f)continue;
-   const float nx=-dy/length*4.5f,ny=dx/length*4.5f;
-   boneOverlay->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.55f,b.y+ny*0.55f),ImVec2(b.x-nx*0.55f,b.y-ny*0.55f),ImVec2(a.x-nx,a.y-ny),boneColor);
-   boneOverlay->AddLine(a,b,IM_COL32(20,25,32,255),1.5f);boneOverlay->AddCircleFilled(a,6.0f,boneColor,16);boneOverlay->AddCircleFilled(b,4.5f,boneColor,16);
+   const float nx=-dy/length*4.0f,ny=dx/length*4.0f;
+   const ImU32 boneOutline=IM_COL32(22,27,35,245);
+   boneOverlay->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.45f,b.y+ny*0.45f),ImVec2(b.x-nx*0.45f,b.y-ny*0.45f),ImVec2(a.x-nx,a.y-ny),boneColor);
+   boneOverlay->AddLine(a,b,boneOutline,2.0f);
+   boneOverlay->AddCircleFilled(a,8.0f,boneColor,20);boneOverlay->AddCircleFilled(b,6.0f,boneColor,20);
+   boneOverlay->AddCircle(a,8.0f,boneOutline,20,1.4f);boneOverlay->AddCircle(b,6.0f,boneOutline,20,1.2f);
   }
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const int parent=boneRigBones_[bi].parentBone;
@@ -5567,6 +5570,29 @@ void EditorUI::drawBoneRigEditor(){
      if(selected)ImGui::SetItemDefaultFocus();
     }
     ImGui::EndCombo();
+   }
+   if(bone.parentBone>=0&&static_cast<std::size_t>(bone.parentBone)<boneRigBones_.size()&&ImGui::Button("Connect to Parent Joint")){
+    const auto parentIndex=static_cast<std::size_t>(bone.parentBone);
+    const auto parentPivot=AnimationPoint((boneRigBones_[parentIndex].pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
+                                         (boneRigBones_[parentIndex].pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
+                                         (boneRigBones_[parentIndex].pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+    const auto parentBoneEnds=[&](std::size_t index){
+     AnimationPoint head{0,0,0},tail{0,0,0};if(index>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+     const auto&group=boneRigBones_[index];head=tail=AnimationPoint((group.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(group.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(group.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+     std::vector<AnimationPoint>points;for(const int vi:group.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vi)],frame,model));
+     float farthest=-1.0f;for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float d=dx*dx+dy*dy+dz*dz;if(d>farthest){farthest=d;head=points[a];tail=points[b];}}
+     const float dh=(head.x-parentPivot.x)*(head.x-parentPivot.x)+(head.y-parentPivot.y)*(head.y-parentPivot.y)+(head.z-parentPivot.z)*(head.z-parentPivot.z);
+     const float dt=(tail.x-parentPivot.x)*(tail.x-parentPivot.x)+(tail.y-parentPivot.y)*(tail.y-parentPivot.y)+(tail.z-parentPivot.z)*(tail.z-parentPivot.z);if(dt<dh)std::swap(head,tail);
+     return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+    };
+    const auto joint=parentBoneEnds(parentIndex).second;
+    if(std::fabs(modelScaleX)>0.0001f&&std::fabs(modelScaleY)>0.0001f&&std::fabs(modelScaleZ)>0.0001f){
+     bone.pivotX=joint.x/modelScaleX-static_cast<float>(frame.xOffset)/4.0f;
+     bone.pivotZ=joint.y/modelScaleY-static_cast<float>(frame.yOffset)/4.0f;
+     bone.pivotY=joint.z/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f;bone.pivotInitialized=true;
+     bone.frameRotations.clear();bone.frameRestVertices.clear();bone.frameRestOffsets.clear();
+     status_="Connected "+bone.name+" to "+boneRigBones_[parentIndex].name+" at the parent joint.";
+    }else status_="Cannot connect bones with a zero model scale.";
    }
    if(ImGui::Button("Assign Selected Vertices")){
    for(const int index:animationSelectedVertices_){
