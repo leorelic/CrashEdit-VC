@@ -4,6 +4,18 @@
 
 This file is the concise project-history index of verified milestones. It records implemented checkpoints and user-confirmed outcomes separately from pending work. A milestone is not a claim that every file variant or workflow is complete.
 
+## Independent development and licensing boundary
+
+**Hard project constraint — preserve CrashEdit-VC's MIT license.** CrashEdit-VC must remain an independently implemented MIT-licensed project. The following repositories are deliberately excluded as sources of code, implementation, dependencies, design templates, feature checklists, or implementation inspiration:
+
+- **Airumu / Blender_CrashXform** — GPL-3.0. This exclusion applies to Model/Animation Editor work. Do not inspect or restudy this project, use its video or repository as a design reference, port or adapt its code, reproduce its implementation, or incorporate its dependencies, assets, or generated output.
+- **ManDude / GOOC** — its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. This exclusion applies to GOOL research. Do not inspect it for GOOL decompilation guidance, copy or adapt its source, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns.
+
+These are deliberate exclusions, not tasks to revisit. Do not add features to CrashEdit-VC merely to match either project, and do not use either repository as a roadmap or comparison checklist. Build features from CrashEdit-VC's own code and accomplishments, independent analysis of Crash 2 data and runtime behavior, primary technical evidence that can be used consistently with the MIT goal, and our own regression fixtures and tests.
+
+When planning or implementing a feature, check this boundary first. If a proposed approach depends on either excluded project, stop and design an independent approach instead. Do not assume that public availability grants permission to reuse code or other copyrighted implementation material.
+
+
 ## Native C++ application foundation
 
 - Established the native C++20/CMake application with Dear ImGui docking, GLFW and OpenGL, plus Windows/Linux/macOS CI.
