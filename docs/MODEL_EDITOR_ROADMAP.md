@@ -268,7 +268,7 @@ Implementation trail:
 
 ## Animation and Model authoring roadmap — updated 2026-11-19
 
-The current Animation/Model editor is the foundation for the next authoring work. Preserve the existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, face-texture workflow, collision editor, and working rendering behavior. The priorities below separate immediate editor improvements from the later Scenery/Geometry authoring category.
+The current Animation/Model editor is the foundation for custom frame authoring. The immediate priority is to make the editor-only Bone Rig and per-frame bone posing workflow genuinely usable: select groups of vertices, create and save bones for those groups, then pose those bones naturally on individual Animation frames. The existing implementation is a rough foundation, not a finished tool; its current interaction and posing workflow needs substantial improvement. Once this bone-editing workflow is dependable and validated, put further Animation Editor expansion on hold and shift the main development focus to the broader Zones / Level Editing category. Preserve the existing 3D Animation Editor, frame editor, circle-dot Animation Timeline, face selection, face-texture workflow, collision editor, and known-good rendering behavior.
 
 ### Completed foundation milestones
 
@@ -296,8 +296,7 @@ The archive relocation API is generic for valid entries in normal type-0 chunks,
 - [x] Scale requires the corresponding opposite faces and scales both boundaries symmetrically.
 - [x] Give gizmo handles mouse-input priority over camera orbit.
 - [x] Remove Free Move from Collision Editing; it remains available for vertex editing.
-- [x] Preserve the raw 0x28-byte collision record and transactional frame/archive write path.
-- [x] User-confirmed working after local build and interaction testing (2026-11-13).
+- [x] Preserve the raw 0x28-byte collision record and transactional frame/archive write path.- [x] User-confirmed working after local build and interaction testing (2026-11-13).
 
 Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2e` fixed gizmo input priority, additive selection, and symmetric scaling.
 
@@ -331,6 +330,23 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 
 **Current implementation notes:** bone definitions, parent metadata, rest poses, pivots, and per-frame rotation metadata are stored in the editor sidecar, not in the Crash 2 Animation format or NSF. The rig is an editor-only vertex-group/transform helper, not a game skeleton. Version-1 sidecars load without rest-pose caches; the first rotation establishes the current visible pose as that frame's new base.
 
+**Status: foundational implementation exists, but the user considers the current bone workflow rough and not acceptable as a finished authoring tool.** Creating bones, assigning selected vertices, saving/loading the rig, and basic per-frame rotation are already implemented. Do not mistake those checkmarks for completion of the intended Blender-like posing experience.
+
+#### Next priority — usable bone creation and per-frame posing
+
+- [ ] Make the workflow for selecting a group of vertices and creating a bone for that group fast, clear, and predictable; retain the existing multi-selection and one-bone-per-vertex rules unless research demonstrates a better safe model.
+- [ ] Make bone creation, naming, selection, vertex assignment/removal, and saved-rig management feel like one coherent rigging workflow rather than disconnected utility controls.
+- [ ] Improve the visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
+- [ ] Implement useful parent/child hierarchy behavior, including child-transform propagation where appropriate; current parent links are metadata only.
+- [ ] Make posing operate on the selected bone and its assigned vertices as a natural bone transform, with intuitive rotation and pivot behavior rather than requiring awkward manual workarounds.
+- [ ] Make per-frame posing dependable: each Animation frame must retain its own pose/rest state, and changing a bone on one frame must not unexpectedly alter other frames.
+- [ ] Support practical pose iteration across frames, including predictable frame switching, pose adjustment, and preservation of previously authored poses.
+- [ ] Make save/reload preserve the rig, bone assignments, hierarchy, pivots, rest poses, and every edited frame pose; test both the editor sidecar and the actual Animation data.
+- [ ] Add a usable undo/redo workflow for bone creation, assignment, hierarchy changes, and per-frame posing.
+- [ ] Validate the complete workflow on representative multi-frame Crash 2 animations, including a custom pose sequence authored with bones and confirmed after save/reopen and in-game testing.
+
+**Exit condition for the Animation/Model authoring focus:** a user can select vertices, create and save bones for those groups, pose the bones independently on multiple frames, revisit and refine those poses, and reliably save/reopen the result without losing or unintentionally changing the rig or animation. Once this is achieved and validated, pause further Animation Editor feature expansion and move the primary roadmap focus to Zones / Level Editing. Keep any remaining animation compatibility defects documented, but do not let optional animation polish indefinitely block the next category.
+
 ### 3. Transform and pivot tools
 
 - [x] Provide Free Move, Axis Move, Scale, and bone rotation controls, with Shift snapping on axis transforms.
@@ -353,22 +369,39 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [x] Validate extracted real-sample entry save/reload and decoded-data stability for both pairs. [ ] Still validate full NSF/NSD archive behavior, original-game loading, texture-page/CLUT resolution, chained animated-texture edge cases, missing references, and malformed resource boundaries.
 - [x] Keep Crash 2 as the acceptance target; Crash 3-specific model/frame behavior remains a separate compatibility pass.
 
-### 5. Scenery / Geometry Editing and level-object authoring
+### 5. Zones / Level Editing — next major roadmap category
 
-This is a separate future category, not an extension of the current Animation/Model editor checklist. It covers whichever workflows the project ultimately adopts for Scenery/Geometry editing and level-object creation, import, conversion, or related authoring. Topology creation/deletion belongs here rather than in the current vertex-transform tools.
+This is the next broad development focus after the Bone Rig and per-frame posing workflow reaches its exit condition. **Zones / Level Editing is substantially broader than Scenery / Geometry Editing.** Scenery and Geometry are important sub-areas within the Zone workflow, not the definition of the entire category. The exact feature breakdown will grow as we research the formats and runtime behavior; do not prematurely constrain this category to the currently known tasks.
+
+#### Zone structure and level-resource relationships
+
+- [ ] Research the overall Crash 2 Zone structure and identify the resources, metadata, and references that make up a playable level.
+- [ ] Map how Zone resources reference, load, order, share, and depend on NSF/NSD entries and other level data.
+- [ ] Understand Zone boundaries, neighboring/connected Zones, transitions, and any runtime rules that affect loading or visibility.
+- [ ] Document the relationship between Zone data, spawn/checkpoint data, cameras, scenery, geometry, level objects, and other relevant resources.
+- [ ] Establish representative real Crash 2 Zone fixtures and a safe round-trip / original-game validation strategy before broad editing.
+
+#### Scenery / Geometry editing and level-object authoring
+
+This is one major sub-area of the Zones category. It covers Scenery/Geometry resources and the workflows needed to inspect, edit, create, import, convert, and place level geometry and objects.
 
 - [ ] Research Scenery/Geometry resource layouts and how level objects reference or combine their geometry, materials, and related resources.
-- [ ] Research the Type 4 **SLST (Sort List)** entry as part of this category, not as an unrelated standalone editor task.
-- [ ] Establish how SLST source and delta records relate to scenery polygon ordering, camera-dependent sorting, zones, and level-object rendering.
+- [ ] Research the Type 4 **SLST (Sort List)** entry as part of Scenery/Geometry and Zone rendering, not as an unrelated standalone editor task.
+- [ ] Establish how SLST source and delta records relate to scenery polygon ordering, camera-dependent sorting, Zones, and level-object rendering.
 - [ ] Confirm runtime semantics, interpolation/transition behavior, and generation constraints from source, multiple real Crash 2 samples, and in-game tests before implementing an SLST generator.
 - [ ] Define safe geometry/topology serialization, including variable-size data, index/count updates, dependent-resource references, and round-trip preservation.
-- [ ] Only then design the user workflow for scenery/geometry editing and level-object creation/import/conversion, with SLST inspection/editing and any required regeneration handled as part of the same category.
+- [ ] Design the user workflow for scenery/geometry editing and level-object creation/import/conversion, with SLST inspection/editing and any required regeneration handled as part of the same sub-area.
 
-The existing Animation/Model vertex tools continue to edit positions on existing topology only. Adding/removing vertices or faces, constructing scenery, and creating/converting level objects are explicitly deferred to this separate category. See the SLST section in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md) and the focused research note in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+#### Additional Zone editing areas to discover
+
+- [ ] Identify and document the other Zone-level editing workflows needed for meaningful level authoring; expand this list as research uncovers the relevant formats and runtime behavior.
+- [ ] Determine how Zone-level changes should be previewed, validated, saved, and tested in the original game without damaging unrelated level resources.
+
+The existing Animation/Model vertex tools continue to edit positions on existing topology only. Adding/removing vertices or faces, constructing scenery, and creating/converting level objects belong under this broader Zones / Level Editing category. See the SLST section in [NSF_ENTRY_SUPPORT_RESEARCH.md](NSF_ENTRY_SUPPORT_RESEARCH.md) and the focused research note in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
 
 ### 6. PS1 Texture Import/Export — final roadmap category
 
-This remains intentionally last, after the editing and Scenery/Geometry priorities above are established. It is a PlayStation 1-specific workflow, not a generic modern texture pipeline.
+This remains intentionally last, after the Zones / Level Editing category (including Scenery/Geometry and the other Zone-level workflows) has been researched and established. It is a PlayStation 1-specific workflow, not a generic modern texture pipeline.
 
 - [ ] Support relevant PS1 representations: 4bpp indexed, 8bpp indexed, and 16-bit direct color, including PS1 transparency/semi-transparency conventions.
 - [ ] Export texture data to a usable image format and import edited images back into the existing texture-page/descriptor workflow.
