@@ -2033,7 +2033,7 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
   std::vector<std::vector<std::uint8_t>>payloads;
   std::vector<ExpectedPose>poses;
   std::size_t linkedFrames=0;
-  if(!buildPayloads(ci,ei,payloads,poses,linkedFrames,error))return false;
+  if(!buildPayloads(ci,ei,payloads,poses,linkedFrames))return false;
   if(linkedFrames==0U)continue;
   if(replaceAnimationFramePayloads(candidate.chunks_[ci],candidate.chunks_[ci].entries[ei],payloads)){
    linkedFrameCount+=linkedFrames;
@@ -2051,7 +2051,7 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
    error="Animation relocation did not produce a single-entry destination chunk.";return false;
   }
   poses.clear();payloads.clear();linkedFrames=0;
-  if(!buildPayloads(newChunkIndex,0U,payloads,poses,linkedFrames,error))return false;
+  if(!buildPayloads(newChunkIndex,0U,payloads,poses,linkedFrames))return false;
   if(linkedFrames==0U){error="Relocated Animation no longer references the selected Model.";return false;}
   if(!replaceAnimationFramePayloads(candidate.chunks_[newChunkIndex],candidate.chunks_[newChunkIndex].entries[0],payloads)){
    error="The converted Animation entry itself exceeds the 64 KiB capacity of a new NSF chunk; conversion was aborted without changing the archive.";return false;
