@@ -16,11 +16,11 @@ public:
  void handleDroppedFiles(int count,const char** paths);
 private:
  struct EditorSnapshot;
- void drawMenu(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
+ void drawMenu(); void drawConvertModelAnimationWindow(); void drawToolbar(); void drawHierarchy(); void drawResourceActionDialog(); void drawViewport(); void drawBottom(); void drawGoolDataWindows(); void drawGoolScriptEditor();
  void undo(); void redo(); void jumpToHistory(std::size_t stateIndex); void resetUndoHistory(); void trackUndoHistory(); void refreshUndoBaselineBytes(); void drawActionHistory(); void clearHistoryLog(); void writeHistoryLog(); bool saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& snapshot); bool loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapshot); void restoreHistoryState(std::size_t stateIndex);
  void drawNode(const ResourceNode&); void drawSearchWindow(); void drawAnimationTimeline(); void drawAnimationViewer(); void drawAnimationFrameEditor(); void drawBoneRigEditor(); void drawFaceEditor(); void drawFaceTextureSelector(); void drawModelEditor(); void drawGoolInspector(); void drawGoolGraph(); void drawGoolBlueprintGraph(); void drawGoolBlueprintInstructions(); void drawNsdGoolMap(); void drawTextureViewer(); void drawClutEditor(); void drawSpawnPointsEditor(); void openVersionDialog(); bool loadLevel(const std::filesystem::path&,std::string&); bool saveFiles();
  Workspace& workspace_;
- bool openDialog_=false,searchWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
+ bool openDialog_=false,searchWindow_=false,convertModelAnimationWindow_=false,nsdGoolMapWindow_=false,versionDialog_=false,centerOpenDialog_=false,centerVersionDialog_=false,about_=false,assets_=true,textureViewer_=true,clutEditor_=true,spawnPointsEditor_=true,entityDataChanged_=false,openSelectedHierarchy_=false,restoredLastNsfPath_=false;
  bool animationFrameEditorOpen_=false,animationFrameEditorFocus_=false;
  struct BoneRigBone { std::string name; std::vector<int> vertices; int parentBone=-1; float pivotX=0.0f,pivotY=0.0f,pivotZ=0.0f; bool pivotInitialized=false; std::map<std::uint64_t,std::array<float,3>> frameRotations; std::map<std::uint64_t,std::vector<Crash::NsfAnimationVertex>> frameRestVertices; std::map<std::uint64_t,std::array<std::int16_t,3>> frameRestOffsets; };
  struct EditorSnapshot { Crash::NsfArchive nsf; Crash::NsdFile nsd; std::vector<BoneRigBone> bones; };
@@ -69,6 +69,7 @@ private:
  char path_[1024]{}; char searchQuery_[256]{}; int searchTypeFilter_=-1;
  std::filesystem::path nsfPath_,nsdPath_;
  int selectedChunk_=-1,selectedSpawn_=-1,selectedEntry_=-1,selectedEntity_=-1,selectedItem_=-1;
+ int convertModelChunk_=-1,convertModelEntry_=-1;
  int resourceAction_=0,resourceTargetKind_=0,resourceTargetChunk_=-1,resourceTargetEntry_=-1,resourceTargetItem_=-1;
  char resourceActionPath_[1024]{};
  int viewerChunk_=-1,viewerEntry_=-1;
