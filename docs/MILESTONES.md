@@ -1,6 +1,6 @@
 # CrashEdit-VC milestones
 
-> Active investigation: animation vertex transform limits remain unresolved. Read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md), [RESEARCH_NOTES.md](RESEARCH_NOTES.md), and [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) before changing frame boundaries, coordinate limits, or chunk-expansion behavior.
+> Animation status: the tested Complex-to-Normal conversion and edited Crash ear geometry have survived VC save, CE-RE round-trip, and original-game playback. Direct editing in the original Complex representation and broader resource compatibility remain open. Read [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) before changing frame decoding, conversion, or chunk handling.
 
 This file is the concise project-history index of verified milestones. It records implemented checkpoints and user-confirmed outcomes separately from pending work. A milestone is not a claim that every file variant or workflow is complete.
 
@@ -151,30 +151,20 @@ This is a genuine archive-capacity feature for Append/Insert. It is not a remedy
 - This is a stable recovery/reference checkpoint, **not a fix for the original vertex-transform limitation**.
 - Native regression and private real-sample checks passed for representative `Cr10G/Cr10V` and `El1eG/El1eV`; automated checks are not user in-game validation.
 
-## Current unresolved issue — Animation vertex coordinate/encoding limits
+## Complex-frame editing limitation and validated conversion route
 
-**User-reported:** certain vertices cannot move beyond a particular location on the X/Y/Z gizmo. The editor prompts to move the Animation entry into a new NSF chunk, but the requested edit does not apply.
+Direct editing of the original Complex (compressed ModelPosition) representation remains a separate unresolved capability. Do not confuse this with NSF chunk capacity or the known-good preview mapping.
 
-**Correction to earlier implementation notes:** the shifted unified-frame mapping claim below was wrong for preview rendering and was reverted. The decoder now matches the known-good `ff5359a` implementation, and renderer triangle consumers retain their special-vertex offset. The user visually confirmed Cr10V preview recovery on 2026-11-27. Do not change this decoder/renderer pairing while investigating the independent edit/save coordinate-limit problem.
+**Validated workaround — user-confirmed 2026-11-27:** convert the Complex Model and linked Animations to Normal, edit the larger Crash ear position, save through CrashEdit-VC, save/reopen through CrashEdit-RE (CE-RE), and test the edited result in Crash 2. The user confirmed the edited geometry works in-game. See [90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357).
 
-The separate save-side work remains documented in the research notes: shared Model expansion/clone isolation, pending-pose relocation identity, and coordinate-input IDs are distinct concerns. They must not be treated as proof that unrestricted vertex editing works.
-
-Implementation/test commits: [9c7b26b](https://github.com/leorelic/CrashEdit-VC/commit/9c7b26b1eae4c799cb20c19854ee0a8765f18724), [7309155](https://github.com/leorelic/CrashEdit-VC/commit/7309155e1cc58379163a4acf996fecf4fecad321), [aba9be9](https://github.com/leorelic/CrashEdit-VC/commit/aba9be96b897149ab656a158da6c2040824c714e), [c084b97](https://github.com/leorelic/CrashEdit-VC/commit/c084b97a953d8146219b7445feb4961fda851994), and [9feefdd](https://github.com/leorelic/CrashEdit-VC/commit/9feefdda2e0eb88aac222b73dab2bd9cc854127e).
-
-- After a passing build, test the Cr10V right-ear edit in the real 4-special-vertex frame; verify the pose survives save/reopen.
-- If a capacity prompt appears, confirm only the edited Cr10V Animation entry is moved; unrelated animations must remain in their original chunks.
-- Confirm the conflicting-ImGui-ID warning no longer appears when hovering the decoded-vertex editor.
-- Acceptance: requested coordinates persist, the pose is exact after reload, no unrelated Animation entry is relocated, and the UI remains free of the ID warning.
-
-Preserve `ff5359a` as the known-good preview/save baseline while investigating.
-
+This validates the tested resource set and edit only. It does not establish unrestricted coordinate ranges, universal Model/Animation compatibility, direct Complex-frame editing, or a complete multi-frame custom-animation workflow. Preserve the [ff5359a preview mapping](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac). Detailed source findings, conversion constraints, and regression requirements remain in [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
 
 ## Animation preview recovery — user-confirmed 2026-11-27
 
 - **Known-good preview contract:** `decodeAnimationVertices()` matches `ff5359a`; compressed ModelPosition `i` is assigned to `frame.vertices[i]`. Renderer Model triangle indices continue to use `triangleIndex + specialVertexCount` in all relevant render/picking/overlay paths.
 - User tested the recovery build and confirmed Cr10V renders correctly again.
 - The shifted decoder mapping and removed renderer offset caused the repeated corrupted-preview builds. Do not reintroduce either change.
-- This is a renderer/preview recovery only. The original per-vertex coordinate/encoding limit and chunk-relocation/save issue remains unresolved. Solve it in the edit/encode path without disturbing the verified preview mapping.
+- This is a renderer/preview recovery only. Direct editing of the original Complex representation remains unresolved; the tested Complex-to-Normal conversion and edited-geometry workflow are separately validated in the later milestone below. Preserve this preview mapping.
 - Reference baseline: [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac). Current research is in [RESEARCH_NOTES.md](RESEARCH_NOTES.md) and [ANIMATION_FORMAT_RESEARCH.md](ANIMATION_FORMAT_RESEARCH.md).
 
 
