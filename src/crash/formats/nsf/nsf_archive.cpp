@@ -1339,7 +1339,7 @@ bool NsfArchive::animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::siz
  return newUsedEnd<0||newUsedEnd>static_cast<std::ptrdiff_t>(NsfChunkSize);
 }
 
-bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t&newChunkIndex,std::string&error){
+bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t&newChunkIndex,std::string&error,std::size_t finalEntrySizeHint){
  auto fail=[&](const char*message){error=message;return false;};
  if(chunkIndex>=chunks_.size())return fail("The source chunk no longer exists.");
  const auto&source=chunks_[chunkIndex];
@@ -1384,7 +1384,8 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   for(const auto&entry:dest.entries){if(!entry.valid||entry.offset>usedEnd||entry.size>usedEnd-entry.offset||entry.size>NsfChunkSize-payload){valid=false;break;}payload+=entry.size;}
   if(!valid||newTableEnd>NsfChunkSize||prefix>NsfChunkSize-newTableEnd)continue;
   std::size_t required=newTableEnd+prefix;if(payload>NsfChunkSize-required)continue;required+=payload;
-  if(selected.size>NsfChunkSize-required)continue;required+=selected.size;
+  const std::size_t packingEntrySize=std::max(selected.size,finalEntrySizeHint);
+  if(packingEntrySize>NsfChunkSize-required)continue;required+=packingEntrySize;
   std::vector<std::uint8_t> bytes(NsfChunkSize,0U);std::copy_n(dest.bytes.begin(),16U,bytes.begin());
   if(prefix)std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(oldTableEnd),prefix,bytes.begin()+static_cast<std::ptrdiff_t>(newTableEnd));
   std::size_t cursor=newTableEnd+prefix;
@@ -2057,8 +2058,20 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
   // reparsed destination entry before attempting the replacement again.
   for(auto&pose:expected)
    if(pose.chunkIndex==ci&&pose.entryIndex>ei)--pose.entryIndex;
+  const auto&sourceEntry=candidate.chunks_[ci].entries[ei];
+  const std::size_t finalHeaderEnd=16U+(payloads.size()+1U)*4U;
+  if(sourceEntry.items.empty()||sourceEntry.items.front().offset<sourceEntry.offset+finalHeaderEnd){error="The Animation entry has an invalid item-table boundary for capacity packing.";return false;}
+  const std::size_t finalPrefix=sourceEntry.items.front().offset-sourceEntry.offset-finalHeaderEnd;
+  const std::size_t oldPayloadEnd=sourceEntry.items.back().offset+sourceEntry.items.back().size,oldEntryEnd=sourceEntry.offset+sourceEntry.size;
+  if(oldPayloadEnd>oldEntryEnd){error="The Animation entry has invalid trailing padding bounds.";return false;}
+  std::size_t finalEntrySize=finalHeaderEnd+finalPrefix;
+  for(const auto&payload:payloads){if(payload.size()>NsfChunkSize-finalEntrySize){error="The converted Animation entry exceeds a 64 KiB NSF chunk.";return false;}finalEntrySize+=payload.size();}
+  const std::size_t finalTrailing=oldEntryEnd-oldPayloadEnd;
+  if(finalTrailing>NsfChunkSize-finalEntrySize){error="The converted Animation entry exceeds a 64 KiB NSF chunk.";return false;}
+  finalEntrySize+=finalTrailing;
+  if(finalEntrySize>NsfChunkSize-24U){error="The converted Animation entry exceeds the capacity of a new 64 KiB NSF chunk.";return false;}
   std::size_t newChunkIndex=0;
-  if(!candidate.moveEntryToNewChunk(ci,ei,newChunkIndex,error))return false;
+  if(!candidate.moveEntryToNewChunk(ci,ei,newChunkIndex,error,finalEntrySize))return false;
   if(newChunkIndex>=candidate.chunks_.size()||candidate.chunks_[newChunkIndex].entries.size()!=1U){
    error="Animation relocation did not produce a single-entry destination chunk.";return false;
   }

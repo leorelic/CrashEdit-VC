@@ -210,7 +210,7 @@ public:
  bool setGoolFrameGroupInterpolated(std::size_t chunkIndex,std::size_t entryIndex,std::size_t groupIndex,bool interpolated);
  bool appendAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex);
  bool animationFrameEditNeedsNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex) const;
- bool moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t& newChunkIndex,std::string& error);
+ bool moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryIndex,std::size_t& newChunkIndex,std::string& error,std::size_t finalEntrySizeHint=0U);
  bool insertAnimationFrameAfter(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool deleteAnimationFrame(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex);
  bool setAnimationFrameHeaderValue(std::size_t chunkIndex,std::size_t entryIndex,std::size_t frameIndex,std::uint32_t field,std::int32_t value);
