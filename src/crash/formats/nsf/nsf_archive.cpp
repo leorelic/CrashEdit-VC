@@ -1827,4 +1827,221 @@ std::vector<NsfEntryLocation> NsfArchive::findEntriesByEid(std::uint32_t eid) co
  return matches;
 }
 std::size_t NsfArchive::compressedChunkCount()const noexcept{return std::count_if(chunks_.begin(),chunks_.end(),[](const auto&c){return c.wasCompressed;});}
+
+static bool makeNormalFramePayload(const NsfChunk&chunk,const NsfAnimationFrame&frame,
+                                  const NsfModel&model,std::vector<std::uint8_t>&payload,
+                                  std::string&error){
+ const std::size_t fixedHeader=24U;
+ const std::size_t fakeHeader=fixedHeader+static_cast<std::size_t>(frame.collisionCount)*0x28U;
+ const std::size_t prefixBytes=frame.specialVertexCount*3U;
+ if(frame.vertexCount!=model.vertexCount||frame.specialVertexCount!=model.specialVertexCount||
+    model.positions.size()+frame.specialVertexCount!=frame.vertexCount||
+    frame.vertices.size()!=frame.vertexCount||!frame.verticesDecoded||
+    frame.specialVertices.size()!=frame.specialVertexCount){
+  error="A linked frame's vertex/special-prefix layout does not match the selected Complex Model.";return false;
+ }
+ // The Normal temporal byte-lane permutation reverses four-byte lanes. A
+ // prefix not aligned to a full word aliases special header bytes with the
+ // first ordinary coordinate bytes. Until that layout is independently proven,
+ // reject it rather than silently corrupt the special vertices.
+ if((prefixBytes&3U)!=0U){
+  error="This frame's special-vertex prefix is not 32-bit aligned; conversion is stopped to protect overlapping special/temporal bytes.";return false;
+ }
+ if(frame.headerSize!=fakeHeader+prefixBytes||frame.rawSize<fakeHeader+prefixBytes||
+    !has(chunk.bytes,frame.rawOffset,frame.rawSize)){
+  error="A linked frame has an invalid header/payload boundary.";return false;
+ }
+ for(std::size_t i=0;i<frame.specialVertexCount;++i){
+  const std::size_t p=frame.rawOffset+fakeHeader+i*3U;
+  for(std::size_t axis=0;axis<3U;++axis)if(chunk.bytes[p+axis]!=frame.specialVertices[i][axis]){
+   error="A special vertex cache does not match the source frame bytes.";return false;
+  }
+ }
+ const std::size_t ordinaryCount=model.positions.size();
+ const std::size_t requiredBits=(prefixBytes+ordinaryCount*3U)*8U;
+ const std::size_t wordCount=std::max(frame.temporalWords.size(),(requiredBits+31U)/32U);
+ if(wordCount>(NsfChunkSize-fakeHeader)/4U){error="The converted Normal frame exceeds one NSF chunk.";return false;}
+ payload.assign(fakeHeader+wordCount*4U,0U);
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),fakeHeader+prefixBytes,payload.begin());
+ std::vector<std::uint8_t>rawBits(wordCount*32U,0U),reordered(wordCount*32U,0U);
+ for(std::size_t wi=0;wi<wordCount;++wi){
+  const std::uint32_t word=wi<frame.temporalWords.size()?frame.temporalWords[wi]:0U;
+  for(unsigned bit=0;bit<32U;++bit)rawBits[wi*32U+bit]=static_cast<std::uint8_t>((word>>(31U-bit))&1U);
+ }
+ for(std::size_t base=0;base+32U<=rawBits.size();base+=32U)
+  for(std::size_t byte=0;byte<4U;++byte)
+   for(std::size_t bit=0;bit<8U;++bit)
+    reordered[base+24U-byte*8U+bit]=rawBits[base+byte*8U+bit];
+ std::size_t cursor=prefixBytes*8U;
+ for(std::size_t i=0;i<ordinaryCount;++i){
+  const auto&v=frame.vertices[i];
+  const std::int32_t values[3]={v.x,v.y,v.z};
+  for(const auto value:values){
+   if(value<0||value>255){error="A Complex ModelPosition is outside the Normal frame's byte coordinate range.";return false;}
+   for(unsigned bit=0;bit<8U;++bit)reordered[cursor++]=static_cast<std::uint8_t>((static_cast<std::uint32_t>(value)>>(7U-bit))&1U);
+  }
+ }
+ for(std::size_t base=0;base+32U<=rawBits.size();base+=32U)
+  for(std::size_t byte=0;byte<4U;++byte)
+   for(std::size_t bit=0;bit<8U;++bit)
+    rawBits[base+byte*8U+bit]=reordered[base+24U-byte*8U+bit];
+ for(std::size_t wi=0;wi<wordCount;++wi){
+  std::uint32_t word=0;
+  for(unsigned bit=0;bit<32U;++bit)word=(word<<1U)|rawBits[wi*32U+bit];
+  for(unsigned byte=0;byte<4U;++byte)payload[fakeHeader+wi*4U+byte]=static_cast<std::uint8_t>(word>>(byte*8U));
+ }
+ error.clear();return true;
+}
+
+static bool removeCompressedPositionItem(NsfChunk&chunk,NsfEntry&entry,std::string&error){
+ if(!entry.valid||entry.type!=2U||entry.items.size()!=6U||entry.itemCount!=6U){
+  error="Selected Model does not have the expected six-item Complex layout.";return false;
+ }
+ const std::size_t entryIndex=static_cast<std::size_t>(&entry-chunk.entries.data());
+ const std::size_t entryCount=chunk.entries.size();
+ if(entryIndex>=entryCount||u32(chunk.bytes,8U)!=entryCount){error="Model entry table is inconsistent.";return false;}
+ const std::size_t oldEntryEnd=entry.offset+entry.size;
+ const std::size_t tableEnd=16U+(entryCount+1U)*4U;
+ if(entry.offset<tableEnd||oldEntryEnd>NsfChunkSize){error="Model entry lies outside its chunk's valid entry region.";return false;}
+ const std::size_t sentinelOffset=16U+entryCount*4U;
+ const std::size_t usedEnd=u32(chunk.bytes,sentinelOffset);
+ if(usedEnd<oldEntryEnd||usedEnd>NsfChunkSize){error="Model chunk's entry-table sentinel is invalid.";return false;}
+ const std::size_t oldHeaderEnd=16U+(entry.items.size()+1U)*4U;
+ const std::size_t newItemCount=5U,newHeaderEnd=16U+(newItemCount+1U)*4U;
+ const std::size_t firstItemOffset=entry.items.front().offset-entry.offset;
+ if(entry.size<oldHeaderEnd||firstItemOffset<oldHeaderEnd||firstItemOffset>entry.size){error="Model item table has invalid padding/offsets.";return false;}
+ const std::size_t prefixPadding=firstItemOffset-oldHeaderEnd;
+ const std::size_t oldPayloadEnd=entry.items.back().offset+entry.items.back().size;
+ if(oldPayloadEnd>oldEntryEnd){error="Model's compressed-position item exceeds its entry.";return false;}
+ const std::size_t trailingPadding=oldEntryEnd-oldPayloadEnd;
+ std::size_t newEntrySize=newHeaderEnd+prefixPadding;
+ for(std::size_t i=0;i<newItemCount;++i){
+  if(entry.items[i].offset<entry.offset||entry.items[i].size>NsfChunkSize-newEntrySize){error="Model item sizes exceed the NSF chunk.";return false;}
+  newEntrySize+=entry.items[i].size;
+ }
+ if(trailingPadding>NsfChunkSize-newEntrySize){error="Model entry padding exceeds the NSF chunk.";return false;}
+ const std::size_t newPayloadEnd=newEntrySize;newEntrySize+=trailingPadding;
+ if(entry.offset>NsfChunkSize||newEntrySize>NsfChunkSize-entry.offset){error="Converted Model entry does not fit its NSF chunk.";return false;}
+ const std::ptrdiff_t delta=static_cast<std::ptrdiff_t>(newEntrySize)-static_cast<std::ptrdiff_t>(entry.size);
+ const std::ptrdiff_t newUsedEnd=static_cast<std::ptrdiff_t>(usedEnd)+delta;
+ if(newUsedEnd<0||newUsedEnd>static_cast<std::ptrdiff_t>(NsfChunkSize)){error="Converted Model would overflow its NSF chunk.";return false;}
+ std::vector<std::uint8_t>newEntry(newEntrySize,0U);
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset),16U,newEntry.begin());
+ auto write32=[](std::vector<std::uint8_t>&bytes,std::size_t offset,std::uint32_t value){for(unsigned b=0;b<4U;++b)bytes[offset+b]=static_cast<std::uint8_t>(value>>(b*8U));};
+ write32(newEntry,12U,static_cast<std::uint32_t>(newItemCount));
+ std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset+oldHeaderEnd),prefixPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(newHeaderEnd));
+ std::size_t cursor=newHeaderEnd+prefixPadding;
+ for(std::size_t i=0;i<newItemCount;++i){
+  write32(newEntry,16U+i*4U,static_cast<std::uint32_t>(cursor));
+  const auto&item=entry.items[i];
+  std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(item.offset),item.size,newEntry.begin()+static_cast<std::ptrdiff_t>(cursor));
+  cursor+=item.size;
+ }
+ write32(newEntry,16U+newItemCount*4U,static_cast<std::uint32_t>(cursor));
+ if(trailingPadding)std::copy_n(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(oldPayloadEnd),trailingPadding,newEntry.begin()+static_cast<std::ptrdiff_t>(newPayloadEnd));
+ const std::size_t newEntryEnd=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(oldEntryEnd)+delta);
+ const std::size_t suffixSize=usedEnd-oldEntryEnd;
+ if(suffixSize)std::memmove(chunk.bytes.data()+newEntryEnd,chunk.bytes.data()+oldEntryEnd,suffixSize);
+ std::copy(newEntry.begin(),newEntry.end(),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset));
+ entry.size=newEntrySize;entry.itemCount=static_cast<std::uint32_t>(newItemCount);entry.items.clear();entry.items.reserve(newItemCount);
+ for(std::size_t i=0;i<newItemCount;++i){
+  const std::size_t begin=u32(chunk.bytes,entry.offset+16U+i*4U),end=u32(chunk.bytes,entry.offset+16U+(i+1U)*4U);
+  entry.items.push_back({entry.offset+begin,end-begin});
+ }
+ for(std::size_t i=entryIndex+1U;i<chunk.entries.size();++i){
+  auto&following=chunk.entries[i];following.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(following.offset)+delta);
+  for(auto&item:following.items)item.offset=static_cast<std::size_t>(static_cast<std::ptrdiff_t>(item.offset)+delta);
+  if(following.type==1U&&following.animation.frames.size()==following.items.size())
+   for(std::size_t fi=0;fi<following.animation.frames.size();++fi){following.animation.frames[fi].rawOffset=following.items[fi].offset;following.animation.frames[fi].rawSize=following.items[fi].size;}
+ }
+ for(std::size_t i=0;i<chunk.entries.size();++i)write32(chunk.bytes,16U+i*4U,static_cast<std::uint32_t>(chunk.entries[i].offset));
+ write32(chunk.bytes,sentinelOffset,static_cast<std::uint32_t>(newUsedEnd));
+ error.clear();return true;
+}
+
+bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&error){
+ NsfArchive candidate=*this;
+ if(!candidate.commitAnimationEdits(error))return false;
+ NsfEntryLocation modelLocation{};bool modelFound=false;
+ for(std::size_t ci=0;ci<candidate.chunks_.size()&&!modelFound;++ci){
+  const auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   const auto&entry=chunk.entries[ei];
+   if(entry.valid&&entry.type==2U&&entry.eid==modelEid&&entry.model.decoded&&entry.model.compressed){modelLocation={ci,ei};modelFound=true;break;}
+  }
+ }
+ if(!modelFound){error="Selected EID is not a decoded Complex Model.";return false;}
+ const NsfModel sourceModel=candidate.chunks_[modelLocation.chunkIndex].entries[modelLocation.entryIndex].model;
+ if(sourceModel.specialVertexCount%4U!=0U){
+  error="This Model's special-vertex count is not 32-bit aligned in the Normal temporal layout. Conversion is safely refused until that byte overlap is resolved.";return false;
+ }
+ struct ExpectedPose {std::size_t chunkIndex,entryIndex,frameIndex;std::uint32_t animationEid;std::vector<NsfAnimationVertex>positions;std::vector<std::array<std::uint8_t,3>>special;};
+ std::vector<ExpectedPose>expected;std::size_t linkedFrameCount=0,linkedEntryCount=0;
+ for(std::size_t ci=0;ci<candidate.chunks_.size();++ci){
+  auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   auto&entry=chunk.entries[ei];if(!entry.valid||entry.type!=1U)continue;
+   if(!entry.animation.decoded){error="Batch conversion cannot proceed because an Animation entry is undecoded; linked references cannot be exhaustively checked.";return false;}
+   std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
+   bool affected=false;
+   for(const auto&frame:entry.animation.frames){
+    if(frame.linkedModelEid!=modelEid){
+     if(!has(chunk.bytes,frame.rawOffset,frame.rawSize)){error="An unrelated frame payload is outside its chunk.";return false;}
+     payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
+     continue;
+    }
+    if(!frame.modelResolved||!frame.verticesDecoded||entry.animation.isCrash3){error="A linked frame is unresolved, undecoded, or uses an unsupported Crash 3 layout.";return false;}
+    std::vector<std::uint8_t>converted;
+    if(!makeNormalFramePayload(chunk,frame,sourceModel,converted,error))return false;
+    payloads.push_back(std::move(converted));affected=true;++linkedFrameCount;
+    expected.push_back({ci,ei,expected.size(),entry.eid,frame.vertices,frame.specialVertices});
+  }
+  if(affected){
+   if(!replaceAnimationFramePayloads(chunk,entry,payloads)){error="Could not rebuild a linked Animation entry within its NSF chunk capacity.";return false;}
+   ++linkedEntryCount;
+  }
+ }
+ if(linkedFrameCount==0U){error="No decoded Animation frames reference the selected Model EID.";return false;}
+ auto&modelChunk=candidate.chunks_[modelLocation.chunkIndex];
+ auto&modelEntry=modelChunk.entries[modelLocation.entryIndex];
+ if(!removeCompressedPositionItem(modelChunk,modelEntry,error))return false;
+ candidate.decodeAnimationModels(false);
+ const auto&convertedModel=candidate.chunks_[modelLocation.chunkIndex].entries[modelLocation.entryIndex].model;
+ if(!convertedModel.decoded||convertedModel.compressed||!convertedModel.polygonsDecoded||!convertedModel.positions.empty()){
+  error="Converted Model did not reparse as a Normal Model.";return false;
+ }
+ if(convertedModel.triangles.size()!=sourceModel.triangles.size()){
+  error="Converted Model polygon count changed during reparse.";return false;
+ }
+ for(std::size_t ti=0;ti<sourceModel.triangles.size();++ti){
+  const auto&a=sourceModel.triangles[ti];const auto&b=convertedModel.triangles[ti];
+  const auto bias=static_cast<std::int32_t>(sourceModel.specialVertexCount);
+  if(b.a!=a.a+bias||b.b!=a.b+bias||b.c!=a.c+bias){
+   error="Converted Model polygon vertex bias changed unexpectedly; archive transaction was discarded.";return false;
+  }
+ }
+ for(const auto&pose:expected){
+  if(pose.chunkIndex>=candidate.chunks_.size()||pose.entryIndex>=candidate.chunks_[pose.chunkIndex].entries.size()){
+   error="Converted Animation location became invalid during archive reparse.";return false;
+  }
+  const auto&entry=candidate.chunks_[pose.chunkIndex].entries[pose.entryIndex];
+  if(!entry.valid||entry.eid!=pose.animationEid||!entry.animation.decoded||pose.frameIndex>=entry.animation.frames.size()){
+   error="A linked Animation did not reparse after conversion.";return false;
+  }
+  const auto&frame=entry.animation.frames[pose.frameIndex];
+  if(frame.linkedModelEid!=modelEid||frame.specialVertexCount!=pose.special.size()||frame.vertices.size()!=frame.vertexCount){
+   error="A converted frame's linked Model or vertex layout changed.";return false;
+  }
+  for(std::size_t i=0;i<pose.special.size();++i)
+   if(frame.specialVertices[i]!=pose.special[i]){error="A converted frame's special vertices changed.";return false;}
+  for(std::size_t i=0;i<pose.positions.size();++i){
+   const auto&before=pose.positions[i];const auto&after=frame.vertices[frame.specialVertexCount+i];
+   if(before.x!=after.x||before.y!=after.y||before.z!=after.z){
+    error="A converted Normal frame did not reproduce its Complex pose exactly.";return false;
+   }
+  }
+ }
+ chunks_=std::move(candidate.chunks_);error.clear();return true;
+}
+
 }
