@@ -180,3 +180,17 @@ Preserve `ff5359a` as the known-good preview/save baseline while investigating.
 - The label is informational only. It does not alter decoding, rendering, editing, or serialization.
 
 The user supplied screenshots confirming `BT10V` displays **Normal** and `Cr10V` displays **Complex**. Preserve these as representative UI/regression references when changing animation identification. This milestone establishes clear editor terminology and identification; it does **not** claim that Complex animation vertex editing or unrestricted coordinate serialization is solved. The Cr10V preview recovery contract and the outstanding Complex edit/save investigation remain as documented above.
+
+
+## Complex-to-Normal Model/Animation conversion with packed NSF relocation — 2026-11-27
+
+**User-confirmed:** a Complex Model and its linked Animations convert successfully to Normal resources in the editor. The initial working checkpoint was [b846498](https://github.com/leorelic/CrashEdit-VC/commit/b846498a65bdf47ba4c95675a163f43655c3f5ac); follow-up work corrected destination chunk packing before accepting this as the capacity-aware milestone.
+
+- Batch conversion now packs overflowed Animations into conversion-created type-0 chunks, calculating capacity from the complete converted entry size, growing offset table, prefix padding, and existing destination entries. It starts another chunk only when the next converted entry cannot fit.
+- Relocation returns the actual destination entry index; conversion no longer assumes each destination chunk contains only one Animation.
+- The selected type-0 chunk Properties panel displays **Remaining space** from the terminal used-data offset.
+- Regression uses a one-frame Animation and a 20-frame Animation: both overflow their source chunk, both are packed into one new chunk, retain distinct EIDs, and survive archive Save/reopen. The original chunk retains its unrelated filler entry.
+- Implementation checkpoint: [9673820](https://github.com/leorelic/CrashEdit-VC/commit/9673820bfa2104dd44596a1511eea187d459efa9).
+- **CI verified:** the two-animation capacity/packing/save-reopen regression passed on Ubuntu and macOS in [workflow 46052914125](https://github.com/leorelic/CrashEdit-VC/actions/runs/46052914125). Windows was still building when this milestone note was written; do not claim Windows validation until its job completes.
+
+This milestone verifies archive conversion and chunk organization. Zone load-list limits and full in-game loading validation remain a separate upcoming Zone workflow.
