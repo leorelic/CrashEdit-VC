@@ -22,7 +22,6 @@ The project deliberately separates:
 **Hard project constraint — preserve CrashEdit-VC's MIT license.** CrashEdit-VC must remain an independently implemented MIT-licensed project. The following repositories are deliberately excluded as sources of code, implementation, dependencies, design templates, feature checklists, or implementation inspiration:
 
 - **Airumu / Blender_CrashXform** — GPL-3.0. Do not inspect or restudy this project, use its video or repository as a design reference, port or adapt its code, reproduce its implementation, or incorporate its dependencies, assets, or generated output.
-- **ManDude / GOOC** — its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. Treat it as unavailable for reuse. Do not inspect it for GOOL decompilation guidance, copy or adapt its source, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns.
 
 These are deliberate exclusions, not tasks to revisit. Do not add features to CrashEdit-VC merely to match either project, and do not use either repository as a roadmap or comparison checklist. Build features from CrashEdit-VC's own code and accomplishments, independent analysis of Crash 2 data and runtime behavior, primary technical evidence that can be used consistently with the MIT goal, and our own regression fixtures and tests.
 
@@ -62,6 +61,12 @@ Compatibility checks mirror observed CrashEdit behavior: warn for zero spawn rec
 **Sample observation:** in the examined Crash 2 level `00_eZ` (level ID `0E`), the spawn record and `obj_willy` checkpoint coordinates were compared. The object's position was X=902, Y=548, Z=760 in decimal. The Get Spawn result was `10FDF00, 120400, 2C17500`. This is a useful regression/example case, not a universal coordinate rule.
 
 **Still pending:** broad real-level round-trip coverage and actual in-game loading validation. A successful parse/serialize cycle does not by itself prove game compatibility.
+
+## GOOL research boundary
+
+**ManDude / GOOC is excluded from this project’s GOOL research.** Its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. Do not inspect or use the repository as a source of GOOL decompilation guidance, code, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns. Do not use it as a feature checklist or design reference.
+
+GOOL research must proceed independently from CrashEdit-VC's own implementation, Crash 2 samples and runtime behavior, and technical sources whose use is compatible with the project's MIT licensing. This is a settled project boundary, not an open research task.
 
 ## GOOL container and data research
 
