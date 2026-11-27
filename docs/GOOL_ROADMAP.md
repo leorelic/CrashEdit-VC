@@ -8,7 +8,7 @@ This roadmap tracks the progression from reliable GOOL inspection toward readabl
 
 The complete project-wide exclusion policy is maintained in [MILESTONES.md](MILESTONES.md). Build GOOL support independently from CrashEdit-VC's own implementation, Crash 2 data/runtime evidence, and compatible technical sources.
 
-## Current editor/workspace status — 2026-11-08
+## Current editor/workspace status — 2026-11-28
 
 - The dedicated **GOOL Script Editor** workspace is implemented beside the 3D Zone Viewer. It includes a read-only, routine-oriented decompilation view and an editable scratch-script surface with indentation diagnostics. The selected GOOL decompilation is not yet directly editable or recompilable.
 - The **GOOL Blueprint** workspace is available as an execution-flow visualization foundation; full visual authoring is still future work.
@@ -125,8 +125,7 @@ The expanded canvas is a future usability milestone, not a prerequisite for the 
 
 ## 5. Editing and recompilation
 
-- [x] Add a dedicated GOOL Script Editor workspace with a routine-oriented, read-only decompilation view and a separate editable scratch-script surface with indentation diagnostics; selected GOOL source editing and recompilation remain future work.
-- [x] Establish the dedicated GOOL Script Editor UI and shared-IR decompilation presentation; [ ] implement editing of selected GOOL source and connect it to validated recompilation.
+- [x] Dedicated GOOL Script Editor workspace with a routine-oriented, read-only decompilation view and a separate editable scratch-script surface with indentation diagnostics; [ ] editing selected GOOL source and validated recompilation remain future work.
 - [ ] Develop Blueprint into a visual authoring interface, allowing users to understand and eventually edit execution flow visually.
 - [ ] Keep the Script Editor and Blueprint backed by the same structured GOOL representation so changes remain consistent between views.
 - [ ] Add validation and diagnostics before allowing modified GOOL data to be written.
