@@ -410,7 +410,19 @@ void EditorUI::trackUndoHistory(){
  bool bonesEqual=boneRigBones_.size()==undoBaseline_.bones.size();
  if(bonesEqual)for(std::size_t i=0;i<boneRigBones_.size();++i){
   const auto&a=boneRigBones_[i];const auto&b=undoBaseline_.bones[i];
-  if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations){bonesEqual=false;break;}
+  bool restVerticesEqual=a.frameRestVertices.size()==b.frameRestVertices.size();
+  if(restVerticesEqual){
+   auto ai=a.frameRestVertices.begin(),bi=b.frameRestVertices.begin();
+   for(;ai!=a.frameRestVertices.end();++ai,++bi){
+    if(ai->first!=bi->first||ai->second.size()!=bi->second.size()){restVerticesEqual=false;break;}
+    for(std::size_t v=0;v<ai->second.size();++v){
+     const auto&av=ai->second[v];const auto&bv=bi->second[v];
+     if(av.x!=bv.x||av.y!=bv.y||av.z!=bv.z){restVerticesEqual=false;break;}
+    }
+    if(!restVerticesEqual)break;
+   }
+  }
+  if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations||a.frameRestOffsets!=b.frameRestOffsets||!restVerticesEqual){bonesEqual=false;break;}
  }
  if(nsfBytes==undoNsfBytes_&&nsfPoseBytes==undoNsfPoseBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
  if(historyCursor_+1U<historyLabels_.size()){
@@ -5463,13 +5475,46 @@ void EditorUI::drawBoneRigEditor(){
  }
  ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
  ImGui::Separator();ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
- if(ImGui::Button("Create Bone")){
+ if(ImGui::Button("Create Empty Bone")){
   std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
   boneRigBones_.push_back(BoneRigBone{name,{}});boneRigSelectedBone_=static_cast<int>(boneRigBones_.size()-1U);std::snprintf(boneRigName_,sizeof(boneRigName_),"Bone");
  }
+ ImGui::SameLine();
+ if(ImGui::Button("Create From Selection")){
+  if(animationSelectedVertices_.empty()){
+   status_="Select one or more vertices in the viewport before creating a bone.";
+  }else{
+   BoneRigBone created;created.name=boneRigName_[0]?boneRigName_:"Bone "+std::to_string(boneRigBones_.size()+1U);
+   double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
+   for(const int index:animationSelectedVertices_){
+    if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
+    for(auto&other:boneRigBones_){
+     auto&members=other.vertices;const auto oldSize=members.size();
+     members.erase(std::remove(members.begin(),members.end(),index),members.end());
+     if(members.size()!=oldSize){other.frameRotations.clear();other.frameRestVertices.clear();other.frameRestOffsets.clear();}
+    }
+    created.vertices.push_back(index);
+    const auto&vertex=frame.vertices[static_cast<std::size_t>(index)];px+=vertex.x;py+=vertex.y;pz+=vertex.z;++count;
+   }
+   if(count){
+    created.pivotX=static_cast<float>(px/count);created.pivotY=static_cast<float>(py/count);created.pivotZ=static_cast<float>(pz/count);created.pivotInitialized=true;
+    boneRigBones_.push_back(std::move(created));boneRigSelectedBone_=static_cast<int>(boneRigBones_.size()-1U);
+    animationSelectedVertices_=boneRigBones_.back().vertices;animationSelectedVertex_=animationSelectedVertices_.front();animationShowVertices_=true;
+    std::snprintf(boneRigName_,sizeof(boneRigName_),"Bone");
+    status_="Created bone from "+std::to_string(count)+" selected vertices.";
+   }else status_="The current vertex selection contains no valid vertices for this frame.";
+  }
+ }
  ImGui::Separator();ImGui::Text("Bones (%zu)",boneRigBones_.size());
  if(ImGui::BeginChild("BoneRigList",ImVec2(0.0f,130.0f),true)){
-  for(std::size_t i=0;i<boneRigBones_.size();++i){ImGui::PushID(static_cast<int>(i));const auto&bone=boneRigBones_[i];const std::string label=bone.name+"  ("+std::to_string(bone.vertices.size())+" vertices)";if(ImGui::Selectable(label.c_str(),boneRigSelectedBone_==static_cast<int>(i)))boneRigSelectedBone_=static_cast<int>(i);ImGui::PopID();}
+  for(std::size_t i=0;i<boneRigBones_.size();++i){
+   ImGui::PushID(static_cast<int>(i));const auto&bone=boneRigBones_[i];const std::string label=bone.name+"  ("+std::to_string(bone.vertices.size())+" vertices)";
+   if(ImGui::Selectable(label.c_str(),boneRigSelectedBone_==static_cast<int>(i))){
+    boneRigSelectedBone_=static_cast<int>(i);animationSelectedVertices_=bone.vertices;
+    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
+   }
+   ImGui::PopID();
+  }
  }
  ImGui::EndChild();
  if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
