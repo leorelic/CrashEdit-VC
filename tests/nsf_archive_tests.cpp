@@ -324,7 +324,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  std::vector<std::uint8_t> capacityArchiveBytes;capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityModelChunk.begin(),capacityModelChunk.end());capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityAnimationChunk.begin(),capacityAnimationChunk.end());
  NsfArchive capacityConversion;assert(capacityConversion.loadBytes(capacityArchiveBytes,e));capacityConversion.decodeAnimationModels(false);
  assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
- const bool capacityConverted=capacityConversion.convertComplexModelToNormal(0x0200007bU,e);if(!capacityConverted)std::cerr<<"Capacity conversion failed: "<<e<<"\\n";assert(capacityConverted);
+ const bool capacityConverted=capacityConversion.convertComplexModelToNormal(0x0200007bU,e);if(!capacityConverted)std::cerr<<"Capacity conversion failed: "<<e<<"\n";assert(capacityConverted);
  assert(capacityConversion.chunks().size()==3U);
  assert(capacityConversion.chunks()[1].entries.size()==1U);
  assert(capacityConversion.chunks()[2].entries.size()==1U&&capacityConversion.chunks()[2].entries[0].eid==0x0200007bU);
