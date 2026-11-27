@@ -17,16 +17,6 @@ The project deliberately separates:
 - **Improvements:** fix misleading output, improve usability, add decoding the original editor lacked, and build stronger validation.
 - **Research:** record uncertain behavior explicitly rather than treating a plausible interpretation as fact.
 
-## Independent development and licensing boundary
-
-**Hard project constraint — preserve CrashEdit-VC's MIT license.** CrashEdit-VC must remain an independently implemented MIT-licensed project. The following repositories are deliberately excluded as sources of code, implementation, dependencies, design templates, feature checklists, or implementation inspiration:
-
-- **Airumu / Blender_CrashXform** — GPL-3.0. Do not inspect or restudy this project, use its video or repository as a design reference, port or adapt its code, reproduce its implementation, or incorporate its dependencies, assets, or generated output.
-
-These are deliberate exclusions, not tasks to revisit. Do not add features to CrashEdit-VC merely to match either project, and do not use either repository as a roadmap or comparison checklist. Build features from CrashEdit-VC's own code and accomplishments, independent analysis of Crash 2 data and runtime behavior, primary technical evidence that can be used consistently with the MIT goal, and our own regression fixtures and tests.
-
-When planning or implementing a feature, check this boundary first. If a proposed approach depends on either excluded project, stop and design an independent approach instead. Do not assume that public availability grants permission to reuse code or other copyrighted implementation material.
-
 ## Native application and renderer milestones
 
 The following are project milestones from the iterative native rewrite. They describe implemented work, not a claim that every subsystem is feature-complete.
