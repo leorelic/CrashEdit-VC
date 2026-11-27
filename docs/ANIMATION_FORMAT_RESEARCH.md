@@ -467,3 +467,8 @@ If a converted Animation entry itself exceeds the maximum size of one new 64 KiB
 ### CI compile correction for chunk-relocation converter — 2026-11-27
 
 The first CI run of the chunk-relocation patch failed at compile time on macOS, Ubuntu, and Windows. The diagnostic was exact: the local `buildPayloads` lambda takes five arguments, but both call sites passed six by also supplying the outer `error` reference. The lambda already captures `error` by reference, so the extra argument was incorrect. Commit `7f8638b09ce17e38b0c4b7f446258ca53c229ade` removes the redundant argument at both call sites. The capacity relocation regression test and this research note were committed afterward; CI for the corrected source/test commits is queued and must be checked before declaring the fix built.
+
+
+### Capacity relocation fixture correction — 2026-11-27
+
+CI run #1451 compiled successfully on Linux and Windows, then failed the `nsf_archive_tests` assertion that the synthetic 100-vertex Animation fixture decoded before conversion. The test fixture had allocated only 264 temporal bytes (`capacityFrame+64`), but 100 vertices require 300 bytes at the fixture's 3-byte-per-vertex temporal layout. This was a test-fixture construction error, not a converter failure: the test never reached `convertComplexModelToNormal()`. The fixture now allocates 300 temporal bytes and adjusts the Animation entry size and filler offset accordingly. Re-run CI and confirm the capacity relocation plus save/reopen assertions before considering this complete.
