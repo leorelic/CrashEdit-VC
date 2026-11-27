@@ -381,3 +381,17 @@ This UI explicitly addresses shared Model references by making the Model the sel
 - Finally load the saved NSF/NSD in the original Crash 2 game/emulator and verify animation playback. Editor preview and archive reparse alone do not prove game compatibility.
 
 **Status:** workflow approved; implementation not started. Preserve the known-good Cr10V preview/renderer baseline. The conversion itself remains unproven for original-game compatibility until the game test passes.
+
+
+### Implementation update — Experimental conversion discovery window (2026-11-27)
+
+The first UI slice is now present on `cpp-port-foundation`:
+
+- Experimental menu now contains **Convert Model/Animation...** (enabled for an open Crash 2 archive).
+- The window lists decoded Complex Models and identifies each by EID plus chunk/entry location.
+- Selecting a Model shows its vertex count, compressed-position count, special-vertex count, and decoded Animation entries/frames that reference its Model EID.
+- The conversion action is deliberately disabled. This is an inspection window only; it does not mutate the archive and does not claim to convert or save anything.
+
+This is not feature completion. The next implementation stage is the archive-level atomic Model + Animation payload converter, including frame stream generation, Model item-table rebuilding, chunk-capacity handling, reparse/pose validation, undo integration, and ordinary NSF save/reopen coverage. Do not enable the UI action until those pieces and regression tests are in place. Original Crash 2 game playback remains the final compatibility gate.
+
+Source commits: `73245a3` (window state/declaration), `f922b51` (Experimental menu and discovery window).
