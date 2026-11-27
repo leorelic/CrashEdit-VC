@@ -1976,7 +1976,7 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
   error="This Model's special-vertex count is not 32-bit aligned in the Normal temporal layout. Conversion is safely refused until that byte overlap is resolved.";return false;
  }
  struct ExpectedPose {std::size_t chunkIndex,entryIndex,frameIndex;std::uint32_t animationEid;std::vector<NsfAnimationVertex>positions;std::vector<std::array<std::uint8_t,3>>special;};
- std::vector<ExpectedPose>expected;std::size_t linkedFrameCount=0,linkedEntryCount=0;
+ std::vector<ExpectedPose>expected;std::size_t linkedFrameCount=0;
  for(std::size_t ci=0;ci<candidate.chunks_.size();++ci){
   auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
   for(std::size_t ei=0;ei<chunk.entries.size();++ei){
@@ -1984,7 +1984,8 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
    if(!entry.animation.decoded){error="Batch conversion cannot proceed because an Animation entry is undecoded; linked references cannot be exhaustively checked.";return false;}
    std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
    bool affected=false;
-   for(const auto&frame:entry.animation.frames){
+   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
+    const auto&frame=entry.animation.frames[fi];
     if(frame.linkedModelEid!=modelEid){
      if(!has(chunk.bytes,frame.rawOffset,frame.rawSize)){error="An unrelated frame payload is outside its chunk.";return false;}
      payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
@@ -1994,11 +1995,11 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
     std::vector<std::uint8_t>converted;
     if(!makeNormalFramePayload(chunk,frame,sourceModel,converted,error))return false;
     payloads.push_back(std::move(converted));affected=true;++linkedFrameCount;
-    expected.push_back({ci,ei,expected.size(),entry.eid,frame.vertices,frame.specialVertices});
+    expected.push_back({ci,ei,fi,entry.eid,frame.vertices,frame.specialVertices});
   }
   if(affected){
    if(!replaceAnimationFramePayloads(chunk,entry,payloads)){error="Could not rebuild a linked Animation entry within its NSF chunk capacity.";return false;}
-   ++linkedEntryCount;
+
   }
  }
  if(linkedFrameCount==0U){error="No decoded Animation frames reference the selected Model EID.";return false;}
