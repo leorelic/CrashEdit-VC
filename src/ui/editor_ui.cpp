@@ -4046,6 +4046,33 @@ void EditorUI::drawAnimationViewer(){
     bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);
    }
   }
+  int hoveredBone=-1;float nearestBoneDistance=13.0f;
+  if(boneRigModelEid_==linkedModelEid&&!boneRigBones_.empty()&&hovered&&!viewportToolbarOwnsMouse&&!animationFaceEditing_){
+   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+    const auto&bone=boneRigBones_[bi];std::vector<AnimationPoint>points;
+    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<displayPositions.size()){
+     const auto&p=displayPositions[static_cast<std::size_t>(index)];points.emplace_back(p.x,p.y,p.z);
+    }
+    if(points.empty())continue;
+    AnimationPoint head=points.front(),tail=points.front();float farthest=-1.0f;
+    for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){
+     const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;
+     const float d=dx*dx+dy*dy+dz*dz;if(d>farthest){farthest=d;head=points[a];tail=points[b];}
+    }
+    const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
+    const float vx=b.x-a.x,vy=b.y-a.y,len2=vx*vx+vy*vy;
+    const float t=len2>0.01f?std::clamp(((io.MousePos.x-a.x)*vx+(io.MousePos.y-a.y)*vy)/len2,0.0f,1.0f):0.0f;
+    const float distance=std::hypot(io.MousePos.x-(a.x+vx*t),io.MousePos.y-(a.y+vy*t));
+    if(distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
+   }
+  }
+  bool boneSelectionClicked=false;
+  if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
+   boneRigSelectedBone_=hoveredBone;animationSelectedVertices_=boneRigBones_[static_cast<std::size_t>(hoveredBone)].vertices;
+   animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
+   animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;
+   boneSelectionClicked=true;status_="Selected bone: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
+  }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   auto rotateBoneVector=[](AnimationPoint v,const std::array<float,3>&euler){
    const float cx=std::cos(euler[0]),sx=std::sin(euler[0]),cy=std::cos(euler[1]),sy=std::sin(euler[1]),cz=std::cos(euler[2]),sz=std::sin(euler[2]);
@@ -4230,7 +4257,7 @@ void EditorUI::drawAnimationViewer(){
     }
    }
   }
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!vertexGizmoHandleHovered&&!boneRotationStarted&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&hoveredVertex<0&&!vertexGizmoHandleHovered&&!boneRotationStarted&&!boneSelectionClicked&&hoveredBone<0&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    vertexBox.pending=true;vertexBox.active=false;vertexBox.start=io.MousePos;vertexBox.current=io.MousePos;vertexBox.add=boneRigWindowOpen_;vertexBox.subtract=io.KeyCtrl;
   }
   if(vertexBox.pending&&ImGui::IsMouseDown(ImGuiMouseButton_Left)){
@@ -4255,7 +4282,7 @@ void EditorUI::drawAnimationViewer(){
    if(!animationSelectedVertices_.empty()){animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;}
    vertexBox.pending=false;vertexBox.active=false;
   }
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!boneSelectionClicked&&hoveredBone<0&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
     canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
@@ -4284,7 +4311,7 @@ void EditorUI::drawAnimationViewer(){
    animationTargetX_-=(-cyaw*io.MouseDelta.x+syaw*io.MouseDelta.y)*pan;
    animationTargetZ_-=(-syaw*io.MouseDelta.x-cyaw*io.MouseDelta.y)*pan;
   }
-  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
+  if(animationShowVertices_&&hoveredVertex>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!boneSelectionClicked&&hoveredBone<0&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)&&!vertexDragStarted&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)){
    const auto selectedIt=std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),hoveredVertex);
    if(io.KeyCtrl){if(selectedIt!=animationSelectedVertices_.end())animationSelectedVertices_.erase(selectedIt);}
    else if(io.KeyShift||boneRigWindowOpen_){if(selectedIt==animationSelectedVertices_.end())animationSelectedVertices_.push_back(hoveredVertex);}
