@@ -1423,7 +1423,7 @@ void EditorUI::drawViewport(){
   sceneYaw_-=io.MouseDelta.x*0.005f;
   scenePitch_=std::clamp(scenePitch_+io.MouseDelta.y*0.005f,-1.45f,1.45f);
  }
- if(canvasActive&&!viewportToolbarOwnsMouse&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
+ if(canvasActive&&!viewportToolbarOwnsMouse&&!boneRigWindowOpen_&&ImGui::IsMouseDragging(ImGuiMouseButton_Right)){
   const float pan=sceneDistance_*0.0018f;
   const float cy=std::cos(sceneYaw_),sy=std::sin(sceneYaw_);
   sceneTargetX_-=(-cy*io.MouseDelta.x+sy*io.MouseDelta.y)*pan;
@@ -4057,9 +4057,32 @@ void EditorUI::drawAnimationViewer(){
   }
   bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
+  if(boneRigWindowOpen_&&hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Right)&&!viewportToolbarOwnsMouse){
+   boneRigSelectedBone_=hoveredBone;boneRigConnectSource_=hoveredBone;
+   status_="Connect "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name+" to parent: left-click the parent joint (Esc cancels).";
+  }
+  if(boneRigWindowOpen_&&boneRigConnectSource_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
+   boneRigConnectSource_=-1;status_="Bone connection cancelled.";
+  }
   if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
-   boneRigSelectedBone_=hoveredBone;
-   boneSelectionClicked=true;status_="Selected bone joint: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
+   if(boneRigConnectSource_>=0){
+    const int child=boneRigConnectSource_,parent=hoveredBone;
+    bool wouldCycle=child==parent;int ancestor=parent;
+    for(std::size_t depth=0;depth<boneRigBones_.size()&&ancestor>=0&&!wouldCycle;++depth){
+     if(ancestor==child){wouldCycle=true;break;}
+     if(static_cast<std::size_t>(ancestor)>=boneRigBones_.size())break;
+     ancestor=boneRigBones_[static_cast<std::size_t>(ancestor)].parentBone;
+    }
+    if(wouldCycle)status_="Cannot connect bones: that would create a hierarchy cycle.";
+    else{
+     boneRigBones_[static_cast<std::size_t>(child)].parentBone=parent;
+     status_="Connected "+boneRigBones_[static_cast<std::size_t>(child)].name+" to "+boneRigBones_[static_cast<std::size_t>(parent)].name+".";
+    }
+    boneRigConnectSource_=-1;boneRigSelectedBone_=child;
+   }else{
+    boneRigSelectedBone_=hoveredBone;
+    boneSelectionClicked=true;status_="Selected bone joint: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
+   }
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   auto rotateBoneVector=[](AnimationPoint v,const std::array<float,3>&euler){
@@ -4745,17 +4768,30 @@ void EditorUI::drawAnimationViewer(){
    const auto&joint=boneRigBones_[boneIndex];
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
+  auto boneTailWorld=[&](std::size_t boneIndex){
+   const auto&bone=boneRigBones_[boneIndex];AnimationPoint center{0.0f,0.0f,0.0f};std::size_t count=0;
+   for(const int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){
+    const auto&p=displayPositions[static_cast<std::size_t>(vi)];center.x+=p.x;center.y+=p.y;center.z+=p.z;++count;
+   }
+   if(count){const float inv=1.0f/static_cast<float>(count);center.x*=inv;center.y*=inv;center.z*=inv;return center;}
+   return boneJointWorld(boneIndex);
+  };
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const int parent=boneRigBones_[bi].parentBone;
-   if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
-   const auto from=boneJointWorld(static_cast<std::size_t>(parent)),to=boneJointWorld(bi);
-   boneOverlay->AddLine(project(from.x,from.y,from.z),project(to.x,to.y,to.z),IM_COL32(70,175,225,220),2.0f);
-  }
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const auto joint=boneJointWorld(bi);const ImVec2 point=project(joint.x,joint.y,joint.z);const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
+   const auto head=boneJointWorld(bi);
+   const auto tail=(parent>=0&&static_cast<std::size_t>(parent)<boneRigBones_.size()&&static_cast<std::size_t>(parent)!=bi)
+      ?boneJointWorld(static_cast<std::size_t>(parent)):boneTailWorld(bi);
+   const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
+   const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
+   if(std::hypot(a.x-b.x,a.y-b.y)>2.0f){
+    boneOverlay->AddLine(a,b,IM_COL32(18,22,28,245),selected?11.0f:8.0f);
+    boneOverlay->AddLine(a,b,selected?IM_COL32(255,190,75,245):IM_COL32(75,175,225,235),selected?6.0f:4.0f);
+   }
    const ImU32 color=selected?IM_COL32(255,205,90,255):IM_COL32(70,175,225,245);
-   boneOverlay->AddCircleFilled(point,selected?7.0f:5.5f,color,20);boneOverlay->AddCircle(point,selected?10.0f:8.0f,IM_COL32(20,24,30,255),20,1.5f);
-   if(selected)boneOverlay->AddCircle(point,12.0f,IM_COL32(255,245,215,240),24,1.5f);
+   boneOverlay->AddCircleFilled(a,selected?7.0f:5.5f,color,20);
+   boneOverlay->AddCircle(a,selected?10.0f:8.0f,IM_COL32(20,24,30,255),20,1.5f);
+   boneOverlay->AddCircleFilled(b,selected?5.5f:4.0f,color,16);
+   if(selected)boneOverlay->AddCircle(a,12.0f,IM_COL32(255,245,215,240),24,1.5f);
   }
   boneOverlay->PopClipRect();
  }
