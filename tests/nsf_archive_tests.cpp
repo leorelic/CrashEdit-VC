@@ -337,23 +337,23 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(specialFrame.vertices[0].x==10&&specialFrame.vertices[0].y==0&&specialFrame.vertices[0].z==0);
  assert(specialFrame.vertices[1].x==0&&specialFrame.vertices[1].y==0&&specialFrame.vertices[1].z==0);
  assert(specialFrame.vertices[2].x==0&&specialFrame.vertices[2].y==0&&specialFrame.vertices[2].z==0);
-  // Known unresolved special-prefix mismatch: preview decode and save encode
-  // currently address compressed Model positions through different frame slots.
-  // Keep the working pose editable and reject a lossy round trip explicitly.
+  // Complex ModelPosition records use the same pose-slot mapping in decode
+  // and encode: record i round-trips through frame.vertices[i], regardless of
+  // specialVertexCount. The special prefix affects bit cursor/index bias only.
   const std::vector<std::size_t> specialEditIndices{0,1};
   const std::vector<NsfAnimationVertex> specialEditTargets{{11,21,31},{44,55,66}};
   assert(specialCompressedArchive.setAnimationFrameVertices(1,0,0,specialEditIndices,specialEditTargets));
-  const auto pendingSpecialPose=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0].vertices;
   NsfArchive specialCommitted=specialCompressedArchive;
-  if(specialCommitted.commitAnimationEdits(e)){
-   std::cerr<<"special-prefix edit unexpectedly committed; verify exact save/reload mapping\n";
-   assert(false);
-  }
-  assert(!e.empty());
-  const auto&preservedSpecialPose=specialCompressedArchive.chunks()[1].entries[0].animation.frames[0].vertices;
-  assert(preservedSpecialPose.size()==pendingSpecialPose.size());
-  for(std::size_t vi=0;vi<preservedSpecialPose.size();++vi)
-   assert(preservedSpecialPose[vi].x==pendingSpecialPose[vi].x&&preservedSpecialPose[vi].y==pendingSpecialPose[vi].y&&preservedSpecialPose[vi].z==pendingSpecialPose[vi].z);
+  assert(specialCommitted.commitAnimationEdits(e));
+  std::vector<std::uint8_t> specialCommittedBytes;
+  assert(specialCommitted.saveUncompressedBytes(specialCommittedBytes,e));
+  NsfArchive specialCommittedReloaded;
+  assert(specialCommittedReloaded.loadBytes(specialCommittedBytes,e));
+  specialCommittedReloaded.decodeAnimationModels(false);
+  const auto&specialCommittedPose=specialCommittedReloaded.chunks()[1].entries[0].animation.frames[0].vertices;
+  assert(specialCommittedPose.size()==specialEditTargets.size()+1U);
+  assert(specialCommittedPose[0].x==11&&specialCommittedPose[0].y==21&&specialCommittedPose[0].z==31);
+  assert(specialCommittedPose[1].x==44&&specialCommittedPose[1].y==55&&specialCommittedPose[1].z==66);
   
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
