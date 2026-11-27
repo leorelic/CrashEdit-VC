@@ -4058,8 +4058,7 @@ void EditorUI::drawAnimationViewer(){
   bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
   if(boneRigWindowOpen_&&hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Right)&&!viewportToolbarOwnsMouse){
-   boneRigSelectedBone_=hoveredBone;boneRigConnectSource_=hoveredBone;
-   status_="Connect "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name+" to parent: left-click the parent joint (Esc cancels).";
+   boneRigSelectedBone_=hoveredBone;ImGui::OpenPopup("Bone Joint Context");
   }
   if(boneRigWindowOpen_&&boneRigConnectSource_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
    boneRigConnectSource_=-1;status_="Bone connection cancelled.";
@@ -4083,6 +4082,14 @@ void EditorUI::drawAnimationViewer(){
     boneRigSelectedBone_=hoveredBone;
     boneSelectionClicked=true;status_="Selected bone joint: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
    }
+  }
+  if(ImGui::BeginPopup("Bone Joint Context")){
+   ImGui::TextUnformatted(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()?boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].name.c_str():"Bone joint");
+   if(ImGui::MenuItem("Connect bone to...")){
+    boneRigConnectSource_=boneRigSelectedBone_;
+    status_="Connect "+boneRigBones_[static_cast<std::size_t>(boneRigConnectSource_)].name+" to parent: left-click the target joint (Esc cancels).";
+   }
+   ImGui::EndPopup();
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   auto rotateBoneVector=[](AnimationPoint v,const std::array<float,3>&euler){
