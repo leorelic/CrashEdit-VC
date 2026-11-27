@@ -354,6 +354,9 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
   assert(specialCommittedPose.size()==specialEditTargets.size()+1U);
   assert(specialCommittedPose[0].x==11&&specialCommittedPose[0].y==21&&specialCommittedPose[0].z==31);
   assert(specialCommittedPose[1].x==44&&specialCommittedPose[1].y==55&&specialCommittedPose[1].z==66);
+  const auto&specialHeaderAfterSave=specialCommittedReloaded.chunks()[1].entries[0].animation.frames[0].specialVertices;
+  assert(specialHeaderAfterSave.size()==1U);
+  assert(specialHeaderAfterSave[0][0]==10&&specialHeaderAfterSave[0][1]==20&&specialHeaderAfterSave[0][2]==30);
   
  // Save-time rebasing preserves the displayed pose while bringing byte coordinates into range.
  std::vector<std::uint8_t> crash2RebaseAnimation=vertexAnimation;
