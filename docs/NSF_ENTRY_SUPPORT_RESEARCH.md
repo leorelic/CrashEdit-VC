@@ -127,13 +127,13 @@ Texture pages are chunk type 1. The EID is stored in the page data header, and t
 - Crash 2 is the first validation target; Crash 3-specific layouts and GOOL-derived model association must be gated by game version.
 
 
-## Model Editor phase — current priority
+## Model/Animation editor relationship
 
-The Model entry is now the next active editor target. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) for the implementation sequence and source map.
+The shared Model/Animation architecture and current priorities are maintained in [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md). The immediate authoring priority is to make Bone creation and per-frame posing usable; after that, the roadmap shifts to Zones / Level Editing. This file remains the format-reference notebook for NSF resource types.
 
 The key architectural relationship is source-confirmed in the original CrashEdit animation renderer: each Crash 2 frame resolves its Model EID; the frame's vertex stream is decoded using that model's optional compressed-position records; the model's decoded triangles then select vertex indices, per-corner colors, texture descriptors, animated texture state, and TPAG pages. Consequently, model geometry and material edits should update the existing Animation Viewer live, while pose positions remain owned by the Animation frame.
 
-The currently completed vertex-marker milestone is recorded in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). It provides the inspection and selection foundation, but it does not yet implement vertex-stream re-encoding or topology editing.
+Vertex inspection/selection, frame editing, and the tested Complex-to-Normal conversion workflow have since been implemented. This does not enable topology changes: a variable-size Model serializer and dependent Animation updates are still required before adding/removing polygons or changing vertex counts.
 
 
 ## Source-baseline correction
