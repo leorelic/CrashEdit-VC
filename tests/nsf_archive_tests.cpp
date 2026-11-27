@@ -276,6 +276,29 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive compressedArchive;assert(compressedArchive.loadBytes(compressedArchiveBytes,e));compressedArchive.decodeAnimationModels(false);
  assert(compressedArchive.chunks().size()==2&&compressedArchive.chunks()[0].entries[0].model.compressed);
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
+ // End-to-end Complex-to-Normal conversion: preserve all linked pose slots,
+ // remove the ModelPosition item, and survive the ordinary Save/reopen path.
+ NsfArchive conversionArchive;assert(conversionArchive.loadBytes(compressedArchiveBytes,e));conversionArchive.decodeAnimationModels(false);
+ const auto complexPoseBefore=conversionArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(conversionArchive.convertComplexModelToNormal(0x0200007bU,e));
+ assert(!conversionArchive.chunks()[0].entries[0].model.compressed);
+ assert(conversionArchive.chunks()[0].entries[0].items.size()==5U);
+ const auto&normalPoseAfter=conversionArchive.chunks()[1].entries[0].animation.frames[0].vertices;
+ assert(normalPoseAfter.size()==complexPoseBefore.size());
+ for(std::size_t vi=0;vi<complexPoseBefore.size();++vi){
+  assert(normalPoseAfter[vi].x==complexPoseBefore[vi].x);
+  assert(normalPoseAfter[vi].y==complexPoseBefore[vi].y);
+  assert(normalPoseAfter[vi].z==complexPoseBefore[vi].z);
+ }
+ std::vector<std::uint8_t> convertedSave;assert(conversionArchive.saveUncompressedBytes(convertedSave,e));
+ NsfArchive convertedReload;assert(convertedReload.loadBytes(convertedSave,e));convertedReload.decodeAnimationModels(false);
+ assert(!convertedReload.chunks()[0].entries[0].model.compressed);
+ const auto&convertedReloadPose=convertedReload.chunks()[1].entries[0].animation.frames[0].vertices;
+ for(std::size_t vi=0;vi<complexPoseBefore.size();++vi){
+  assert(convertedReloadPose[vi].x==complexPoseBefore[vi].x);
+  assert(convertedReloadPose[vi].y==complexPoseBefore[vi].y);
+  assert(convertedReloadPose[vi].z==complexPoseBefore[vi].z);
+ }
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
  const std::vector<std::size_t> compressedBatchIndices{0,2};
