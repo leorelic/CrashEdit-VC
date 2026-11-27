@@ -117,7 +117,7 @@ Important audited details:
 
 The existing detailed opcode/bitfield inventory and test notes are in [gool-crash2-instruction-audit.md](gool-crash2-instruction-audit.md).
 
-## Native MIPS mode: source comparison and current correction needed
+## Native MIPS mode: source comparison and applied correction
 
 The original CrashEdit implementation switches from GOOL decoding into native MIPS decoding after opcode 73 (`0x49`). Its GOOL entry parser recognizes two exact 32-bit words as MIPS-mode return patterns:
 - `0x03E00008` (`jr $ra`)
@@ -127,12 +127,12 @@ The parser includes the instruction after the return pattern as the delay-slot i
 
 **Important distinction:** `0x03E0A809` conventionally disassembles as `jalr $s5,$ra`, not `jalr $ra,$ra`. The canonical encoding for `jalr $ra,$ra` is `0x03E0F809`. Therefore, the disassembler should display the instruction according to its actual fields, while the GOOL stream parser must independently honor the original CrashEdit sentinel convention.
 
-**Correction to apply:** the current native parser was recently changed to use `0x03E0F809` as the mode-return sentinel. That diverges from the original source behavior and should be restored to `0x03E0A809`, with a regression test that separately verifies:
+**Correction applied:** the native parser now uses the original raw-word sentinel `0x03E0A809`, with regression coverage that separately verifies:
 - `0x03E0A809` displays as `jalr $s5,$ra`;
 - `0x03E0F809` displays as `jalr $ra,$ra`;
 - the GOOL/MIPS parser exits MIPS mode on the original raw sentinel `0x03E0A809` (and `jr $ra`) after consuming the delay slot.
 
-The native MIPS decoder now covers common R3000A operations including shifts, register jumps/calls, syscall/break, HI/LO transfers, multiply/divide, arithmetic/logical operations, branches/jumps, immediate operations, and load/store instructions. Register operand ordering for `jalr` and source-register selection for `mthi`/`mtlo` were corrected during source/encoding review. Keep raw words visible for verification.
+The native MIPS decoder now covers the supported R3000A subset plus the modeled COP0/COP2/GTE forms described in [GOOL_ROADMAP.md](GOOL_ROADMAP.md). Register operand ordering for `jalr` and source-register selection for `mthi`/`mtlo` were corrected during source/encoding review. Keep raw words visible for verification.
 
 ## COP2 / PlayStation GTE finding — research only, not implemented
 
@@ -361,11 +361,11 @@ The 2026-11-25 note above was incorrect: restoring raw special XYZ bytes *after*
 Latest user report: the animation preview looks correct again. Native tests and private real-sample checks passed for the latest patch sequence; Windows and Ubuntu CI passed, with macOS queued at last check. User is continuing game testing. Do not treat this as universal animation or in-game save validation.
 
 
-## Animation recovery checkpoint and unresolved vertex limit — 2026-11-26
+## Historical animation recovery checkpoint — 2026-11-26 (superseded by conversion milestone)
 
 Checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac): user-confirmed animation preview looks correct again and saving works. This restores a stable baseline; it does not solve the original transform defect.
 
-**Current user-reported defect:** certain vertices hit a location limit on the X/Y/Z gizmo. The editor incorrectly asks to move the Animation entry into a new NSF chunk, yet the requested edit still is not applied. The investigation is about Animation frame boundaries and coordinate/encoding limits. Chunk relocation is not a valid fix unless a separate chunk-capacity failure is demonstrated.
+**Historical status at this checkpoint:** certain vertices hit a location limit on the X/Y/Z gizmo, and an incorrect chunk-capacity prompt appeared. This was the pre-conversion state. The later Complex-to-Normal conversion and edited-geometry test resolved the user's practical larger-ear editing case for the tested resource; direct Complex editing and broad compatibility remain separate open work.
 
 Next: compare the gizmo's allowed coordinate range, frame boundary/offset metadata, compressed or uncompressed encoder constraints, and save validation for the exact failing vertex/axis. Record the first rejected coordinate and rejection reason; do not speculate or silently clamp/drop/wrap the edit. Verify movement beyond the old limit, save/reopen, then original-game behavior independently.
 
