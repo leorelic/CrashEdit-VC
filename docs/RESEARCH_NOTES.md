@@ -708,3 +708,13 @@ Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Compl
 - Show Remaining space in Properties based on the terminal used-data offset, not the fixed 64 KiB buffer size.
 
 The regression now uses two linked Animations of deliberately different frame counts: the short entry relocates first, and the longer entry's aggregate frame growth then forces a second relocation and asserts that they share one destination chunk, keep distinct EIDs, reparse, and survive Save/reopen. The source chunk retains its unrelated filler. Do not mark this correction as a milestone until CI passes.
+
+## Complex-to-Normal conversion: user-confirmed in-game validation — 2026-11-27
+
+**User-confirmed end-to-end:** after converting the Complex Model and its linked Animations, saving the resulting archive through CrashEdit-RE (CE-RE), the user tested that saved file in Crash 2 and reported that it worked correctly in-game.
+
+This closes the previously pending game-compatibility validation for the tested converted model/animation set. Combined with the passing native regression for capacity-aware packing and archive Save/reopen, the conversion milestone now has both archive-level and original-game evidence.
+
+- Accepted milestone/checkpoint: [90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357).
+- Scope: user-tested converted Model and linked Animations, with the saved file round-tripped through CE-RE before in-game testing.
+- Do not generalize this single successful test to every Complex Model, Animation layout, special-vertex configuration, or Zone load-list scenario. Retain representative regression coverage and test additional resource sets as they arise.
