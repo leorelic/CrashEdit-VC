@@ -1977,35 +1977,100 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
  }
  struct ExpectedPose {std::size_t chunkIndex,entryIndex,frameIndex;std::uint32_t animationEid;std::vector<NsfAnimationVertex>positions;std::vector<std::array<std::uint8_t,3>>special;};
  std::vector<ExpectedPose>expected;std::size_t linkedFrameCount=0;
+ std::vector<NsfEntryLocation>animationLocations;
  for(std::size_t ci=0;ci<candidate.chunks_.size();++ci){
-  auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
-  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
-   auto&entry=chunk.entries[ei];if(!entry.valid||entry.type!=1U)continue;
-   if(!entry.animation.decoded){error="Batch conversion cannot proceed because an Animation entry is undecoded; linked references cannot be exhaustively checked.";return false;}
-   std::vector<std::vector<std::uint8_t>>payloads;payloads.reserve(entry.animation.frames.size());
-   bool affected=false;
-   for(std::size_t fi=0;fi<entry.animation.frames.size();++fi){
-    const auto&frame=entry.animation.frames[fi];
+  const auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei)
+   if(chunk.entries[ei].valid&&chunk.entries[ei].type==1U)animationLocations.push_back({ci,ei});
+ }
+ // Descending entry order keeps not-yet-processed source indices stable when
+ // a too-large Animation is removed and relocated out of its chunk.
+ std::sort(animationLocations.begin(),animationLocations.end(),[](const NsfEntryLocation&a,const NsfEntryLocation&b){
+  return a.chunkIndex!=b.chunkIndex?a.chunkIndex>b.chunkIndex:a.entryIndex>b.entryIndex;
+ });
+ for(const auto&location:animationLocations){
+  const std::size_t ci=location.chunkIndex,ei=location.entryIndex;
+  if(ci>=candidate.chunks_.size()||ei>=candidate.chunks_[ci].entries.size()){
+   error="An Animation entry moved unexpectedly during batch conversion.";return false;
+  }
+  auto&entry=candidate.chunks_[ci].entries[ei];
+  if(!entry.valid||entry.type!=1U)continue;
+  if(!entry.animation.decoded){error="Batch conversion cannot proceed because an Animation entry is undecoded; linked references cannot be exhaustively checked.";return false;}
+  auto buildPayloads=[&](std::size_t targetChunk,std::size_t targetEntry,
+                         std::vector<std::vector<std::uint8_t>>&payloads,
+                         std::vector<ExpectedPose>&poses,std::size_t&linkedFrames)->bool{
+   if(targetChunk>=candidate.chunks_.size()||targetEntry>=candidate.chunks_[targetChunk].entries.size()){
+    error="Relocated Animation entry could not be located.";return false;
+   }
+   const auto&target=candidate.chunks_[targetChunk];
+   const auto&anim=target.entries[targetEntry];
+   if(!anim.valid||anim.type!=1U||!anim.animation.decoded){
+    error="Relocated Animation entry did not decode.";return false;
+   }
+   payloads.clear();payloads.reserve(anim.animation.frames.size());poses.clear();linkedFrames=0;
+   for(std::size_t fi=0;fi<anim.animation.frames.size();++fi){
+    const auto&frame=anim.animation.frames[fi];
     if(frame.linkedModelEid!=modelEid){
-     if(!has(chunk.bytes,frame.rawOffset,frame.rawSize)){error="An unrelated frame payload is outside its chunk.";return false;}
-     payloads.emplace_back(chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),chunk.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
+     if(!has(target.bytes,frame.rawOffset,frame.rawSize)){
+      error="An unrelated frame payload is outside its chunk.";return false;
+     }
+     payloads.emplace_back(target.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset),
+                          target.bytes.begin()+static_cast<std::ptrdiff_t>(frame.rawOffset+frame.rawSize));
      continue;
     }
-    if(!frame.modelResolved||!frame.verticesDecoded||entry.animation.isCrash3){error="A linked frame is unresolved, undecoded, or uses an unsupported Crash 3 layout.";return false;}
+    if(!frame.modelResolved||!frame.verticesDecoded||anim.animation.isCrash3){
+     error="A linked frame is unresolved, undecoded, or uses an unsupported Crash 3 layout.";return false;
+    }
     std::vector<std::uint8_t>converted;
-    if(!makeNormalFramePayload(chunk,frame,sourceModel,converted,error))return false;
-    payloads.push_back(std::move(converted));affected=true;++linkedFrameCount;
+    if(!makeNormalFramePayload(target,frame,sourceModel,converted,error))return false;
+    payloads.push_back(std::move(converted));++linkedFrames;
     std::vector<NsfAnimationVertex>ordinaryPose(frame.vertices.begin(),
      frame.vertices.begin()+static_cast<std::ptrdiff_t>(sourceModel.positions.size()));
-    expected.push_back({ci,ei,fi,entry.eid,std::move(ordinaryPose),frame.specialVertices});
+    poses.push_back({targetChunk,targetEntry,fi,anim.eid,std::move(ordinaryPose),frame.specialVertices});
+   }
+   return true;
+  };
+  std::vector<std::vector<std::uint8_t>>payloads;
+  std::vector<ExpectedPose>poses;
+  std::size_t linkedFrames=0;
+  if(!buildPayloads(ci,ei,payloads,poses,linkedFrames,error))return false;
+  if(linkedFrames==0U)continue;
+  if(replaceAnimationFramePayloads(candidate.chunks_[ci],candidate.chunks_[ci].entries[ei],payloads)){
+   linkedFrameCount+=linkedFrames;
+   expected.insert(expected.end(),std::make_move_iterator(poses.begin()),std::make_move_iterator(poses.end()));
+   continue;
   }
-  if(affected){
-   if(!replaceAnimationFramePayloads(chunk,entry,payloads)){error="Could not rebuild a linked Animation entry within its NSF chunk capacity.";return false;}
-
+  // Entry-level capacity was exceeded. Relocate the original untouched entry
+  // into its own type-0 chunk, then regenerate converted frames against the
+  // reparsed destination entry before attempting the replacement again.
+  for(auto&pose:expected)
+   if(pose.chunkIndex==ci&&pose.entryIndex>ei)--pose.entryIndex;
+  std::size_t newChunkIndex=0;
+  if(!candidate.moveEntryToNewChunk(ci,ei,newChunkIndex,error))return false;
+  if(newChunkIndex>=candidate.chunks_.size()||candidate.chunks_[newChunkIndex].entries.size()!=1U){
+   error="Animation relocation did not produce a single-entry destination chunk.";return false;
   }
- }
+  poses.clear();payloads.clear();linkedFrames=0;
+  if(!buildPayloads(newChunkIndex,0U,payloads,poses,linkedFrames,error))return false;
+  if(linkedFrames==0U){error="Relocated Animation no longer references the selected Model.";return false;}
+  if(!replaceAnimationFramePayloads(candidate.chunks_[newChunkIndex],candidate.chunks_[newChunkIndex].entries[0],payloads)){
+   error="The converted Animation entry itself exceeds the 64 KiB capacity of a new NSF chunk; conversion was aborted without changing the archive.";return false;
+  }
+  linkedFrameCount+=linkedFrames;
+  expected.insert(expected.end(),std::make_move_iterator(poses.begin()),std::make_move_iterator(poses.end()));
  }
  if(linkedFrameCount==0U){error="No decoded Animation frames reference the selected Model EID.";return false;}
+ // Animation relocation can shift the selected Model's entry index when it
+ // shares a source chunk. Resolve it again by EID before rebuilding its item table.
+ modelFound=false;
+ for(std::size_t ci=0;ci<candidate.chunks_.size()&&!modelFound;++ci){
+  const auto&chunk=candidate.chunks_[ci];if(chunk.type!=0U||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   const auto&entry=chunk.entries[ei];
+   if(entry.valid&&entry.type==2U&&entry.eid==modelEid&&entry.model.decoded&&entry.model.compressed){modelLocation={ci,ei};modelFound=true;break;}
+  }
+ }
+ if(!modelFound){error="Selected Complex Model could not be located after Animation relocation.";return false;}
  auto&modelChunk=candidate.chunks_[modelLocation.chunkIndex];
  auto&modelEntry=modelChunk.entries[modelLocation.entryIndex];
  if(!removeCompressedPositionItem(modelChunk,modelEntry,error))return false;
