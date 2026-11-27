@@ -1144,10 +1144,18 @@ void EditorUI::drawConvertModelAnimationWindow(){
   }
  }
  ImGui::Separator();
- ImGui::BeginDisabled(true);
- ImGui::Button("Convert Model and All Linked Animations");
+ static std::string conversionStatus;
+ const ModelChoice*convertTarget=selectedModel();
+ ImGui::BeginDisabled(convertTarget==nullptr);
+ if(ImGui::Button("Convert Model and All Linked Animations")){
+  if(convertTarget){
+   const std::uint32_t targetEid=convertTarget->eid;
+   if(nsf_.convertComplexModelToNormal(targetEid,conversionStatus))
+    conversionStatus="Conversion succeeded for "+Crash::eidToEName(targetEid)+". Use the normal Save button to write the converted archive.";
+  }
+ }
  ImGui::EndDisabled();
- ImGui::TextWrapped("Batch conversion is not enabled yet. The conversion backend must first prove that the Model and every linked frame can be rebuilt atomically, including special-vertex layout and NSF chunk capacity. Until then this window is inspection-only; no archive data is changed.");
+ if(!conversionStatus.empty())ImGui::TextWrapped("%s",conversionStatus.c_str());
  if(ImGui::Button("Close"))convertModelAnimationWindow_=false;
  ImGui::End();
 }
