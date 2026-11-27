@@ -311,7 +311,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(capacityModelChunk,cmEntry+16U+6U*4U,static_cast<std::uint32_t>(capacityModelCursor));
  p32(capacityModelChunk,20U,static_cast<std::uint32_t>(cmEntry+capacityModelEntrySize));
  p32(capacityModelChunk,cmInfo+0x38,static_cast<std::uint32_t>(capacityPositions));
- for(std::size_t vi=0;vi<capacityPositions;++vi)p32(capacityModelChunk,cmPositions+vi*4U,0x000001ffU);
+ for(std::size_t vi=0;vi<capacityPositions;++vi)p32(capacityModelChunk,cmPositions+vi*4U,0U); // zero-width signed deltas: 3 bits per vertex, so 264 source bytes decode
  std::vector<std::uint8_t> capacityAnimationChunk(65536);p16(capacityAnimationChunk,0,0x1234);p16(capacityAnimationChunk,2,0);p32(capacityAnimationChunk,4,7);p32(capacityAnimationChunk,8,2);
  constexpr std::size_t capacityAnimEntry=32,capacityFrame=56,capacitySourceTemporalBytes=264,capacityAnimEntryBytes=24+24+capacitySourceTemporalBytes;
  constexpr std::size_t capacityFillerEntry=capacityAnimEntry+capacityAnimEntryBytes,capacityUsedEnd=65520;
@@ -326,6 +326,8 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  NsfArchive capacityConversion;assert(capacityConversion.loadBytes(capacityArchiveBytes,e));capacityConversion.decodeAnimationModels(false);
  assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
  assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].collisionCount==0U&&capacityConversion.chunks()[1].entries[0].animation.frames[0].headerSize==24U&&capacityConversion.chunks()[1].entries[0].animation.frames[0].specialVertexCount==0U);
+ assert(capacityConversion.chunks()[0].entries[0].model.positions[0].xBits==0U&&capacityConversion.chunks()[0].entries[0].model.positions[0].yBits==0U&&capacityConversion.chunks()[0].entries[0].model.positions[0].zBits==0U);
+ assert(capacitySourceTemporalBytes*8U<capacityPositions*24U);
  const bool capacityConverted=capacityConversion.convertComplexModelToNormal(0x0200007bU,e);if(!capacityConverted)std::cerr<<"Capacity conversion failed: "<<e<<"\n";assert(capacityConverted);
  assert(capacityConversion.chunks().size()==3U);
  assert(capacityConversion.chunks()[2].entries[0].animation.frames[0].rawSize==24U+300U);
