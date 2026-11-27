@@ -4,13 +4,7 @@
 
 ## Independent research boundary
 
-ManDude's **GOOC** repository is excluded from GOOL research. Its licensing has not been established as compatible with CrashEdit-VC's MIT distribution. Do not inspect it for guidance or reuse its source, compiler/decompiler logic, tools, dependencies, assets, generated output, or implementation patterns. Do not use it as a design reference or feature checklist. The project's overall repository-exclusion policy is recorded in [MILESTONES.md](MILESTONES.md).
-
-Build the GOOL decoder/decompiler independently from CrashEdit-VC's own code, analyzed Crash 2 data and runtime behavior, and technical evidence compatible with the project's MIT goal.
-
-This is the first-pass instruction-format audit for **Crash Bandicoot 2 GOOL (Version2)**. The reference for the current mnemonic/format inventory is the CrashEdit instruction registry in `Crash/Formats/Crash Formats/GOOL/GOOLInstructionList.cs`, together with its generic bitfield parser in `GOOLInstruction.cs`. The C++ decoder must stay version-gated and preserve the original 32-bit instruction word.
-
-The registry explicitly marks some opcodes as unidentified. Those entries are not promoted to guessed mnemonics. Their known bitfield layouts are still useful and are retained where the reference registry supplies one.
+GOOC is excluded from GOOL research. Follow the scoped restriction in [GOOL_ROADMAP.md](GOOL_ROADMAP.md) and the complete project-wide policy in [MILESTONES.md](MILESTONES.md).
 
 ## Encoding rules confirmed by the reference implementation
 
