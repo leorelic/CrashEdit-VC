@@ -336,7 +336,7 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [ ] Make the workflow for selecting a group of vertices and creating a bone for that group fast, clear, and predictable; retain the existing multi-selection and one-bone-per-vertex rules unless research demonstrates a better safe model.
 - [ ] Make bone creation, naming, selection, vertex assignment/removal, and saved-rig management feel like one coherent rigging workflow rather than disconnected utility controls.
 - [x] Improve the first-pass bone silhouette with a tapered shaft, rounded endpoint joints, and dark outlines; this is a visual foundation, not yet a final anatomically styled bone mesh.
-- [x] Add **Connect to Parent Joint** for a selected child bone: after choosing a parent, snap the child pivot to the parent's far joint and invalidate its cached rest/rotation data.
+- [x] Add **Connect Pivot to Parent** for a selected child bone: after choosing a parent, snap the child pivot to the parent's pivot and invalidate its cached rest/rotation data.
 - [ ] Improve the full visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
 - [ ] Implement parent/child transform propagation so connected descendants follow parent movement/rotation while retaining their relative joint offsets; current hierarchy connections do not yet propagate transforms.
 - [ ] Make posing operate on the selected bone and its assigned vertices as a natural bone transform, with intuitive rotation and pivot behavior rather than requiring awkward manual workarounds.
