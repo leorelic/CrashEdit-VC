@@ -477,3 +477,8 @@ CI run #1451 compiled successfully on Linux and Windows, then failed the `nsf_ar
 ### Capacity relocation fixture model-copy correction — 2026-11-27
 
 Diagnostic run #1454 compiled on Ubuntu and failed the capacity test before entering relocation. The added diagnostic exposed `Selected EID is not a decoded Complex Model.` Inspection found the fixture copied `compressedModelChunk` into `capacityModelChunk`, but the subsequent 100-position item-offset, vertex-count, and ModelPosition writes mistakenly targeted the original `compressedModelChunk`. The archive under test loaded the stale copy, so it did not contain the intended expanded model. Commit `d8df6f7d251af4272e09d8159f5dd3f354016b45` redirects those fixture writes to `capacityModelChunk` and fixes the diagnostic newline. CI #1455 must confirm that the fixture now reaches and passes the actual relocation and Save/reopen assertions; do not treat this as converter validation until that run succeeds.
+
+
+### Capacity-relocation regression fixture: model vertex-count field
+
+CI runs #1455 and #1456 built successfully but failed before entering conversion: the synthetic capacity model was not decoded as Complex. Inspection of `parseModel()` showed the fixture had changed `ModelInfo + 0x2c` (polygon-word count) to 100, while compressed ModelPosition count is derived from `vertexCount` at `+0x38` minus the special-vertex base at `+0x4c`. The test now leaves polygon-word count intact and sets `+0x38` to 100, matching the 100 compressed-position records. Removed the unused frame-byte calculation as well. This corrects the fixture's header semantics; the relocation/conversion assertion still requires a passing CI run.
