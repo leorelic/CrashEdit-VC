@@ -422,3 +422,16 @@ Before beginning the conversion fixes, preserve the current implementation exact
 - Main working branch: `cpp-port-foundation`
 
 This checkpoint is the rollback point for the implementation stages below. Do not reset or force-update the backup branch. Any rollback should restore the working branch to this commit while preserving later research notes as needed.
+
+
+### Complex pose-slot encoder mismatch — implementation started 2026-11-27
+
+Re-inspection of `decodeAnimationVertices()`, `encodeAnimationFrameVertex()`, and `commitAnimationEdits()` found the concrete source mismatch:
+
+- Complex decoding writes ModelPosition record `i` to `frame.vertices[i]`.
+- The compressed encoder previously read and edited `frame.vertices[i + specialVertexCount]` and rejected vertex indices below `specialVertexCount` as if they were special-header vertices.
+- The compressed commit path also tried to serialize the first `specialVertexCount` slots of `frame.vertices` back into the special-vertex header. Those slots are actually the leading decoded ModelPosition records in the Complex pose representation; special XYZ data is held separately in `frame.specialVertices`.
+
+Initial code correction on `cpp-port-foundation` aligns the Complex encoder with the decoder's direct pose-slot mapping, allows compressed ModelPosition slots to use indices starting at zero, and removes the erroneous special-header write loop from the compressed commit path. The special prefix remains relevant to the temporal bit cursor and renderer polygon-index bias, not to shifting decoded ModelPosition slots.
+
+A regression test was changed from asserting rejection to asserting save/reload of edited compressed pose slots with a nonzero special count. This is the first implementation stage only: it does not yet implement Complex-to-Normal Model payload conversion, Normal frame-stream construction, or atomic batch conversion. Keep the rollback branch above unchanged until the conversion feature is validated end-to-end.
