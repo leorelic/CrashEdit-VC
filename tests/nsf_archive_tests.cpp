@@ -299,6 +299,42 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
   assert(convertedReloadPose[vi].y==complexPoseBefore[vi].y);
   assert(convertedReloadPose[vi].z==complexPoseBefore[vi].z);
  }
+ // Force a converted Animation entry to exceed its source chunk's free
+ // tail. The batch converter must relocate it into a fresh NSF chunk and then
+ // preserve the converted pose through the ordinary Save/reopen path.
+ auto capacityModelChunk=compressedModelChunk;
+ constexpr std::size_t capacityPositions=100;
+ const std::size_t capacityModelEntrySize=cmTable+0x50U+12U+52U+12U+4U+capacityPositions*4U;
+ std::size_t capacityModelCursor=cmTable;
+ const std::size_t capacityModelItemSizes[]={0x50,12,52,12,4,capacityPositions*4U};
+ for(std::size_t ii=0;ii<6U;++ii){p32(capacityModelChunk,cmEntry+16U+ii*4U,static_cast<std::uint32_t>(capacityModelCursor));capacityModelCursor+=capacityModelItemSizes[ii];}
+ p32(capacityModelChunk,cmEntry+16U+6U*4U,static_cast<std::uint32_t>(capacityModelCursor));
+ p32(capacityModelChunk,20U,static_cast<std::uint32_t>(cmEntry+capacityModelEntrySize));
+ p32(capacityModelChunk,cmInfo+0x2c,static_cast<std::uint32_t>(capacityPositions));
+ for(std::size_t vi=0;vi<capacityPositions;++vi)p32(capacityModelChunk,cmPositions+vi*4U,0x000001ffU);
+ std::vector<std::uint8_t> capacityAnimationChunk(65536);p16(capacityAnimationChunk,0,0x1234);p16(capacityAnimationChunk,2,0);p32(capacityAnimationChunk,4,7);p32(capacityAnimationChunk,8,2);
+ constexpr std::size_t capacityAnimEntry=32,capacityFrame=56,capacityFrameBytes=64+capacityPositions*3U,capacityAnimEntryBytes=24+64+264;
+ constexpr std::size_t capacityFillerEntry=capacityAnimEntry+capacityAnimEntryBytes,capacityUsedEnd=65520;
+ p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacityFillerEntry);p32(capacityAnimationChunk,24,capacityUsedEnd);
+ p32(capacityAnimationChunk,28,0U);
+ p32(capacityAnimationChunk,capacityAnimEntry,0x0100ffff);p32(capacityAnimationChunk,capacityAnimEntry+4,0x0200007b);p32(capacityAnimationChunk,capacityAnimEntry+8,1);p32(capacityAnimationChunk,capacityAnimEntry+12,1);p32(capacityAnimationChunk,capacityAnimEntry+16,24);p32(capacityAnimationChunk,capacityAnimEntry+20,capacityAnimEntryBytes);
+ p32(capacityAnimationChunk,capacityFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacityFrame+12,1);p32(capacityAnimationChunk,capacityFrame+16,0x0200007b);p32(capacityAnimationChunk,capacityFrame+20,64);
+ for(std::size_t bi=0;bi<264U;++bi)capacityAnimationChunk[capacityFrame+64U+bi]=0U;
+ p32(capacityAnimationChunk,capacityFillerEntry,0x0100ffff);p32(capacityAnimationChunk,capacityFillerEntry+4,0x02000099);p32(capacityAnimationChunk,capacityFillerEntry+8,0);p32(capacityAnimationChunk,capacityFillerEntry+12,0);p32(capacityAnimationChunk,capacityFillerEntry+16,20);
+ std::vector<std::uint8_t> capacityArchiveBytes;capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityModelChunk.begin(),capacityModelChunk.end());capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityAnimationChunk.begin(),capacityAnimationChunk.end());
+ NsfArchive capacityConversion;assert(capacityConversion.loadBytes(capacityArchiveBytes,e));capacityConversion.decodeAnimationModels(false);
+ assert(capacityConversion.chunks()[1].entries[0].animation.frames[0].verticesDecoded);
+ assert(capacityConversion.convertComplexModelToNormal(0x0200007bU,e));
+ assert(capacityConversion.chunks().size()==3U);
+ assert(capacityConversion.chunks()[1].entries.size()==1U);
+ assert(capacityConversion.chunks()[2].entries.size()==1U&&capacityConversion.chunks()[2].entries[0].eid==0x0200007bU);
+ assert(!capacityConversion.chunks()[0].entries[0].model.compressed);
+ std::vector<std::uint8_t> capacitySaved;assert(capacityConversion.saveUncompressedBytes(capacitySaved,e));
+ NsfArchive capacityReload;assert(capacityReload.loadBytes(capacitySaved,e));capacityReload.decodeAnimationModels(false);
+ assert(capacityReload.chunks().size()==3U);
+ assert(capacityReload.chunks()[2].entries[0].animation.frames[0].verticesDecoded);
+ assert(capacityReload.chunks()[2].entries[0].animation.frames[0].vertexCount==capacityPositions);
+ 
  // The actual Cr10G-style special count is four (12-byte aligned). Verify
  // conversion moves the Complex pose into Normal ordinary slots after the
  // four preserved special vertices, including a full save/reopen.
