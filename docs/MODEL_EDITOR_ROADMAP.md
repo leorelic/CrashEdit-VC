@@ -329,13 +329,15 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 
 #### Next priority — usable bone creation and per-frame posing
 
-- [x] Add a direct **Create From Selection** workflow that creates a bone from the current viewport selection, transfers those vertices out of any previous groups, and initializes the pivot from the group's current-frame center; selecting a bone in the list now also selects/highlights its assigned vertices in the viewport.
-- [x] Add viewport hit-testing for the visible bone segments so clicking a bone selects it and its assigned vertices directly; existing axis/rotation tools can then operate on that group without returning to the Bone List.
+- [x] Add a direct **Create From Selection** workflow that creates a bone from the current viewport selection, transfers those vertices out of any previous groups, and initializes the pivot from the group's current-frame center.
+- [x] Clicking a bone joint or selecting a bone in the list selects the rig joint without automatically changing the vertex selection or enabling vertex mode. Vertex Assignment Mode is explicit and synchronized with the viewport's vertex-mode toggle.
+- [x] Add viewport hit-testing for authored bone joint pivots; selection targets the joint rather than the farthest pair of assigned vertices.
+- [x] Replace the oversized vertex-derived tapered shapes with small joint markers and thin parent-to-child links based on authored pivot locations.
 - [ ] Add direct bone-body dragging and connected parent/child transform propagation; the current parent links remain organizational until this is implemented and validated.
 - [x] Include per-frame rest-pose vertex contents and rest offsets in undo-history change detection so editor-only pose-cache changes are not silently omitted from history.
 - [ ] Make the workflow for selecting a group of vertices and creating a bone for that group fast, clear, and predictable; retain the existing multi-selection and one-bone-per-vertex rules unless research demonstrates a better safe model.
 - [ ] Make bone creation, naming, selection, vertex assignment/removal, and saved-rig management feel like one coherent rigging workflow rather than disconnected utility controls.
-- [x] Improve the first-pass bone silhouette with a tapered shaft, rounded endpoint joints, and dark outlines; this is a visual foundation, not yet a final anatomically styled bone mesh.
+- [x] Remove the misleading oversized tapered bone silhouette; use restrained pivot/joint markers and thin parent links as an interim rig visualization. A Blender-like bone body with authored head/tail joints remains unfinished.
 - [x] Add **Connect Pivot to Parent** for a selected child bone: after choosing a parent, snap the child pivot to the parent's pivot and invalidate its cached rest/rotation data.
 - [ ] Improve the full visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
 - [ ] Implement parent/child transform propagation so connected descendants follow parent movement/rotation while retaining their relative joint offsets; current hierarchy connections do not yet propagate transforms.
