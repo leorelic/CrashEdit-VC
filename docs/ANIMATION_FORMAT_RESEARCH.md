@@ -1,6 +1,6 @@
 # Crash 2 animation format research and recovery roadmap
 
-Status: active investigation; the compressed decoder destination and temporal-prefix save behavior have been re-aligned with CrashEdit-RE source. CI, real-sample, and in-game validation are still required; the visual compatibility defect remains open.
+Status: the Cr10V preview mapping has been visually confirmed by the user after recovery, and the tested Complex-to-Normal conversion plus edited larger Crash ear position have survived CE-RE round-trip and original-game playback. The original Complex-frame coordinate/encoding limitation remains a separate issue; conversion is the validated practical route for the tested resource.
 Reference baseline: [CrashEdit-RE, airumu/CrashEdit, branch t/net9](https://github.com/airumu/CrashEdit/tree/t/net9).
 Primary source files:
 - `Crash/Formats/Crash Formats/Animation/Frame.cs`
@@ -122,11 +122,10 @@ Do not declare an animation-decoding milestone until:
 
 ## Current state
 
-- Recovery checkpoint [`ff5359af45779fcd29b3827a563215b433cef1ac`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac): user reports the animation preview looks correct again and has confirmed saving works. Treat this as a stable baseline, not resolution of the original transform-limit defect.
-- Original defect still open: some vertices cannot be moved past a particular X/Y/Z gizmo location; the editor wrongly prompts for a new NSF chunk, and the edit is still not applied. Investigate the actual Animation frame coordinate/encoding boundary and the gizmo/save validation path. Chunk expansion should not be offered as the remedy unless a separate, demonstrated chunk-capacity problem exists.
-- Determine the precise boundary from source and controlled sample edits: record the frame/vertex, requested and current coordinates, axis, encoded base/width/reset state, frame offset/boundary fields, and exact rejection path. Compare the limit used by the gizmo with the limit accepted by the encoder and serialized frame.
-- Preserve exact-pose verification. Do not silently clamp, wrap, drop, or misroute an edit. Confirm the previously blocked movement is applied and survives save/reopen; validate original-game behavior separately.
-- Native tests and private real-sample checks passed for representative compressed `Cr10G/Cr10V` and `El1eG/El1eV` resources. This is code-level evidence, not user confirmation that the coordinate-limit issue is resolved.
+- **Preview baseline:** [`ff5359a`](https://github.com/leorelic/CrashEdit-VC/commit/ff5359af45779fcd29b3827a563215b433cef1ac) remains the known-good Cr10V preview mapping. The user confirmed the recovered preview visually; preserve the decoder/renderer index-offset pairing.
+- **Complex edit limitation:** the original Complex-frame coordinate/encoding limitation has not been proven fixed in its native representation. Do not imply unrestricted Complex editing.
+- **Validated workaround:** convert the tested Complex Model and linked Animations to Normal, edit the larger Crash ear position, save through VC, round-trip through CrashEdit-RE (CE-RE), and test in Crash 2. The user confirmed the edited result works in-game. See the conversion milestone below and `RESEARCH_NOTES.md`.
+- **Scope:** this validates the tested resource set, not every Model/Animation layout or arbitrary coordinate. Continue broad compatibility testing and retain exact-pose/save-reopen regressions.
 
 ## Relationship to the existing project research log
 
@@ -138,7 +137,7 @@ The broader research log already records important source/sample evidence:
 - Real `El1eG/El1eV` and `Cr10G/Cr10V` structure counts and triangle-record comparisons.
 - The private sample workflow's golden checks for decoded frame vertex streams and triangle records, plus raw-entry preservation on save/reload.
 
-Keep that evidence intact. The current visual defect does not invalidate those specific data-parity results, but neither do those results prove the complete native renderer is visually correct. Treat the issue as a separate unresolved end-to-end checkpoint: compare the same affected frame in RE and VC through decoded vertices, Model-local indices, final index offsets, coordinate transforms, materials/textures, and rasterized output. Do not re-run or replace already documented research unless a new reproducible discrepancy requires it.
+Keep that evidence intact. The Cr10V preview mapping has since been visually confirmed by the user after the recovery checkpoint. Preserve the verified decoder destination and renderer special-vertex offset as a pair; do not repeat the earlier index-mapping experiments without a reproducible discrepancy. The separate Complex edit/encoding limitation is addressed by the validated explicit conversion workflow for the tested resource, not by changing preview decoding.
 
 The existing `MODEL_EDITOR_ROADMAP.md` also contains the Model-entry research and planned validation. Update that roadmap when a finding affects Model topology, texture/material resolution, or Model serialization; update this document for frame/temporal decoding; and update `RESEARCH_NOTES.md` for cross-subsystem findings or milestone evidence. Cross-link rather than copy long sections.
 
@@ -311,9 +310,9 @@ CrashEdit-RE has `ModelEntry.ConvertCompressedToUncompressed()`, proving a conve
 - `DecompressModel()` drops the ModelPosition table but reuses Info and PolyData. `ConvertIndices()` changes its initial vertex-index bias based on whether Positions is null (`-Info[0x4C]` for compressed, zero for uncompressed). Keeping the same polygon stream while changing this condition can alter triangle vertex mapping.
 - `MakeTemporals()` iterates `vertexCount - specialVertexCount` but reads `vertices[i]` from index zero, despite the uncompressed frame decoder reading ordinary coordinates from index `specialVertexCount`. Special-prefix preservation therefore needs a precise round-trip proof.
 
-Treat the conversion as structurally plausible, not proven in-game. The target is the game's existing Normal/uncompressed representation. Validate all frames, world-space poses, special vertices, collision/header data, polygon-to-vertex mapping, ModelEID references/shared users, NSF reparse, and original-game playback. Then edit one vertex and repeat save/reopen/game playback.
+The initial uncertainty is now resolved for the tested resource set: the user confirmed that the converted Model and linked Animations play in Crash 2 after CE-RE save/round-trip, and subsequently confirmed that a larger edited Crash ear position also survives VC save, CE-RE round-trip, and original-game playback. See [milestone 90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357) and the later edited-geometry confirmation recorded in `MILESTONES.md`.
 
-Keep two eventual strategies: genuine Complex delta encoding and explicit Complex-to-Normal conversion. Conversion must be user-invoked, previewable, atomic, and rollback-safe; never silently convert during ordinary save. Preserve the verified Cr10V renderer/decoder.
+This does not establish universal compatibility. Continue testing additional Model/Animation layouts, special-vertex configurations, shared Model references, chunk capacity, and Zone load-list constraints. Keep conversion explicit and rollback-safe; never silently convert during ordinary save. Preserve the verified Cr10V renderer/decoder. A genuine Complex delta encoder remains a separate possible future strategy, not a prerequisite for using the validated conversion workflow.
 ## UI operation requirement: Convert to Normal — 2026-11-27
 
 User-requested workflow: right-click a Complex Animation entry in Resource Hierarchy and choose **Convert to Normal**. Conversion overwrites the existing resources in place, retaining their EIDs; no new Model/Animation EIDs or duplicate resources are introduced in this first version.
