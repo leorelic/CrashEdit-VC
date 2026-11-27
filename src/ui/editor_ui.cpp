@@ -5571,28 +5571,11 @@ void EditorUI::drawBoneRigEditor(){
     }
     ImGui::EndCombo();
    }
-   if(bone.parentBone>=0&&static_cast<std::size_t>(bone.parentBone)<boneRigBones_.size()&&ImGui::Button("Connect to Parent Joint")){
-    const auto parentIndex=static_cast<std::size_t>(bone.parentBone);
-    const auto parentPivot=AnimationPoint((boneRigBones_[parentIndex].pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,
-                                         (boneRigBones_[parentIndex].pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,
-                                         (boneRigBones_[parentIndex].pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-    const auto parentBoneEnds=[&](std::size_t index){
-     AnimationPoint head{0,0,0},tail{0,0,0};if(index>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-     const auto&group=boneRigBones_[index];head=tail=AnimationPoint((group.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(group.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(group.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-     std::vector<AnimationPoint>points;for(const int vi:group.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vi)],frame,model));
-     float farthest=-1.0f;for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float d=dx*dx+dy*dy+dz*dz;if(d>farthest){farthest=d;head=points[a];tail=points[b];}}
-     const float dh=(head.x-parentPivot.x)*(head.x-parentPivot.x)+(head.y-parentPivot.y)*(head.y-parentPivot.y)+(head.z-parentPivot.z)*(head.z-parentPivot.z);
-     const float dt=(tail.x-parentPivot.x)*(tail.x-parentPivot.x)+(tail.y-parentPivot.y)*(tail.y-parentPivot.y)+(tail.z-parentPivot.z)*(tail.z-parentPivot.z);if(dt<dh)std::swap(head,tail);
-     return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-    };
-    const auto joint=parentBoneEnds(parentIndex).second;
-    if(std::fabs(modelScaleX)>0.0001f&&std::fabs(modelScaleY)>0.0001f&&std::fabs(modelScaleZ)>0.0001f){
-     bone.pivotX=joint.x/modelScaleX-static_cast<float>(frame.xOffset)/4.0f;
-     bone.pivotZ=joint.y/modelScaleY-static_cast<float>(frame.yOffset)/4.0f;
-     bone.pivotY=joint.z/modelScaleZ-static_cast<float>(frame.zOffset)/4.0f;bone.pivotInitialized=true;
-     bone.frameRotations.clear();bone.frameRestVertices.clear();bone.frameRestOffsets.clear();
-     status_="Connected "+bone.name+" to "+boneRigBones_[parentIndex].name+" at the parent joint.";
-    }else status_="Cannot connect bones with a zero model scale.";
+   if(bone.parentBone>=0&&static_cast<std::size_t>(bone.parentBone)<boneRigBones_.size()&&ImGui::Button("Connect Pivot to Parent")){
+    const auto&parentBone=boneRigBones_[static_cast<std::size_t>(bone.parentBone)];
+    bone.pivotX=parentBone.pivotX;bone.pivotY=parentBone.pivotY;bone.pivotZ=parentBone.pivotZ;bone.pivotInitialized=parentBone.pivotInitialized;
+    bone.frameRotations.clear();bone.frameRestVertices.clear();bone.frameRestOffsets.clear();
+    status_="Snapped "+bone.name+" pivot to "+parentBone.name+" pivot. Parent transform propagation is not implemented yet.";
    }
    if(ImGui::Button("Assign Selected Vertices")){
    for(const int index:animationSelectedVertices_){
