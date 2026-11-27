@@ -310,10 +310,10 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  for(std::size_t ii=0;ii<6U;++ii){p32(capacityModelChunk,cmEntry+16U+ii*4U,static_cast<std::uint32_t>(capacityModelCursor));capacityModelCursor+=capacityModelItemSizes[ii];}
  p32(capacityModelChunk,cmEntry+16U+6U*4U,static_cast<std::uint32_t>(capacityModelCursor));
  p32(capacityModelChunk,20U,static_cast<std::uint32_t>(cmEntry+capacityModelEntrySize));
- p32(capacityModelChunk,cmInfo+0x2c,static_cast<std::uint32_t>(capacityPositions));
+ p32(capacityModelChunk,cmInfo+0x38,static_cast<std::uint32_t>(capacityPositions));
  for(std::size_t vi=0;vi<capacityPositions;++vi)p32(capacityModelChunk,cmPositions+vi*4U,0x000001ffU);
  std::vector<std::uint8_t> capacityAnimationChunk(65536);p16(capacityAnimationChunk,0,0x1234);p16(capacityAnimationChunk,2,0);p32(capacityAnimationChunk,4,7);p32(capacityAnimationChunk,8,2);
- constexpr std::size_t capacityAnimEntry=32,capacityFrame=56,capacityFrameBytes=64+capacityPositions*3U,capacityAnimEntryBytes=24+64+300;
+ constexpr std::size_t capacityAnimEntry=32,capacityFrame=56,capacityAnimEntryBytes=24+64+300;
  constexpr std::size_t capacityFillerEntry=capacityAnimEntry+capacityAnimEntryBytes,capacityUsedEnd=65520;
  p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacityFillerEntry);p32(capacityAnimationChunk,24,capacityUsedEnd);
  p32(capacityAnimationChunk,28,0U);
