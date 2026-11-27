@@ -618,6 +618,7 @@ void EditorUI::draw(){
  }
  ImGui::End();
  drawSearchWindow();
+ drawConvertModelAnimationWindow();
  if(!restoredLastNsfPath_){
   if(path_[0]=='\0'&&!editorPreferences.lastNsfPath.empty())
    std::snprintf(path_,sizeof(path_),"%s",editorPreferences.lastNsfPath.c_str());
@@ -1057,6 +1058,8 @@ void EditorUI::drawMenu(){
  if(ImGui::BeginMenu("Search")){if(ImGui::MenuItem("Find Entry...","Ctrl+F",false,nsfValid_))searchWindow_=true;ImGui::EndMenu();}
  if(ImGui::BeginMenu("View")){ImGui::MenuItem("Properties",nullptr,&editorPreferences.showProperties);ImGui::MenuItem("Console / Diagnostics",nullptr,&editorPreferences.showConsole);ImGui::EndMenu();}
  if(ImGui::BeginMenu("Experimental")){
+  if(ImGui::MenuItem("Convert Model/Animation...",nullptr,false,nsfValid_&&gameVersion_==GameVersion::Crash2))convertModelAnimationWindow_=true;
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("Inspect Complex Models and every Animation that references the selected Model.");
   if(ImGui::MenuItem("Traditional GOOL Inspection",nullptr,&editorPreferences.traditionalGoolInspection)){activeGoolChunk_=-1;activeGoolEntry_=-1;ImGui::MarkIniSettingsDirty();}
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Use the original GOOL inspection windows instead of the Script Editor and Blueprint workspace.");
   if(ImGui::MenuItem("Create .bak backups during save",nullptr,&editorPreferences.createBakBackup))ImGui::MarkIniSettingsDirty();
@@ -1071,6 +1074,82 @@ void EditorUI::drawMenu(){
  }
  if(ImGui::BeginMenu("Help")){if(ImGui::MenuItem("About"))about_=true;ImGui::EndMenu();}
  ImGui::EndMenuBar();
+}
+void EditorUI::drawConvertModelAnimationWindow(){
+ if(!convertModelAnimationWindow_)return;
+ if(!nsfValid_||gameVersion_!=GameVersion::Crash2){convertModelAnimationWindow_=false;return;}
+ struct ModelChoice{int chunk=-1,entry=-1;std::uint32_t eid=0;};
+ std::vector<ModelChoice>models;
+ for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+  const auto&chunk=nsf_.chunks()[ci];if(chunk.type!=0||!chunk.entryTableValid)continue;
+  for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+   const auto&entry=chunk.entries[ei];
+   if(entry.valid&&entry.type==2U&&entry.model.decoded&&entry.model.compressed)
+    models.push_back({static_cast<int>(ci),static_cast<int>(ei),entry.eid});
+  }
+ }
+ auto selectedModel=[&]()->const ModelChoice*{
+  for(const auto&choice:models)if(choice.chunk==convertModelChunk_&&choice.entry==convertModelEntry_)return &choice;
+  return nullptr;
+ };
+ if(!selectedModel()&&!models.empty()){convertModelChunk_=models.front().chunk;convertModelEntry_=models.front().entry;}
+ ImGui::SetNextWindowSize(ImVec2(620,480),ImGuiCond_FirstUseEver);
+ if(!ImGui::Begin("Convert Model/Animation",&convertModelAnimationWindow_)){
+  ImGui::End();return;
+ }
+ ImGui::TextWrapped("Choose a Complex Model to inspect every decoded Animation frame that references it. Conversion will replace the existing Model and linked Animation resources while preserving their EIDs.");
+ if(models.empty()){
+  ImGui::Spacing();ImGui::TextDisabled("No decoded Complex Models are available in this Crash 2 archive.");
+ }else{
+  const ModelChoice*current=selectedModel();
+  std::string preview=current?Crash::eidToEName(current->eid)+"  (chunk "+std::to_string(current->chunk)+", entry "+std::to_string(current->entry)+")":"Select a Model";
+  if(ImGui::BeginCombo("Complex Model",preview.c_str())){
+   for(const auto&choice:models){
+    const std::string label=Crash::eidToEName(choice.eid)+"  (chunk "+std::to_string(choice.chunk)+", entry "+std::to_string(choice.entry)+")";
+    const bool isSelected=choice.chunk==convertModelChunk_&&choice.entry==convertModelEntry_;
+    if(ImGui::Selectable(label.c_str(),isSelected)){convertModelChunk_=choice.chunk;convertModelEntry_=choice.entry;}
+    if(isSelected)ImGui::SetItemDefaultFocus();
+   }
+   ImGui::EndCombo();
+  }
+  current=selectedModel();
+  if(current){
+   const auto&modelEntry=nsf_.chunks()[static_cast<std::size_t>(current->chunk)].entries[static_cast<std::size_t>(current->entry)];
+   ImGui::Separator();
+   ImGui::Text("Model: %s",Crash::eidToEName(current->eid).c_str());
+   ImGui::Text("Vertices: %u  |  Compressed positions: %zu  |  Special vertices: %u",
+    modelEntry.model.vertexCount,modelEntry.model.positions.size(),modelEntry.model.specialVertexCount);
+   ImGui::Separator();
+   ImGui::Text("Linked Animations");
+   ImGui::BeginChild("##ConvertModelAnimationReferences",ImVec2(0,220),ImGuiChildFlags_Borders);
+   std::size_t linkedEntries=0,linkedFrames=0;
+   for(std::size_t ci=0;ci<nsf_.chunks().size();++ci){
+    const auto&chunk=nsf_.chunks()[ci];if(chunk.type!=0||!chunk.entryTableValid)continue;
+    for(std::size_t ei=0;ei<chunk.entries.size();++ei){
+     const auto&entry=chunk.entries[ei];
+     if(!entry.valid||entry.type!=1U)continue;
+     std::size_t matchingFrames=0;
+     if(entry.animation.decoded){
+      for(const auto&frame:entry.animation.frames)if(frame.modelEid==current->eid)++matchingFrames;
+     }
+     if(matchingFrames==0)continue;
+     ++linkedEntries;linkedFrames+=matchingFrames;
+     ImGui::BulletText("%s  (chunk %zu, entry %zu) — %zu / %zu frames",
+      Crash::eidToEName(entry.eid).c_str(),ci,ei,matchingFrames,entry.animation.frames.size());
+    }
+   }
+   if(linkedEntries==0)ImGui::TextDisabled("No decoded Animation entries currently reference this Model.");
+   ImGui::EndChild();
+   ImGui::Text("Found %zu Animation entries and %zu linked frames.",linkedEntries,linkedFrames);
+  }
+ }
+ ImGui::Separator();
+ ImGui::BeginDisabled(true);
+ ImGui::Button("Convert Model and All Linked Animations");
+ ImGui::EndDisabled();
+ ImGui::TextWrapped("Batch conversion is not enabled yet. The conversion backend must first prove that the Model and every linked frame can be rebuilt atomically, including special-vertex layout and NSF chunk capacity. Until then this window is inspection-only; no archive data is changed.");
+ if(ImGui::Button("Close"))convertModelAnimationWindow_=false;
+ ImGui::End();
 }
 void EditorUI::drawToolbar(){const auto&style=ImGui::GetStyle();const float toolbarHeight=ImGui::GetFrameHeight()+style.WindowPadding.y*2.0f+2.0f;ImGui::BeginChild("Toolbar",ImVec2(0,toolbarHeight),ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar);if(ImGui::Button("Open NSF")){openDialog_=true;centerOpenDialog_=true;}ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_||!nsdValid_);if(ImGui::Button("Save"))saveFiles();ImGui::EndDisabled();ImGui::SameLine();ImGui::SameLine();ImGui::BeginDisabled(!nsfValid_);if(ImGui::Button("Search"))searchWindow_=true;ImGui::EndDisabled();ImGui::SameLine();ImGui::TextDisabled("| Game: %s",nsfValid_?versionName(gameVersion_):"None");ImGui::SameLine();ImGui::SetNextItemWidth(82.0f);int regionChoice=editorPreferences.palRegion?1:0;const char*regionNames[]={"NTSC","PAL"};if(ImGui::Combo("##NSFRegion",&regionChoice,regionNames,2)){editorPreferences.palRegion=regionChoice==1;animationFrameTimer_=0.0f;}ImGui::EndChild();}
 void EditorUI::drawHierarchy(){ImGui::Begin("Resource Hierarchy");
