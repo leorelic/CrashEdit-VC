@@ -494,3 +494,12 @@ The fixture now supplies a 264-byte source temporal stream (66 words, enough for
 ### Capacity relocation fixture: correct Crash 2 frame header — 2026-11-27
 
 CI run #1461 compiled on Windows, macOS, and Ubuntu but failed before conversion: `verticesDecoded` was false for the synthetic capacity animation. The test had incorrectly modeled a Crash 2 frame with a 64-byte fixed header. `parseAnimationFrame()` uses a 24-byte fixed header; `headerSize=64` therefore described 40 special-vertex bytes, which is not divisible by 3 and caused the frame parser to reject it. Corrected the fixture to use `headerSize=24`, place the 264-byte source temporal stream at `frame+24`, and set the animation entry size to `24-byte entry header + 24-byte frame header + 264 temporal bytes = 312`. The converted Normal frame should be `24+300=324` bytes, a 36-byte increase. The source chunk has only 16 bytes free, so this still forces relocation. Commit `0196dd39844b6f4eb1e29c5bc0e6fcfd51415ee7` corrects the test fixture; CI must still confirm decoding, relocation, and Save/reopen.
+
+
+### Capacity-relocation regression fixture: Crash 2 frame +12 is collisionCount — 2026-11-27
+
+The capacity relocation test repeatedly failed before invoking the converter. The fixture wrote `1` at frame offset `+12` while intending to specify a special-vertex count. In the Crash 2 fixed frame header, offset `+12` is **collisionCount**; special-vertex count is derived from `headerSize - (24 + collisionCount * 0x28)`.
+
+With collisionCount=1, the fixed header plus collision record is 64 bytes, so a headerSize of 24 is invalid and the frame parser rejects it. The fixture has no collision records and uses a zero special prefix, so the correct bytes are collisionCount=0, headerSize=24, temporal stream beginning at frame+24. Added explicit assertions for these decoded values so this field confusion cannot silently recur.
+
+This is a regression-fixture defect, not evidence that the capacity fallback failed. The previous CI run built successfully but aborted at the fixture's verticesDecoded assertion, before conversion or relocation was reached. Do not change production conversion/relocation code based on that run; the corrected fixture must first execute the intended conversion test. Source fix commit: c227a54a3e3edd7c1f078f511c0ae56ce7912539.
