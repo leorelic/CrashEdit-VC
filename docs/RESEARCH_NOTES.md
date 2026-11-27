@@ -701,7 +701,7 @@ Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Compl
 
 - Relocate the complete Animation entry on source-chunk overflow.
 - Try the latest conversion-created packing chunk before allocating another.
-- Include the growing entry-offset table, prefix padding, all complete raw entries, incoming entry, and retained unused-tail padding in capacity calculations.
+- Include the growing entry-offset table, prefix padding, all complete raw entries and the incoming entry in capacity calculations.
 - Rebuild and reparse the table and terminal used-data offset after appending.
 - Preserve pending edited poses by chunk/entry/frame identity even when the relocated entry is appended at index 1+.
 - Do not reorganize unrelated pre-existing chunks.

@@ -1381,9 +1381,9 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   const std::size_t prefix=dest.entries.front().offset-oldTableEnd,newTableEnd=20U+(count+1U)*4U;
   std::size_t payload=0;bool valid=true;
   for(const auto&entry:dest.entries){if(!entry.valid||entry.offset>usedEnd||entry.size>usedEnd-entry.offset||entry.size>NsfChunkSize-payload){valid=false;break;}payload+=entry.size;}
-  const std::size_t trailing=NsfChunkSize-usedEnd;if(!valid||newTableEnd>NsfChunkSize||prefix>NsfChunkSize-newTableEnd)continue;
+  if(!valid||newTableEnd>NsfChunkSize||prefix>NsfChunkSize-newTableEnd)continue;
   std::size_t required=newTableEnd+prefix;if(payload>NsfChunkSize-required)continue;required+=payload;
-  if(selected.size>NsfChunkSize-required)continue;required+=selected.size;if(trailing>NsfChunkSize-required)continue;
+  if(selected.size>NsfChunkSize-required)continue;required+=selected.size;
   std::vector<std::uint8_t> bytes(NsfChunkSize,0U);std::copy_n(dest.bytes.begin(),16U,bytes.begin());
   if(prefix)std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(oldTableEnd),prefix,bytes.begin()+static_cast<std::ptrdiff_t>(newTableEnd));
   std::size_t cursor=newTableEnd+prefix;
@@ -1391,7 +1391,7 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   if(selected.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(selected.offset),selected.size,bytes.begin()+static_cast<std::ptrdiff_t>(cursor));
   write32(bytes,16U+count*4U,static_cast<std::uint32_t>(cursor));cursor+=selected.size;
   write32(bytes,16U+(count+1U)*4U,static_cast<std::uint32_t>(cursor));write32(bytes,8U,static_cast<std::uint32_t>(count+1U));
-  if(trailing)std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(usedEnd),trailing,bytes.begin()+static_cast<std::ptrdiff_t>(cursor));
+
   std::size_t po=0;NsfChunk parsed;std::string pe;if(!decodeChunk(bytes,po,parsed,pe)||po!=NsfChunkSize||!parsed.entryTableValid||parsed.entries.size()!=count+1U)continue;
   parsed.wasCompressed=dest.wasCompressed;parsed.conversionPackingChunk=true;packedDestination=index;packedChunk=std::move(parsed);break;
  }
