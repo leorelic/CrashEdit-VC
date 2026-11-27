@@ -208,3 +208,19 @@ This is a follow-up to the [90f4a99 conversion/game-compatibility milestone](htt
 - The earlier Complex coordinate/edit limitation is therefore practically bypassed for the tested resource by conversion, without claiming unrestricted editing of every Model or coordinate.
 
 **Scope / follow-up:** exact coordinate limits and broad model coverage remain unmeasured. Reopen the larger edited save in CE-RE and test it in-game to confirm the edited pose—not only the unchanged converted animation—survives the full pipeline. Zone load-list and chunk-capacity edge cases remain separate validation items.
+
+
+## Edited larger Crash ear position confirmed in-game — 2026-11-27
+
+**Major milestone — user-confirmed end-to-end success:** the larger Crash ear position made possible by Complex-to-Normal conversion has now been tested in the original game and works.
+
+The validated pipeline is:
+1. Convert the Complex Model and linked Animations to Normal.
+2. Move Crash's ear to a substantially larger position previously unavailable in the Complex representation.
+3. Save the edited model in CrashEdit-VC.
+4. Save/reopen through CrashEdit-RE (CE-RE).
+5. Load the edited result in Crash 2 and confirm the larger ear position works in-game.
+
+This upgrades the preceding conversion milestone from “converted resources play in-game” to “actual edited geometry survives the full save/round-trip/game pipeline.” It is a major step toward fully custom animations because it validates a practical route for editing geometry beyond the former Complex coordinate/edit limitation.
+
+**Not yet claimed:** a complete custom-animation workflow. Multi-frame pose authoring, reliable serialization of all frame edits, reference/chunk/Zone constraints, and full custom-animation playback still need their own validation. Exact coordinate limits and broad resource coverage also remain unmeasured. See [RESEARCH_NOTES.md](RESEARCH_NOTES.md) for the detailed evidence and scope.
