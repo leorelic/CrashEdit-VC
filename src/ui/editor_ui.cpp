@@ -4775,29 +4775,70 @@ void EditorUI::drawAnimationViewer(){
    const auto&joint=boneRigBones_[boneIndex];
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
-  auto boneTailWorld=[&](std::size_t boneIndex){
-   const auto&bone=boneRigBones_[boneIndex];AnimationPoint center{0.0f,0.0f,0.0f};std::size_t count=0;
-   for(const int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){
-    const auto&p=displayPositions[static_cast<std::size_t>(vi)];center.x+=p.x;center.y+=p.y;center.z+=p.z;++count;
-   }
-   if(count){const float inv=1.0f/static_cast<float>(count);center.x*=inv;center.y*=inv;center.z*=inv;return center;}
-   return boneJointWorld(boneIndex);
-  };
+  // Fit a bone-like indicator to the assigned vertex region. The principal
+  // covariance axis supplies its direction; projected bounds supply length
+  // and width. This is a display fit, independent of the pivot gizmo.
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const int parent=boneRigBones_[bi].parentBone;
-   const auto head=boneJointWorld(bi);
-   const auto tail=(parent>=0&&static_cast<std::size_t>(parent)<boneRigBones_.size()&&static_cast<std::size_t>(parent)!=bi)
-      ?boneJointWorld(static_cast<std::size_t>(parent)):boneTailWorld(bi);
-   const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
-   const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
-   if(std::hypot(a.x-b.x,a.y-b.y)>2.0f){
-    boneOverlay->AddLine(a,b,IM_COL32(18,22,28,245),selected?11.0f:8.0f);
-    boneOverlay->AddLine(a,b,selected?IM_COL32(255,190,75,245):IM_COL32(75,175,225,235),selected?6.0f:4.0f);
+   const auto&bone=boneRigBones_[bi];
+   std::vector<AnimationPoint> points;points.reserve(bone.vertices.size());
+   AnimationPoint center{0.0f,0.0f,0.0f};
+   for(const int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){
+    const auto&p=displayPositions[static_cast<std::size_t>(vi)];points.push_back(p);
+    center.x+=p.x;center.y+=p.y;center.z+=p.z;
    }
-   const ImU32 color=selected?IM_COL32(255,205,90,255):IM_COL32(70,175,225,245);
-   boneOverlay->AddCircleFilled(a,selected?7.0f:5.5f,color,20);
-   boneOverlay->AddCircle(a,selected?10.0f:8.0f,IM_COL32(20,24,30,255),20,1.5f);
-   boneOverlay->AddCircleFilled(b,selected?5.5f:4.0f,color,16);
+   if(points.empty())continue;
+   const float inv=1.0f/static_cast<float>(points.size());
+   center.x*=inv;center.y*=inv;center.z*=inv;
+   float covariance[3][3]{};
+   for(const auto&p:points){
+    const float d[3]{p.x-center.x,p.y-center.y,p.z-center.z};
+    for(int r=0;r<3;++r)for(int c=0;c<3;++c)covariance[r][c]+=d[r]*d[c];
+   }
+   int seedAxis=0;if(covariance[1][1]>covariance[seedAxis][seedAxis])seedAxis=1;
+   if(covariance[2][2]>covariance[seedAxis][seedAxis])seedAxis=2;
+   float axis[3]{0.0f,0.0f,0.0f};axis[seedAxis]=1.0f;
+   for(int iteration=0;iteration<32;++iteration){
+    float next[3]{};
+    for(int r=0;r<3;++r)for(int c=0;c<3;++c)next[r]+=covariance[r][c]*axis[c];
+    const float norm=std::sqrt(next[0]*next[0]+next[1]*next[1]+next[2]*next[2]);
+    if(norm<1.0e-6f)break;
+    for(int k=0;k<3;++k)axis[k]=next[k]/norm;
+   }
+   float minAlong=std::numeric_limits<float>::max(),maxAlong=-std::numeric_limits<float>::max();
+   float maxRadial=0.0f;
+   for(const auto&p:points){
+    const float d[3]{p.x-center.x,p.y-center.y,p.z-center.z};
+    const float along=d[0]*axis[0]+d[1]*axis[1]+d[2]*axis[2];
+    minAlong=std::min(minAlong,along);maxAlong=std::max(maxAlong,along);
+    const float rx=d[0]-along*axis[0],ry=d[1]-along*axis[1],rz=d[2]-along*axis[2];
+    maxRadial=std::max(maxRadial,std::sqrt(rx*rx+ry*ry+rz*rz));
+   }
+   const float span=maxAlong-minAlong;
+   if(span<1.0e-4f)continue;
+   const AnimationPoint head{center.x+axis[0]*minAlong,center.y+axis[1]*minAlong,center.z+axis[2]*minAlong};
+   const AnimationPoint tail{center.x+axis[0]*maxAlong,center.y+axis[1]*maxAlong,center.z+axis[2]*maxAlong};
+   const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
+   const float dx=b.x-a.x,dy=b.y-a.y,screenLength=std::hypot(dx,dy);
+   if(screenLength<2.0f)continue;
+   const float nx=-dy/screenLength,ny=dx/screenLength;
+   float projectedRadius=0.0f;
+   for(const auto&p:points){const ImVec2 q=project(p.x,p.y,p.z);projectedRadius=std::max(projectedRadius,std::abs((q.x-a.x)*nx+(q.y-a.y)*ny));}
+   const float halfWidth=std::clamp(projectedRadius*0.72f,4.0f,std::max(4.0f,screenLength*0.24f));
+   auto at=[&](float t,float side,float width){return ImVec2(a.x+dx*t+nx*halfWidth*side*width,a.y+dy*t+ny*halfWidth*side*width);};
+   const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
+   const ImU32 fill=selected?IM_COL32(255,190,75,245):IM_COL32(75,175,225,230);
+   const ImU32 outline=IM_COL32(18,22,28,250);
+   ImVec2 shape[10]{
+    a,at(0.16f,1.0f,0.45f),at(0.42f,1.0f,1.0f),at(0.72f,1.0f,0.72f),at(0.94f,1.0f,0.22f),
+    b,at(0.94f,-1.0f,0.22f),at(0.72f,-1.0f,0.72f),at(0.42f,-1.0f,1.0f),at(0.16f,-1.0f,0.45f)
+   };
+   boneOverlay->AddConvexPolyFilled(shape,10,fill);
+   boneOverlay->AddPolyline(shape,10,outline,ImDrawFlags_Closed,selected?3.0f:2.0f);
+   boneOverlay->AddLine(at(0.20f,0.0f,0.0f),at(0.82f,0.0f,0.0f),IM_COL32(255,245,220,190),1.5f);
+   boneOverlay->AddCircleFilled(a,selected?6.5f:5.0f,fill,20);
+   boneOverlay->AddCircle(a,selected?9.5f:7.5f,outline,20,1.5f);
+   boneOverlay->AddCircleFilled(b,selected?5.5f:4.5f,fill,20);
+   boneOverlay->AddCircle(b,selected?8.0f:6.5f,outline,20,1.5f);
    if(selected)boneOverlay->AddCircle(a,12.0f,IM_COL32(255,245,215,240),24,1.5f);
   }
   boneOverlay->PopClipRect();
