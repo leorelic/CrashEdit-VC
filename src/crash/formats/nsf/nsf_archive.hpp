@@ -194,6 +194,7 @@ public:
  bool saveUncompressedBytes(std::vector<std::uint8_t>&,std::string&) const;
  bool saveUncompressedSourceBytes(std::vector<std::uint8_t>&,std::string&) const;
  bool commitAnimationEdits(std::string&);
+ bool convertComplexModelToNormal(std::uint32_t modelEid,std::string&);
  bool saveAnimationEditOverlay(std::vector<std::uint8_t>&,std::string&) const;
  bool loadAnimationEditOverlay(const std::vector<std::uint8_t>&,std::string&);
  const std::vector<NsfChunk>& chunks()const noexcept{return chunks_;}
