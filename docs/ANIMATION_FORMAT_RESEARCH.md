@@ -411,3 +411,14 @@ Implementation order is therefore:
 4. Add normal Save/reopen and post-conversion vertex-edit/save/reopen tests; keep the UI action disabled until these pass.
 
 The current source contains a regression case specifically proving the special-prefix save guard. Treat that test as a known safety boundary, not as a test to weaken or remove. No conversion code or button activation is claimed by this research update.
+
+
+### Rollback checkpoint before Complex-to-Normal implementation — 2026-11-27
+
+Before beginning the conversion fixes, preserve the current implementation exactly as:
+
+- Commit: `bfabede85f9c7693993f73f2a76872926a5fc262` (includes the Experimental conversion-inspection window and research blocker notes)
+- Backup branch: `backup/pre-complex-to-normal-conversion-2026-11-27`
+- Main working branch: `cpp-port-foundation`
+
+This checkpoint is the rollback point for the implementation stages below. Do not reset or force-update the backup branch. Any rollback should restore the working branch to this commit while preserving later research notes as needed.
