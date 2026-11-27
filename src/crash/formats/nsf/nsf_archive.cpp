@@ -1995,7 +1995,9 @@ bool NsfArchive::convertComplexModelToNormal(std::uint32_t modelEid,std::string&
     std::vector<std::uint8_t>converted;
     if(!makeNormalFramePayload(chunk,frame,sourceModel,converted,error))return false;
     payloads.push_back(std::move(converted));affected=true;++linkedFrameCount;
-    expected.push_back({ci,ei,fi,entry.eid,frame.vertices,frame.specialVertices});
+    std::vector<NsfAnimationVertex>ordinaryPose(frame.vertices.begin(),
+     frame.vertices.begin()+static_cast<std::ptrdiff_t>(sourceModel.positions.size()));
+    expected.push_back({ci,ei,fi,entry.eid,std::move(ordinaryPose),frame.specialVertices});
   }
   if(affected){
    if(!replaceAnimationFramePayloads(chunk,entry,payloads)){error="Could not rebuild a linked Animation entry within its NSF chunk capacity.";return false;}
