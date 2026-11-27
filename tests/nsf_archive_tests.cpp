@@ -299,6 +299,43 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
   assert(convertedReloadPose[vi].y==complexPoseBefore[vi].y);
   assert(convertedReloadPose[vi].z==complexPoseBefore[vi].z);
  }
+ // The actual Cr10G-style special count is four (12-byte aligned). Verify
+ // conversion moves the Complex pose into Normal ordinary slots after the
+ // four preserved special vertices, including a full save/reopen.
+ std::vector<std::uint8_t> alignedModel(65536);p16(alignedModel,0,0x1234);p16(alignedModel,2,0);p32(alignedModel,4,6);p32(alignedModel,8,1);
+ constexpr std::size_t amEntry=24,amItems=6,amTable=16+(amItems+1)*4;const std::size_t amSizes[]={0x50,4,4,0,0,4};std::size_t amEntrySize=amTable;for(auto n:amSizes)amEntrySize+=n;
+ p32(alignedModel,16,amEntry);p32(alignedModel,20,amEntry+amEntrySize);p32(alignedModel,amEntry,0x0100ffff);p32(alignedModel,amEntry+4,0x0200007b);p32(alignedModel,amEntry+8,2);p32(alignedModel,amEntry+12,amItems);
+ std::size_t amOffset=amTable;for(std::size_t i=0;i<amItems;++i){p32(alignedModel,amEntry+16+i*4,static_cast<std::uint32_t>(amOffset));amOffset+=amSizes[i];}p32(alignedModel,amEntry+16+amItems*4,static_cast<std::uint32_t>(amEntrySize));
+ const std::size_t amInfo=amEntry+amTable,amPoly=amInfo+0x50,amColor=amPoly+4,amPosition=amColor+4;
+ p32(alignedModel,amInfo+0x2c,1);p32(alignedModel,amInfo+0x38,5);p32(alignedModel,amInfo+0x3c,1);p32(alignedModel,amInfo+0x4c,4);
+ p32(alignedModel,amPoly,0xffffffffU);p32(alignedModel,amColor,0x00010203U);p32(alignedModel,amPosition,0x000001ffU);
+ std::vector<std::uint8_t> alignedAnimation(65536);p16(alignedAnimation,0,0x1234);p16(alignedAnimation,2,0);p32(alignedAnimation,4,7);p32(alignedAnimation,8,1);
+ constexpr std::size_t aaEntry=24,aaFrame=48,aaFrameSize=40,aaEntrySize=24+aaFrameSize;p32(alignedAnimation,16,aaEntry);p32(alignedAnimation,20,aaEntry+aaEntrySize);
+ p32(alignedAnimation,aaEntry,0x0100ffff);p32(alignedAnimation,aaEntry+4,0x0200007c);p32(alignedAnimation,aaEntry+8,1);p32(alignedAnimation,aaEntry+12,1);p32(alignedAnimation,aaEntry+16,24);p32(alignedAnimation,aaEntry+20,aaEntrySize);
+ p32(alignedAnimation,aaFrame+8,5);p32(alignedAnimation,aaFrame+12,0);p32(alignedAnimation,aaFrame+16,0x0200007b);p32(alignedAnimation,aaFrame+20,36);
+ const std::uint8_t alignedSpecialBytes[12]={10,20,30,40,50,60,70,80,90,100,110,120};for(std::size_t i=0;i<12U;++i)alignedAnimation[aaFrame+24U+i]=alignedSpecialBytes[i];p32(alignedAnimation,aaFrame+36,0U);
+ std::vector<std::uint8_t> alignedArchiveBytes;alignedArchiveBytes.insert(alignedArchiveBytes.end(),alignedModel.begin(),alignedModel.end());alignedArchiveBytes.insert(alignedArchiveBytes.end(),alignedAnimation.begin(),alignedAnimation.end());
+ NsfArchive alignedConversion;assert(alignedConversion.loadBytes(alignedArchiveBytes,e));alignedConversion.decodeAnimationModels(false);
+ const auto alignedComplexPose=alignedConversion.chunks()[1].entries[0].animation.frames[0].vertices;
+ const auto alignedSpecialPose=alignedConversion.chunks()[1].entries[0].animation.frames[0].specialVertices;
+ assert(alignedSpecialPose.size()==4U);
+ assert(alignedConversion.convertComplexModelToNormal(0x0200007bU,e));
+ const auto&alignedNormalFrame=alignedConversion.chunks()[1].entries[0].animation.frames[0];
+ assert(!alignedConversion.chunks()[0].entries[0].model.compressed);
+ for(std::size_t vi=0;vi<4U;++vi){
+  assert(alignedNormalFrame.vertices[vi].x==alignedSpecialBytes[vi*3U]);
+  assert(alignedNormalFrame.vertices[vi].y==alignedSpecialBytes[vi*3U+1U]);
+  assert(alignedNormalFrame.vertices[vi].z==alignedSpecialBytes[vi*3U+2U]);
+ }
+ assert(alignedNormalFrame.vertices[4].x==alignedComplexPose[0].x);
+ assert(alignedNormalFrame.vertices[4].y==alignedComplexPose[0].y);
+ assert(alignedNormalFrame.vertices[4].z==alignedComplexPose[0].z);
+ std::vector<std::uint8_t> alignedSaved;assert(alignedConversion.saveUncompressedBytes(alignedSaved,e));
+ NsfArchive alignedReload;assert(alignedReload.loadBytes(alignedSaved,e));alignedReload.decodeAnimationModels(false);
+ assert(!alignedReload.chunks()[0].entries[0].model.compressed);
+ assert(alignedReload.chunks()[1].entries[0].animation.frames[0].vertices[4].x==alignedComplexPose[0].x);
+ assert(alignedReload.chunks()[1].entries[0].animation.frames[0].vertices[4].y==alignedComplexPose[0].y);
+ assert(alignedReload.chunks()[1].entries[0].animation.frames[0].vertices[4].z==alignedComplexPose[0].z);
  assert(compressedArchive.setAnimationFrameVertex(1,0,0,1,1,10));
  assert(compressedArchive.chunks()[1].entries[0].animation.frames[0].vertices[1].y==10);
  const std::vector<std::size_t> compressedBatchIndices{0,2};
