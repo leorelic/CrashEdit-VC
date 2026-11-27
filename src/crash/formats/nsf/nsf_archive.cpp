@@ -808,36 +808,22 @@ bool NsfArchive::commitAnimationEdits(std::string&e){
       if(modelEntry.valid&&modelEntry.type==2U&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
     if(!entry.animation.isCrash3&&frame.linkedModelEid!=0U&&!model){e="Animation frame "+std::to_string(fi)+" references a model that is not available for Crash 2 save validation. The editable pose is preserved.";return false;}
     if(model&&model->compressed){
-     // Special vertices live in the frame header, not in the model's
-     // compressed-position table. Preserve the full working pose while the
-     // header setter refreshes its decoded view.
+     // Complex pose slots correspond directly to ModelPosition records.
+     // Special vertices are stored independently in frame.specialVertices.
      const auto desiredVertices=frame.vertices;
-     for(std::size_t vi=0;vi<frame.specialVertexCount;++vi){
-      const auto v=frame.vertices[vi];
-      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,0U,v.x)||
-         !candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,1U,v.y)||
-         !candidate.encodeAnimationFrameVertex(ci,ei,fi,vi,2U,v.z)){
-       e="Animation frame "+std::to_string(fi)+" contains a special vertex that cannot be represented in its Crash 2 frame header. The editable pose is preserved.";
-       return false;
-      }
-     }
-     frame.vertices=desiredVertices;
      if(model->positions.size()+frame.specialVertexCount!=frame.vertices.size()){
       e="Animation frame "+std::to_string(fi)+" has a compressed-position count plus special-vertex count that does not match its frame vertices. The editable pose is preserved.";
       return false;
      }
      if(!model->positions.empty()){
-      const std::size_t firstCompressedVertex=frame.specialVertexCount;
-      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,firstCompressedVertex,0U,frame.vertices[firstCompressedVertex].x)){
+      if(!candidate.encodeAnimationFrameVertex(ci,ei,fi,0U,0U,frame.vertices[0].x)){
        if(!candidate.expandCompressedModelPositions(frame.linkedModelEid,ci,ei,e))return false;
        continue;
       }
-      // The encoder must reproduce the complete edited pose after decoding
-      // the just-written temporal words. Never silently accept a lossy save.
-      for(std::size_t vi=0;vi<desiredVertices.size();++vi){
+      for(std::size_t vi=0;vi<model->positions.size();++vi){
        const auto&actual=frame.vertices[vi];const auto&desired=desiredVertices[vi];
        if(actual.x!=desired.x||actual.y!=desired.y||actual.z!=desired.z){
-        e="Compressed animation frame "+std::to_string(fi)+" did not reproduce edited vertex "+std::to_string(vi)+" exactly. The editable pose is preserved.";
+        e="Compressed animation frame "+std::to_string(fi)+" did not reproduce edited ModelPosition "+std::to_string(vi)+" exactly. The editable pose is preserved.";
         return false;
        }
       }
@@ -1626,7 +1612,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(const auto&modelChunk:chunks_)if(modelChunk.type==0&&modelChunk.entryTableValid)
   for(const auto&modelEntry:modelChunk.entries)
    if(modelEntry.valid&&modelEntry.type==2&&modelEntry.eid==frame.linkedModelEid&&modelEntry.model.decoded){model=&modelEntry.model;break;}
- if(vertexIndex<frame.specialVertexCount){
+ if(vertexIndex<frame.specialVertexCount&&!(model&&model->compressed)){
   if(value>255)return false;
   if(!setAnimationFrameSpecialVertex(chunkIndex,entryIndex,frameIndex,vertexIndex,axis,static_cast<std::uint8_t>(value)))return false;
   return decodeAnimationVertices(frame,model,crash3);
@@ -1637,7 +1623,7 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
  for(std::size_t wordIndex=0;wordIndex<frame.temporalWords.size();++wordIndex){const auto word=u32(chunk.bytes,temporalOffset+wordIndex*4U);for(unsigned bit=0;bit<32U;++bit)bits.push_back(static_cast<std::uint8_t>((word>>(31U-bit))&1U));}
  const std::size_t start=frame.specialVertexCount*24U;
  if(model&&model->compressed){
-  if(vertexIndex<frame.specialVertexCount||vertexIndex-frame.specialVertexCount>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
+  if(vertexIndex>=model->positions.size()||model->positions.size()+frame.specialVertexCount!=frame.vertices.size())return false;
   std::size_t bit=start;std::int32_t xAcc=0,yAcc=0,zAcc=0;
   auto toByte=[&](std::int32_t source,std::int32_t&target){if(crash3){if(source%8!=0)return false;source/=8;}if(source<0||source>maximumCoordinate)return false;target=source;return true;};
   auto encodeSigned=[&](std::uint8_t width,std::int32_t delta)->bool{
