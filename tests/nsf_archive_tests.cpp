@@ -315,7 +315,7 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  std::vector<std::uint8_t> capacityAnimationChunk(65536);p16(capacityAnimationChunk,0,0x1234);p16(capacityAnimationChunk,2,0);p32(capacityAnimationChunk,4,7);p32(capacityAnimationChunk,8,3);
  constexpr std::size_t capacityAnimEntry=36,capacityFrame=60,capacitySourceTemporalBytes=264,capacityAnimEntryBytes=24+24+capacitySourceTemporalBytes;
  constexpr std::size_t capacitySecondEntry=capacityAnimEntry+capacityAnimEntryBytes,capacityFillerEntry=capacitySecondEntry+capacityAnimEntryBytes,capacityUsedEnd=65520;
- p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacitySecondEntry);p32(capacityAnimationChunk,24,capacityFillerEntry);p32(capacityAnimationChunk,28,capacityUsedEnd);p32(capacityAnimationChunk,32,capacityUsedEnd);
+ p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacitySecondEntry);p32(capacityAnimationChunk,24,capacityFillerEntry);p32(capacityAnimationChunk,28,capacityUsedEnd);
  p32(capacityAnimationChunk,capacityAnimEntry,0x0100ffff);p32(capacityAnimationChunk,capacityAnimEntry+4,0x0200007b);p32(capacityAnimationChunk,capacityAnimEntry+8,1);p32(capacityAnimationChunk,capacityAnimEntry+12,1);p32(capacityAnimationChunk,capacityAnimEntry+16,24);p32(capacityAnimationChunk,capacityAnimEntry+20,capacityAnimEntryBytes);
  p32(capacityAnimationChunk,capacityFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacityFrame+12,0U); // Crash 2 +12 is collisionCount, not specialVertexCount.
  p32(capacityAnimationChunk,capacityFrame+16,0x0200007b);p32(capacityAnimationChunk,capacityFrame+20,24);
