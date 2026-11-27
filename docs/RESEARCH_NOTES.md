@@ -694,3 +694,17 @@ Other required checks: preserve frame `HeaderSize` and raw special-vertex bytes 
 ### Product decision
 
 Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Complex-to-Normal conversion. Conversion must be an explicit archive operation with a preview/diff and safe rollback, not an invisible save fallback. It must clone/isolate shared Model resources where necessary and must not change the working Cr10V preview decoder/renderer. No claim of in-game compatibility is allowed until step 5 passes.
+
+## Complex-to-Normal conversion: packed relocation and chunk capacity
+
+**User-confirmed 2026-11-27:** conversion of a Complex Model and linked Animations works. The first successful implementation moved every overflowed Animation into its own type-0 chunk, wasting chunk slots and risking zone load-list limits.
+
+- Relocate the complete Animation entry on source-chunk overflow.
+- Try the latest conversion-created packing chunk before allocating another.
+- Include the growing entry-offset table, prefix padding, all complete raw entries, incoming entry, and retained unused-tail padding in capacity calculations.
+- Rebuild and reparse the table and terminal used-data offset after appending.
+- Preserve pending edited poses by chunk/entry/frame identity even when the relocated entry is appended at index 1+.
+- Do not reorganize unrelated pre-existing chunks.
+- Show Remaining space in Properties based on the terminal used-data offset, not the fixed 64 KiB buffer size.
+
+The regression now uses two linked Animations that both overflow their source chunk and asserts that they share one destination chunk, keep distinct EIDs, reparse, and survive Save/reopen. The source chunk retains its unrelated filler. Do not mark this correction as a milestone until CI passes.

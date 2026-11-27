@@ -185,6 +185,7 @@ struct NsfEntryLocation { std::size_t chunkIndex=0, entryIndex=0; };
 struct NsfChunk {
  std::vector<std::uint8_t> bytes;
  std::int32_t chunkId=0; std::uint16_t type=0; bool wasCompressed=false;
+ bool conversionPackingChunk=false;
  std::vector<NsfEntry> entries; bool entryTableValid=false; std::string entryTableError;
 };
 class NsfArchive {

@@ -1372,6 +1372,29 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   }
  }
  NsfArchive candidate=*this;
+ std::size_t packedDestination=std::numeric_limits<std::size_t>::max();NsfChunk packedChunk;
+ for(std::size_t di=candidate.chunks_.size();di>0;--di){
+  const std::size_t index=di-1U;const auto&dest=candidate.chunks_[index];
+  if(index==chunkIndex||!dest.conversionPackingChunk||dest.type!=0U||!dest.entryTableValid||dest.entries.empty())continue;
+  const std::size_t count=dest.entries.size(),oldTableEnd=20U+count*4U,usedEnd=u32(dest.bytes,16U+count*4U);
+  if(usedEnd>NsfChunkSize||usedEnd<oldTableEnd||dest.entries.front().offset<oldTableEnd||dest.entries.front().offset>usedEnd)continue;
+  const std::size_t prefix=dest.entries.front().offset-oldTableEnd,newTableEnd=20U+(count+1U)*4U;
+  std::size_t payload=0;bool valid=true;
+  for(const auto&entry:dest.entries){if(!entry.valid||entry.offset>usedEnd||entry.size>usedEnd-entry.offset||entry.size>NsfChunkSize-payload){valid=false;break;}payload+=entry.size;}
+  const std::size_t trailing=NsfChunkSize-usedEnd;if(!valid||newTableEnd>NsfChunkSize||prefix>NsfChunkSize-newTableEnd)continue;
+  std::size_t required=newTableEnd+prefix;if(payload>NsfChunkSize-required)continue;required+=payload;
+  if(selected.size>NsfChunkSize-required)continue;required+=selected.size;if(trailing>NsfChunkSize-required)continue;
+  std::vector<std::uint8_t> bytes(NsfChunkSize,0U);std::copy_n(dest.bytes.begin(),16U,bytes.begin());
+  if(prefix)std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(oldTableEnd),prefix,bytes.begin()+static_cast<std::ptrdiff_t>(newTableEnd));
+  std::size_t cursor=newTableEnd+prefix;
+  for(std::size_t ei=0;ei<count;++ei){const auto&entry=dest.entries[ei];std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(entry.offset),entry.size,bytes.begin()+static_cast<std::ptrdiff_t>(cursor));write32(bytes,16U+ei*4U,static_cast<std::uint32_t>(cursor));cursor+=entry.size;}
+  if(selected.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(selected.offset),selected.size,bytes.begin()+static_cast<std::ptrdiff_t>(cursor));
+  write32(bytes,16U+count*4U,static_cast<std::uint32_t>(cursor));cursor+=selected.size;
+  write32(bytes,16U+(count+1U)*4U,static_cast<std::uint32_t>(cursor));write32(bytes,8U,static_cast<std::uint32_t>(count+1U));
+  if(trailing)std::copy_n(dest.bytes.begin()+static_cast<std::ptrdiff_t>(usedEnd),trailing,bytes.begin()+static_cast<std::ptrdiff_t>(cursor));
+  std::size_t po=0;NsfChunk parsed;std::string pe;if(!decodeChunk(bytes,po,parsed,pe)||po!=NsfChunkSize||!parsed.entryTableValid||parsed.entries.size()!=count+1U)continue;
+  parsed.wasCompressed=dest.wasCompressed;parsed.conversionPackingChunk=true;packedDestination=index;packedChunk=std::move(parsed);break;
+ }
  std::vector<std::uint8_t> rebuiltSource(NsfChunkSize,0U);
  std::copy_n(source.bytes.begin(),16U,rebuiltSource.begin());
  if(prefixPadding)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(tableEnd),prefixPadding,
@@ -1405,29 +1428,18 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
                             rebuiltSource.begin()+static_cast<std::ptrdiff_t>(cursor));
  for(unsigned b=0;b<4U;++b)rebuiltSource[8U+b]=static_cast<std::uint8_t>(remainingCount>>(b*8U));
 
- // Normal entry chunks use the ordinary type-0 header; their ChunkId is not an
- // entry identifier (type-1 texture chunks use that field for their EID).
- std::vector<std::uint8_t> newBytes(NsfChunkSize,0U);
- newBytes[0]=0x34U;newBytes[1]=0x12U;newBytes[2]=0U;newBytes[3]=0U;
- for(unsigned b=0;b<4U;++b)newBytes[4U+b]=0U;
- newBytes[8]=1U;newBytes[9]=newBytes[10]=newBytes[11]=0U;
- newBytes[16]=24U;newBytes[17]=newBytes[18]=newBytes[19]=0U;
- const std::size_t newUsedEnd=24U+selected.size;
- for(unsigned b=0;b<4U;++b)newBytes[20U+b]=static_cast<std::uint8_t>(newUsedEnd>>(b*8U));
- if(selected.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(selected.offset),selected.size,newBytes.begin()+24);
-
- std::string parseError;
- std::size_t parseOffset=0;NsfChunk parsedSource;
- if(!decodeChunk(rebuiltSource,parseOffset,parsedSource,parseError)||parseOffset!=NsfChunkSize||!parsedSource.entryTableValid)
-  return fail("Could not rebuild the source chunk's entry table safely.");
- parsedSource.wasCompressed=source.wasCompressed;
- parseOffset=0;NsfChunk parsedDestination;
- if(!decodeChunk(newBytes,parseOffset,parsedDestination,parseError)||parseOffset!=NsfChunkSize||
-    !parsedDestination.entryTableValid||parsedDestination.entries.size()!=1U||!parsedDestination.entries[0].valid)
-  return fail("Could not validate the new chunk after relocating the entry.");
-
+ std::string parseError;std::size_t parseOffset=0;NsfChunk parsedSource;
+ if(!decodeChunk(rebuiltSource,parseOffset,parsedSource,parseError)||parseOffset!=NsfChunkSize||!parsedSource.entryTableValid)return fail("Could not rebuild the source chunk's entry table safely.");
+ parsedSource.wasCompressed=source.wasCompressed;std::size_t relocatedEntryIndex=0;
+ if(packedDestination==std::numeric_limits<std::size_t>::max()){
+  std::vector<std::uint8_t> newBytes(NsfChunkSize,0U);newBytes[0]=0x34U;newBytes[1]=0x12U;newBytes[8]=1U;newBytes[16]=24U;
+  const std::size_t newUsedEnd=24U+selected.size;write32(newBytes,20U,static_cast<std::uint32_t>(newUsedEnd));
+  if(selected.size)std::copy_n(source.bytes.begin()+static_cast<std::ptrdiff_t>(selected.offset),selected.size,newBytes.begin()+24);
+  parseOffset=0;NsfChunk parsedDestination;
+  if(!decodeChunk(newBytes,parseOffset,parsedDestination,parseError)||parseOffset!=NsfChunkSize||!parsedDestination.entryTableValid||parsedDestination.entries.size()!=1U||!parsedDestination.entries[0].valid)return fail("Could not validate the new chunk after relocating the entry.");
+  parsedDestination.conversionPackingChunk=true;candidate.chunks_.push_back(std::move(parsedDestination));newChunkIndex=candidate.chunks_.size()-1U;
+ }else{candidate.chunks_[packedDestination]=std::move(packedChunk);newChunkIndex=packedDestination;relocatedEntryIndex=candidate.chunks_[packedDestination].entries.size()-1U;}
  candidate.chunks_[chunkIndex]=std::move(parsedSource);
- candidate.chunks_.push_back(std::move(parsedDestination));
  if(candidate.goolDecoded_)candidate.decodeGools(candidate.goolVersion_);
  candidate.decodeZones(candidate.crash3Retail_);
  if(candidate.animationModelsDecoded_)candidate.decodeAnimationModels(candidate.animationModelsCrash3_);
@@ -1440,8 +1452,8 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   std::size_t targetEntryIndex=pending.entryIndex;
   if(pending.chunkIndex==chunkIndex){
    if(pending.entryIndex==entryIndex){
-    targetChunkIndex=candidate.chunks_.size()-1U;
-    targetEntryIndex=0U;
+    targetChunkIndex=newChunkIndex;
+    targetEntryIndex=relocatedEntryIndex;
    }else if(pending.entryIndex>entryIndex){
     targetEntryIndex=pending.entryIndex-1U;
    }
@@ -1468,7 +1480,6 @@ bool NsfArchive::moveEntryToNewChunk(std::size_t chunkIndex,std::size_t entryInd
   }
  }
  *this=std::move(candidate);
- newChunkIndex=chunks_.size()-1U;
  error.clear();return true;
 }
 
