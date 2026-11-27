@@ -193,4 +193,6 @@ The user supplied screenshots confirming `BT10V` displays **Normal** and `Cr10V`
 - Implementation checkpoint: [9673820](https://github.com/leorelic/CrashEdit-VC/commit/9673820bfa2104dd44596a1511eea187d459efa9).
 - **CI verified:** the two-animation capacity/packing/save-reopen regression passed on Ubuntu and macOS in [workflow 46052914125](https://github.com/leorelic/CrashEdit-VC/actions/runs/46052914125). Windows was still building when this milestone note was written; do not claim Windows validation until its job completes.
 
-This milestone verifies archive conversion and chunk organization. Zone load-list limits and full in-game loading validation remain a separate upcoming Zone workflow.
+**Major milestone — user-confirmed 2026-11-27:** the user saved the converted archive through CrashEdit-RE (CE-RE), then tested that saved file in Crash 2 and reported that it worked correctly in-game. This confirms the tested converted Model and linked Animations survive conversion, packed chunk relocation, archive save/round-trip, and actual game loading/playback. The milestone is [90f4a99](https://github.com/leorelic/CrashEdit-VC/commit/90f4a995e4f399cdd71a7d951ed27171ef6b9357).
+
+Scope is the tested resource set; continue validating other models/animation layouts and Zone load-list edge cases separately. Detailed evidence and limits are recorded in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
