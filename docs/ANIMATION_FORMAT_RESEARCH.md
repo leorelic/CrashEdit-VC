@@ -472,3 +472,8 @@ The first CI run of the chunk-relocation patch failed at compile time on macOS, 
 ### Capacity relocation fixture correction — 2026-11-27
 
 CI run #1451 compiled successfully on Linux and Windows, then failed the `nsf_archive_tests` assertion that the synthetic 100-vertex Animation fixture decoded before conversion. The test fixture had allocated only 264 temporal bytes (`capacityFrame+64`), but 100 vertices require 300 bytes at the fixture's 3-byte-per-vertex temporal layout. This was a test-fixture construction error, not a converter failure: the test never reached `convertComplexModelToNormal()`. The fixture now allocates 300 temporal bytes and adjusts the Animation entry size and filler offset accordingly. Re-run CI and confirm the capacity relocation plus save/reopen assertions before considering this complete.
+
+
+### Capacity relocation fixture model-copy correction — 2026-11-27
+
+Diagnostic run #1454 compiled on Ubuntu and failed the capacity test before entering relocation. The added diagnostic exposed `Selected EID is not a decoded Complex Model.` Inspection found the fixture copied `compressedModelChunk` into `capacityModelChunk`, but the subsequent 100-position item-offset, vertex-count, and ModelPosition writes mistakenly targeted the original `compressedModelChunk`. The archive under test loaded the stale copy, so it did not contain the intended expanded model. Commit `d8df6f7d251af4272e09d8159f5dd3f354016b45` redirects those fixture writes to `capacityModelChunk` and fixes the diagnostic newline. CI #1455 must confirm that the fixture now reaches and passes the actual relocation and Save/reopen assertions; do not treat this as converter validation until that run succeeds.
