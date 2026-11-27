@@ -4775,6 +4775,14 @@ void EditorUI::drawAnimationViewer(){
    const auto&joint=boneRigBones_[boneIndex];
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
+  // Parent relationships remain explicit joint links behind the fitted bodies.
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const int parent=boneRigBones_[bi].parentBone;
+   if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
+   const auto child=boneJointWorld(bi),parentJoint=boneJointWorld(static_cast<std::size_t>(parent));
+   boneOverlay->AddLine(project(parentJoint.x,parentJoint.y,parentJoint.z),project(child.x,child.y,child.z),IM_COL32(20,24,30,220),3.0f);
+   boneOverlay->AddLine(project(parentJoint.x,parentJoint.y,parentJoint.z),project(child.x,child.y,child.z),IM_COL32(75,175,225,180),1.5f);
+  }
   // Fit a bone-like indicator to the assigned vertex region. The principal
   // covariance axis supplies its direction; projected bounds supply length
   // and width. This is a display fit, independent of the pivot gizmo.
