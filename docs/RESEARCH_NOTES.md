@@ -707,4 +707,4 @@ Keep both strategies: (A) a genuine Complex delta encoder and (B) explicit Compl
 - Do not reorganize unrelated pre-existing chunks.
 - Show Remaining space in Properties based on the terminal used-data offset, not the fixed 64 KiB buffer size.
 
-The regression now uses two linked Animations that both overflow their source chunk and asserts that they share one destination chunk, keep distinct EIDs, reparse, and survive Save/reopen. The source chunk retains its unrelated filler. Do not mark this correction as a milestone until CI passes.
+The regression now uses two linked Animations of deliberately different frame counts: the short entry relocates first, and the longer entry's aggregate frame growth then forces a second relocation and asserts that they share one destination chunk, keep distinct EIDs, reparse, and survive Save/reopen. The source chunk retains its unrelated filler. Do not mark this correction as a milestone until CI passes.

@@ -313,15 +313,22 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  p32(capacityModelChunk,cmInfo+0x38,static_cast<std::uint32_t>(capacityPositions));
  for(std::size_t vi=0;vi<capacityPositions;++vi)p32(capacityModelChunk,cmPositions+vi*4U,0U); // zero-width signed deltas: 3 bits per vertex, so 264 source bytes decode
  std::vector<std::uint8_t> capacityAnimationChunk(65536);p16(capacityAnimationChunk,0,0x1234);p16(capacityAnimationChunk,2,0);p32(capacityAnimationChunk,4,7);p32(capacityAnimationChunk,8,3);
- constexpr std::size_t capacityAnimEntry=36,capacityFrame=60,capacitySourceTemporalBytes=264,capacityAnimEntryBytes=24+24+capacitySourceTemporalBytes;
- constexpr std::size_t capacitySecondEntry=capacityAnimEntry+capacityAnimEntryBytes,capacityFillerEntry=capacitySecondEntry+capacityAnimEntryBytes,capacityUsedEnd=65520;
+ constexpr std::size_t capacityAnimEntry=36,capacitySourceTemporalBytes=264,capacityFrameBytes=24+capacitySourceTemporalBytes,capacityBigFrameCount=20,capacityBigTable=16+(capacityBigFrameCount+1U)*4U,capacityBigEntryBytes=capacityBigTable+capacityBigFrameCount*capacityFrameBytes,capacitySmallEntryBytes=24+capacityFrameBytes;
+ constexpr std::size_t capacitySecondEntry=capacityAnimEntry+capacityBigEntryBytes,capacityFillerEntry=capacitySecondEntry+capacitySmallEntryBytes,capacityUsedEnd=65520;
  p32(capacityAnimationChunk,16,capacityAnimEntry);p32(capacityAnimationChunk,20,capacitySecondEntry);p32(capacityAnimationChunk,24,capacityFillerEntry);p32(capacityAnimationChunk,28,capacityUsedEnd);
- p32(capacityAnimationChunk,capacityAnimEntry,0x0100ffff);p32(capacityAnimationChunk,capacityAnimEntry+4,0x0200007b);p32(capacityAnimationChunk,capacityAnimEntry+8,1);p32(capacityAnimationChunk,capacityAnimEntry+12,1);p32(capacityAnimationChunk,capacityAnimEntry+16,24);p32(capacityAnimationChunk,capacityAnimEntry+20,capacityAnimEntryBytes);
- p32(capacityAnimationChunk,capacityFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacityFrame+12,0U); // Crash 2 +12 is collisionCount, not specialVertexCount.
- p32(capacityAnimationChunk,capacityFrame+16,0x0200007b);p32(capacityAnimationChunk,capacityFrame+20,24);
- for(std::size_t bi=0;bi<capacitySourceTemporalBytes;++bi)capacityAnimationChunk[capacityFrame+24U+bi]=0U;
- std::copy_n(capacityAnimationChunk.begin()+static_cast<std::ptrdiff_t>(capacityAnimEntry),capacityAnimEntryBytes,capacityAnimationChunk.begin()+static_cast<std::ptrdiff_t>(capacitySecondEntry));
- p32(capacityAnimationChunk,capacitySecondEntry+4,0x0200007c);
+ p32(capacityAnimationChunk,capacityAnimEntry,0x0100ffff);p32(capacityAnimationChunk,capacityAnimEntry+4,0x0200007b);p32(capacityAnimationChunk,capacityAnimEntry+8,1);p32(capacityAnimationChunk,capacityAnimEntry+12,static_cast<std::uint32_t>(capacityBigFrameCount));
+ for(std::size_t fi=0;fi<capacityBigFrameCount;++fi){
+  const std::size_t itemOffset=capacityBigTable+fi*capacityFrameBytes,frameOffset=capacityAnimEntry+itemOffset;
+  p32(capacityAnimationChunk,capacityAnimEntry+16U+fi*4U,static_cast<std::uint32_t>(itemOffset));
+  p32(capacityAnimationChunk,frameOffset+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,frameOffset+12,0U); // +12 is collisionCount, not specialVertexCount.
+  p32(capacityAnimationChunk,frameOffset+16,0x0200007b);p32(capacityAnimationChunk,frameOffset+20,24);
+  for(std::size_t bi=0;bi<capacitySourceTemporalBytes;++bi)capacityAnimationChunk[frameOffset+24U+bi]=0U;
+ }
+ p32(capacityAnimationChunk,capacityAnimEntry+16U+capacityBigFrameCount*4U,static_cast<std::uint32_t>(capacityBigTable+capacityBigFrameCount*capacityFrameBytes));
+ p32(capacityAnimationChunk,capacitySecondEntry,0x0100ffff);p32(capacityAnimationChunk,capacitySecondEntry+4,0x0200007c);p32(capacityAnimationChunk,capacitySecondEntry+8,1);p32(capacityAnimationChunk,capacitySecondEntry+12,1);p32(capacityAnimationChunk,capacitySecondEntry+16,24);p32(capacityAnimationChunk,capacitySecondEntry+20,capacitySmallEntryBytes);
+ const std::size_t capacitySmallFrame=capacitySecondEntry+24;
+ p32(capacityAnimationChunk,capacitySmallFrame+8,static_cast<std::uint32_t>(capacityPositions));p32(capacityAnimationChunk,capacitySmallFrame+12,0U);p32(capacityAnimationChunk,capacitySmallFrame+16,0x0200007b);p32(capacityAnimationChunk,capacitySmallFrame+20,24);
+ for(std::size_t bi=0;bi<capacitySourceTemporalBytes;++bi)capacityAnimationChunk[capacitySmallFrame+24U+bi]=0U;
  p32(capacityAnimationChunk,capacityFillerEntry,0x0100ffff);p32(capacityAnimationChunk,capacityFillerEntry+4,0x02000099);p32(capacityAnimationChunk,capacityFillerEntry+8,0);p32(capacityAnimationChunk,capacityFillerEntry+12,0);p32(capacityAnimationChunk,capacityFillerEntry+16,20);
  std::vector<std::uint8_t> capacityArchiveBytes;capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityModelChunk.begin(),capacityModelChunk.end());capacityArchiveBytes.insert(capacityArchiveBytes.end(),capacityAnimationChunk.begin(),capacityAnimationChunk.end());
  NsfArchive capacityConversion;assert(capacityConversion.loadBytes(capacityArchiveBytes,e));capacityConversion.decodeAnimationModels(false);
@@ -333,15 +340,15 @@ int main(){using namespace CrashEdit::Crash;assert(eidToEName(0x0200007BU)=="100
  assert(capacityConversion.chunks().size()==3U);
  assert(capacityConversion.chunks()[2].entries.size()==2U);
  assert(capacityConversion.chunks()[2].entries[0].eid==0x0200007cU&&capacityConversion.chunks()[2].entries[1].eid==0x0200007bU);
- assert(capacityConversion.chunks()[2].entries[0].animation.frames[0].rawSize==24U+300U);
- assert(capacityConversion.chunks()[2].entries[1].animation.frames[0].rawSize==24U+300U);
+ assert(capacityConversion.chunks()[2].entries[0].animation.frames.size()==1U&&capacityConversion.chunks()[2].entries[0].animation.frames[0].rawSize==24U+300U);
+ assert(capacityConversion.chunks()[2].entries[1].animation.frames.size()==capacityBigFrameCount&&capacityConversion.chunks()[2].entries[1].animation.frames[0].rawSize==24U+300U);
  assert(capacityConversion.chunks()[1].entries.size()==1U);
  assert(!capacityConversion.chunks()[0].entries[0].model.compressed);
  std::vector<std::uint8_t> capacitySaved;assert(capacityConversion.saveUncompressedBytes(capacitySaved,e));
  NsfArchive capacityReload;assert(capacityReload.loadBytes(capacitySaved,e));capacityReload.decodeAnimationModels(false);
  assert(capacityReload.chunks().size()==3U);
  assert(capacityReload.chunks()[2].entries.size()==2U);
- for(const auto&relocated:capacityReload.chunks()[2].entries){assert(relocated.animation.frames[0].verticesDecoded);assert(relocated.animation.frames[0].vertexCount==capacityPositions);}
+ for(const auto&relocated:capacityReload.chunks()[2].entries){assert(relocated.animation.frames.size()>0U);for(const auto&frame:relocated.animation.frames){assert(frame.verticesDecoded);assert(frame.vertexCount==capacityPositions);}}
  
  // The actual Cr10G-style special count is four (12-byte aligned). Verify
  // conversion moves the Complex pose into Normal ordinary slots after the
