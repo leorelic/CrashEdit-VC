@@ -4049,30 +4049,17 @@ void EditorUI::drawAnimationViewer(){
   int hoveredBone=-1;float nearestBoneDistance=13.0f;
   if(boneRigModelEid_==linkedModelEid&&!boneRigBones_.empty()&&hovered&&!viewportToolbarOwnsMouse&&!animationFaceEditing_){
    for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-    const auto&bone=boneRigBones_[bi];std::vector<AnimationPoint>points;
-    for(const int index:bone.vertices)if(index>=0&&static_cast<std::size_t>(index)<displayPositions.size()){
-     const auto&p=displayPositions[static_cast<std::size_t>(index)];points.emplace_back(p.x,p.y,p.z);
-    }
-    if(points.empty())continue;
-    AnimationPoint head=points.front(),tail=points.front();float farthest=-1.0f;
-    for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){
-     const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;
-     const float d=dx*dx+dy*dy+dz*dz;if(d>farthest){farthest=d;head=points[a];tail=points[b];}
-    }
-    const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
-    const float vx=b.x-a.x,vy=b.y-a.y,len2=vx*vx+vy*vy;
-    const float t=len2>0.01f?std::clamp(((io.MousePos.x-a.x)*vx+(io.MousePos.y-a.y)*vy)/len2,0.0f,1.0f):0.0f;
-    const float distance=std::hypot(io.MousePos.x-(a.x+vx*t),io.MousePos.y-(a.y+vy*t));
+    const auto&bone=boneRigBones_[bi];if(!bone.pivotInitialized)continue;
+    const AnimationPoint joint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+    const ImVec2 point=project(joint.x,joint.y,joint.z);const float distance=std::hypot(io.MousePos.x-point.x,io.MousePos.y-point.y);
     if(distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
    }
   }
   bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
   if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
-   boneRigSelectedBone_=hoveredBone;animationSelectedVertices_=boneRigBones_[static_cast<std::size_t>(hoveredBone)].vertices;
-   animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
-   animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;
-   boneSelectionClicked=true;status_="Selected bone: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
+   boneRigSelectedBone_=hoveredBone;
+   boneSelectionClicked=true;status_="Selected bone joint: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
   }
   auto isAnimationVertexSelected=[&](int index){return std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),index)!=animationSelectedVertices_.end();};
   auto rotateBoneVector=[](AnimationPoint v,const std::array<float,3>&euler){
@@ -4753,47 +4740,24 @@ void EditorUI::drawAnimationViewer(){
    boneOverlay->AddCircle(center,7.0f,IM_COL32(20,24,30,255),16,1.5f);
    if(boneRigRotateMode_)boneOverlay->AddText(ImVec2(center.x+10.0f,center.y-20.0f),IM_COL32(245,245,245,255),"Rotate");
   }
-  auto boneEnds=[&](std::size_t boneIndex){
-   AnimationPoint head{0.0f,0.0f,0.0f},tail{0.0f,0.0f,0.0f};
-   if(boneIndex>=boneRigBones_.size())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-   const auto&group=boneRigBones_[boneIndex];
-   const AnimationPoint groupPivot((group.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(group.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(group.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-   head=tail=groupPivot;
-   std::vector<AnimationPoint>points;
-   for(const int vertexIndex:group.vertices)if(vertexIndex>=0&&static_cast<std::size_t>(vertexIndex)<frame.vertices.size())points.push_back(transformVertex(frame.vertices[static_cast<std::size_t>(vertexIndex)],frame,model));
-   if(points.empty())return std::pair<AnimationPoint,AnimationPoint>{head,tail};
-   if(points.size()==1){head=tail=points.front();return std::pair<AnimationPoint,AnimationPoint>{head,tail};}
-   float farthest=-1.0f;
-   for(std::size_t a=0;a<points.size();++a)for(std::size_t b=a+1;b<points.size();++b){const float dx=points[a].x-points[b].x,dy=points[a].y-points[b].y,dz=points[a].z-points[b].z;const float distance=dx*dx+dy*dy+dz*dz;if(distance>farthest){farthest=distance;head=points[a];tail=points[b];}}
-   const auto distanceToPivot=[&](const AnimationPoint&p){const float dx=p.x-groupPivot.x,dy=p.y-groupPivot.y,dz=p.z-groupPivot.z;return dx*dx+dy*dy+dz*dz;};
-   if(distanceToPivot(tail)<distanceToPivot(head))std::swap(head,tail);
-   return std::pair<AnimationPoint,AnimationPoint>{head,tail};
+  auto boneJointWorld=[&](std::size_t boneIndex){
+   if(boneIndex>=boneRigBones_.size())return AnimationPoint{0.0f,0.0f,0.0f};
+   const auto&joint=boneRigBones_[boneIndex];
+   return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const auto ends=boneEnds(bi);const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
-   const ImU32 boneColor=static_cast<int>(bi)==boneRigSelectedBone_?IM_COL32(255,205,90,255):IM_COL32(95,185,230,225);
-   if(ends.first.x==ends.second.x&&ends.first.y==ends.second.y&&ends.first.z==ends.second.z){boneOverlay->AddCircleFilled(a,5.0f,boneColor,16);continue;}
-   const float dx=b.x-a.x,dy=b.y-a.y,length=std::sqrt(dx*dx+dy*dy);if(length<1.0f)continue;
-   const float nx=-dy/length*4.0f,ny=dx/length*4.0f;
-   const ImU32 boneOutline=IM_COL32(22,27,35,245);
-   boneOverlay->AddQuadFilled(ImVec2(a.x+nx,a.y+ny),ImVec2(b.x+nx*0.45f,b.y+ny*0.45f),ImVec2(b.x-nx*0.45f,b.y-ny*0.45f),ImVec2(a.x-nx,a.y-ny),boneColor);
-   boneOverlay->AddLine(a,b,boneOutline,2.0f);
-   boneOverlay->AddCircleFilled(a,8.0f,boneColor,20);boneOverlay->AddCircleFilled(b,6.0f,boneColor,20);
-   boneOverlay->AddCircle(a,8.0f,boneOutline,20,1.4f);boneOverlay->AddCircle(b,6.0f,boneOutline,20,1.2f);
-  }
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const int parent=boneRigBones_[bi].parentBone;
    if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
-   const auto parentEnds=boneEnds(static_cast<std::size_t>(parent)),childEnds=boneEnds(bi);
-   const ImVec2 from=project(parentEnds.second.x,parentEnds.second.y,parentEnds.second.z),to=project(childEnds.first.x,childEnds.first.y,childEnds.first.z);
-   boneOverlay->AddLine(from,to,IM_COL32(255,190,80,235),3.0f);boneOverlay->AddCircleFilled(to,5.0f,IM_COL32(255,190,80,245),16);
+   const auto from=boneJointWorld(static_cast<std::size_t>(parent)),to=boneJointWorld(bi);
+   boneOverlay->AddLine(project(from.x,from.y,from.z),project(to.x,to.y,to.z),IM_COL32(70,175,225,220),2.0f);
   }
-  if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
-   const auto ends=boneEnds(static_cast<std::size_t>(boneRigSelectedBone_));
-   const ImVec2 a=project(ends.first.x,ends.first.y,ends.first.z),b=project(ends.second.x,ends.second.y,ends.second.z);
-   boneOverlay->AddCircle(a,8.0f,IM_COL32(255,255,255,235),16,1.5f);boneOverlay->AddCircle(b,7.0f,IM_COL32(255,255,255,235),16,1.5f);
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const auto joint=boneJointWorld(bi);const ImVec2 point=project(joint.x,joint.y,joint.z);const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
+   const ImU32 color=selected?IM_COL32(255,205,90,255):IM_COL32(70,175,225,245);
+   boneOverlay->AddCircleFilled(point,selected?7.0f:5.5f,color,20);boneOverlay->AddCircle(point,selected?10.0f:8.0f,IM_COL32(20,24,30,255),20,1.5f);
+   if(selected)boneOverlay->AddCircle(point,12.0f,IM_COL32(255,245,215,240),24,1.5f);
   }
-   boneOverlay->PopClipRect();
+  boneOverlay->PopClipRect();
  }
  
 dl->PopClipRect();
@@ -5504,7 +5468,10 @@ void EditorUI::drawBoneRigEditor(){
   boneRigAnimationEid_=0;boneRigModelEid_=0;status_="Bone rig will reload from its sidecar file.";
  }
  ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
- ImGui::Separator();ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
+ ImGui::Separator();
+  if(ImGui::Checkbox("Vertex Assignment Mode",&boneRigVertexEditMode_))animationShowVertices_=boneRigVertexEditMode_;
+  ImGui::TextDisabled("Bone mode selects joints independently. Enable vertex assignment mode to pick vertices for a bone.");
+  ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
  if(ImGui::Button("Create Empty Bone",ImVec2(-1.0f,0.0f))){
   std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
   boneRigBones_.push_back(BoneRigBone{name,{}});boneRigSelectedBone_=static_cast<int>(boneRigBones_.size()-1U);std::snprintf(boneRigName_,sizeof(boneRigName_),"Bone");
@@ -5537,10 +5504,8 @@ void EditorUI::drawBoneRigEditor(){
  ImGui::Separator();ImGui::Text("Bones (%zu)",boneRigBones_.size());
  if(ImGui::BeginChild("BoneRigList",ImVec2(0.0f,130.0f),true)){
   for(std::size_t i=0;i<boneRigBones_.size();++i){
-   ImGui::PushID(static_cast<int>(i));const auto&bone=boneRigBones_[i];const std::string label=bone.name+"  ("+std::to_string(bone.vertices.size())+" vertices)";
-   if(ImGui::Selectable(label.c_str(),boneRigSelectedBone_==static_cast<int>(i))){
-    boneRigSelectedBone_=static_cast<int>(i);animationSelectedVertices_=bone.vertices;
-    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();animationShowVertices_=true;
+   ImGui::PushID(static_cast<int>(i));const auto&bone=boneRigBones_[i];const std::string label=bone.name+"  ("+std::to_string(bone.vertices.size())+" vertices)";   if(ImGui::Selectable(label.c_str(),boneRigSelectedBone_==static_cast<int>(i))){
+    boneRigSelectedBone_=static_cast<int>(i);
    }
    ImGui::PopID();
   }
