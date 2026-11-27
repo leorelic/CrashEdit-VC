@@ -335,8 +335,10 @@ Implementation trail: `10d07b5` added six-face selection and transforms; `f058b2
 - [x] Include per-frame rest-pose vertex contents and rest offsets in undo-history change detection so editor-only pose-cache changes are not silently omitted from history.
 - [ ] Make the workflow for selecting a group of vertices and creating a bone for that group fast, clear, and predictable; retain the existing multi-selection and one-bone-per-vertex rules unless research demonstrates a better safe model.
 - [ ] Make bone creation, naming, selection, vertex assignment/removal, and saved-rig management feel like one coherent rigging workflow rather than disconnected utility controls.
-- [ ] Improve the visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
-- [ ] Implement useful parent/child hierarchy behavior, including child-transform propagation where appropriate; current parent links are metadata only.
+- [x] Improve the first-pass bone silhouette with a tapered shaft, rounded endpoint joints, and dark outlines; this is a visual foundation, not yet a final anatomically styled bone mesh.
+- [x] Add **Connect to Parent Joint** for a selected child bone: after choosing a parent, snap the child pivot to the parent's far joint and invalidate its cached rest/rotation data.
+- [ ] Improve the full visual bone representation and viewport interaction so users can understand each bone's pivot, orientation, assigned vertices, and relationship to other bones.
+- [ ] Implement parent/child transform propagation so connected descendants follow parent movement/rotation while retaining their relative joint offsets; current hierarchy connections do not yet propagate transforms.
 - [ ] Make posing operate on the selected bone and its assigned vertices as a natural bone transform, with intuitive rotation and pivot behavior rather than requiring awkward manual workarounds.
 - [ ] Make per-frame posing dependable: each Animation frame must retain its own pose/rest state, and changing a bone on one frame must not unexpectedly alter other frames.
 - [ ] Support practical pose iteration across frames, including predictable frame switching, pose adjustment, and preservation of previously authored poses.
