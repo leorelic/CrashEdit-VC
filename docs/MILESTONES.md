@@ -50,7 +50,7 @@ Renderer parity in a viewer is not proof of game-runtime behavior; retain repres
 - Implemented native GOOL entry/header, instruction, data-pool, state-map/state-descriptor, and Crash 2 frame-group parsing with bounded diagnostics and raw-data retention.
 - Audited Crash 2 opcode operand formats against the original CrashEdit source, including writable destination references, special source-reference encodings, unresolved references, and version-scoped opcode assignments.
 - Added native MIPS decoding for common R3000A instructions and documented the parser's exact GOOL/MIPS mode-return raw-word convention.
-- Identified a valid PS1 COP2/GTE instruction in a real GOOL native-code stream; this is documented research, not implemented GTE decoding.
+- Implemented project-authored COP2/GTE disassembly: structural command/transfer/branch/load-store decoding plus verified effects for a supported command subset; unknown and reserved forms remain explicitly unanalyzed.
 - Inspected real GOOL samples `DispC` and `WillC`, confirming their item layouts and frame-group records consume the sample data exactly.
 
 The longer opcode audit and corrections live in [gool-crash2-instruction-audit.md](gool-crash2-instruction-audit.md) and [RESEARCH_NOTES.md](RESEARCH_NOTES.md). Read the source-correction note before changing the MIPS mode-return sentinel.
