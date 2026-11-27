@@ -395,3 +395,19 @@ The first UI slice is now present on `cpp-port-foundation`:
 This is not feature completion. The next implementation stage is the archive-level atomic Model + Animation payload converter, including frame stream generation, Model item-table rebuilding, chunk-capacity handling, reparse/pose validation, undo integration, and ordinary NSF save/reopen coverage. Do not enable the UI action until those pieces and regression tests are in place. Original Crash 2 game playback remains the final compatibility gate.
 
 Source commits: `73245a3` (window state/declaration), `f922b51` (Experimental menu and discovery window).
+
+
+### Conversion blocker confirmed from current NSF implementation — 2026-11-27
+
+Source inspection of `src/crash/formats/nsf/nsf_archive.cpp` confirmed that the existing `expandCompressedModelPositions()` routine is **not** the requested Complex-to-Normal conversion. It widens the compressed ModelPosition delta widths to 7 bits and rebuilds linked temporal streams; it leaves the Model's compressed-position table and Complex classification in place. It is a save-time recovery path for edited frames, not a conversion operation.
+
+A more fundamental prerequisite is already captured by the current regression fixture in `tests/nsf_archive_tests.cpp`: a Crash 2 frame with a nonzero special-vertex prefix is decoded using the established compressed destination mapping, but `commitAnimationEdits()` intentionally rejects its edited round-trip because the Normal encoder and decoder currently address the prefix/ordinary vertex slots differently. The test asserts that the commit must fail and that the pending pose remains intact. This means simply calling the existing Normal encoder after deleting the ModelPosition table would risk silently moving vertices or corrupting the prefix/temporal bit overlap.
+
+Implementation order is therefore:
+
+1. Add a dedicated, tested Complex-to-Normal frame encoder/decoder round-trip for both zero and nonzero special counts, preserving the renderer's proven vertex indexing and temporal word lane permutation.
+2. Add a Model serializer that removes the compressed ModelPosition item and updates the Model info/count/item-offset table without changing polygon semantics or special-vertex triangle bias.
+3. Add an archive transaction that stages the Model plus every linked Animation payload, rejects any unparsed/incomplete reference set, checks 64 KiB chunk capacity, reparses the candidate, and verifies every frame pose before replacing live archive state.
+4. Add normal Save/reopen and post-conversion vertex-edit/save/reopen tests; keep the UI action disabled until these pass.
+
+The current source contains a regression case specifically proving the special-prefix save guard. Treat that test as a known safety boundary, not as a test to weaken or remove. No conversion code or button activation is claimed by this research update.
