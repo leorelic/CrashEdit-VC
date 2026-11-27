@@ -5469,6 +5469,7 @@ void EditorUI::drawBoneRigEditor(){
  }
  ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
  ImGui::Separator();
+  boneRigVertexEditMode_=animationShowVertices_;
   if(ImGui::Checkbox("Vertex Assignment Mode",&boneRigVertexEditMode_))animationShowVertices_=boneRigVertexEditMode_;
   ImGui::TextDisabled("Bone mode selects joints independently. Enable vertex assignment mode to pick vertices for a bone.");
   ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
