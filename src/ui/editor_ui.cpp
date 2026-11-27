@@ -5484,10 +5484,10 @@ void EditorUI::drawBoneRigEditor(){
   if(animationSelectedVertices_.empty()){
    status_="Select one or more vertices in the viewport before creating a bone.";
   }else{
-   BoneRigBone created;created.name=boneRigName_[0]?boneRigName_:"Bone "+std::to_string(boneRigBones_.size()+1U);
+   BoneRigBone created;created.name=boneRigName_;if(created.name.empty())created.name="Bone "+std::to_string(boneRigBones_.size()+1U);
    double px=0.0,py=0.0,pz=0.0;std::size_t count=0;
    for(const int index:animationSelectedVertices_){
-    if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
+    if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size()||std::find(created.vertices.begin(),created.vertices.end(),index)!=created.vertices.end())continue;
     for(auto&other:boneRigBones_){
      auto&members=other.vertices;const auto oldSize=members.size();
      members.erase(std::remove(members.begin(),members.end(),index),members.end());
