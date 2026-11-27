@@ -1650,9 +1650,10 @@ bool NsfArchive::encodeAnimationFrameVertex(std::size_t chunkIndex,std::size_t e
   for(std::size_t i=0;i<model->positions.size();++i){
    const auto&p=model->positions[i];if(p.xBits==7U)xAcc=0;if(p.yBits==7U)yAcc=0;if(p.zBits==7U)zAcc=0;
    std::int32_t targetX=0,targetY=0,targetZ=0;
-   // The editor stores special vertices at the front of the unified pose array.
-   // ModelPosition i therefore maps to frame vertex i + specialVertexCount.
-   const std::size_t frameVertexIndex=i+frame.specialVertexCount;
+   // Complex ModelPosition i is decoded into frame.vertices[i].
+   // specialVertexCount advances the compressed bit cursor and the renderer's
+   // polygon index bias; it does not shift the decoded/editable pose slots.
+   const std::size_t frameVertexIndex=i;
    if(frameVertexIndex>=frame.vertices.size())return false;
    const auto&source=frame.vertices[frameVertexIndex];
    if(!toByte(frameVertexIndex==vertexIndex&&axis==0U?value:source.x,targetX)||!toByte(frameVertexIndex==vertexIndex&&axis==1U?value:source.y,targetY)||!toByte(frameVertexIndex==vertexIndex&&axis==2U?value:source.z,targetZ))return false;
