@@ -708,6 +708,13 @@ Keep the earlier scope limits: this is a confirmed test case, not proof of unlim
 
 ## Bone viewport finalization — 2026-11-28
 
-Current Bone-mode UI checkpoint: `B` and the viewport bone toggle enable/disable Bone mode; the fitted bone layer is hidden when mode is off. The transform toolbar is available in Bone mode, and Shift-add / Ctrl-remove multi-bone selection builds a combined assigned-vertex group for Free Move, Axis Move, Scale, and Rotate. Free Move is initiated by dragging a selected bone body. The Animation boundary check is now in the viewer header, not drawn over the scene. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [MILESTONES.md](MILESTONES.md).
+Current Bone-mode UI checkpoint: `B` and the viewport bone toggle enable/disable Bone mode; the fitted bone layer is hidden when mode is off. The transform toolbar is available in Bone mode, and plain-click additive / Ctrl-remove multi-bone selection; Shift is reserved for camera orbit builds a combined assigned-vertex group for Free Move, Axis Move, Scale, and Rotate. Free Move is initiated by dragging a selected bone body. The Animation boundary check is now in the viewer header, not drawn over the scene. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [MILESTONES.md](MILESTONES.md).
 
 CI and user validation are pending for this UI pass. This does not change the format research: the rig remains editor-side metadata, not a native Crash skeleton; parent-child propagation and independently authored joint endpoints are still deferred.
+
+
+## Bone selection and endpoint editing correction — 2026-11-28
+
+User clarified the intended interaction: Bone mode locks ordinary left-drag camera orbit just like vertex editing. Clicking bones adds them to the current selection; Ctrl-click removes; Shift+left-drag is reserved for camera orbit and must not change selection. The viewport now follows additive click / Ctrl-remove and ignores Shift-click for selection.
+
+Clicking either fitted bone endpoint selects the vertices in that end region (rather than the entire assigned region), so the endpoint can be moved with the existing transform gizmos as a joint-like edit. This is an initial vertex-group endpoint manipulation, not a persistent independent joint coordinate system: endpoint position is still derived from the fitted assigned vertices and may refit as the mesh changes. Validate endpoint behavior and multi-selection in-app before calling it final.
