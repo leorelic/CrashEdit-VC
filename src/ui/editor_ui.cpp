@@ -4822,7 +4822,7 @@ void EditorUI::drawAnimationViewer(){
    child[ci]=parent[pe];
   }
   // Connection is represented by coincident fitted endpoints, not a pivot-to-pivot line.
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi])continue;const auto&ends=fittedBoneEnds[bi];const ImVec2 joint=project(ends[0].x,ends[0].y,ends[0].z);boneOverlay->AddCircleFilled(joint,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(joint,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;const auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];float best=std::numeric_limits<float>::max();AnimationPoint joint=child[0];for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float x=child[c].x-parent[p].x,y=child[c].y-parent[p].y,z=child[c].z-parent[p].z,d=x*x+y*y+z*z;if(d<best){best=d;joint=child[c];}}const ImVec2 q=project(joint.x,joint.y,joint.z);boneOverlay->AddCircleFilled(q,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(q,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
 
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const int parent=boneRigBones_[bi].parentBone;
