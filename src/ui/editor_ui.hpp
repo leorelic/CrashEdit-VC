@@ -33,6 +33,7 @@ private:
  std::vector<std::uint8_t> undoNsfBytes_,undoNsfPoseBytes_,undoNsdBytes_;
  bool undoBaselineValid_=false;
  int boneRigSelectedBone_=-1,boneRigConnectSource_=-1;
+ std::vector<int> boneRigSelectedBones_;
  std::uint32_t boneRigModelEid_=0,boneRigAnimationEid_=0;
  bool boneRigRotateMode_=false,boneRigLocalSpace_=true,boneRigUsePivot_=true,boneRigVertexEditMode_=false;
  char boneRigName_[64]="Bone";
