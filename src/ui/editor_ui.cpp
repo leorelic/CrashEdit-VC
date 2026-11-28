@@ -4111,9 +4111,18 @@ void EditorUI::drawAnimationViewer(){
     }
     boneRigSelectedBone_=boneRigSelectedBones_.size()==1U?boneRigSelectedBones_.front():-1;
     animationSelectedVertices_.clear();
-    for(const int selectedBone:boneRigSelectedBones_)if(selectedBone>=0&&static_cast<std::size_t>(selectedBone)<boneRigBones_.size())
-     for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
-      if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
+    if(hoveredBoneEndpoint>=0&&hoveredBone>=0&&static_cast<std::size_t>(hoveredBone)<boneRigBones_.size()&&fittedBoneEndsValid[static_cast<std::size_t>(hoveredBone)]){
+     const auto&ends=fittedBoneEnds[static_cast<std::size_t>(hoveredBone)];const auto&tip=ends[hoveredBoneEndpoint];const auto&other=ends[1-hoveredBoneEndpoint];
+     const float dx=other.x-tip.x,dy=other.y-tip.y,dz=other.z-tip.z;const float span=std::sqrt(dx*dx+dy*dy+dz*dz);const float cutoff=std::max(0.001f,span*0.38f);
+     for(const int vertex:boneRigBones_[static_cast<std::size_t>(hoveredBone)].vertices)if(vertex>=0&&static_cast<std::size_t>(vertex)<displayPositions.size()){
+      const auto&p=displayPositions[static_cast<std::size_t>(vertex)];const float x=p.x-tip.x,y=p.y-tip.y,z=p.z-tip.z;
+      if(std::sqrt(x*x+y*y+z*z)<=cutoff)animationSelectedVertices_.push_back(vertex);
+     }
+    }else{
+     for(const int selectedBone:boneRigSelectedBones_)if(selectedBone>=0&&static_cast<std::size_t>(selectedBone)<boneRigBones_.size())
+      for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
+       if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
+    }
     animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();
     boneSelectionClicked=true;status_="Selected "+std::to_string(boneRigSelectedBones_.size())+" bone(s).";
    }
@@ -4833,6 +4842,13 @@ void EditorUI::drawAnimationViewer(){
    auto distance2=[](const AnimationPoint&a,const AnimationPoint&b){const float x=a.x-b.x,y=a.y-b.y,z=a.z-b.z;return x*x+y*y+z*z;};
    float best=std::numeric_limits<float>::max();int ci=0,pe=0;for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float d=distance2(child[c],parent[p]);if(d<best){best=d;ci=c;pe=p;}}
    child[ci]=parent[pe];
+  }
+  int hoveredBoneEndpoint=-1;
+  if(hoveredBone>=0&&static_cast<std::size_t>(hoveredBone)<fittedBoneEnds.size()&&fittedBoneEndsValid[static_cast<std::size_t>(hoveredBone)]){
+   const auto&ends=fittedBoneEnds[static_cast<std::size_t>(hoveredBone)];
+   const ImVec2 p0=project(ends[0].x,ends[0].y,ends[0].z),p1=project(ends[1].x,ends[1].y,ends[1].z);
+   const float d0=std::hypot(io.MousePos.x-p0.x,io.MousePos.y-p0.y),d1=std::hypot(io.MousePos.x-p1.x,io.MousePos.y-p1.y);
+   if(std::min(d0,d1)<13.0f)hoveredBoneEndpoint=d0<=d1?0:1;
   }
   // Connection is represented by coincident fitted endpoints, not a pivot-to-pivot line.
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;const auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];float best=std::numeric_limits<float>::max();AnimationPoint joint=child[0];for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float x=child[c].x-parent[p].x,y=child[c].y-parent[p].y,z=child[c].z-parent[p].z,d=x*x+y*y+z*z;if(d<best){best=d;joint=child[c];}}const ImVec2 q=project(joint.x,joint.y,joint.z);boneOverlay->AddCircleFilled(q,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(q,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
