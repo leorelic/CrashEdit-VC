@@ -5501,12 +5501,12 @@ void EditorUI::drawBoneRigEditor(){
  const std::uint32_t modelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  if(!Crash::isValidEid(modelEid)||!frame.verticesDecoded)return;
  if(boneRigModelEid_!=modelEid||boneRigAnimationEid_!=entry.eid){
-  boneRigModelEid_=modelEid;boneRigAnimationEid_=entry.eid;boneRigBones_.clear();boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;
+  boneRigModelEid_=modelEid;boneRigAnimationEid_=entry.eid;boneRigBones_.clear();boneRigJoints_.clear();boneRigSelectedEndpoints_.clear();boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;boneRigRotateMode_=false;
   const auto dataDirectory=std::filesystem::current_path()/"data";
   const auto bonePath=dataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
   std::ifstream input(bonePath);
   std::string signature;unsigned version=0;std::uint32_t storedAnimation=0,storedModel=0;std::size_t boneCount=0;
-  if(input>>signature>>version>>storedAnimation>>storedModel>>boneCount&&signature=="CRASHEDIT_BONES"&&(version==1U||version==2U)&&storedAnimation==entry.eid&&storedModel==modelEid&&boneCount<=4096U){
+  if(input>>signature>>version>>storedAnimation>>storedModel>>boneCount&&signature=="CRASHEDIT_BONES"&&(version==1U||version==2U||version==3U)&&storedAnimation==entry.eid&&storedModel==modelEid&&boneCount<=4096U){
    bool valid=true;std::vector<BoneRigBone>loaded;loaded.reserve(boneCount);
    for(std::size_t i=0;i<boneCount&&valid;++i){
     BoneRigBone bone;std::size_t vertexCount=0,rotationCount=0;
@@ -5536,6 +5536,15 @@ void EditorUI::drawBoneRigEditor(){
     }
     loaded.push_back(std::move(bone));
    }
+   std::vector<BoneRigJoint>loadedJoints;
+   if(valid&&version>=3U){
+    std::size_t jointCount=0;if(!(input>>jointCount)||jointCount>16384U)valid=false;
+    for(std::size_t ji=0;ji<jointCount&&valid;++ji){
+     BoneRigJoint joint;if(!(input>>std::quoted(joint.name)>>joint.boneA>>joint.endpointA>>joint.boneB>>joint.endpointB)){valid=false;break;}
+     if(joint.name.empty()||joint.boneA<0||joint.boneB<0||joint.boneA==joint.boneB||static_cast<std::size_t>(joint.boneA)>=loaded.size()||static_cast<std::size_t>(joint.boneB)>=loaded.size()||joint.endpointA<0||joint.endpointA>1||joint.endpointB<0||joint.endpointB>1){valid=false;break;}
+     loadedJoints.push_back(std::move(joint));
+    }
+   }
    if(valid){
     std::vector<int>assignedVertices;
     for(std::size_t i=0;i<loaded.size();++i){
@@ -5554,7 +5563,7 @@ void EditorUI::drawBoneRigEditor(){
      if(!valid)break;
     }
    }
-   if(valid){boneRigBones_=std::move(loaded);status_="Loaded editor bone rig: "+bonePath.filename().string();}
+   if(valid){boneRigBones_=std::move(loaded);boneRigJoints_=std::move(loadedJoints);status_="Loaded editor bone rig: "+bonePath.filename().string();}
    else status_="Bone rig file is invalid; starting with an empty rig.";
   }
  }
@@ -5573,7 +5582,7 @@ void EditorUI::drawBoneRigEditor(){
   std::ofstream output(temporaryBoneFile,std::ios::trunc);
   bool saved=static_cast<bool>(output);
   if(saved){
-   output<<"CRASHEDIT_BONES 2 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
+   output<<"CRASHEDIT_BONES 3 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
    for(const auto&savedBone:boneRigBones_){
     output<<std::quoted(savedBone.name)<<" "<<savedBone.parentBone<<" "<<savedBone.pivotX<<" "<<savedBone.pivotY<<" "<<savedBone.pivotZ<<" "<<savedBone.pivotInitialized<<" "<<savedBone.vertices.size();
     for(const int vertex:savedBone.vertices)output<<" "<<vertex;
@@ -5588,6 +5597,8 @@ void EditorUI::drawBoneRigEditor(){
      output<<"\n";
     }
    }
+   output<<boneRigJoints_.size()<<"\n";
+   for(const auto&joint:boneRigJoints_)output<<std::quoted(joint.name)<<" "<<joint.boneA<<" "<<joint.endpointA<<" "<<joint.boneB<<" "<<joint.endpointB<<"\n";
    output.flush();saved=static_cast<bool>(output);output.close();
   }
   if(saved){
