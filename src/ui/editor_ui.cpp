@@ -4797,7 +4797,33 @@ void EditorUI::drawAnimationViewer(){
    const auto&joint=boneRigBones_[boneIndex];
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
-  // Parent relationships remain explicit joint links behind the fitted bodies.
+  // Precompute each fitted region's long-axis endpoints in model space.
+  std::vector<std::array<AnimationPoint,2>> fittedBoneEnds(boneRigBones_.size());
+  std::vector<bool> fittedBoneEndsValid(boneRigBones_.size(),false);
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const auto&bone=boneRigBones_[bi];AnimationPoint c{0.0f,0.0f,0.0f};std::vector<AnimationPoint> pts;
+   for(int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){const auto&p=displayPositions[static_cast<std::size_t>(vi)];pts.push_back(p);c.x+=p.x;c.y+=p.y;c.z+=p.z;}
+   if(pts.size()<2)continue;const float inv=1.0f/static_cast<float>(pts.size());c.x*=inv;c.y*=inv;c.z*=inv;
+   float cov[3][3]{};for(const auto&p:pts){const float d[3]{p.x-c.x,p.y-c.y,p.z-c.z};for(int r=0;r<3;++r)for(int k=0;k<3;++k)cov[r][k]+=d[r]*d[k];}
+   int seed=0;if(cov[1][1]>cov[seed][seed])seed=1;if(cov[2][2]>cov[seed][seed])seed=2;float axis[3]{};axis[seed]=1.0f;
+   for(int it=0;it<32;++it){float n[3]{};for(int r=0;r<3;++r)for(int k=0;k<3;++k)n[r]+=cov[r][k]*axis[k];const float length=std::sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);if(length<1.0e-6f)break;for(int k=0;k<3;++k)axis[k]=n[k]/length;}
+   float lo=std::numeric_limits<float>::max(),hi=-std::numeric_limits<float>::max();for(const auto&p:pts){const float d[3]{p.x-c.x,p.y-c.y,p.z-c.z};const float t=d[0]*axis[0]+d[1]*axis[1]+d[2]*axis[2];lo=std::min(lo,t);hi=std::max(hi,t);}
+   if(hi-lo<1.0e-4f)continue;
+   fittedBoneEnds[bi]={AnimationPoint{c.x+axis[0]*lo,c.y+axis[1]*lo,c.z+axis[2]*lo},AnimationPoint{c.x+axis[0]*hi,c.y+axis[1]*hi,c.z+axis[2]*hi}};
+   fittedBoneEndsValid[bi]=true;
+  }
+  // Snap each child's nearest fitted endpoint onto the nearest parent endpoint.
+  // Repeated passes allow parent chains regardless of list order.
+  for(std::size_t pass=0;pass<boneRigBones_.size();++pass)for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+   const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;
+   auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];
+   auto distance2=[](const AnimationPoint&a,const AnimationPoint&b){const float x=a.x-b.x,y=a.y-b.y,z=a.z-b.z;return x*x+y*y+z*z;};
+   float best=std::numeric_limits<float>::max();int ci=0,pe=0;for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float d=distance2(child[c],parent[p]);if(d<best){best=d;ci=c;pe=p;}}
+   child[ci]=parent[pe];
+  }
+  // Connection is represented by coincident fitted endpoints, not a pivot-to-pivot line.
+  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi])continue;const auto&ends=fittedBoneEnds[bi];const ImVec2 joint=project(ends[0].x,ends[0].y,ends[0].z);boneOverlay->AddCircleFilled(joint,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(joint,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
+
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const int parent=boneRigBones_[bi].parentBone;
    if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
@@ -4845,8 +4871,9 @@ void EditorUI::drawAnimationViewer(){
    }
    const float span=maxAlong-minAlong;
    if(span<1.0e-4f)continue;
-   const AnimationPoint head{center.x+axis[0]*minAlong,center.y+axis[1]*minAlong,center.z+axis[2]*minAlong};
-   const AnimationPoint tail{center.x+axis[0]*maxAlong,center.y+axis[1]*maxAlong,center.z+axis[2]*maxAlong};
+   AnimationPoint head{center.x+axis[0]*minAlong,center.y+axis[1]*minAlong,center.z+axis[2]*minAlong};
+   AnimationPoint tail{center.x+axis[0]*maxAlong,center.y+axis[1]*maxAlong,center.z+axis[2]*maxAlong};
+   if(bi<fittedBoneEnds.size()&&fittedBoneEndsValid[bi]){head=fittedBoneEnds[bi][0];tail=fittedBoneEnds[bi][1];}
    const ImVec2 a=project(head.x,head.y,head.z),b=project(tail.x,tail.y,tail.z);
    const float dx=b.x-a.x,dy=b.y-a.y,screenLength=std::hypot(dx,dy);
    if(screenLength<2.0f)continue;
