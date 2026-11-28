@@ -285,7 +285,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
  invalidateBlueprintAnalysisCache();nsf_=std::move(archive);sceneCameraInitialized_=false;sceneCameraChunk_=-1;sceneCameraEntry_=-1;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
- nsfValid_=true;boneRigBones_.clear();boneRigSelectedBones_.clear();boneRigModelEid_=0;boneRigAnimationEid_=0;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
+ nsfValid_=true;boneRigBones_.clear();boneRigJoints_.clear();boneRigSelectedEndpoints_.clear();boneRigSelectedBones_.clear();boneRigModelEid_=0;boneRigAnimationEid_=0;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd){status_+=" Matching NSD unavailable: "+nsdError;Diagnostics::log(DiagnosticLevel::Warning,"Matching NSD unavailable: "+nsdError);}
  editorPreferences.lastNsfPath=file.string();
@@ -4084,7 +4084,7 @@ void EditorUI::drawAnimationViewer(){
   bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
   if(boneRigWindowOpen_&&hoveredBone>=0&&hoveredBoneEndpoint>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Right)&&!viewportToolbarOwnsMouse){
-   boneRigContextBone_=hoveredBone;boneRigContextEndpoint_=hoveredBoneEndpoint;boneRigSelectedBone_=hoveredBone;ImGui::OpenPopup("Bone Joint Context");
+   boneRigContextBone_=hoveredBone;boneRigContextEndpoint_=hoveredBoneEndpoint;ImGui::OpenPopup("Bone Joint Context");
   }
   if(boneRigWindowOpen_&&boneRigConnectSourceBone_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
    boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;status_="Joint connection cancelled.";
@@ -4817,9 +4817,14 @@ void EditorUI::drawAnimationViewer(){
    const auto&joint=boneRigBones_[boneIndex];
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
-  // Connection is represented by coincident fitted endpoints, not a pivot-to-pivot line.
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;const auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];float best=std::numeric_limits<float>::max();AnimationPoint joint=child[0];for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float x=child[c].x-parent[p].x,y=child[c].y-parent[p].y,z=child[c].z-parent[p].z,d=x*x+y*y+z*z;if(d<best){best=d;joint=child[c];}}const ImVec2 q=project(joint.x,joint.y,joint.z);boneOverlay->AddCircleFilled(q,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(q,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
-
+  // Draw each named shared joint once at its exact connected endpoint.
+  for(const auto&joint:boneRigJoints_){
+   if(joint.boneA<0||joint.boneB<0||joint.endpointA<0||joint.endpointA>1||joint.endpointB<0||joint.endpointB>1)continue;
+   const auto a=static_cast<std::size_t>(joint.boneA),b=static_cast<std::size_t>(joint.boneB);
+   if(a>=fittedBoneEnds.size()||b>=fittedBoneEnds.size()||!fittedBoneEndsValid[a]||!fittedBoneEndsValid[b])continue;
+   const auto&p=fittedBoneEnds[a][static_cast<std::size_t>(joint.endpointA)];const ImVec2 q=project(p.x,p.y,p.z);
+   boneOverlay->AddCircleFilled(q,6.0f,IM_COL32(245,205,105,245),20);boneOverlay->AddCircle(q,8.0f,IM_COL32(18,22,28,250),20,1.5f);
+  }
   // Do not draw pivot-to-pivot hierarchy lines: they create a stray line
   // outside the fitted bone bodies. Connections are shown by snapped fitted endpoints.
   // Fit a bone-like indicator to the assigned vertex region. The principal
