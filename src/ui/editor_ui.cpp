@@ -4135,7 +4135,7 @@ void EditorUI::drawAnimationViewer(){
   };
   auto selectedBoneValid=[&](){
    const bool hasBone=boneRigModelEid_==linkedModelEid&&boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()&&!boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].vertices.empty();
-   const bool hasVertexSelection=animationShowVertices_&&!animationSelectedVertices_.empty();
+   const bool hasVertexSelection=(animationShowVertices_||boneRigWindowOpen_)&&!animationSelectedVertices_.empty();
    return boneRigRotateMode_&&(hasBone||hasVertexSelection)&&poseFrameIndex>=0&&frame.verticesDecoded;
   };
   auto bonePivotWorld=[&](){
