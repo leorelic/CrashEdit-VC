@@ -4103,12 +4103,11 @@ void EditorUI::drawAnimationViewer(){
     }
     boneRigConnectSource_=-1;boneRigSelectedBone_=child;
    }else{
-    if(io.KeyShift||io.KeyCtrl){
-     auto selectedIt=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),hoveredBone);
-     if(io.KeyCtrl&&selectedIt!=boneRigSelectedBones_.end())boneRigSelectedBones_.erase(selectedIt);
-     else if(selectedIt==boneRigSelectedBones_.end())boneRigSelectedBones_.push_back(hoveredBone);
-    }else{
-     boneRigSelectedBones_.clear();boneRigSelectedBones_.push_back(hoveredBone);
+    auto selectedIt=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),hoveredBone);
+    if(io.KeyCtrl){
+     if(selectedIt!=boneRigSelectedBones_.end())boneRigSelectedBones_.erase(selectedIt);
+    }else if(selectedIt==boneRigSelectedBones_.end()){
+     boneRigSelectedBones_.push_back(hoveredBone);
     }
     boneRigSelectedBone_=boneRigSelectedBones_.size()==1U?boneRigSelectedBones_.front():-1;
     animationSelectedVertices_.clear();
