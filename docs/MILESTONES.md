@@ -230,3 +230,10 @@ This upgrades the preceding conversion milestone from “converted resources pla
 User clarified the intended interaction: Bone mode locks ordinary left-drag camera orbit just like vertex editing. Clicking bones adds them to the current selection; Ctrl-click removes; Shift+left-drag is reserved for camera orbit and must not change selection. The viewport now follows additive click / Ctrl-remove and ignores Shift-click for selection.
 
 Clicking either fitted bone endpoint selects the vertices in that end region (rather than the entire assigned region), so the endpoint can be moved with the existing transform gizmos as a joint-like edit. This is an initial vertex-group endpoint manipulation, not a persistent independent joint coordinate system: endpoint position is still derived from the fitted assigned vertices and may refit as the mesh changes. Validate endpoint behavior and multi-selection in-app before calling it final.
+
+
+### Bone viewport gizmo visibility and toolbar placement (2026-11-28)
+- Bone-mode translation/scale gizmo geometry was gated by `animationShowVertices_`, although bone selection already populates `animationSelectedVertices_` and gizmo interaction is permitted in Bone mode. The draw gate now also allows `boneRigWindowOpen_`.
+- Moved the Bone mode toggle into the vertical left viewport toolbar; shifted the remaining mode/tool column down to avoid overlap.
+- CI and in-app verification pending for commit `a9f6be7cca2f60ea72a9e94b00d6118a64d7a18c`.
+- Independent persistent joint endpoints are not yet implemented: fitted endpoints remain derived from assigned vertex regions. True endpoint/joint editing would require persistent endpoint coordinates and updating fitting, connected-bone snapping, serialization, and transform semantics. Keep this as a bounded follow-up; do not block Zone Editor on a full skeletal-rig rewrite.
