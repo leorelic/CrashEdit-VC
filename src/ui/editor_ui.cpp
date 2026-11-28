@@ -5742,7 +5742,7 @@ void EditorUI::drawBoneRigEditor(){
    }
    if(count){bone.pivotX=static_cast<float>(px/count);bone.pivotY=static_cast<float>(py/count);bone.pivotZ=static_cast<float>(pz/count);bone.pivotInitialized=true;bone.frameRotations.clear();bone.frameRestVertices.clear();}
   }
-  ImGui::TextDisabled("With Bone List open, click or box-select adds visible vertices; Ctrl-click or Ctrl-box-select removes them. Shift-drag orbits; middle-drag always orbits. In normal vertex mode, Shift adds, Ctrl removes, and dragging empty space box-selects.");
+  ImGui::TextDisabled("In Bone mode, select only Head/Tail points. Ctrl-click removes a point; selecting both endpoints highlights and edits the whole segment. Right-click a point to connect or disconnect a named joint. Shift-drag orbits; middle-drag always orbits.");
   ImGui::TextDisabled("The viewport Rotate tool works on selected vertices with or without bones. Rotation edits the current frame; bones remain editor-only.");
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
