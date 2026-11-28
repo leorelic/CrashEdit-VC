@@ -214,3 +214,12 @@ The validated pipeline is:
 This upgrades the preceding conversion milestone from “converted resources play in-game” to “actual edited geometry survives the full save/round-trip/game pipeline.” It is a major step toward fully custom animations because it validates a practical route for editing geometry beyond the former Complex coordinate/edit limitation.
 
 **Not yet claimed:** a complete custom-animation workflow. Multi-frame pose authoring, reliable serialization of all frame edits, reference/chunk/Zone constraints, and full custom-animation playback still need their own validation. Exact coordinate limits and broad resource coverage also remain unmeasured. See [RESEARCH_NOTES.md](RESEARCH_NOTES.md) for the detailed evidence and scope.
+
+
+## Bone viewport controls and selection cleanup — 2026-11-28
+
+**Implementation checkpoint — CI and in-app validation pending:** the Bone mode controls now use the viewport bone toggle / `B` shortcut to enable or disable the bone layer; disabling Bone mode hides fitted bodies and joint overlays. Bone mode exposes Free Move, Axis Move, Scale, and Rotate controls. Selected bones can be multi-selected (Shift-add, Ctrl-remove), highlighted, and transformed as a combined assigned-vertex group; Free Move can drag a selected bone body. The Animation boundary-check status is displayed in the 3D Animation Editor header rather than over the rendered scene.
+
+- Source checkpoints: [4301e77](https://github.com/leorelic/CrashEdit-VC/commit/4301e77c5f24df23a2d5ce9e091d6fa0e325846f), [d89f242](https://github.com/leorelic/CrashEdit-VC/commit/d89f242d6fafb45d1164607741b09e5b5e15f927), [949a7cb](https://github.com/leorelic/CrashEdit-VC/commit/949a7cb15719f80053b75e1e1fa360916d25c761), and [402caa4](https://github.com/leorelic/CrashEdit-VC/commit/402caa44554e834656fe0a25c09eefbdb25e600f).
+- This remains an editor-side vertex-group rig, not a game skeleton. Parent/child transform propagation and persistent independently authored head/tail joints remain deferred.
+- Do not promote this to a user-confirmed major milestone until the new build passes CI and the user verifies Bone mode, multi-selection transforms, and the relocated boundary status in the running application.
