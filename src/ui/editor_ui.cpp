@@ -3537,7 +3537,7 @@ void EditorUI::drawAnimationViewer(){
   ImGui::SliderInt("##AnimationMovementSpeed",&editorPreferences.animationMoveSpeed,25,400,"%d%%");
   ImGui::EndPopup();
  }
- const ImVec2 boneButtonMin(canvasMin.x+78.0f,canvasMin.y+8.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);
+ const ImVec2 boneButtonMin(canvasMin.x+8.0f,canvasMin.y+38.0f),boneButtonMax(boneButtonMin.x+28.0f,boneButtonMin.y+26.0f);
  ImGui::SetCursorScreenPos(boneButtonMin);
  const bool boneButtonClicked=ImGui::InvisibleButton("##AnimationBoneList",ImVec2(28.0f,26.0f));
  const bool boneButtonHovered=ImGui::IsItemHovered();
@@ -3553,7 +3553,7 @@ void EditorUI::drawAnimationViewer(){
   if(textureButtonClicked)animationTextureSelectorOpen_=!animationTextureSelectorOpen_;
   if(textureButtonHovered)ImGui::SetTooltip("Texture Selector (H)");
  }
- const ImVec2 modeToolbarStart(canvasMin.x+8.0f,canvasMin.y+38.0f);
+ const ImVec2 modeToolbarStart(canvasMin.x+8.0f,canvasMin.y+68.0f);
  const ImVec2 faceButtonMin=modeToolbarStart,faceButtonMax(modeToolbarStart.x+28.0f,modeToolbarStart.y+26.0f);
  ImGui::SetCursorScreenPos(faceButtonMin);
  const bool faceModeClicked=ImGui::InvisibleButton("##AnimationFaceEditMode",ImVec2(28.0f,26.0f));
@@ -4441,7 +4441,7 @@ void EditorUI::drawAnimationViewer(){
   if(animationFaceEditing_&&hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
    animationSelectedFace_=hoveredFace;animationPlaying_=false;
   }
-  if(animationShowVertices_&&!boneRigRotateMode_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
+  if((animationShowVertices_||boneRigWindowOpen_)&&!boneRigRotateMode_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
      (vertexToolMode!=VertexToolMode::Scale||animationSelectedVertices_.size()>=2U)){
    const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
    if(center.x>-99999.0f){
