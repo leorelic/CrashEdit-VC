@@ -523,3 +523,17 @@ Research/design detail: [RESEARCH_NOTES.md](RESEARCH_NOTES.md), “Named joint a
 - [ ] Right-clicking an endpoint must open a context menu identifying the exact bone and Head/Tail point.
 - [ ] “Connect to...” must enter explicit endpoint-picking mode. The next click must select the exact target Head/Tail on another bone; never choose a target endpoint by proximity after a bone-body click. Escape cancels.
 - [ ] Show the exact source and target endpoint names in the connection flow and resulting joint record; make the created joint independently selectable/context-menu accessible.
+
+
+### Bone rig point-only selection and editing — additional acceptance criteria (2026-11-28)
+
+The named-joint milestone must also satisfy:
+
+- [ ] Continue saving/loading all rig authoring data independently in the editor's bone .txt sidecar. Persist bone definitions/assignments, stable endpoint IDs, named joints and exact endpoint references, and frame-specific endpoint/joint pose data or its deterministic editable representation. Verify close/reopen restores the same rig.
+- [ ] Once point-based joints are available, disable whole-bone body picking in the viewport. Only endpoint/shared-joint points are selectable; clicking a segment body must not select the bone.
+- [ ] Highlight an entire bone segment only when both of its endpoint points are selected. A single selected endpoint highlights only that point.
+- [ ] Make editing obey point selection: one endpoint selected edits that point; both endpoints selected permit editing the complete segment. A shared joint edit must update/respect every endpoint linked to that joint.
+- [ ] Preserve the current fitted indicator appearance and animation playback-following behavior while changing the selection/edit model.
+- [ ] Add regression/manual checks for point-only picking, one-point vs two-point highlighting, endpoint-only vs whole-segment transforms, shared-joint edits, sidecar save/reload, and frame-specific edits without cross-frame overwrites.
+
+These criteria replace the current prototype's whole-bone body selection and whole assigned-vertex-set transforms after the point-based interaction is implemented. Do not remove legacy sidecar compatibility or existing assignments during the transition.
