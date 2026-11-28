@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 #include "ui/gool_script_editor.hpp"
 namespace CrashEdit {
