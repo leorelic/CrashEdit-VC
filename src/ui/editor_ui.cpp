@@ -3389,6 +3389,7 @@ void EditorUI::drawAnimationViewer(){
  // specialVertexCount is a separate frame-layout property and is not this type.
  if(model)ImGui::TextColored(model->compressed?ImVec4(0.95f,0.72f,0.28f,1.0f):ImVec4(0.45f,0.82f,0.58f,1.0f),"Animation Type: %s",model->compressed?"Complex":"Normal");
  else ImGui::TextDisabled("Animation Type: Unknown (linked Model unavailable)");
+ if(animationFrameBoundsVisible_){const int coordinateScale=animation.isCrash3?8:1;const int maximumCoordinate=255*coordinateScale;const bool insideGameRange=frame.verticesDecoded&&std::all_of(frame.vertices.begin(),frame.vertices.end(),[&](const Crash::NsfAnimationVertex&v){return v.x>=0&&v.y>=0&&v.z>=0&&v.x<=maximumCoordinate&&v.y<=maximumCoordinate&&v.z<=maximumCoordinate;});ImGui::SameLine();ImGui::TextColored(insideGameRange?ImVec4(0.45f,0.86f,0.52f,1.0f):ImVec4(0.96f,0.35f,0.32f,1.0f),"Boundary check: %s",insideGameRange?"inside 0–255":"outside 0–255");}
  {
   ImGui::SameLine();
   std::string currentAnimationLabel="No linked animation";
@@ -4624,8 +4625,7 @@ void EditorUI::drawAnimationViewer(){
          const ImVec2 a=projectedBounds[edge[0]],b=projectedBounds[edge[1]];
          if(a.x>-99999.0f&&b.x>-99999.0f)dl->AddLine(a,b,boundsColor,1.75f);
         }
-        const ImVec2 labelPos(canvasMin.x+46.0f,canvasMin.y+10.0f);
-        dl->AddText(labelPos,boundsColor,insideGameRange?"Animation coordinates inside 0–255":"Animation coordinates outside 0–255");
+        // Boundary status is displayed in the viewer header, not over the scene.
        }
        if(animationCollisionViewer_&&!frame.collisions.empty()){
        constexpr float collisionScale=102400.0f;
