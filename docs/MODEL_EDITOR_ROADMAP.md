@@ -490,3 +490,10 @@ Clicking either fitted bone endpoint selects the vertices in that end region (ra
 - [ ] Test multiple links, head-to-head, head-to-tail, tail-to-tail, link removal, save/reopen, and edits across animation frames.
 
 The desired connection data is a pair of stable endpoint references (bone ID + endpoint ID) rather than a parent index. One bone may connect through either endpoint; connection direction has no semantic parent/child meaning. See [RESEARCH_NOTES.md](RESEARCH_NOTES.md), “Joint model requirement clarified by user”.
+
+
+### Transform toolbar toggle cleanup — 2026-11-28
+- [x] Make Axis Move and Scale toolbar buttons toggle back to Free Move when clicked while already active, matching the existing Rotation button's on/off behavior.
+- [x] Remove the redundant “Vertex Assignment Mode” checkbox from the Bone Rig panel. It only mirrored the existing Vertex Mode visibility/selection flag and did not perform bone assignment. The panel now directs users to Vertex Mode (V) and Create From Selection.
+- [ ] If needed later, design a genuine reassignment workflow for adding/removing already-selected vertices from an existing bone; do not reintroduce a checkbox that only duplicates vertex visibility.
+- [ ] CI and in-app validation pending for commit [75cd092](https://github.com/leorelic/CrashEdit-VC/commit/75cd092bc55fc93dcab049b7c2ea56bbb05c772b).
