@@ -4046,13 +4046,35 @@ void EditorUI::drawAnimationViewer(){
     bestDistance=distance;bestDepth=camera.depth;hoveredVertex=static_cast<int>(vi);
    }
   }
-  int hoveredBone=-1;float nearestBoneDistance=13.0f;
-  if(boneRigModelEid_==linkedModelEid&&!boneRigBones_.empty()&&hovered&&!viewportToolbarOwnsMouse&&!animationFaceEditing_){
+  int hoveredBone=-1;float nearestBoneDistance=18.0f;
+  if(boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&!boneRigBones_.empty()&&hovered&&!viewportToolbarOwnsMouse&&!animationFaceEditing_){
+   // Hit-test the visible fitted body (not only the authored pivot dot).
+   // A screen-space principal axis approximates the exact polygon footprint
+   // and keeps the clickable area aligned with the displayed bone silhouette.
    for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-    const auto&bone=boneRigBones_[bi];if(!bone.pivotInitialized)continue;
-    const AnimationPoint joint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-    const ImVec2 point=project(joint.x,joint.y,joint.z);const float distance=std::hypot(io.MousePos.x-point.x,io.MousePos.y-point.y);
-    if(distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
+    const auto&bone=boneRigBones_[bi];std::vector<ImVec2> projected;projected.reserve(bone.vertices.size());
+    ImVec2 center(0.0f,0.0f);for(const int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){
+     const auto&p=displayPositions[static_cast<std::size_t>(vi)];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
+     const ImVec2 q=projectCamera(camera);projected.push_back(q);center.x+=q.x;center.y+=q.y;
+    }
+    if(projected.size()<2)continue;const float inv=1.0f/static_cast<float>(projected.size());center.x*=inv;center.y*=inv;
+    float xx=0.0f,xy=0.0f,yy=0.0f;for(const auto&q:projected){const float x=q.x-center.x,y=q.y-center.y;xx+=x*x;xy+=x*y;yy+=y*y;}
+    const float angle=0.5f*std::atan2(2.0f*xy,xx-yy),ux=std::cos(angle),uy=std::sin(angle);
+    float minAlong=std::numeric_limits<float>::max(),maxAlong=-std::numeric_limits<float>::max(),halfWidth=0.0f;
+    for(const auto&q:projected){const float x=q.x-center.x,y=q.y-center.y,along=x*ux+y*uy,side=-x*uy+y*ux;minAlong=std::min(minAlong,along);maxAlong=std::max(maxAlong,along);halfWidth=std::max(halfWidth,std::abs(side));}
+    if(maxAlong-minAlong<2.0f)continue;
+    const ImVec2 a(center.x+ux*minAlong,center.y+uy*minAlong),b(center.x+ux*maxAlong,center.y+uy*maxAlong);
+    const float dx=b.x-a.x,dy=b.y-a.y,length2=dx*dx+dy*dy;if(length2<1.0f)continue;
+    const float t=std::clamp(((io.MousePos.x-a.x)*dx+(io.MousePos.y-a.y)*dy)/length2,0.0f,1.0f);
+    const float distance=std::hypot(io.MousePos.x-(a.x+t*dx),io.MousePos.y-(a.y+t*dy));
+    const float hitWidth=std::clamp(halfWidth*0.55f,10.0f,20.0f);
+    if(distance<=hitWidth&&distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
+    // Also allow selecting the pivot marker itself.
+    if(bone.pivotInitialized){
+     const AnimationPoint joint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
+     const ImVec2 point=project(joint.x,joint.y,joint.z);const float pivotDistance=std::hypot(io.MousePos.x-point.x,io.MousePos.y-point.y);
+     if(pivotDistance<nearestBoneDistance){nearestBoneDistance=pivotDistance;hoveredBone=static_cast<int>(bi);}
+    }
    }
   }
   bool boneRotationStarted=false;
