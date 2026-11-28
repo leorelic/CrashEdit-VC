@@ -4063,106 +4063,89 @@ void EditorUI::drawAnimationViewer(){
    fittedBoneEnds[bi]={AnimationPoint{c.x+axis[0]*lo,c.y+axis[1]*lo,c.z+axis[2]*lo},AnimationPoint{c.x+axis[0]*hi,c.y+axis[1]*hi,c.z+axis[2]*hi}};
    fittedBoneEndsValid[bi]=true;
   }
-  // Snap each child's nearest fitted endpoint onto the nearest parent endpoint.
-  // Repeated passes allow parent chains regardless of list order.
-  for(std::size_t pass=0;pass<boneRigBones_.size();++pass)for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;
-   auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];
-   auto distance2=[](const AnimationPoint&a,const AnimationPoint&b){const float x=a.x-b.x,y=a.y-b.y,z=a.z-b.z;return x*x+y*y+z*z;};
-   float best=std::numeric_limits<float>::max();int ci=0,pe=0;for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float d=distance2(child[c],parent[p]);if(d<best){best=d;ci=c;pe=p;}}
-   child[ci]=parent[pe];
+  // Resolve each named joint against this frame's fitted endpoint positions.
+  for(const auto&joint:boneRigJoints_){
+   if(joint.boneA<0||joint.boneB<0||joint.endpointA<0||joint.endpointA>1||joint.endpointB<0||joint.endpointB>1)continue;
+   const auto a=static_cast<std::size_t>(joint.boneA),b=static_cast<std::size_t>(joint.boneB);
+   if(a>=fittedBoneEnds.size()||b>=fittedBoneEnds.size()||!fittedBoneEndsValid[a]||!fittedBoneEndsValid[b])continue;
+   auto&pa=fittedBoneEnds[a][static_cast<std::size_t>(joint.endpointA)];
+   auto&pb=fittedBoneEnds[b][static_cast<std::size_t>(joint.endpointB)];
+   const AnimationPoint shared{(pa.x+pb.x)*0.5f,(pa.y+pb.y)*0.5f,(pa.z+pb.z)*0.5f};pa=shared;pb=shared;
   }
-  int hoveredBone=-1;float nearestBoneDistance=18.0f;
+  int hoveredBone=-1,hoveredBoneEndpoint=-1;float nearestEndpointDistance=13.0f;
   if(boneRigWindowOpen_&&boneRigModelEid_==linkedModelEid&&!boneRigBones_.empty()&&hovered&&!viewportToolbarOwnsMouse&&!animationFaceEditing_){
-   // Hit-test the visible fitted body (not only the authored pivot dot).
-   // A screen-space principal axis approximates the exact polygon footprint
-   // and keeps the clickable area aligned with the displayed bone silhouette.
-   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-    const auto&bone=boneRigBones_[bi];std::vector<ImVec2> projected;projected.reserve(bone.vertices.size());
-    ImVec2 center(0.0f,0.0f);for(const int vi:bone.vertices)if(vi>=0&&static_cast<std::size_t>(vi)<displayPositions.size()){
-     const auto&p=displayPositions[static_cast<std::size_t>(vi)];const CameraPoint camera=toCamera(p.x,p.y,p.z);if(camera.depth<=0.1f)continue;
-     const ImVec2 q=projectCamera(camera);projected.push_back(q);center.x+=q.x;center.y+=q.y;
-    }
-    if(projected.size()<2)continue;const float inv=1.0f/static_cast<float>(projected.size());center.x*=inv;center.y*=inv;
-    float xx=0.0f,xy=0.0f,yy=0.0f;for(const auto&q:projected){const float x=q.x-center.x,y=q.y-center.y;xx+=x*x;xy+=x*y;yy+=y*y;}
-    const float angle=0.5f*std::atan2(2.0f*xy,xx-yy),ux=std::cos(angle),uy=std::sin(angle);
-    float minAlong=std::numeric_limits<float>::max(),maxAlong=-std::numeric_limits<float>::max(),halfWidth=0.0f;
-    for(const auto&q:projected){const float x=q.x-center.x,y=q.y-center.y,along=x*ux+y*uy,side=-x*uy+y*ux;minAlong=std::min(minAlong,along);maxAlong=std::max(maxAlong,along);halfWidth=std::max(halfWidth,std::abs(side));}
-    if(maxAlong-minAlong<2.0f)continue;
-    const ImVec2 a(center.x+ux*minAlong,center.y+uy*minAlong),b(center.x+ux*maxAlong,center.y+uy*maxAlong);
-    const float dx=b.x-a.x,dy=b.y-a.y,length2=dx*dx+dy*dy;if(length2<1.0f)continue;
-    const float t=std::clamp(((io.MousePos.x-a.x)*dx+(io.MousePos.y-a.y)*dy)/length2,0.0f,1.0f);
-    const float distance=std::hypot(io.MousePos.x-(a.x+t*dx),io.MousePos.y-(a.y+t*dy));
-    const float hitWidth=std::clamp(halfWidth*0.55f,10.0f,20.0f);
-    if(distance<=hitWidth&&distance<nearestBoneDistance){nearestBoneDistance=distance;hoveredBone=static_cast<int>(bi);}
-    // Also allow selecting the pivot marker itself.
-    if(bone.pivotInitialized){
-     const AnimationPoint joint((bone.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(bone.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(bone.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
-     const ImVec2 point=project(joint.x,joint.y,joint.z);const float pivotDistance=std::hypot(io.MousePos.x-point.x,io.MousePos.y-point.y);
-     if(pivotDistance<nearestBoneDistance){nearestBoneDistance=pivotDistance;hoveredBone=static_cast<int>(bi);}
-    }
+   // Bone bodies are not selectable. Only exact fitted Head/Tail points are pickable.
+   for(std::size_t bi=0;bi<boneRigBones_.size();++bi)if(fittedBoneEndsValid[bi])for(int endpoint=0;endpoint<2;++endpoint){
+    const auto&p=fittedBoneEnds[bi][static_cast<std::size_t>(endpoint)];const ImVec2 screen=project(p.x,p.y,p.z);
+    const float distance=std::hypot(io.MousePos.x-screen.x,io.MousePos.y-screen.y);
+    if(distance<nearestEndpointDistance){nearestEndpointDistance=distance;hoveredBone=static_cast<int>(bi);hoveredBoneEndpoint=endpoint;}
    }
-  }
-  int hoveredBoneEndpoint=-1;
-  if(hoveredBone>=0&&static_cast<std::size_t>(hoveredBone)<fittedBoneEnds.size()&&fittedBoneEndsValid[static_cast<std::size_t>(hoveredBone)]){
-   const auto&ends=fittedBoneEnds[static_cast<std::size_t>(hoveredBone)];
-   const ImVec2 p0=project(ends[0].x,ends[0].y,ends[0].z),p1=project(ends[1].x,ends[1].y,ends[1].z);
-   const float d0=std::hypot(io.MousePos.x-p0.x,io.MousePos.y-p0.y),d1=std::hypot(io.MousePos.x-p1.x,io.MousePos.y-p1.y);
-   if(std::min(d0,d1)<13.0f)hoveredBoneEndpoint=d0<=d1?0:1;
   }
   bool boneRotationStarted=false;
   bool boneSelectionClicked=false;
-  if(boneRigWindowOpen_&&hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Right)&&!viewportToolbarOwnsMouse){
-   boneRigSelectedBone_=hoveredBone;ImGui::OpenPopup("Bone Joint Context");
+  if(boneRigWindowOpen_&&hoveredBone>=0&&hoveredBoneEndpoint>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Right)&&!viewportToolbarOwnsMouse){
+   boneRigContextBone_=hoveredBone;boneRigContextEndpoint_=hoveredBoneEndpoint;boneRigSelectedBone_=hoveredBone;ImGui::OpenPopup("Bone Joint Context");
   }
-  if(boneRigWindowOpen_&&boneRigConnectSource_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
-   boneRigConnectSource_=-1;status_="Bone connection cancelled.";
+  if(boneRigWindowOpen_&&boneRigConnectSourceBone_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
+   boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;status_="Joint connection cancelled.";
   }
-  if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
-   if(boneRigConnectSource_>=0){
-    const int child=boneRigConnectSource_,parent=hoveredBone;
-    bool wouldCycle=child==parent;int ancestor=parent;
-    for(std::size_t depth=0;depth<boneRigBones_.size()&&ancestor>=0&&!wouldCycle;++depth){
-     if(ancestor==child){wouldCycle=true;break;}
-     if(static_cast<std::size_t>(ancestor)>=boneRigBones_.size())break;
-     ancestor=boneRigBones_[static_cast<std::size_t>(ancestor)].parentBone;
-    }
-    if(wouldCycle)status_="Cannot connect bones: that would create a hierarchy cycle.";
+  if(hoveredBone>=0&&hoveredBoneEndpoint>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
+   const std::pair<int,int> target{hoveredBone,hoveredBoneEndpoint};
+   if(boneRigConnectSourceBone_>=0){
+    const auto source=std::pair<int,int>{boneRigConnectSourceBone_,boneRigConnectSourceEndpoint_};
+    if(source.first==target.first)status_="A joint must connect endpoints on two different bones.";
     else{
-     boneRigBones_[static_cast<std::size_t>(child)].parentBone=parent;
-     status_="Connected "+boneRigBones_[static_cast<std::size_t>(child)].name+" to "+boneRigBones_[static_cast<std::size_t>(parent)].name+".";
+     const auto existing=std::find_if(boneRigJoints_.begin(),boneRigJoints_.end(),[&](const BoneRigJoint&j){
+      return (j.boneA==source.first&&j.endpointA==source.second&&j.boneB==target.first&&j.endpointB==target.second)||
+             (j.boneB==source.first&&j.endpointB==source.second&&j.boneA==target.first&&j.endpointA==target.second);
+     });
+     if(existing==boneRigJoints_.end()){
+      BoneRigJoint joint;joint.name="Joint "+std::to_string(boneRigJoints_.size()+1U);
+      joint.boneA=source.first;joint.endpointA=source.second;joint.boneB=target.first;joint.endpointB=target.second;
+      boneRigJoints_.push_back(std::move(joint));status_="Created a named joint between the selected endpoints.";
+     }else status_="Those exact endpoints are already connected.";
     }
-    boneRigConnectSource_=-1;boneRigSelectedBone_=child;
+    boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;
    }else{
-    auto selectedIt=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),hoveredBone);
-    if(io.KeyCtrl){
-     if(selectedIt!=boneRigSelectedBones_.end())boneRigSelectedBones_.erase(selectedIt);
-    }else if(selectedIt==boneRigSelectedBones_.end()){
-     boneRigSelectedBones_.push_back(hoveredBone);
+    auto selected=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),target);
+    if(io.KeyCtrl){if(selected!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(selected);}
+    else if(selected==boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.push_back(target);
+    else boneRigSelectedEndpoints_.erase(selected);
+    boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;
+    for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
+     const bool head=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{static_cast<int>(bi),0})!=boneRigSelectedEndpoints_.end();
+     const bool tail=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{static_cast<int>(bi),1})!=boneRigSelectedEndpoints_.end();
+     if(head&&tail){boneRigSelectedBones_.push_back(static_cast<int>(bi));boneRigSelectedBone_=static_cast<int>(bi);}
     }
-    boneRigSelectedBone_=boneRigSelectedBones_.size()==1U?boneRigSelectedBones_.front():-1;
     animationSelectedVertices_.clear();
-    if(hoveredBoneEndpoint>=0&&hoveredBone>=0&&static_cast<std::size_t>(hoveredBone)<boneRigBones_.size()&&fittedBoneEndsValid[static_cast<std::size_t>(hoveredBone)]){
-     const auto&ends=fittedBoneEnds[static_cast<std::size_t>(hoveredBone)];const auto&tip=ends[hoveredBoneEndpoint];const auto&other=ends[1-hoveredBoneEndpoint];
+    for(const auto&point:boneRigSelectedEndpoints_){
+     if(point.first<0||static_cast<std::size_t>(point.first)>=boneRigBones_.size()||!fittedBoneEndsValid[static_cast<std::size_t>(point.first)])continue;
+     const auto&ends=fittedBoneEnds[static_cast<std::size_t>(point.first)];const auto&tip=ends[static_cast<std::size_t>(point.second)];const auto&other=ends[static_cast<std::size_t>(1-point.second)];
      const float dx=other.x-tip.x,dy=other.y-tip.y,dz=other.z-tip.z;const float span=std::sqrt(dx*dx+dy*dy+dz*dz);const float cutoff=std::max(0.001f,span*0.38f);
-     for(const int vertex:boneRigBones_[static_cast<std::size_t>(hoveredBone)].vertices)if(vertex>=0&&static_cast<std::size_t>(vertex)<displayPositions.size()){
+     for(const int vertex:boneRigBones_[static_cast<std::size_t>(point.first)].vertices)if(vertex>=0&&static_cast<std::size_t>(vertex)<displayPositions.size()){
       const auto&p=displayPositions[static_cast<std::size_t>(vertex)];const float x=p.x-tip.x,y=p.y-tip.y,z=p.z-tip.z;
-      if(std::sqrt(x*x+y*y+z*z)<=cutoff)animationSelectedVertices_.push_back(vertex);
+      if(std::sqrt(x*x+y*y+z*z)<=cutoff&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
      }
-    }else{
-     for(const int selectedBone:boneRigSelectedBones_)if(selectedBone>=0&&static_cast<std::size_t>(selectedBone)<boneRigBones_.size())
-      for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
-       if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
     }
+    // A segment becomes selected/editable as a whole only after both points are selected.
+    for(const int selectedBone:boneRigSelectedBones_)for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
+     if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
     animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();
-    boneSelectionClicked=true;status_="Selected "+std::to_string(boneRigSelectedBones_.size())+" bone(s).";
+    boneSelectionClicked=true;status_="Selected "+std::to_string(boneRigSelectedEndpoints_.size())+" endpoint(s).";
    }
   }
   if(ImGui::BeginPopup("Bone Joint Context")){
-   ImGui::TextUnformatted(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()?boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)].name.c_str():"Bone joint");
-   if(ImGui::MenuItem("Connect bone to...")){
-    boneRigConnectSource_=boneRigSelectedBone_;
-    status_="Connect "+boneRigBones_[static_cast<std::size_t>(boneRigConnectSource_)].name+" to parent: left-click the target joint (Esc cancels).";
+   if(boneRigContextBone_>=0&&static_cast<std::size_t>(boneRigContextBone_)<boneRigBones_.size()){
+    ImGui::Text("%s %s",boneRigBones_[static_cast<std::size_t>(boneRigContextBone_)].name.c_str(),boneRigContextEndpoint_==0?"Head":"Tail");
+    if(ImGui::MenuItem("Connect to...")){
+     boneRigConnectSourceBone_=boneRigContextBone_;boneRigConnectSourceEndpoint_=boneRigContextEndpoint_;
+     status_="Select the exact target Head or Tail on another bone (Esc cancels).";
+    }
+    for(std::size_t ji=0;ji<boneRigJoints_.size();++ji){
+     const auto&joint=boneRigJoints_[ji];
+     const bool touches=(joint.boneA==boneRigContextBone_&&joint.endpointA==boneRigContextEndpoint_)||(joint.boneB==boneRigContextBone_&&joint.endpointB==boneRigContextEndpoint_);
+     if(touches&&ImGui::MenuItem(("Disconnect "+joint.name).c_str())){boneRigJoints_.erase(boneRigJoints_.begin()+static_cast<std::ptrdiff_t>(ji));status_="Disconnected the selected joint.";break;}
+    }
    }
    ImGui::EndPopup();
   }
@@ -4377,7 +4360,7 @@ void EditorUI::drawAnimationViewer(){
   if((animationShowVertices_||boneRigWindowOpen_)&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!boneSelectionClicked&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
-    canStart=boneRigWindowOpen_?hoveredBone>=0&&std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),hoveredBone)!=boneRigSelectedBones_.end():(hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex));
+    canStart=boneRigWindowOpen_?false:(hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex));
    else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
     dragAxis=vertexGizmoAxis;canStart=vertexGizmoHandleHovered;
    }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
@@ -4890,7 +4873,7 @@ void EditorUI::drawAnimationViewer(){
    for(const auto&p:points){const ImVec2 q=project(p.x,p.y,p.z);projectedRadius=std::max(projectedRadius,std::abs((q.x-a.x)*nx+(q.y-a.y)*ny));}
    const float halfWidth=std::clamp(projectedRadius*0.72f,4.0f,std::max(4.0f,screenLength*0.24f));
    auto at=[&](float t,float side,float width){return ImVec2(a.x+dx*t+nx*halfWidth*side*width,a.y+dy*t+ny*halfWidth*side*width);};
-   const bool selected=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),static_cast<int>(bi))!=boneRigSelectedBones_.end()||static_cast<int>(bi)==boneRigSelectedBone_;
+   const bool selected=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),static_cast<int>(bi))!=boneRigSelectedBones_.end();
    const ImU32 fill=selected?IM_COL32(255,190,75,245):IM_COL32(75,175,225,230);
    const ImU32 outline=IM_COL32(18,22,28,250);
    ImVec2 shape[10]{
@@ -4900,11 +4883,14 @@ void EditorUI::drawAnimationViewer(){
    boneOverlay->AddConvexPolyFilled(shape,10,fill);
    boneOverlay->AddPolyline(shape,10,outline,ImDrawFlags_Closed,selected?3.0f:2.0f);
    boneOverlay->AddLine(at(0.20f,0.0f,0.0f),at(0.82f,0.0f,0.0f),IM_COL32(255,245,220,190),1.5f);
-   boneOverlay->AddCircleFilled(a,selected?6.5f:5.0f,fill,20);
-   boneOverlay->AddCircle(a,selected?9.5f:7.5f,outline,20,1.5f);
-   boneOverlay->AddCircleFilled(b,selected?5.5f:4.5f,fill,20);
-   boneOverlay->AddCircle(b,selected?8.0f:6.5f,outline,20,1.5f);
-   if(selected)boneOverlay->AddCircle(a,12.0f,IM_COL32(255,245,215,240),24,1.5f);
+   const bool headSelected=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{static_cast<int>(bi),0})!=boneRigSelectedEndpoints_.end();
+   const bool tailSelected=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{static_cast<int>(bi),1})!=boneRigSelectedEndpoints_.end();
+   boneOverlay->AddCircleFilled(a,headSelected?7.0f:5.0f,headSelected?IM_COL32(255,205,95,255):fill,20);
+   boneOverlay->AddCircle(a,headSelected?10.0f:7.5f,outline,20,1.5f);
+   boneOverlay->AddCircleFilled(b,tailSelected?7.0f:4.5f,tailSelected?IM_COL32(255,205,95,255):fill,20);
+   boneOverlay->AddCircle(b,tailSelected?10.0f:6.5f,outline,20,1.5f);
+   if(headSelected)boneOverlay->AddCircle(a,12.0f,IM_COL32(255,245,215,240),24,1.5f);
+   if(tailSelected)boneOverlay->AddCircle(b,12.0f,IM_COL32(255,245,215,240),24,1.5f);
   }
   boneOverlay->PopClipRect();
  }
@@ -5578,7 +5564,7 @@ void EditorUI::drawBoneRigEditor(){
  if(!ImGui::Begin("Bone List",&boneRigWindowOpen_)){ImGui::End();return;}
  ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+ImGui::GetContentRegionAvail().x);
  ImGui::Text("%s | %s",Crash::eidToEName(entry.eid).c_str(),Crash::eidToEName(modelEid).c_str());
- ImGui::TextDisabled("Editor-only vertex groups and visual parent links. Saved separately from the NSF.");
+ ImGui::TextDisabled("Editor-only vertex groups and named endpoint joints. Saved separately from the NSF.");
  const auto boneDataDirectory=std::filesystem::current_path()/"data";
  const auto boneFile=boneDataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
  if(ImGui::Button("Save Bones")){
@@ -5668,30 +5654,7 @@ void EditorUI::drawBoneRigEditor(){
    std::snprintf(nameBuffer,sizeof(nameBuffer),"%s",bone.name.c_str());
    ImGui::SetNextItemWidth(-1.0f);
    if(ImGui::InputText("##RenameBone",nameBuffer,sizeof(nameBuffer)))bone.name=nameBuffer;
-   const char*parentLabel=bone.parentBone>=0&&static_cast<std::size_t>(bone.parentBone)<boneRigBones_.size()?boneRigBones_[static_cast<std::size_t>(bone.parentBone)].name.c_str():"None";
-   if(ImGui::BeginCombo("Parent Bone",parentLabel)){
-    if(ImGui::Selectable("None",bone.parentBone<0))bone.parentBone=-1;
-    for(std::size_t candidate=0;candidate<boneRigBones_.size();++candidate){
-     if(candidate==static_cast<std::size_t>(boneRigSelectedBone_))continue;
-     bool wouldCycle=false;int ancestor=static_cast<int>(candidate);
-     for(std::size_t depth=0;depth<boneRigBones_.size()&&ancestor>=0;++depth){
-      if(ancestor==boneRigSelectedBone_){wouldCycle=true;break;}
-      if(static_cast<std::size_t>(ancestor)>=boneRigBones_.size())break;
-      ancestor=boneRigBones_[static_cast<std::size_t>(ancestor)].parentBone;
-     }
-     if(wouldCycle)continue;
-     const bool selected=bone.parentBone==static_cast<int>(candidate);
-     if(ImGui::Selectable(boneRigBones_[candidate].name.c_str(),selected))bone.parentBone=static_cast<int>(candidate);
-     if(selected)ImGui::SetItemDefaultFocus();
-    }
-    ImGui::EndCombo();
-   }
-   if(bone.parentBone>=0&&static_cast<std::size_t>(bone.parentBone)<boneRigBones_.size()&&ImGui::Button("Connect Pivot to Parent")){
-    const auto&parentBone=boneRigBones_[static_cast<std::size_t>(bone.parentBone)];
-    bone.pivotX=parentBone.pivotX;bone.pivotY=parentBone.pivotY;bone.pivotZ=parentBone.pivotZ;bone.pivotInitialized=parentBone.pivotInitialized;
-    bone.frameRotations.clear();bone.frameRestVertices.clear();bone.frameRestOffsets.clear();
-    status_="Snapped "+bone.name+" pivot to "+parentBone.name+" pivot. Parent transform propagation is not implemented yet.";
-   }
+   ImGui::TextDisabled("Use endpoint context menus to create or disconnect named joints.");
    if(ImGui::Button("Assign Selected Vertices")){
    for(const int index:animationSelectedVertices_){
     if(index<0||static_cast<std::size_t>(index)>=frame.vertices.size())continue;
