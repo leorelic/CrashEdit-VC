@@ -4441,22 +4441,6 @@ void EditorUI::drawAnimationViewer(){
   if(animationFaceEditing_&&hoveredFace>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!ImGui::IsMouseDragging(ImGuiMouseButton_Left,2.0f)&&(!animationShowVertices_||hoveredVertex<0)){
    animationSelectedFace_=hoveredFace;animationPlaying_=false;
   }
-  if((animationShowVertices_||boneRigWindowOpen_)&&!boneRigRotateMode_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
-     (vertexToolMode!=VertexToolMode::Scale||animationSelectedVertices_.size()>=2U)){
-   const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
-   if(center.x>-99999.0f){
-    const float axisLength=std::clamp(animationGridRadius_*0.18f,0.5f,5.0f);
-    if(vertexToolMode==VertexToolMode::AxisMove){
-     const ImU32 colors[3]={IM_COL32(245,75,75,255),IM_COL32(80,220,120,255),IM_COL32(90,160,255,255)};
-     const char*axisNames[3]={"X","Y","Z"};
-     for(int axis=0;axis<3;++axis){const auto direction=axisWorldVector(axis);const ImVec2 end=project(pivot.x+direction.x*axisLength,pivot.y+direction.y*axisLength,pivot.z+direction.z*axisLength);dl->AddLine(center,end,colors[axis],4.0f);dl->AddCircleFilled(end,8.0f,colors[axis],16);dl->AddCircle(end,10.0f,IM_COL32(15,18,24,255),16,1.5f);dl->AddText(ImVec2(end.x+5.0f,end.y-7.0f),colors[axis],axisNames[axis]);}
-     dl->AddCircleFilled(center,4.0f,IM_COL32(240,240,240,255),12);
-    }else{
-     dl->AddCircle(center,20.0f,IM_COL32(235,190,70,230),32,2.5f);
-     dl->AddCircleFilled(ImVec2(center.x+14.0f,center.y-14.0f),5.0f,IM_COL32(255,205,80,255),12);
-    }
-   }
-  }
   // Keep the compact grid centered on the animation's initial bounds.
   // Its size and spacing remain fixed while the camera moves or zooms.
   constexpr float groundY=0.0f;
@@ -4810,7 +4794,7 @@ void EditorUI::drawAnimationViewer(){
  }
  // Transform handles are a true viewport overlay: draw them after the model,
  // collision geometry, and depth-tested GPU image so they remain unobscured.
- if(animationShowVertices_&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
+ if((animationShowVertices_||boneRigWindowOpen_)&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove&&
     (vertexToolMode!=VertexToolMode::Scale||animationSelectedVertices_.size()>=2U)){
   const auto pivot=selectedVertexPivot();const ImVec2 center=project(pivot.x,pivot.y,pivot.z);
   if(center.x>-99999.0f){
