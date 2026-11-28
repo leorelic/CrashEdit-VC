@@ -4114,9 +4114,19 @@ void EditorUI::drawAnimationViewer(){
     boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;
    }else{
     auto selected=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),target);
-    if(io.KeyCtrl){if(selected!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(selected);}
-    else if(selected==boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.push_back(target);
-    else boneRigSelectedEndpoints_.erase(selected);
+    bool removing=io.KeyCtrl||selected!=boneRigSelectedEndpoints_.end();
+    if(removing){if(selected!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(selected);}
+    else boneRigSelectedEndpoints_.push_back(target);
+    // A linked endpoint is the same logical joint: select/deselect both endpoint identities together.
+    for(const auto&joint:boneRigJoints_){
+     std::pair<int,int> other{-1,-1};
+     if(joint.boneA==target.first&&joint.endpointA==target.second)other={joint.boneB,joint.endpointB};
+     else if(joint.boneB==target.first&&joint.endpointB==target.second)other={joint.boneA,joint.endpointA};
+     if(other.first<0)continue;
+     auto linked=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),other);
+     if(removing){if(linked!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(linked);}
+     else if(linked==boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.push_back(other);
+    }
     boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;
     for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
      const bool head=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{static_cast<int>(bi),0})!=boneRigSelectedEndpoints_.end();
@@ -5669,6 +5679,10 @@ void EditorUI::drawBoneRigEditor(){
   }
  }
  ImGui::EndChild();
+ if(!boneRigJoints_.empty()){
+  ImGui::Separator();ImGui::Text("Named Joints (%zu)",boneRigJoints_.size());
+  for(std::size_t ji=0;ji<boneRigJoints_.size();++ji){ImGui::PushID(static_cast<int>(ji));auto&joint=boneRigJoints_[ji];char jointName[128]{};std::snprintf(jointName,sizeof(jointName),"%s",joint.name.c_str());ImGui::SetNextItemWidth(-1.0f);if(ImGui::InputText("##JointName",jointName,sizeof(jointName)))joint.name=jointName;ImGui::PopID();}
+ }
  if(boneRigSelectedBone_>=0&&static_cast<std::size_t>(boneRigSelectedBone_)<boneRigBones_.size()){
   auto&bone=boneRigBones_[static_cast<std::size_t>(boneRigSelectedBone_)];
   ImGui::Separator();ImGui::Text("Selected Bone");
