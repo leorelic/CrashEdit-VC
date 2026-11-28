@@ -4778,7 +4778,7 @@ void EditorUI::drawAnimationViewer(){
   }
  }
 
- ImDrawList*boneOverlay=ImGui::GetForegroundDrawList();
+ ImDrawList*boneOverlay=ImGui::GetWindowDrawList();
  boneOverlay->PushClipRect(canvasMin,canvasMax,true);
  if(selectedBoneValid()){
    const AnimationPoint pivot=bonePivotWorld();const float radius=std::clamp(animationGridRadius_*0.28f,0.25f,2.0f);
