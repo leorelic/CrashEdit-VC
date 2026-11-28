@@ -505,3 +505,8 @@ This is a regression-fixture defect, not evidence that the capacity fallback fai
 
 
 Follow-up source audit found a second fixture defect: the 100 ModelPosition records were set to raw `0x1ff`, which means 7-bit X/Z/Y deltas (8 bits per component including sign), requiring 300 bytes of compressed temporal data. The fixture only supplied 264 bytes, so decoding would still fail after correcting collisionCount. Set those synthetic records to raw zero (all three delta widths zero, three sign bits per vertex); 264 bytes now safely decode the Complex source, while the Normal target still requires 300 bytes. The test asserts the source-width and growth relationship explicitly. This keeps the regression focused on real payload expansion and the relocation fallback.
+
+
+## Animation viewport boundary-status UI — 2026-11-28
+
+The optional Animation Coordinate Bounds guide now reports its 0–255 coordinate-range check in the 3D Animation Editor's header above the viewport instead of drawing the status label over the scene. The guide's bounding-box rendering and coordinate validation behavior are otherwise unchanged. This is a UI placement change, not a new format claim; see [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) for the Bone-mode viewport checkpoint.
