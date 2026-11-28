@@ -745,3 +745,19 @@ The current implementation remains a visual/selection prototype: endpoints are f
 User tested the foreground gizmo fix and confirmed the gizmos now render correctly. Follow-up issue: Axis Move and Scale toolbar buttons only activated their modes and could not deactivate them by clicking again, unlike Rotation. Fixed in [75cd092](https://github.com/leorelic/CrashEdit-VC/commit/75cd092bc55fc93dcab049b7c2ea56bbb05c772b): clicking the active Axis Move or Scale button now returns to Free Move; clicking an inactive one selects it. Rotation retains its existing independent toggle behavior.
 
 The Bone Rig panel's “Vertex Assignment Mode” checkbox was not a distinct assignment workflow. Inspection showed it only mirrored `animationShowVertices_`, duplicating the existing Vertex Mode (V) visibility/selection toggle; it did not assign selected vertices to a bone. Removed the misleading checkbox and replaced it with guidance to use Vertex Mode and “Create From Selection”. Bone membership is currently established when creating a bone from the selected vertices; a separate reassignment workflow is not implemented by that checkbox. CI and in-app validation of this follow-up are pending.
+
+
+## Named joint authoring clarified by user — 2026-11-28
+
+The concrete authoring example is Crash's left arm (Crash's anatomical right): create **UpperArm** and **LowerArm**, select the closest endpoint of each segment, and connect those two exact endpoints. The result is a three-point chain: shoulder → **Elbow** → wrist. The middle point is one named, selectable joint shared by the two bone segments; it is not a parent bone, pivot-to-pivot line, or inferred hierarchy edge.
+
+Design requirements:
+- Every bone has two persistent, independently authored endpoints (head and tail), each with stable identity and editable coordinates.
+- A joint is a named editor-side object that binds an exact endpoint reference from one bone to an exact endpoint reference from another bone. Creating the joint snaps/associates those two endpoints to one shared position; it does not merge the bones or their vertex assignments.
+- Joint selection must be distinct from bone-body selection. Clicking a joint selects that joint; clicking a bone selects the segment. The UI must make selected endpoints/joints visually unambiguous.
+- The authoring flow should support choosing the first endpoint, choosing the second endpoint, naming the resulting joint (e.g. Elbow), cancel, unlink, rename, and re-link. A candidate detector may highlight nearby endpoint pairs, but must not silently create a joint.
+- Multiple joints across a rig form connected chains and branched structures (arm, leg, fingers, spine). A bone may connect through either endpoint. No parent/child semantics or automatic descendant propagation are implied.
+- Save/reload must preserve endpoint identities/coordinates, joint names and exact endpoint references, and bone assignments. Metadata remains in the existing editor-only rig sidecar; do not encode it into native NSF/NSD resources.
+- Existing sidecar versions 1/2 and existing rigs must remain readable. Migration must not silently reinterpret `parentBone` as a named joint; legacy links should be surfaced as unconverted/legacy data or explicitly discarded with user-visible notice after backup.
+
+Implementation sequence: (1) introduce stable endpoint and joint data types plus a versioned sidecar migration; (2) render/pick/select endpoints and named joints independently of bone bodies; (3) implement explicit two-endpoint joint creation, rename, unlink/relink and candidate highlighting; (4) make linked endpoints share one authoritative joint coordinate during endpoint edits; (5) validate chains/branches, multiple links, undo/redo and save/reload. The current PCA-fitted endpoints and `parentBone` connections remain prototype-only until this migration is complete.
