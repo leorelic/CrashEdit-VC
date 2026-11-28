@@ -4114,9 +4114,10 @@ void EditorUI::drawAnimationViewer(){
     boneRigConnectSourceBone_=-1;boneRigConnectSourceEndpoint_=-1;
    }else{
     auto selected=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),target);
-    bool removing=io.KeyCtrl||selected!=boneRigSelectedEndpoints_.end();
-    if(removing){if(selected!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(selected);}
-    else boneRigSelectedEndpoints_.push_back(target);
+    bool selectionChanged=false;
+    const bool removing=io.KeyCtrl;
+    if(removing){if(selected!=boneRigSelectedEndpoints_.end()){boneRigSelectedEndpoints_.erase(selected);selectionChanged=true;}}
+    else if(selected==boneRigSelectedEndpoints_.end()){boneRigSelectedEndpoints_.push_back(target);selectionChanged=true;}
     // A linked endpoint is the same logical joint: select/deselect both endpoint identities together.
     for(const auto&joint:boneRigJoints_){
      std::pair<int,int> other{-1,-1};
@@ -4124,8 +4125,8 @@ void EditorUI::drawAnimationViewer(){
      else if(joint.boneB==target.first&&joint.endpointB==target.second)other={joint.boneA,joint.endpointA};
      if(other.first<0)continue;
      auto linked=std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),other);
-     if(removing){if(linked!=boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.erase(linked);}
-     else if(linked==boneRigSelectedEndpoints_.end())boneRigSelectedEndpoints_.push_back(other);
+     if(removing){if(linked!=boneRigSelectedEndpoints_.end()){boneRigSelectedEndpoints_.erase(linked);selectionChanged=true;}}
+     else if(linked==boneRigSelectedEndpoints_.end()){boneRigSelectedEndpoints_.push_back(other);selectionChanged=true;}
     }
     boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;
     for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
@@ -4147,7 +4148,7 @@ void EditorUI::drawAnimationViewer(){
     for(const int selectedBone:boneRigSelectedBones_)for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
      if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
     animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();
-    boneSelectionClicked=true;status_="Selected "+std::to_string(boneRigSelectedEndpoints_.size())+" endpoint(s).";
+    boneSelectionClicked=selectionChanged;status_="Selected "+std::to_string(boneRigSelectedEndpoints_.size())+" endpoint(s).";
    }
   }
   if(ImGui::BeginPopup("Bone Joint Context")){
