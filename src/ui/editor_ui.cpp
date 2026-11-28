@@ -411,6 +411,8 @@ void EditorUI::trackUndoHistory(){
  std::vector<std::uint8_t>nsfBytes,nsfPoseBytes,nsdBytes;std::string error;
  if(!nsf_.saveUncompressedSourceBytes(nsfBytes,error)||!nsf_.saveAnimationEditOverlay(nsfPoseBytes,error))return;
  if(nsdValid_&&!nsd_.saveBytes(nsdBytes,error))return;
+ bool jointsEqual=boneRigJoints_.size()==undoBaseline_.joints.size();
+ if(jointsEqual)for(std::size_t i=0;i<boneRigJoints_.size();++i){const auto&a=boneRigJoints_[i];const auto&b=undoBaseline_.joints[i];if(a.name!=b.name||a.boneA!=b.boneA||a.endpointA!=b.endpointA||a.boneB!=b.boneB||a.endpointB!=b.endpointB){jointsEqual=false;break;}}
  bool bonesEqual=boneRigBones_.size()==undoBaseline_.bones.size();
  if(bonesEqual)for(std::size_t i=0;i<boneRigBones_.size();++i){
   const auto&a=boneRigBones_[i];const auto&b=undoBaseline_.bones[i];
@@ -428,7 +430,7 @@ void EditorUI::trackUndoHistory(){
   }
   if(a.name!=b.name||a.vertices!=b.vertices||a.parentBone!=b.parentBone||a.pivotX!=b.pivotX||a.pivotY!=b.pivotY||a.pivotZ!=b.pivotZ||a.pivotInitialized!=b.pivotInitialized||a.frameRotations!=b.frameRotations||a.frameRestOffsets!=b.frameRestOffsets||!restVerticesEqual){bonesEqual=false;break;}
  }
- if(nsfBytes==undoNsfBytes_&&nsfPoseBytes==undoNsfPoseBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual)return;
+ if(nsfBytes==undoNsfBytes_&&nsfPoseBytes==undoNsfPoseBytes_&&nsdBytes==undoNsdBytes_&&bonesEqual&&jointsEqual)return;
  if(historyCursor_+1U<historyLabels_.size()){
   for(std::size_t i=historyCursor_+1U;i<historySnapshotPaths_.size();++i){std::error_code ec;std::filesystem::remove(historySnapshotPaths_[i],ec);}
   historyLabels_.resize(historyCursor_+1U);historySnapshotPaths_.resize(historyCursor_+1U);
@@ -5731,7 +5733,7 @@ void EditorUI::drawBoneRigEditor(){
   ImGui::Text("Assigned vertex indices");
   if(ImGui::BeginChild("BoneRigMembers",ImVec2(0.0f,90.0f),true)){if(bone.vertices.empty())ImGui::TextDisabled("No vertices assigned.");else{std::string members;for(std::size_t i=0;i<bone.vertices.size();++i){if(i)members+=", ";members+=std::to_string(bone.vertices[i]);}ImGui::TextWrapped("%s",members.c_str());}}
   ImGui::EndChild();
-  if(ImGui::Button("Delete Bone")){const int removed=boneRigSelectedBone_;boneRigBones_.erase(boneRigBones_.begin()+removed);for(auto&other:boneRigBones_){if(other.parentBone==removed)other.parentBone=-1;else if(other.parentBone>removed)--other.parentBone;}boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(removed,static_cast<int>(boneRigBones_.size()-1U));boneRigRotateMode_=false;}
+  if(ImGui::Button("Delete Bone")){const int removed=boneRigSelectedBone_;boneRigBones_.erase(boneRigBones_.begin()+removed);for(auto&other:boneRigBones_){if(other.parentBone==removed)other.parentBone=-1;else if(other.parentBone>removed)--other.parentBone;}boneRigJoints_.erase(std::remove_if(boneRigJoints_.begin(),boneRigJoints_.end(),[&](const BoneRigJoint&j){return j.boneA==removed||j.boneB==removed;}),boneRigJoints_.end());for(auto&j:boneRigJoints_){if(j.boneA>removed)--j.boneA;if(j.boneB>removed)--j.boneB;}boneRigSelectedEndpoints_.erase(std::remove_if(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),[&](const auto&p){return p.first==removed;}),boneRigSelectedEndpoints_.end());for(auto&p:boneRigSelectedEndpoints_)if(p.first>removed)--p.first;boneRigSelectedBone_=boneRigBones_.empty()?-1:std::min(removed,static_cast<int>(boneRigBones_.size()-1U));boneRigSelectedBones_.clear();boneRigRotateMode_=false;}
  }else ImGui::TextDisabled("Create a bone, select vertices in the viewport, then assign them here.");
  ImGui::PopTextWrapPos();ImGui::End();
 }
