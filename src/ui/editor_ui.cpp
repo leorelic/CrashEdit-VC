@@ -4824,13 +4824,8 @@ void EditorUI::drawAnimationViewer(){
   // Connection is represented by coincident fitted endpoints, not a pivot-to-pivot line.
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){const int pi=boneRigBones_[bi].parentBone;if(pi<0||static_cast<std::size_t>(pi)>=boneRigBones_.size()||!fittedBoneEndsValid[bi]||!fittedBoneEndsValid[static_cast<std::size_t>(pi)])continue;const auto&child=fittedBoneEnds[bi];const auto&parent=fittedBoneEnds[static_cast<std::size_t>(pi)];float best=std::numeric_limits<float>::max();AnimationPoint joint=child[0];for(int c=0;c<2;++c)for(int p=0;p<2;++p){const float x=child[c].x-parent[p].x,y=child[c].y-parent[p].y,z=child[c].z-parent[p].z,d=x*x+y*y+z*z;if(d<best){best=d;joint=child[c];}}const ImVec2 q=project(joint.x,joint.y,joint.z);boneOverlay->AddCircleFilled(q,5.0f,IM_COL32(75,175,225,235),20);boneOverlay->AddCircle(q,7.0f,IM_COL32(18,22,28,245),20,1.5f);}
 
-  for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
-   const int parent=boneRigBones_[bi].parentBone;
-   if(parent<0||static_cast<std::size_t>(parent)>=boneRigBones_.size()||static_cast<std::size_t>(parent)==bi)continue;
-   const auto child=boneJointWorld(bi),parentJoint=boneJointWorld(static_cast<std::size_t>(parent));
-   boneOverlay->AddLine(project(parentJoint.x,parentJoint.y,parentJoint.z),project(child.x,child.y,child.z),IM_COL32(20,24,30,220),3.0f);
-   boneOverlay->AddLine(project(parentJoint.x,parentJoint.y,parentJoint.z),project(child.x,child.y,child.z),IM_COL32(75,175,225,180),1.5f);
-  }
+  // Do not draw pivot-to-pivot hierarchy lines: they create a stray line
+  // outside the fitted bone bodies. Connections are shown by snapped fitted endpoints.
   // Fit a bone-like indicator to the assigned vertex region. The principal
   // covariance axis supplies its direction; projected bounds supply length
   // and width. This is a display fit, independent of the pivot gizmo.
