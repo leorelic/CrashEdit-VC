@@ -4798,7 +4798,7 @@ void EditorUI::drawAnimationViewer(){
    return AnimationPoint((joint.pivotX+static_cast<float>(frame.xOffset)/4.0f)*modelScaleX,(joint.pivotZ+static_cast<float>(frame.yOffset)/4.0f)*modelScaleY,(joint.pivotY+static_cast<float>(frame.zOffset)/4.0f)*modelScaleZ);
   };
   // Precompute each fitted region's long-axis endpoints in model space.
-  std::vector<std::array<AnimationPoint,2>> fittedBoneEnds(boneRigBones_.size());
+  std::vector<std::array<AnimationPoint,2>> fittedBoneEnds(boneRigBones_.size(),std::array<AnimationPoint,2>{AnimationPoint{0.0f,0.0f,0.0f},AnimationPoint{0.0f,0.0f,0.0f}});
   std::vector<bool> fittedBoneEndsValid(boneRigBones_.size(),false);
   for(std::size_t bi=0;bi<boneRigBones_.size();++bi){
    const auto&bone=boneRigBones_[bi];AnimationPoint c{0.0f,0.0f,0.0f};std::vector<AnimationPoint> pts;
