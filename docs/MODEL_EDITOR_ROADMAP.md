@@ -455,3 +455,9 @@ Acceptance: reproduce and record the exact frame, vertex, axis, current/requeste
 - [ ] Enable Complex editing only after save/reopen and original-game validation. Preserve the user-confirmed Cr10V preview baseline (ff5359a).
 
 Research details: ANIMATION_FORMAT_RESEARCH.md and RESEARCH_NOTES.md.
+
+## Bone viewport controls checkpoint — 2026-11-28
+
+The user has accepted the fitted bone indicators and connected-joint presentation after the stray pivot-to-pivot line was removed. The current finalization pass adds a true Bone mode toggle (`B` / viewport bone button), hides the bone layer when Bone mode is disabled, exposes Free Move / Axis Move / Scale / Rotate in Bone mode, supports Shift-add / Ctrl-remove multi-bone selection, and transforms the combined assigned-vertex set. Free Move starts by dragging a selected bone body. The Animation coordinate boundary status now lives in the 3D Animation Editor header above the viewer.
+
+**Validation status:** implementation checkpoint only until the current CI run and user test complete. Treat the existing bone feature as sufficient for the present milestone; prioritize Zones / Level Editing after the user confirms this build. Do not extend scope with independently authored head/tail joints, automatic bone detection, X-ray selection, or child-transform propagation unless a concrete blocker is found. Parent links remain organizational metadata; the rig is editor-only and does not serialize as a game skeleton.
