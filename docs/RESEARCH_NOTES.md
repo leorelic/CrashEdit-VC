@@ -704,3 +704,10 @@ Confirmed sequence for the tested resource:
 **Custom-animation relevance:** this validates a necessary building block for custom animation authoring: editable converted geometry can be saved and consumed by the original game. It does not yet establish a complete custom-animation workflow. Remaining work includes editing/keyframing frame poses, reliably serializing all intended frame changes, maintaining Model/Animation EID references and chunk/Zone constraints, and testing complete multi-frame custom animations in-game.
 
 Keep the earlier scope limits: this is a confirmed test case, not proof of unlimited coordinate range or compatibility with every Model/Animation layout.
+
+
+## Bone viewport finalization — 2026-11-28
+
+Current Bone-mode UI checkpoint: `B` and the viewport bone toggle enable/disable Bone mode; the fitted bone layer is hidden when mode is off. The transform toolbar is available in Bone mode, and Shift-add / Ctrl-remove multi-bone selection builds a combined assigned-vertex group for Free Move, Axis Move, Scale, and Rotate. Free Move is initiated by dragging a selected bone body. The Animation boundary check is now in the viewer header, not drawn over the scene. See [MODEL_EDITOR_ROADMAP.md](MODEL_EDITOR_ROADMAP.md) and [MILESTONES.md](MILESTONES.md).
+
+CI and user validation are pending for this UI pass. This does not change the format research: the rig remains editor-side metadata, not a native Crash skeleton; parent-child propagation and independently authored joint endpoints are still deferred.
