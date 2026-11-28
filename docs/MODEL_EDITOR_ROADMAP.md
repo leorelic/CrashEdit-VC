@@ -497,3 +497,20 @@ The desired connection data is a pair of stable endpoint references (bone ID + e
 - [x] Remove the redundant “Vertex Assignment Mode” checkbox from the Bone Rig panel. It only mirrored the existing Vertex Mode visibility/selection flag and did not perform bone assignment. The panel now directs users to Vertex Mode (V) and Create From Selection.
 - [ ] If needed later, design a genuine reassignment workflow for adding/removing already-selected vertices from an existing bone; do not reintroduce a checkbox that only duplicates vertex visibility.
 - [ ] CI and in-app validation pending for commit [75cd092](https://github.com/leorelic/CrashEdit-VC/commit/75cd092bc55fc93dcab049b7c2ea56bbb05c772b).
+
+
+## Bone rig authoring — named joints and connected segments (2026-11-28)
+
+The target is a segment-and-joint rig, not a parent/child skeleton. Example: **UpperArm** + **LowerArm**, joined at a named **Elbow**, gives shoulder → elbow → wrist. The Elbow is one selectable joint shared by the two exact bone endpoints.
+
+- [ ] Replace temporary `parentBone` links with stable per-bone Head/Tail endpoint identities and named joint records containing two exact endpoint references.
+- [ ] Give every bone independently authored, persistent head/tail coordinates; do not derive final endpoint positions only from PCA of assigned vertices.
+- [ ] Add distinct viewport picking/selection for bone bodies, endpoints, and named joints, with clear selected/hovered states.
+- [ ] Add explicit endpoint-A then endpoint-B creation flow, joint naming, cancellation, rename, unlink, and relink. Candidate proximity detection may highlight suggestions but must require confirmation.
+- [ ] Treat the joint as the shared authoritative point for both connected endpoints. Editing the joint moves the connection point for both segments; do not introduce parent/descendant transform propagation.
+- [ ] Support chains and branches, either endpoint orientation, multiple joints per bone where valid, and head-head/head-tail/tail-tail connections.
+- [ ] Version the editor-only sidecar, preserve existing bone vertex groups and frame edits, and provide a safe migration path for existing v1/v2 rigs. Do not reinterpret legacy `parentBone` links as named joints without user confirmation.
+- [ ] Include joints/endpoints in undo/redo snapshots and compare logic; verify save/reload and frame switching.
+- [ ] Test the Cr10V left-arm case: UpperArm + LowerArm → named Elbow, yielding exactly three visible points (shoulder, elbow, wrist).
+
+Research/design detail: [RESEARCH_NOTES.md](RESEARCH_NOTES.md), “Named joint authoring clarified by user”. This is the active bone milestone; the existing fitted-endpoint/parentBone behavior is only a prototype and must not be treated as completion.
