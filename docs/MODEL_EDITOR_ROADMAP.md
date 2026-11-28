@@ -514,3 +514,12 @@ The target is a segment-and-joint rig, not a parent/child skeleton. Example: **U
 - [ ] Test the Cr10V left-arm case: UpperArm + LowerArm → named Elbow, yielding exactly three visible points (shoulder, elbow, wrist).
 
 Research/design detail: [RESEARCH_NOTES.md](RESEARCH_NOTES.md), “Named joint authoring clarified by user”. This is the active bone milestone; the existing fitted-endpoint/parentBone behavior is only a prototype and must not be treated as completion.
+
+
+### Additional acceptance criteria — endpoint interaction and animation poses (2026-11-28)
+
+- [ ] Preserve the existing fitted bone indicator appearance and its current behavior of following animated vertex positions during playback.
+- [ ] Keep endpoint/joint identities stable across the animation, while storing or deterministically resolving distinct endpoint/joint positions for each frame. Per-frame edits must not overwrite other frames; frame scrubbing and playback must display the appropriate pose.
+- [ ] Right-clicking an endpoint must open a context menu identifying the exact bone and Head/Tail point.
+- [ ] “Connect to...” must enter explicit endpoint-picking mode. The next click must select the exact target Head/Tail on another bone; never choose a target endpoint by proximity after a bone-body click. Escape cancels.
+- [ ] Show the exact source and target endpoint names in the connection flow and resulting joint record; make the created joint independently selectable/context-menu accessible.
