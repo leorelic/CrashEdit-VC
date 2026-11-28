@@ -458,6 +458,13 @@ Research details: ANIMATION_FORMAT_RESEARCH.md and RESEARCH_NOTES.md.
 
 ## Bone viewport controls checkpoint — 2026-11-28
 
-The user has accepted the fitted bone indicators and connected-joint presentation after the stray pivot-to-pivot line was removed. The current finalization pass adds a true Bone mode toggle (`B` / viewport bone button), hides the bone layer when Bone mode is disabled, exposes Free Move / Axis Move / Scale / Rotate in Bone mode, supports Shift-add / Ctrl-remove multi-bone selection, and transforms the combined assigned-vertex set. Free Move starts by dragging a selected bone body. The Animation coordinate boundary status now lives in the 3D Animation Editor header above the viewer.
+The user has accepted the fitted bone indicators and connected-joint presentation after the stray pivot-to-pivot line was removed. The current finalization pass adds a true Bone mode toggle (`B` / viewport bone button), hides the bone layer when Bone mode is disabled, exposes Free Move / Axis Move / Scale / Rotate in Bone mode, supports plain-click additive / Ctrl-remove multi-bone selection; Shift is reserved for camera orbit, and transforms the combined assigned-vertex set. Free Move starts by dragging a selected bone body. The Animation coordinate boundary status now lives in the 3D Animation Editor header above the viewer.
 
 **Validation status:** implementation checkpoint only until the current CI run and user test complete. Treat the existing bone feature as sufficient for the present milestone; prioritize Zones / Level Editing after the user confirms this build. Do not extend scope with independently authored head/tail joints, automatic bone detection, X-ray selection, or child-transform propagation unless a concrete blocker is found. Parent links remain organizational metadata; the rig is editor-only and does not serialize as a game skeleton.
+
+
+## Bone selection and endpoint editing correction — 2026-11-28
+
+User clarified the intended interaction: Bone mode locks ordinary left-drag camera orbit just like vertex editing. Clicking bones adds them to the current selection; Ctrl-click removes; Shift+left-drag is reserved for camera orbit and must not change selection. The viewport now follows additive click / Ctrl-remove and ignores Shift-click for selection.
+
+Clicking either fitted bone endpoint selects the vertices in that end region (rather than the entire assigned region), so the endpoint can be moved with the existing transform gizmos as a joint-like edit. This is an initial vertex-group endpoint manipulation, not a persistent independent joint coordinate system: endpoint position is still derived from the fitted assigned vertices and may refit as the mesh changes. Validate endpoint behavior and multi-selection in-app before calling it final.
