@@ -223,3 +223,10 @@ This upgrades the preceding conversion milestone from “converted resources pla
 - Source checkpoints: [4301e77](https://github.com/leorelic/CrashEdit-VC/commit/4301e77c5f24df23a2d5ce9e091d6fa0e325846f), [d89f242](https://github.com/leorelic/CrashEdit-VC/commit/d89f242d6fafb45d1164607741b09e5b5e15f927), [949a7cb](https://github.com/leorelic/CrashEdit-VC/commit/949a7cb15719f80053b75e1e1fa360916d25c761), and [402caa4](https://github.com/leorelic/CrashEdit-VC/commit/402caa44554e834656fe0a25c09eefbdb25e600f), with modifier-click selection corrected in [89cd362](https://github.com/leorelic/CrashEdit-VC/commit/89cd362903cb3e7baecf305e2b76437c5b5a073b).
 - This remains an editor-side vertex-group rig, not a game skeleton. Parent/child transform propagation and persistent independently authored head/tail joints remain deferred.
 - Do not promote this to a user-confirmed major milestone until the new build passes CI and the user verifies Bone mode, multi-selection transforms, and the relocated boundary status in the running application.
+
+
+## Bone selection and endpoint editing correction — 2026-11-28
+
+User clarified the intended interaction: Bone mode locks ordinary left-drag camera orbit just like vertex editing. Clicking bones adds them to the current selection; Ctrl-click removes; Shift+left-drag is reserved for camera orbit and must not change selection. The viewport now follows additive click / Ctrl-remove and ignores Shift-click for selection.
+
+Clicking either fitted bone endpoint selects the vertices in that end region (rather than the entire assigned region), so the endpoint can be moved with the existing transform gizmos as a joint-like edit. This is an initial vertex-group endpoint manipulation, not a persistent independent joint coordinate system: endpoint position is still derived from the fitted assigned vertices and may refit as the mesh changes. Validate endpoint behavior and multi-selection in-app before calling it final.
