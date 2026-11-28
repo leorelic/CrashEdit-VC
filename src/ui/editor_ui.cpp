@@ -5556,6 +5556,8 @@ void EditorUI::drawBoneRigEditor(){
       if(valid){bone.frameRestVertices.emplace(key,std::move(rest));bone.frameRestOffsets.emplace(key,offsets);}
      }
     }
+    // Legacy v1/v2 parentBone values are prototype hierarchy metadata, not joints.
+    bone.parentBone=-1;
     loaded.push_back(std::move(bone));
    }
    std::vector<BoneRigJoint>loadedJoints;
@@ -5606,7 +5608,7 @@ void EditorUI::drawBoneRigEditor(){
   if(saved){
    output<<"CRASHEDIT_BONES 3 "<<entry.eid<<" "<<modelEid<<" "<<boneRigBones_.size()<<"\n";
    for(const auto&savedBone:boneRigBones_){
-    output<<std::quoted(savedBone.name)<<" "<<savedBone.parentBone<<" "<<savedBone.pivotX<<" "<<savedBone.pivotY<<" "<<savedBone.pivotZ<<" "<<savedBone.pivotInitialized<<" "<<savedBone.vertices.size();
+    output<<std::quoted(savedBone.name)<<" "<<-1<<" "<<savedBone.pivotX<<" "<<savedBone.pivotY<<" "<<savedBone.pivotZ<<" "<<savedBone.pivotInitialized<<" "<<savedBone.vertices.size();
     for(const int vertex:savedBone.vertices)output<<" "<<vertex;
     output<<" "<<savedBone.frameRotations.size()<<"\n";
     for(const auto&[key,rotation]:savedBone.frameRotations)output<<key<<" "<<rotation[0]<<" "<<rotation[1]<<" "<<rotation[2]<<"\n";
