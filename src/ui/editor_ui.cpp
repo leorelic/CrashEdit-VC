@@ -4376,7 +4376,7 @@ void EditorUI::drawAnimationViewer(){
   if((animationShowVertices_||boneRigWindowOpen_)&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!boneSelectionClicked&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
-    canStart=boneRigWindowOpen_?false:(hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex));
+    canStart=boneRigWindowOpen_?hoveredBone>=0&&hoveredBoneEndpoint>=0&&std::find(boneRigSelectedEndpoints_.begin(),boneRigSelectedEndpoints_.end(),std::pair<int,int>{hoveredBone,hoveredBoneEndpoint})!=boneRigSelectedEndpoints_.end():(hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex));
    else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::AxisMove){
     dragAxis=vertexGizmoAxis;canStart=vertexGizmoHandleHovered;
    }else if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::Scale){
