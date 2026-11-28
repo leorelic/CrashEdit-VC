@@ -4102,8 +4102,20 @@ void EditorUI::drawAnimationViewer(){
     }
     boneRigConnectSource_=-1;boneRigSelectedBone_=child;
    }else{
-    boneRigSelectedBone_=hoveredBone;
-    boneSelectionClicked=true;status_="Selected bone joint: "+boneRigBones_[static_cast<std::size_t>(hoveredBone)].name;
+    if(io.KeyShift||io.KeyCtrl){
+     auto selectedIt=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),hoveredBone);
+     if(io.KeyCtrl&&selectedIt!=boneRigSelectedBones_.end())boneRigSelectedBones_.erase(selectedIt);
+     else if(selectedIt==boneRigSelectedBones_.end())boneRigSelectedBones_.push_back(hoveredBone);
+    }else{
+     boneRigSelectedBones_.clear();boneRigSelectedBones_.push_back(hoveredBone);
+    }
+    boneRigSelectedBone_=boneRigSelectedBones_.size()==1U?boneRigSelectedBones_.front():-1;
+    animationSelectedVertices_.clear();
+    for(const int selectedBone:boneRigSelectedBones_)if(selectedBone>=0&&static_cast<std::size_t>(selectedBone)<boneRigBones_.size())
+     for(const int vertex:boneRigBones_[static_cast<std::size_t>(selectedBone)].vertices)
+      if(vertex>=0&&std::find(animationSelectedVertices_.begin(),animationSelectedVertices_.end(),vertex)==animationSelectedVertices_.end())animationSelectedVertices_.push_back(vertex);
+    animationSelectedVertex_=animationSelectedVertices_.empty()?-1:animationSelectedVertices_.front();
+    boneSelectionClicked=true;status_="Selected "+std::to_string(boneRigSelectedBones_.size())+" bone(s).";
    }
   }
   if(ImGui::BeginPopup("Bone Joint Context")){
@@ -4273,7 +4285,7 @@ void EditorUI::drawAnimationViewer(){
   bool vertexDragStarted=false;
   int vertexGizmoAxis=-1;
   bool vertexGizmoHandleHovered=false;
-  if(animationShowVertices_&&!animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove){
+  if((animationShowVertices_||boneRigWindowOpen_)&&!animationCollisionViewer_&&hovered&&!viewportToolbarOwnsMouse&&!animationSelectedVertices_.empty()&&vertexToolMode!=VertexToolMode::FreeMove){
    const auto gizmoPivot=selectedVertexPivot();
    const ImVec2 gizmoCenter=project(gizmoPivot.x,gizmoPivot.y,gizmoPivot.z);
    if(gizmoCenter.x>-99999.0f){
@@ -4322,7 +4334,7 @@ void EditorUI::drawAnimationViewer(){
    if(!animationSelectedVertices_.empty()){animationPlaybackFrame_=static_cast<double>(poseFrameIndex);animationFrame_=poseFrameIndex;animationPlaying_=false;animationFrameEditorOpen_=true;}
    vertexBox.pending=false;vertexBox.active=false;
   }
-  if(animationShowVertices_&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!boneSelectionClicked&&hoveredBone<0&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
+  if((animationShowVertices_||boneRigWindowOpen_)&&hovered&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!io.KeyCtrl&&!boneRotationStarted&&!boneSelectionClicked&&hoveredBone<0&&!vertexBox.pending&&!viewportToolbarOwnsMouse&&!collisionDragStarted&&!(animationCollisionViewer_&&hoveredCollisionIndex>=0)){
    int dragAxis=-1;bool canStart=false;
    if(!animationSelectedVertices_.empty()&&vertexToolMode==VertexToolMode::FreeMove)
     canStart=hoveredVertex>=0&&isAnimationVertexSelected(hoveredVertex);
