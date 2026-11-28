@@ -781,3 +781,17 @@ Further user clarification for the named-joint implementation:
 - Preserve the current fitted indicator appearance and playback-following behavior. The change is to selection, edit semantics, and persistent rig data, not an unsolicited visual redesign.
 
 This supersedes the current prototype's whole-bone click/additive selection and assigned-vertex-group transform semantics once the point-based system is implemented. Existing sidecar data must be migrated safely or retained with an explicit compatibility path; never silently discard existing bone assignments.
+
+
+### First implementation pass — point selection and named endpoint joints (2026-11-28)
+
+Implemented in the native viewport and editor-only bone sidecar:
+
+- Viewport picking is now point-only. The fitted bone body is no longer a selectable target; only its two fitted endpoints can be selected.
+- Head and Tail selections are tracked independently. A segment is highlighted as a whole only when both endpoints of that same bone are selected. One endpoint highlights only that point.
+- Endpoint selection drives the existing vertex-edit pipeline: one point selects its end-region vertex group; both points select the complete assigned vertex group. This preserves per-frame Animation vertex editing and the current fitted/playback-following indicator appearance.
+- Right-clicking an endpoint identifies its bone and Head/Tail. `Connect to...` then requires a click on the exact target endpoint. Escape cancels. Connected endpoint selection propagates across the shared joint; context actions can disconnect it.
+- Added named joint records with exact `(bone index, endpoint index)` pairs, editable names, and frame-specific display snapping based on each frame's fitted endpoint positions. There is no parent/child propagation.
+- Bone sidecars now write `CRASHEDIT_BONES 3`, including joint records. Versions 1 and 2 remain readable; existing vertex assignments and frame edit data are retained. Joint records are included in undo/redo snapshots and are cleaned/remapped when bones are deleted.
+
+**Still pending before calling the rig complete:** independently authored endpoint coordinate overrides (rather than only the current per-frame fitted positions), direct joint gizmo editing as a shared point rather than editing the fitted end-region vertex subset, and in-app testing of connect/disconnect, two-point selection, transforms, and sidecar save/reopen on Cr10V. The current implementation is a first interaction milestone; CI success is not a substitute for the user's viewport test.
