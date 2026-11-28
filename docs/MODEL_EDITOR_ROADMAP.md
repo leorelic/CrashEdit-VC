@@ -537,3 +537,20 @@ The named-joint milestone must also satisfy:
 - [ ] Add regression/manual checks for point-only picking, one-point vs two-point highlighting, endpoint-only vs whole-segment transforms, shared-joint edits, sidecar save/reload, and frame-specific edits without cross-frame overwrites.
 
 These criteria replace the current prototype's whole-bone body selection and whole assigned-vertex-set transforms after the point-based interaction is implemented. Do not remove legacy sidecar compatibility or existing assignments during the transition.
+
+
+### Point-only bone viewport and named joints — first implementation pass (2026-11-28)
+
+Implemented in the current native editor pass:
+
+- [x] Bone-body picking is disabled in the viewport; Head/Tail endpoint points are the only viewport selection targets.
+- [x] Selecting one endpoint highlights that point; selecting both endpoints of a bone highlights the entire segment.
+- [x] Point selection drives endpoint-region vertex editing; selecting both endpoints expands to the whole bone's assigned vertices.
+- [x] Right-click identifies the exact bone endpoint; `Connect to...` requires explicit target Head/Tail picking, and Escape cancels.
+- [x] Named endpoint-pair joints can be created, renamed, disconnected, and selected through their shared endpoint. Selecting a linked endpoint selects both sides of the logical joint.
+- [x] Joint records are stored in the independent `data/<animation>-bones.txt` sidecar using format version 3; versions 1 and 2 remain readable. Undo/redo snapshots include joint records.
+- [x] Joint positions are resolved and snapped from the current frame's fitted endpoints, preserving the current playback-following visual behavior.
+
+Still open:
+- [ ] Add independently authored per-frame endpoint coordinate overrides and direct shared-joint gizmo editing. Current endpoint editing operates through the existing frame-specific vertex groups and fitted endpoint calculation.
+- [ ] User-test the Cr10V arm case, point-only picking, transforms, joint connection/disconnection, and sidecar save/reopen. Do not mark the Bone Rig milestone complete or move to Zones until these are verified.
