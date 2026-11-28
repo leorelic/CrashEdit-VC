@@ -330,7 +330,7 @@ bool EditorUI::saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& 
  if(!snapshot.nsf.saveUncompressedSourceBytes(nsfBytes,error)||!snapshot.nsf.saveAnimationEditOverlay(poseBytes,error))return false;
  if(nsdValid_&&!snapshot.nsd.saveBytes(nsdBytes,error))return false;
  std::ofstream out(path,std::ios::binary|std::ios::trunc);if(!out)return false;
- const std::uint32_t magic=0x48435645U,version=2U;
+ const std::uint32_t magic=0x48435645U,version=3U;
  const std::uint8_t hasNsd=nsdValid_?1U:0U;
  auto write=[&](const auto&value){out.write(reinterpret_cast<const char*>(&value),sizeof(value));};
  auto writeBytes=[&](const std::vector<std::uint8_t>&bytes){const std::uint64_t size=bytes.size();write(size);if(size)out.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(size));};
@@ -343,6 +343,8 @@ bool EditorUI::saveHistorySnapshot(std::size_t stateIndex,const EditorSnapshot& 
   write(bone.parentBone);write(bone.pivotX);write(bone.pivotY);write(bone.pivotZ);write(bone.pivotInitialized);
   write(rotationCount);for(const auto&[frame,rotation]:bone.frameRotations){write(frame);out.write(reinterpret_cast<const char*>(rotation.data()),static_cast<std::streamsize>(sizeof(float)*rotation.size()));}
  }
+ const std::uint64_t jointCount=snapshot.joints.size();write(jointCount);
+ for(const auto&joint:snapshot.joints){const std::uint64_t nameSize=joint.name.size();write(nameSize);if(nameSize)out.write(joint.name.data(),static_cast<std::streamsize>(nameSize));write(joint.boneA);write(joint.endpointA);write(joint.boneB);write(joint.endpointB);}
  out.flush();if(!out)return false;
  if(stateIndex>=historySnapshotPaths_.size())historySnapshotPaths_.resize(stateIndex+1U);
  historySnapshotPaths_[stateIndex]=path;return true;
@@ -354,7 +356,7 @@ bool EditorUI::loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapsh
  auto readBytes=[&](std::vector<std::uint8_t>&bytes){std::uint64_t size=0;if(!read(size)||size>1024ULL*1024ULL*1024ULL)return false;bytes.resize(static_cast<std::size_t>(size));if(size)in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(size));return static_cast<bool>(in);};
  std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;std::string error;
  std::vector<std::uint8_t>nsfBytes,nsdBytes,poseBytes;
- if(!read(magic)||!read(version)||magic!=0x48435645U||(version!=1U&&version!=2U)||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
+ if(!read(magic)||!read(version)||magic!=0x48435645U||(version!=1U&&version!=2U&&version!=3U)||!read(hasNsd)||!readBytes(nsfBytes)||!readBytes(nsdBytes))return false;
  if(version>=2U&&!readBytes(poseBytes))return false;
  Crash::NsfArchive archive;if(!archive.loadBytes(nsfBytes,error))return false;
  if(gameVersion_==GameVersion::Crash2||gameVersion_==GameVersion::Crash3BetaMAY14||gameVersion_==GameVersion::Crash3)archive.decodeZones(gameVersion_==GameVersion::Crash3);
@@ -372,11 +374,13 @@ bool EditorUI::loadHistorySnapshot(std::size_t stateIndex,EditorSnapshot& snapsh
   for(std::uint64_t j=0;j<rotationCount;++j){std::uint64_t frame=0;std::array<float,3>rotation{};if(!read(frame))return false;in.read(reinterpret_cast<char*>(rotation.data()),static_cast<std::streamsize>(sizeof(float)*rotation.size()));if(!in)return false;bone.frameRotations.emplace(frame,rotation);}
   bones.push_back(std::move(bone));
  }
- snapshot.nsf=std::move(archive);snapshot.nsd=std::move(level);snapshot.bones=std::move(bones);return static_cast<bool>(in);
+ std::vector<BoneRigJoint>joints;
+ if(version>=3U){std::uint64_t count=0;if(!read(count)||count>16384U)return false;for(std::uint64_t i=0;i<count;++i){BoneRigJoint joint;std::uint64_t nameSize=0;if(!read(nameSize)||nameSize>1024U*1024U)return false;joint.name.resize(static_cast<std::size_t>(nameSize));if(nameSize)in.read(joint.name.data(),static_cast<std::streamsize>(nameSize));if(!read(joint.boneA)||!read(joint.endpointA)||!read(joint.boneB)||!read(joint.endpointB))return false;joints.push_back(std::move(joint));}}
+ snapshot.nsf=std::move(archive);snapshot.nsd=std::move(level);snapshot.bones=std::move(bones);snapshot.joints=std::move(joints);return static_cast<bool>(in);
 }
 void EditorUI::restoreHistoryState(std::size_t stateIndex){
  EditorSnapshot restored;if(!loadHistorySnapshot(stateIndex,restored)){status_="Could not restore history state "+std::to_string(stateIndex)+". The temporary snapshot may be missing or damaged.";return;}
- undoBaseline_=std::move(restored);boneRigBones_=undoBaseline_.bones;nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;nsdValid_=false;
+ undoBaseline_=std::move(restored);boneRigBones_=undoBaseline_.bones;boneRigJoints_=undoBaseline_.joints;nsf_=undoBaseline_.nsf;nsd_=undoBaseline_.nsd;nsdValid_=false;
  if(stateIndex<historySnapshotPaths_.size()){
   std::ifstream in(historySnapshotPaths_[stateIndex],std::ios::binary);std::uint32_t magic=0,version=0;std::uint8_t hasNsd=0;in.read(reinterpret_cast<char*>(&magic),4);in.read(reinterpret_cast<char*>(&version),4);in.read(reinterpret_cast<char*>(&hasNsd),1);nsdValid_=hasNsd!=0;
  }
@@ -388,7 +392,7 @@ void EditorUI::refreshUndoBaselineBytes(){
  undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();std::string error;
  if(nsfValid_){nsf_.saveUncompressedSourceBytes(undoNsfBytes_,error);nsf_.saveAnimationEditOverlay(undoNsfPoseBytes_,error);}
  if(nsdValid_)nsd_.saveBytes(undoNsdBytes_,error);
- undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=nsfValid_;
+ undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaseline_.joints=boneRigJoints_;undoBaselineValid_=nsfValid_;
 }
 void EditorUI::resetUndoHistory(){
  historyLabels_.clear();historySnapshotPaths_.clear();historyCursor_=0;undoBaselineValid_=false;undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();clearHistoryLog();
@@ -396,7 +400,7 @@ void EditorUI::resetUndoHistory(){
  std::string error;
  if(!nsf_.saveUncompressedSourceBytes(undoNsfBytes_,error)||!nsf_.saveAnimationEditOverlay(undoNsfPoseBytes_,error))return;
  if(nsdValid_&&!nsd_.saveBytes(undoNsdBytes_,error)){undoNsfBytes_.clear();undoNsfPoseBytes_.clear();undoNsdBytes_.clear();return;}
- undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaselineValid_=true;
+ undoBaseline_.nsf=nsf_;undoBaseline_.nsd=nsd_;undoBaseline_.bones=boneRigBones_;undoBaseline_.joints=boneRigJoints_;undoBaselineValid_=true;
  historyLabels_.push_back("Original file state");
  if(!saveHistorySnapshot(0U,undoBaseline_)){historyLabels_.clear();undoBaselineValid_=false;status_="Could not create the temporary original-state history snapshot.";}
  writeHistoryLog();
@@ -432,7 +436,7 @@ void EditorUI::trackUndoHistory(){
  std::string actionLabel=status_;
  if(actionLabel.empty()||actionLabel=="Ready — open a Crash 2 level archive."||actionLabel=="Undo completed."||actionLabel=="Redo completed.")actionLabel="Edit NSF data";
  std::replace(actionLabel.begin(),actionLabel.end(),'\n',' ');std::replace(actionLabel.begin(),actionLabel.end(),'\r',' ');
- EditorSnapshot next;next.nsf=nsf_;next.nsd=nsd_;next.bones=boneRigBones_;
+ EditorSnapshot next;next.nsf=nsf_;next.nsd=nsd_;next.bones=boneRigBones_;next.joints=boneRigJoints_;
  const std::size_t nextIndex=historyLabels_.size();
  if(!saveHistorySnapshot(nextIndex,next)){status_="History snapshot could not be written to the temporary folder; the action was not added to Action History.";return;}
  historyLabels_.push_back(actionLabel);historyCursor_=nextIndex;
