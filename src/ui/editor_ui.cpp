@@ -3581,9 +3581,9 @@ void EditorUI::drawAnimationViewer(){
    if(freeMoveClicked)vertexToolMode=VertexToolMode::FreeMove;if(freeMoveHovered)ImGui::SetTooltip("Free Move — drag selected vertices in the view plane");
   }
   ImGui::SetCursorScreenPos(axisMoveMin);const bool axisMoveClicked=ImGui::InvisibleButton("##AnimationAxisMove",ImVec2(28.0f,26.0f));axisMoveHovered=ImGui::IsItemHovered();
-  if(axisMoveClicked)vertexToolMode=VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Axis Move — drag selected collision faces along their matching axes":"Axis Move — drag X/Y/Z gizmo handles for the selected vertices");
+  if(axisMoveClicked)vertexToolMode=vertexToolMode==VertexToolMode::AxisMove?VertexToolMode::FreeMove:VertexToolMode::AxisMove;if(axisMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Axis Move — drag selected collision faces along their matching axes":"Axis Move — drag X/Y/Z gizmo handles for the selected vertices");
   ImGui::SetCursorScreenPos(scaleMoveMin);const bool scaleMoveClicked=ImGui::InvisibleButton("##AnimationScaleMove",ImVec2(28.0f,26.0f));scaleMoveHovered=ImGui::IsItemHovered();
-  if(scaleMoveClicked)vertexToolMode=VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
+  if(scaleMoveClicked)vertexToolMode=vertexToolMode==VertexToolMode::Scale?VertexToolMode::FreeMove:VertexToolMode::Scale;if(scaleMoveHovered)ImGui::SetTooltip(animationCollisionViewer_?"Scale — resize a pair of opposite selected faces symmetrically":"Scale — scale selected vertices symmetrically around their center");
  }
  if(!animationCollisionViewer_){
   ImGui::SetCursorScreenPos(rotateMoveMin);const bool rotateMoveClicked=ImGui::InvisibleButton("##AnimationRotateMove",ImVec2(28.0f,26.0f));rotateMoveHovered=ImGui::IsItemHovered();
@@ -5620,9 +5620,7 @@ void EditorUI::drawBoneRigEditor(){
  }
  ImGui::TextDisabled("Sidecar: data/%s",boneFile.filename().string().c_str());
  ImGui::Separator();
-  boneRigVertexEditMode_=animationShowVertices_;
-  if(ImGui::Checkbox("Vertex Assignment Mode",&boneRigVertexEditMode_))animationShowVertices_=boneRigVertexEditMode_;
-  ImGui::TextDisabled("Bone mode selects joints independently. Enable vertex assignment mode to pick vertices for a bone.");
+  ImGui::TextDisabled("Use the viewport's Vertex Mode (V) to show and select vertices. Create a bone from the current vertex selection with Create From Selection.");
   ImGui::TextUnformatted("New Bone");ImGui::SetNextItemWidth(-1.0f);ImGui::InputText("##BoneName",boneRigName_,sizeof(boneRigName_));
  if(ImGui::Button("Create Empty Bone",ImVec2(-1.0f,0.0f))){
   std::string name=boneRigName_;if(name.empty())name="Bone "+std::to_string(boneRigBones_.size()+1U);
