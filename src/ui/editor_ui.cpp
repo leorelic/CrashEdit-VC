@@ -285,7 +285,7 @@ bool EditorUI::loadLevel(const std::filesystem::path& file,std::string& error){
  if(haveNsd)for(const auto&warning:level.validationWarnings())Diagnostics::log(DiagnosticLevel::Warning,warning);
  if(!workspace_.open(file.parent_path(),error)){Diagnostics::log(DiagnosticLevel::Error,"Failed to open level workspace: "+error);return false;}
  invalidateBlueprintAnalysisCache();nsf_=std::move(archive);sceneCameraInitialized_=false;sceneCameraChunk_=-1;sceneCameraEntry_=-1;viewerChunk_=-1;viewerEntry_=-1;nsfPath_=file;nsdPath_=sidecar;nsdValid_=haveNsd;if(haveNsd)nsd_=std::move(level);
- nsfValid_=true;boneRigBones_.clear();boneRigModelEid_=0;boneRigAnimationEid_=0;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
+ nsfValid_=true;boneRigBones_.clear();boneRigSelectedBones_.clear();boneRigModelEid_=0;boneRigAnimationEid_=0;selectedChunk_=-1;selectedSpawn_=-1;selectedEntry_=-1;selectedEntity_=-1;gameVersion_=pendingVersion_;workspace_.selectResource(file.string());resetUndoHistory();
  status_=std::string("Loaded ")+versionName(gameVersion_)+" NSF ("+std::to_string(nsf_.chunks().size())+" chunks).";
  if(!haveNsd){status_+=" Matching NSD unavailable: "+nsdError;Diagnostics::log(DiagnosticLevel::Warning,"Matching NSD unavailable: "+nsdError);}
  editorPreferences.lastNsfPath=file.string();
@@ -4891,7 +4891,7 @@ void EditorUI::drawAnimationViewer(){
    for(const auto&p:points){const ImVec2 q=project(p.x,p.y,p.z);projectedRadius=std::max(projectedRadius,std::abs((q.x-a.x)*nx+(q.y-a.y)*ny));}
    const float halfWidth=std::clamp(projectedRadius*0.72f,4.0f,std::max(4.0f,screenLength*0.24f));
    auto at=[&](float t,float side,float width){return ImVec2(a.x+dx*t+nx*halfWidth*side*width,a.y+dy*t+ny*halfWidth*side*width);};
-   const bool selected=static_cast<int>(bi)==boneRigSelectedBone_;
+   const bool selected=std::find(boneRigSelectedBones_.begin(),boneRigSelectedBones_.end(),static_cast<int>(bi))!=boneRigSelectedBones_.end()||static_cast<int>(bi)==boneRigSelectedBone_;
    const ImU32 fill=selected?IM_COL32(255,190,75,245):IM_COL32(75,175,225,230);
    const ImU32 outline=IM_COL32(18,22,28,250);
    ImVec2 shape[10]{
@@ -5516,7 +5516,7 @@ void EditorUI::drawBoneRigEditor(){
  const std::uint32_t modelEid=animation.isCrash3?frame.linkedModelEid:frame.modelEid;
  if(!Crash::isValidEid(modelEid)||!frame.verticesDecoded)return;
  if(boneRigModelEid_!=modelEid||boneRigAnimationEid_!=entry.eid){
-  boneRigModelEid_=modelEid;boneRigAnimationEid_=entry.eid;boneRigBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;
+  boneRigModelEid_=modelEid;boneRigAnimationEid_=entry.eid;boneRigBones_.clear();boneRigSelectedBones_.clear();boneRigSelectedBone_=-1;boneRigRotateMode_=false;
   const auto dataDirectory=std::filesystem::current_path()/"data";
   const auto bonePath=dataDirectory/(Crash::eidToEName(entry.eid)+"-bones.txt");
   std::ifstream input(bonePath);
