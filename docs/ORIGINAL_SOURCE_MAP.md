@@ -9,6 +9,7 @@ The original C# source remains on `t/net9`. This table maps major reference area
 | `Crash/Formats/Crash Formats/NSF.cs` | NSF container | `src/crash/formats/nsf/` |
 | `Crash/Formats/Crash Formats/NSD/` | NSD variants | `src/crash/formats/nsd/` |
 | `Crash/Formats/Crash Formats/Zone/` | Zones, entities, cameras | `src/crash/formats/zone/` |
+| Animation / Model viewers | Animation frames, linked Models, editor-side vertex-group Bone Rig and viewport gizmos | `src/ui/editor_ui.cpp`; Bone Rig is sidecar/editor metadata, not a game skeleton |
 | `Crash/Formats/Crash Formats/GOOL/` | GOOL instruction analysis, control flow, decompilation, and script representation | `src/crash/formats/gool/`; NSF entry/container parsing remains in `src/crash/formats/nsf/` |
 | `CrashEdit/Render/` | OpenTK renderer | `src/render/` (portable OpenGL) |
 | `CrashEdit/`, `Crash.UI/` | Windows Forms UI | Dear ImGui panels |
