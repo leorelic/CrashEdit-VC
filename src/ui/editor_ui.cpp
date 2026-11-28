@@ -4087,7 +4087,7 @@ void EditorUI::drawAnimationViewer(){
   if(boneRigWindowOpen_&&boneRigConnectSource_>=0&&ImGui::IsKeyPressed(ImGuiKey_Escape)){
    boneRigConnectSource_=-1;status_="Bone connection cancelled.";
   }
-  if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
+  if(hoveredBone>=0&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)&&!io.KeyShift&&!boneRotationStarted&&!viewportToolbarOwnsMouse){
    if(boneRigConnectSource_>=0){
     const int child=boneRigConnectSource_,parent=hoveredBone;
     bool wouldCycle=child==parent;int ancestor=parent;
