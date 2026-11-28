@@ -3566,8 +3566,8 @@ void EditorUI::drawAnimationViewer(){
  const bool viewModeHovered=ImGui::IsItemHovered();
  if(viewModeClicked){animationFaceEditing_=false;animationTextureSelectorOpen_=false;animationHoveredFace_=-1;}
  if(viewModeHovered)ImGui::SetTooltip("View Mode");
- const bool showVertexTransformToolbar=animationShowVertices_||animationCollisionViewer_;
- const bool showFreeMoveButton=animationShowVertices_&&!animationCollisionViewer_;
+ const bool showVertexTransformToolbar=animationShowVertices_||animationCollisionViewer_||boneRigWindowOpen_;
+ const bool showFreeMoveButton=(animationShowVertices_||boneRigWindowOpen_)&&!animationCollisionViewer_;
  const float axisMoveY=modeToolbarStart.y+(showFreeMoveButton?90.0f:60.0f);
  const ImVec2 freeMoveMin(modeToolbarStart.x,modeToolbarStart.y+60.0f),freeMoveMax(freeMoveMin.x+28.0f,freeMoveMin.y+26.0f);
  const ImVec2 axisMoveMin(modeToolbarStart.x,axisMoveY),axisMoveMax(axisMoveMin.x+28.0f,axisMoveMin.y+26.0f);
@@ -3610,6 +3610,7 @@ void EditorUI::drawAnimationViewer(){
   }
   if(ImGui::IsKeyPressed(ImGuiKey_F,false)){animationFaceEditing_=!animationFaceEditing_;animationHoveredFace_=-1;if(!animationFaceEditing_)animationTextureSelectorOpen_=false;}
   if(ImGui::IsKeyPressed(ImGuiKey_C,false)){animationCollisionViewer_=!animationCollisionViewer_;if(animationCollisionViewer_&&vertexToolMode==VertexToolMode::FreeMove)vertexToolMode=VertexToolMode::AxisMove;}
+  if(ImGui::IsKeyPressed(ImGuiKey_B,false))boneRigWindowOpen_=!boneRigWindowOpen_;
   if(ImGui::IsKeyPressed(ImGuiKey_V,false))animationShowVertices_=!animationShowVertices_;
   if(ImGui::IsKeyPressed(ImGuiKey_X,false))animationWireframe_=!animationWireframe_;
   if(ImGui::IsKeyPressed(ImGuiKey_T,false))animationTexturesDisabled_=!animationTexturesDisabled_;
@@ -4778,6 +4779,7 @@ void EditorUI::drawAnimationViewer(){
   }
  }
 
+ if(boneRigWindowOpen_){
  ImDrawList*boneOverlay=ImGui::GetWindowDrawList();
  boneOverlay->PushClipRect(canvasMin,canvasMax,true);
  if(selectedBoneValid()){
@@ -4894,6 +4896,8 @@ void EditorUI::drawAnimationViewer(){
    if(selected)boneOverlay->AddCircle(a,12.0f,IM_COL32(255,245,215,240),24,1.5f);
   }
   boneOverlay->PopClipRect();
+ }
+
  }
  
 dl->PopClipRect();
